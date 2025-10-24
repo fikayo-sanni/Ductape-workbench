@@ -15,7 +15,7 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.0.0 <21.0.0"
   },
   "dependencies": {
     "@ductape/sdk": "^0.0.4-v19",
