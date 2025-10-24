@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -517,7 +517,6 @@ function CompletionStep({ onComplete }: { onComplete: () => void }) {
 export default function OnboardingModal({ open, onComplete, onSkip }: OnboardingModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [stepData, setStepData] = useState<Record<string, any>>({});
 
   const steps: OnboardingStep[] = [
     {
@@ -578,11 +577,7 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
     },
   ];
 
-  const handleNext = (data?: any) => {
-    if (data) {
-      setStepData(prev => ({ ...prev, [steps[currentStep].id]: data }));
-    }
-    
+  const handleNext = () => {
     setCompletedSteps(prev => new Set([...prev, currentStep]));
     
     if (currentStep < steps.length - 1) {

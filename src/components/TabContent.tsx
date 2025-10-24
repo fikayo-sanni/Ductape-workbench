@@ -8,8 +8,6 @@ import Logs from './Logs';
 import Dashboard from './Dashboard';
 import TokensTabContent from './tabs/TokensTabContent';
 import TeamsTabContent from './tabs/TeamsTabContent';
-import ActionRequestPanel from './ActionRequestPanel';
-import ActionResponsePanel from './ActionResponsePanel';
 import ActionViewTabContent from './tabs/ActionViewTabContent';
 import AuthTabContent from './tabs/AuthTabContent';
 import NewAuthTabContent from './tabs/NewAuthTabContent';
@@ -30,7 +28,6 @@ import StorageComponentContent from './tabs/StorageComponentContent';
 import CacheComponentContent from './tabs/CacheComponentContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import GenericComponentContent from './tabs/GenericComponentContent';
-import FeatureBuilder from './tabs/FeatureBuilder';
 
 function FeatureTabContent({ tab }: { tab: Tab }) {
   // Check if this is a component from product (not app)

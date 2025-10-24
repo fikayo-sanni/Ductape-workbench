@@ -82,11 +82,11 @@ export function useIntro(options: UseIntroOptions) {
       }
 
       // Add debugging event handlers
-      introRef.current.onbeforechange((element) => {
+      introRef.current.onbeforechange((element: any) => {
         console.log('Intro.js before change:', element);
       });
 
-      introRef.current.onafterchange((element) => {
+      introRef.current.onafterchange((element: any) => {
         console.log('Intro.js after change:', element);
       });
     }

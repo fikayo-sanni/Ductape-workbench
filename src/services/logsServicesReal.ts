@@ -1,16 +1,9 @@
 import logsServices from './logsServices';
-
-interface FetchLogsParams {
-  workspace_id: string;
-  user_id: string;
-  public_key: string;
-  page?: number;
-  limit?: number;
-}
+import { FetchLogsData, FetchLogsOptions } from '../types/logs';
 
 const logsServicesReal = {
-  fetchLogs: async (params: FetchLogsParams) => {
-    return await logsServices.fetchLogs(params);
+  fetchLogs: async (data: FetchLogsData, payload: FetchLogsOptions = {}) => {
+    return await logsServices.fetchLogs(data, payload);
   },
 };
 
