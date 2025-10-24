@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --font-raleway: 'Raleway', sans-serif;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+  }
+}
+
+:root {
+  --primary: 8, 70, 166;
+  --DEFAULT: 255, 255, 255;
+  --white700: 249, 250, 252;
+  --grey: 35, 40, 48;
+  --grey200: 143, 146, 161;
+  --grey400: 212, 212, 212;
+  --grey700: 151, 151, 151;
+  --grey900: 217, 217, 217;
+}
+
+.light {
+  --primary: 8, 70, 166;
+  --DEFAULT: 255, 255, 255;
+  --white700: 249, 250, 252;
+  --grey: 35, 40, 48;
+  --grey200: 143, 146, 161;
+  --grey400: 212, 212, 212;
+  --grey900: 217, 217, 217;
+  --grey700: 151, 151, 151;
+}
+
+.dark {
+  --primary: 11, 100, 234;
+  --DEFAULT: 33, 35, 48;
+  --white700: 23, 25, 35;
+  --grey: 190, 192, 201;
+  --grey200: 240, 241, 245;
+  --grey400: 67, 69, 87;
+  --grey700: 190, 192, 201;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-raleway);
+}
+
+* {
+  box-sizing: border-box;
+}

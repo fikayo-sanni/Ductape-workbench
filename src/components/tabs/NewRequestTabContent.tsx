@@ -1,0 +1,187 @@
+import { useState } from 'react';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { HttpMethod } from '@/types';
+import { Send, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface NewRequestTabContentProps {
+  tabId: string;
+  data?: any;
+}
+
+export default function NewRequestTabContent({ tabId }: NewRequestTabContentProps) {
+  const { addRequest, setCurrentRequest, updateTab, closeTab, currentProjectId } = useWorkbenchStore();
+
+  const [formData, setFormData] = useState({
+    name: '',
+    method: 'GET' as HttpMethod,
+    url: '',
+    description: '',
+  });
+
+  const handleSave = () => {
+    if (!formData.name.trim()) {
+      toast.error('Please enter a request name');
+      return;
+    }
+
+    if (!formData.url.trim()) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
+    // Create new request
+    const newRequest = {
+      id: `request-${Date.now()}`,
+      projectId: currentProjectId || 'default',
+      name: formData.name,
+      method: formData.method,
+      url: formData.url,
+      headers: [],
+      queryParams: [],
+      body: {
+        type: 'none' as const,
+        json: '',
+        formData: [],
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    addRequest(newRequest);
+    setCurrentRequest(newRequest.id);
+
+    // Update the tab to be a regular request tab
+    updateTab(tabId, {
+      type: 'request',
+      title: formData.name,
+      itemId: newRequest.id,
+      isDirty: false,
+    });
+
+    toast.success('Request created successfully');
+  };
+
+  const handleCancel = () => {
+    closeTab(tabId);
+  };
+
+  return (
+    <div className="h-full overflow-auto bg-grey-100 p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Send className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-grey">Create New Request</h1>
+              <p className="text-sm text-grey-600">Configure a new API request</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Form */}
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+          {/* Request Name */}
+          <div>
+            <Label htmlFor="name" className="required">
+              Request Name
+            </Label>
+            <Input
+              id="name"
+              placeholder="e.g., Get User Profile"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="mt-2"
+            />
+            <p className="text-xs text-grey-600 mt-1">A descriptive name for your request</p>
+          </div>
+
+          {/* Method and URL */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="method">Method</Label>
+              <Select
+                value={formData.method}
+                onValueChange={(value) => setFormData({ ...formData, method: value as HttpMethod })}
+              >
+                <SelectTrigger id="method" className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="PATCH">PATCH</SelectItem>
+                  <SelectItem value="DELETE">DELETE</SelectItem>
+                  <SelectItem value="HEAD">HEAD</SelectItem>
+                  <SelectItem value="OPTIONS">OPTIONS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-3">
+              <Label htmlFor="url" className="required">
+                URL
+              </Label>
+              <Input
+                id="url"
+                placeholder="https://api.example.com/endpoint"
+                value={formData.url}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              placeholder="Add a description for this request..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="mt-2"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
+            <Button variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} className="gap-2">
+              <Save className="h-4 w-4" />
+              Create Request
+            </Button>
+          </div>
+        </div>
+
+        {/* Help Text */}
+        <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-grey mb-2">Next Steps</h3>
+          <ul className="text-sm text-grey-600 space-y-1 list-disc list-inside">
+            <li>After creating the request, you can configure headers, query parameters, and body</li>
+            <li>Use the request panel to test your API endpoint</li>
+            <li>Save the request for future use</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}

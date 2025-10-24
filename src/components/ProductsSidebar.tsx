@@ -1,0 +1,275 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/store/useAuth';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import { Input } from './ui/input';
+import { Search, Loader2, Database, HardDrive, Activity, MessageSquare, Box } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { IProduct } from '@/types/product';
+import productServicesReal from '@/services/productServicesReal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+
+type ViewMode = 'products' | 'components';
+
+export default function ProductsSidebar() {
+  const { user, currentWorkspaceId } = useAuth();
+  const { openTab } = useWorkbenchStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('products');
+
+  const handleProductClick = (product: IProduct) => {
+    setSelectedProductId(product._id);
+    openTab({
+      id: `product-${product._id}`,
+      type: 'product',
+      title: product.name,
+      itemId: product._id,
+      data: product,
+    });
+  };
+
+  // Fetch products
+  const { data: productsData, isLoading } = useQuery({
+    queryKey: ['products', currentWorkspaceId],
+    queryFn: () =>
+      productServicesReal.fetchProducts({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        status: 'all',
+      }),
+    // Always enabled
+    enabled: true,
+  });
+
+  const products = productsData?.data || [];
+
+  const filteredProducts = products.filter(product => {
+    if (!searchQuery) return true;
+    return (
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.tag.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      public: 'bg-green text-white',
+      private: 'bg-yellow text-white',
+      draft: 'bg-grey-400 text-grey',
+    };
+    return colors[status.toLowerCase()] || 'bg-grey-400 text-grey';
+  };
+
+  // Get all components from all products
+  const getAllComponents = () => {
+    const components: Array<{ type: string; name: string; productName: string; data: any }> = [];
+
+    products.forEach((product: IProduct) => {
+      // Databases
+      product.databases?.forEach((db: any) => {
+        components.push({ type: 'database', name: db.name || db.tag, productName: product.name, data: { ...db, componentType: 'database', productName: product.name } });
+      });
+      // Storage
+      product.storage?.forEach((storage: any) => {
+        components.push({ type: 'storage', name: storage.name || storage.tag, productName: product.name, data: { ...storage, componentType: 'storage', productName: product.name } });
+      });
+      // Caches
+      product.caches?.forEach((cache: any) => {
+        components.push({ type: 'cache', name: cache.name || cache.tag, productName: product.name, data: { ...cache, componentType: 'cache', productName: product.name } });
+      });
+      // Message Brokers
+      product.messageBroker?.forEach((broker: any) => {
+        components.push({ type: 'message-broker', name: broker.name || broker.tag, productName: product.name, data: { ...broker, componentType: 'message-broker', productName: product.name } });
+      });
+      // Jobs
+      product.jobs?.forEach((job: any) => {
+        components.push({ type: 'job', name: job.name || job.tag, productName: product.name, data: { ...job, componentType: 'job', productName: product.name } });
+      });
+    });
+
+    return components.filter(comp => {
+      if (!searchQuery) return true;
+      return (
+        comp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        comp.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        comp.type.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    });
+  };
+
+  const handleComponentClick = (component: any) => {
+    openTab({
+      id: `${component.type}-${component.data._id}-${Date.now()}`,
+      type: component.type as any,
+      title: component.name,
+      itemId: component.data._id,
+      data: component.data,
+    });
+  };
+
+  const getComponentIcon = (type: string) => {
+    const icons: Record<string, any> = {
+      database: Database,
+      storage: HardDrive,
+      cache: Activity,
+      'message-broker': MessageSquare,
+      job: Box,
+    };
+    return icons[type] || Box;
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-white border-r border-grey-400" data-intro="products-view">
+      {/* Header */}
+      <div className="p-4 border-b border-grey-400">
+        <h2 className="text-lg font-semibold text-grey mb-3">Products</h2>
+
+        {/* View Mode Toggle */}
+        <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="products">View Products</SelectItem>
+            <SelectItem value="components">View Assets</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Search */}
+      <div className="p-4 border-b border-grey-400">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+          <Input
+            placeholder={viewMode === 'products' ? 'Search products...' : 'Search assets...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {/* Content List */}
+      <div className="flex-1 overflow-auto p-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : viewMode === 'products' ? (
+          // Products View
+          filteredProducts.length === 0 ? (
+            <div className="text-center py-8 text-grey-600 text-sm">
+              {searchQuery ? 'No matching products' : 'No products yet'}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredProducts.map((product: IProduct) => (
+                <div
+                  key={product._id}
+                  className={cn(
+                    'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2',
+                    selectedProductId === product._id && 'border-primary bg-blue-400'
+                  )}
+                >
+                  {/* Logo or Initials */}
+                  <div
+                    onClick={() => handleProductClick(product)}
+                    className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer"
+                  >
+                    {product.logo ? (
+                      <img
+                        src={product.logo}
+                        alt={product.name}
+                        className="w-full h-full rounded-md object-cover"
+                      />
+                    ) : (
+                      getInitials(product.name)
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div
+                    onClick={() => handleProductClick(product)}
+                    className="flex-1 min-w-0 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-grey truncate">
+                        {product.name}
+                      </h3>
+                      <span
+                        className={cn(
+                          'px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0',
+                          getStatusColor(product.status)
+                        )}
+                      >
+                        {product.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-grey-600 truncate">{product.tag}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          // Components View
+          (() => {
+            const allComponents = getAllComponents();
+            return allComponents.length === 0 ? (
+              <div className="text-center py-8 text-grey-600 text-sm">
+                {searchQuery ? 'No matching components' : 'No components yet'}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {allComponents.map((component, index) => {
+                  const Icon = getComponentIcon(component.type);
+                  return (
+                    <div
+                      key={`${component.type}-${component.data._id}-${index}`}
+                      onClick={() => handleComponentClick(component)}
+                      className="p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      {/* Icon */}
+                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+
+                      {/* Component Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-grey truncate">
+                          {component.name}
+                        </h3>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs text-grey-600 truncate">{component.productName}</p>
+                          <span className="text-xs text-grey-400">•</span>
+                          <p className="text-xs text-grey-600 capitalize">{component.type.replace('-', ' ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
+      </div>
+    </div>
+  );
+}
