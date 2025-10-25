@@ -207,7 +207,7 @@ export default function AppsSidebar() {
               <div>
                 <div className="px-4 py-2 bg-grey-100 border-b border-grey-400">
                   <h3 className="text-xs font-semibold text-grey-600 uppercase">
-                    Workspace Apps
+                    Internal
                   </h3>
                 </div>
                 <div className="p-4 space-y-1">
@@ -221,7 +221,7 @@ export default function AppsSidebar() {
               <div>
                 <div className="px-4 py-2 bg-grey-100 border-b border-grey-400">
                   <h3 className="text-xs font-semibold text-grey-600 uppercase">
-                    Third Party Apps
+                    Third Party
                   </h3>
                 </div>
                 <div className="p-4 space-y-1">

@@ -111,9 +111,10 @@ export default function NewRequestTabContent({ tabId }: NewRequestTabContentProp
           </div>
 
           {/* Method and URL */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="method">Method</Label>
+          <div className="space-y-4">
+            {/* Method Selector */}
+            <div className="w-32">
+              <Label htmlFor="method">HTTP Method</Label>
               <Select
                 value={formData.method}
                 onValueChange={(value) => setFormData({ ...formData, method: value as HttpMethod })}
@@ -133,17 +134,20 @@ export default function NewRequestTabContent({ tabId }: NewRequestTabContentProp
               </Select>
             </div>
 
-            <div className="md:col-span-3">
-              <Label htmlFor="url" className="required">
-                URL
+            {/* Prominent URL Input */}
+            <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
+              <Label htmlFor="url" className="required text-xl font-bold text-primary">
+                🌐 Request URL
               </Label>
               <Input
                 id="url"
                 placeholder="https://api.example.com/endpoint"
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                className="mt-2"
+                className="mt-3 text-xl h-16 border-3 border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/30 transition-all duration-300 shadow-lg"
+                autoFocus
               />
+              <p className="text-base text-grey-700 mt-3 font-medium">Enter the full URL for your API endpoint</p>
             </div>
           </div>
 

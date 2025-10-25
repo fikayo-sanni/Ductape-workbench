@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useRef, useEffect } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,12 +26,13 @@ interface NewAppTabContentProps {
 }
 
 export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps) {
-  const { closeTab } = useWorkbenchStore();
+  const { closeTab, openTab } = useWorkbenchStore();
   const { currentWorkspaceId, user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAppCreatedModal, setShowAppCreatedModal] = useState(false);
   const [createdApp, setCreatedApp] = useState<any>(null);
   const [isConnectingToProduct, setIsConnectingToProduct] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState<string>('workspace');
   
   // Extract product context from data
   const product = data?.productId ? {
@@ -48,6 +49,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     description: '',
     status: 'active' as 'active' | 'inactive',
     logo: '',
+    version: '1.0.0',
   });
 
   // File upload mutation
@@ -82,24 +84,48 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     },
   });
 
+  // Fetch workspace details to get workspace name
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces', user?._id],
+    queryFn: () => workspaceServices.fetchWorkspaces({
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!user?._id,
+  });
+
+  // Update workspace name when data is available
+  useEffect(() => {
+    if (workspacesData?.data && currentWorkspaceId) {
+      const currentWorkspace = workspacesData.data.find(
+        (ws: any) => ws.workspace_id === currentWorkspaceId || ws._id === currentWorkspaceId
+      );
+      if (currentWorkspace) {
+        setWorkspaceName(currentWorkspace.workspace_name || 'workspace');
+      }
+    }
+  }, [workspacesData, currentWorkspaceId]);
+
   // Environment configurations with product mapping
   const [environments, setEnvironments] = useState(() => {
     if (product && product.envs && product.envs.length > 0) {
       // Map to product environments
       return product.envs.map((env: any) => ({
-        slug: env.slug,
-        name: env.env_name || env.name,
+        env_name: env.env_name || env.name,
+        slug: env.slug.length === 3 ? env.slug : env.slug.substring(0, 3).toUpperCase(),
+        description: env.description || '',
         base_url: '',
-        enabled: true,
+        whitelist: false,
+        active: true,
         productEnvId: env._id,
         productEnvSlug: env.slug
       }));
     }
     // Default environments if no product context
     return [
-      { slug: 'development', name: 'Development', base_url: '', enabled: true, productEnvId: null, productEnvSlug: null },
-      { slug: 'staging', name: 'Staging', base_url: '', enabled: false, productEnvId: null, productEnvSlug: null },
-      { slug: 'production', name: 'Production', base_url: '', enabled: true, productEnvId: null, productEnvSlug: null },
+      { env_name: 'Development', slug: 'DEV', description: 'Development environment', base_url: '', whitelist: false, active: true, productEnvId: null, productEnvSlug: null },
+      { env_name: 'Staging', slug: 'STG', description: 'Staging environment', base_url: '', whitelist: false, active: false, productEnvId: null, productEnvSlug: null },
+      { env_name: 'Production', slug: 'PRO', description: 'Production environment', base_url: '', whitelist: false, active: true, productEnvId: null, productEnvSlug: null },
     ];
   });
 
@@ -119,9 +145,9 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       return;
     }
 
-    // Check if at least one environment is enabled with a base URL
-    const enabledEnvs = environments.filter((env: any) => env.enabled && env.base_url.trim());
-    if (enabledEnvs.length === 0) {
+    // Check if at least one environment is active with a base URL
+    const activeEnvs = environments.filter((env: any) => env.active && env.base_url.trim());
+    if (activeEnvs.length === 0) {
       toast.error('Please configure at least one environment with a base URL');
       return;
     }
@@ -129,6 +155,16 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     try {
       setIsConnectingToProduct(true);
       toast.loading('Creating app, updating environments, and connecting to product...', { id: 'appCreation' });
+
+      // Prepare environments array for backend (only active environments with base URLs)
+      const envsForBackend = activeEnvs.map((env: any) => ({
+        env_name: env.env_name,
+        slug: env.slug,
+        description: env.description,
+        base_url: env.base_url,
+        whitelist: env.whitelist,
+        active: env.active
+      }));
 
       // Create the app first
       const appResponse = await appServices.createApp({
@@ -139,9 +175,12 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
           app_name: formData.app_name,
           description: formData.description,
           tag: formData.tag,
+          version: formData.version,
+          logo: formData.logo,
           workspace_id: currentWorkspaceId,
           user_id: user?._id || '',
           public_key: user?.public_key || '',
+          envs: envsForBackend
         }
       });
 
@@ -166,11 +205,9 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
         ductape = null;
       }
 
-      // Update environment base URLs for each enabled environment using SDK
-      const enabledEnvs = environments.filter((env: any) => env.enabled);
-      
+      // Update environment base URLs for each active environment using SDK
       if (ductape) {
-        for (const env of enabledEnvs) {
+        for (const env of activeEnvs) {
           if (env.base_url) {
             try {
               const data = {
@@ -196,7 +233,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
           const appAccess = await ductape.product.apps.connect(newApp.tag);
           
           // Prepare environment mappings for SDK
-          const envMappings = enabledEnvs.map((env: any) => ({
+          const envMappings = activeEnvs.map((env: any) => ({
             app_env_slug: env.slug,
             product_env_slug: env.productEnvSlug || env.slug,
             variables: [], // Will be configured later
@@ -231,6 +268,15 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       // Close the new app tab
       closeTab(tabId);
 
+      // Open the created app tab immediately
+      openTab({
+        id: `app-${newApp._id}-${Date.now()}`,
+        type: 'app',
+        title: newApp.app_name || newApp.name,
+        itemId: newApp._id,
+        data: newApp,
+      });
+
       // Store the created app and show the modal
       setCreatedApp(newApp);
       setShowAppCreatedModal(true);
@@ -249,10 +295,17 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
 
   const generateTag = () => {
     if (formData.app_name) {
-      const tag = formData.app_name
+      const appName = formData.app_name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
+      const workspaceTag = workspaceName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      console.log('workspaceTag', workspaceTag);
+      
+      const tag = `${workspaceTag}:${appName}`;
       setFormData({ ...formData, tag });
     }
   };
@@ -265,10 +318,14 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
 
   const addEnvironment = () => {
     setEnvironments((prev: any) => [...prev, {
-      slug: `env-${Date.now()}`,
-      name: 'New Environment',
+      env_name: 'New Environment',
+      slug: 'NEW',
+      description: '',
       base_url: '',
-      enabled: true
+      whitelist: false,
+      active: true,
+      productEnvId: null,
+      productEnvSlug: null
     }]);
   };
 
@@ -384,7 +441,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
             <div className="flex gap-2 mt-2">
               <Input
                 id="tag"
-                placeholder="e.g., github-api"
+                placeholder="e.g., my-workspace:github-api"
                 value={formData.tag}
                 onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
               />
@@ -393,7 +450,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
               </Button>
             </div>
             <p className="text-xs text-grey-600 mt-1">
-              A unique identifier (lowercase, alphanumeric, and hyphens only)
+              Format: workspace-name:app-name (auto-generated from app name)
             </p>
           </div>
 
@@ -408,6 +465,21 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
               rows={4}
               className="mt-2"
             />
+          </div>
+
+          {/* Version */}
+          <div>
+            <Label htmlFor="version" className="required">
+              Version
+            </Label>
+            <Input
+              id="version"
+              placeholder="e.g., 1.0.0"
+              value={formData.version}
+              onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+              className="mt-2"
+            />
+            <p className="text-xs text-grey-600 mt-1">Semantic version number (e.g., 1.0.0, 2.1.3)</p>
           </div>
 
           {/* Environment URLs */}
@@ -442,15 +514,22 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                   <div className="flex items-center gap-3 mb-3">
                     <input
                       type="checkbox"
-                      checked={env.enabled}
-                      onChange={(e) => updateEnvironment(index, 'enabled', e.target.checked)}
+                      checked={env.active}
+                      onChange={(e) => updateEnvironment(index, 'active', e.target.checked)}
                       className="w-4 h-4 rounded border-grey-400"
                     />
                     <Input
                       placeholder="Environment name"
-                      value={env.name}
-                      onChange={(e) => updateEnvironment(index, 'name', e.target.value)}
+                      value={env.env_name}
+                      onChange={(e) => updateEnvironment(index, 'env_name', e.target.value)}
                       className="flex-1"
+                    />
+                    <Input
+                      placeholder="Slug (3 chars)"
+                      value={env.slug}
+                      onChange={(e) => updateEnvironment(index, 'slug', e.target.value.toUpperCase().substring(0, 3))}
+                      className="w-20"
+                      maxLength={3}
                     />
                     {!product && environments.length > 1 && (
                       <Button
@@ -463,6 +542,16 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                         Remove
                       </Button>
                     )}
+                  </div>
+                  
+                  {/* Environment Description */}
+                  <div className="mb-3">
+                    <Input
+                      placeholder="Environment description (optional)"
+                      value={env.description}
+                      onChange={(e) => updateEnvironment(index, 'description', e.target.value)}
+                      className="w-full"
+                    />
                   </div>
                   
                   {/* Product Environment Mapping */}
@@ -487,7 +576,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                       value={env.base_url}
                       onChange={(e) => updateEnvironment(index, 'base_url', e.target.value)}
                       className="flex-1"
-                      disabled={!env.enabled}
+                      disabled={!env.active}
                     />
                     <span className="text-xs text-grey-600 px-2 py-1 bg-white rounded border border-grey-400">
                       {env.slug}

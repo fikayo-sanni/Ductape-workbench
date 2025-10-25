@@ -23,14 +23,8 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
   const { openTab } = useWorkbenchStore();
 
   const handleImportContent = () => {
-    // Open the app tab first, then the user can use the import functionality from there
-    openTab({
-      id: `app-${app._id}-${Date.now()}`,
-      type: 'app',
-      title: app.app_name || app.name,
-      itemId: app._id,
-      data: app,
-    });
+    // The app tab is already open, just close the modal
+    // User can use the import functionality from the app tab
     onOpenChange(false);
   };
 
@@ -51,6 +45,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
   };
 
   const handleSkip = () => {
+    // The app tab is already open, just close the modal
     onOpenChange(false);
   };
 
@@ -65,7 +60,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
             <div>
               <DialogTitle>App Created Successfully!</DialogTitle>
               <DialogDescription>
-                Your app "{app?.app_name || app?.name}" has been created. What would you like to do next?
+                Your app "{app?.app_name || app?.name}" has been created and is now open. What would you like to do next?
               </DialogDescription>
             </div>
           </div>
@@ -75,22 +70,24 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
           <div className="space-y-3">
             <Button
               onClick={handleImportContent}
+              variant="outline"
               className="w-full gap-3 h-auto p-4 justify-start"
             >
-              <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                 <Download className="h-5 w-5 text-blue" />
               </div>
               <div className="text-left">
                 <div className="font-semibold">Import App Content</div>
-                <div className="text-sm opacity-80">Import from Postman, OpenAPI, or other sources</div>
+                <div className="text-sm opacity-80">Use the import feature in the app tab</div>
               </div>
             </Button>
 
             <Button
               onClick={handleAddRequest}
+              variant="outline"
               className="w-full gap-3 h-auto p-4 justify-start"
             >
-              <div className="w-10 h-10 rounded-lg bg-purple/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                 <Plus className="h-5 w-5 text-purple" />
               </div>
               <div className="text-left">

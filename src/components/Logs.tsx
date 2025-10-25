@@ -58,6 +58,23 @@ const componentTypes = [
   { id: 'job', name: 'Job' },
 ];
 
+const timeRangeOptions = [
+  { id: 'custom', name: 'Custom range', minutes: 0 },
+  { id: '30s', name: 'Last 30 seconds', minutes: 0.5 },
+  { id: '1m', name: 'Last 1 minute', minutes: 1 },
+  { id: '5m', name: 'Last 5 minutes', minutes: 5 },
+  { id: '15m', name: 'Last 15 minutes', minutes: 15 },
+  { id: '30m', name: 'Last 30 minutes', minutes: 30 },
+  { id: '1h', name: 'Last 1 hour', minutes: 60 },
+  { id: '5h', name: 'Last 5 hours', minutes: 300 },
+  { id: '24h', name: 'Last 24 hours', minutes: 1440 },
+  { id: '1w', name: 'Last 1 week', minutes: 10080 },
+  { id: '1mo', name: 'Last 1 month', minutes: 43200 },
+  { id: '3mo', name: 'Last 3 months', minutes: 129600 },
+  { id: '6mo', name: 'Last 6 months', minutes: 259200 },
+  { id: '1y', name: 'Last 1 year', minutes: 525600 },
+];
+
 type ProcessLog = ILog['logs']['data'][number];
 
 const columnHelper = createColumnHelper<ProcessLog>();
@@ -347,6 +364,20 @@ export default function Logs() {
 
   const debouncedSearch = useDebouncedValue(logsFilters.searchTerm, 500);
 
+  // Calculate date range based on selected time range
+  const getDateRange = (timeRange: string) => {
+    const option = timeRangeOptions.find(opt => opt.id === timeRange);
+    if (!option) return { start_date: undefined, end_date: undefined };
+    
+    const now = new Date();
+    const startDate = new Date(now.getTime() - (option.minutes * 60 * 1000));
+    
+    return {
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: now.toISOString().split('T')[0],
+    };
+  };
+
   // Fetch products for filtering
   const { data: productsData } = useQuery({
     queryKey: ['products', currentWorkspaceId],
@@ -383,9 +414,10 @@ export default function Logs() {
     isFetchingNextPage,
     status: logsStatus,
   } = useInfiniteQuery({
-    queryKey: ['workspace-logs', currentWorkspaceId, logsFilters.component, logsFilters.app, logsFilters.product, logsFilters.status, logsFilters.startDate, logsFilters.endDate, debouncedSearch],
-    queryFn: ({ pageParam = 1 }) =>
-      logsServicesReal.fetchLogs(
+    queryKey: ['workspace-logs', currentWorkspaceId, logsFilters.component, logsFilters.app, logsFilters.product, logsFilters.status, logsFilters.startDate, logsFilters.endDate, logsFilters.timeRange, debouncedSearch],
+    queryFn: ({ pageParam = 1 }) => {
+      const dateRange = getDateRange(logsFilters.timeRange);
+      return logsServicesReal.fetchLogs(
         {
           user_id: user?._id ?? '',
           public_key: user?.public_key ?? '',
@@ -397,12 +429,13 @@ export default function Logs() {
           product_id: logsFilters.product === 'all' ? undefined : logsFilters.product,
           status: logsFilters.status === 'all' ? undefined : logsFilters.status,
           process_id: debouncedSearch || undefined,
-          start_date: logsFilters.startDate || undefined,
-          end_date: logsFilters.endDate || undefined,
+          start_date: logsFilters.startDate || dateRange.start_date,
+          end_date: logsFilters.endDate || dateRange.end_date,
           page: pageParam,
           limit: 20,
         }
-      ),
+      );
+    },
     getNextPageParam: (lastPage) => {
       // Check if metadata exists at root level or in data.logs
       const metadata = lastPage.metadata || lastPage.data?.logs?.metadata;
@@ -448,6 +481,7 @@ export default function Logs() {
       searchTerm: '',
       startDate: '',
       endDate: '',
+      timeRange: '24h',
     });
   };
 
@@ -471,160 +505,275 @@ export default function Logs() {
       ) : (
         <div className="p-6">
           <div className="flex flex-col gap-4">
-            {/* Search and Filters */}
-            <div className="flex flex-col gap-4">
-              {/* Search */}
-              <div className="w-full">
-                <Input
-                  type="text"
-                  placeholder="Search by process ID"
-                  value={logsFilters.searchTerm}
-                  onChange={(e) => setLogsFilters({ searchTerm: e.target.value })}
-                  className="w-full"
-                />
+              {/* Search and Filters */}
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-grey-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search logs by process ID, message, or tag..."
+                    value={logsFilters.searchTerm}
+                    onChange={(e) => setLogsFilters({ searchTerm: e.target.value })}
+                    className="pl-10 h-9 border-grey-300 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  />
+                </div>
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-2 text-sm text-grey-600 hover:text-grey border border-grey-300 rounded-md hover:bg-grey-50 transition-colors"
+                >
+                  Clear filters
+                </button>
               </div>
 
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
-                <Select
-                  value={logsFilters.component}
-                  onValueChange={(value) => setLogsFilters({ component: value })}
-                >
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Select component type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All components</SelectItem>
-                    {componentTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Filter Bar */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                  {/* Component Filter */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm text-grey-600 font-medium">Component:</span>
+                    <Select
+                      value={logsFilters.component}
+                      onValueChange={(value) => setLogsFilters({ component: value })}
+                    >
+                      <SelectTrigger className="h-9 w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        {componentTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            {type.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Select
-                  value={logsFilters.product}
-                  onValueChange={(value) => setLogsFilters({ product: value })}
-                >
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All products</SelectItem>
-                    {products.map((product) => (
-                      <SelectItem key={product._id} value={product._id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {/* Product Filter - Only show if component is selected */}
+                  {logsFilters.component !== 'all' && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm text-grey-600 font-medium">Product:</span>
+                      <Select
+                        value={logsFilters.product}
+                        onValueChange={(value) => setLogsFilters({ product: value })}
+                      >
+                        <SelectTrigger className="h-9 w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          {products.map((product) => (
+                            <SelectItem key={product._id} value={product._id}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                <Select
-                  value={logsFilters.app}
-                  onValueChange={(value) => setLogsFilters({ app: value })}
-                >
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Select app" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All apps</SelectItem>
-                    {apps.map((app) => (
-                      <SelectItem key={app._id} value={app._id}>
-                        {app.app_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {/* App Filter - Only show if product is selected */}
+                  {logsFilters.product !== 'all' && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm text-grey-600 font-medium">App:</span>
+                      <Select
+                        value={logsFilters.app}
+                        onValueChange={(value) => setLogsFilters({ app: value })}
+                      >
+                        <SelectTrigger className="h-9 w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          {apps.map((app) => (
+                            <SelectItem key={app._id} value={app._id}>
+                              {app.app_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                <Select
-                  value={logsFilters.status}
-                  onValueChange={(value) => setLogsFilters({ status: value })}
-                >
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    {responseStatuses.map((status) => (
-                      <SelectItem key={status.id} value={status.id}>
-                        {status.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {/* Status Filter - Always visible */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm text-grey-600 font-medium">Status:</span>
+                    <Select
+                      value={logsFilters.status}
+                      onValueChange={(value) => setLogsFilters({ status: value })}
+                    >
+                      <SelectTrigger className="h-9 w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        {responseStatuses.map((status) => (
+                          <SelectItem key={status.id} value={status.id}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${
+                                status.id === 'success' ? 'bg-green-500' :
+                                status.id === 'fail' ? 'bg-red-500' :
+                                'bg-yellow-500'
+                              }`}></div>
+                              {status.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Input
-                  type="date"
-                  value={logsFilters.startDate}
-                  onChange={(e) => setLogsFilters({ startDate: e.target.value })}
-                  className="w-full sm:w-[180px]"
-                  placeholder="Start date"
-                />
+                  {/* Time Range Filter - Always visible */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm text-grey-600 font-medium">Time:</span>
+                    <Select
+                      value={logsFilters.timeRange}
+                      onValueChange={(value) => setLogsFilters({ timeRange: value })}
+                    >
+                      <SelectTrigger className="h-9 w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeRangeOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Input
-                  type="date"
-                  value={logsFilters.endDate}
-                  onChange={(e) => setLogsFilters({ endDate: e.target.value })}
-                  className="w-full sm:w-[180px]"
-                  placeholder="End date"
-                />
-
-                {(logsFilters.component !== 'all' ||
-                  logsFilters.app !== 'all' ||
-                  logsFilters.product !== 'all' ||
-                  logsFilters.status !== 'all' ||
-                  logsFilters.startDate ||
-                  logsFilters.endDate ||
-                  logsFilters.searchTerm) && (
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-grey-600 hover:text-grey flex items-center gap-2 px-3 py-2 rounded-md hover:bg-grey-100"
-                  >
-                    Clear filters
-                  </button>
-                )}
+                  {/* Date Range Filters - Only show if custom time range is selected */}
+                  {logsFilters.timeRange === 'custom' && (
+                    <>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-sm text-grey-600 font-medium">From:</span>
+                        <Input
+                          type="datetime-local"
+                          value={logsFilters.startDate ? new Date(logsFilters.startDate + 'T00:00').toISOString().slice(0, 16) : ''}
+                          onChange={(e) => setLogsFilters({ startDate: e.target.value ? new Date(e.target.value).toISOString().split('T')[0] : '' })}
+                          className="h-9 w-48"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-sm text-grey-600 font-medium">To:</span>
+                        <Input
+                          type="datetime-local"
+                          value={logsFilters.endDate ? new Date(logsFilters.endDate + 'T23:59').toISOString().slice(0, 16) : ''}
+                          onChange={(e) => setLogsFilters({ endDate: e.target.value ? new Date(e.target.value).toISOString().split('T')[0] : '' })}
+                          className="h-9 w-48"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Active Filters Display */}
+              {/* Active Filter Chips */}
               {(logsFilters.component !== 'all' ||
                 logsFilters.app !== 'all' ||
                 logsFilters.product !== 'all' ||
                 logsFilters.status !== 'all' ||
+                logsFilters.timeRange !== '24h' ||
                 logsFilters.startDate ||
                 logsFilters.endDate) && (
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="text-sm text-grey-600">Filtered by:</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-grey-600 font-medium">Active filters:</span>
                   {logsFilters.component !== 'all' && (
-                    <Badge variant="outline" className="text-grey">
-                      Component:{' '}
-                      {componentTypes.find((c) => c.id === logsFilters.component)?.name}
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
+                      Component: {componentTypes.find((c) => c.id === logsFilters.component)?.name}
+                      <button
+                        onClick={() => setLogsFilters({ component: 'all' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                   {logsFilters.product !== 'all' && (
-                    <Badge variant="outline" className="text-grey">
-                      Product:{' '}
-                      {products.find((p) => p._id === logsFilters.product)?.name}
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
+                      Product: {products.find((p) => p._id === logsFilters.product)?.name}
+                      <button
+                        onClick={() => setLogsFilters({ product: 'all' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                   {logsFilters.app !== 'all' && (
-                    <Badge variant="outline" className="text-grey">
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
                       App: {apps.find((a) => a._id === logsFilters.app)?.app_name}
+                      <button
+                        onClick={() => setLogsFilters({ app: 'all' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                   {logsFilters.status !== 'all' && (
-                    <Badge variant="outline" className="text-grey">
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
                       Status: {capitalizeFirst(logsFilters.status)}
+                      <button
+                        onClick={() => setLogsFilters({ status: 'all' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </Badge>
+                  )}
+                  {logsFilters.timeRange !== '24h' && (
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
+                      Time: {timeRangeOptions.find((t) => t.id === logsFilters.timeRange)?.name}
+                      <button
+                        onClick={() => setLogsFilters({ timeRange: '24h' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                   {logsFilters.startDate && (
-                    <Badge variant="outline" className="text-grey">
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
                       From: {logsFilters.startDate}
+                      <button
+                        onClick={() => setLogsFilters({ startDate: '' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                   {logsFilters.endDate && (
-                    <Badge variant="outline" className="text-grey">
+                    <Badge variant="outline" className="text-grey bg-white border-grey-400 hover:bg-grey-50">
                       To: {logsFilters.endDate}
+                      <button
+                        onClick={() => setLogsFilters({ endDate: '' })}
+                        className="ml-1 hover:bg-grey-200 rounded-full p-0.5"
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </Badge>
                   )}
                 </div>
@@ -657,6 +806,7 @@ export default function Logs() {
                   logsFilters.app !== 'all' ||
                   logsFilters.product !== 'all' ||
                   logsFilters.status !== 'all' ||
+                  logsFilters.timeRange !== '24h' ||
                   logsFilters.startDate ||
                   logsFilters.endDate ||
                   logsFilters.searchTerm) && (

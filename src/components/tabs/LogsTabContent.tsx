@@ -57,6 +57,22 @@ const componentTypes = [
   { id: 'job', name: 'Job' },
 ];
 
+const timeRangeOptions = [
+  { id: '30s', name: 'Last 30 seconds', minutes: 0.5 },
+  { id: '1m', name: 'Last 1 minute', minutes: 1 },
+  { id: '5m', name: 'Last 5 minutes', minutes: 5 },
+  { id: '15m', name: 'Last 15 minutes', minutes: 15 },
+  { id: '30m', name: 'Last 30 minutes', minutes: 30 },
+  { id: '1h', name: 'Last 1 hour', minutes: 60 },
+  { id: '5h', name: 'Last 5 hours', minutes: 300 },
+  { id: '24h', name: 'Last 24 hours', minutes: 1440 },
+  { id: '1w', name: 'Last 1 week', minutes: 10080 },
+  { id: '1mo', name: 'Last 1 month', minutes: 43200 },
+  { id: '3mo', name: 'Last 3 months', minutes: 129600 },
+  { id: '6mo', name: 'Last 6 months', minutes: 259200 },
+  { id: '1y', name: 'Last 1 year', minutes: 525600 },
+];
+
 type ProcessLog = ILog['logs']['data'][number];
 
 const columnHelper = createColumnHelper<ProcessLog>();
@@ -349,9 +365,24 @@ export default function LogsTabContent() {
     app: 'all',
     product: 'all',
     status: 'all',
+    timeRange: '24h',
   });
 
   const debouncedSearch = useDebouncedValue(searchTerm, 500);
+
+  // Calculate date range based on selected time range
+  const getDateRange = (timeRange: string) => {
+    const option = timeRangeOptions.find(opt => opt.id === timeRange);
+    if (!option) return { start_date: undefined, end_date: undefined };
+    
+    const now = new Date();
+    const startDate = new Date(now.getTime() - (option.minutes * 60 * 1000));
+    
+    return {
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: now.toISOString().split('T')[0],
+    };
+  };
 
   // Fetch products for filtering
   const { data: productsData } = useQuery({
@@ -390,8 +421,9 @@ export default function LogsTabContent() {
     status: logsStatus,
   } = useInfiniteQuery({
     queryKey: ['workspace-logs', currentWorkspaceId, filters, debouncedSearch],
-    queryFn: ({ pageParam = 1 }) =>
-      logsServices.fetchLogs(
+    queryFn: ({ pageParam = 1 }) => {
+      const dateRange = getDateRange(filters.timeRange);
+      return logsServices.fetchLogs(
         {
           user_id: user?._id ?? '',
           public_key: user?.public_key ?? '',
@@ -405,8 +437,10 @@ export default function LogsTabContent() {
           process_id: debouncedSearch || undefined,
           page: pageParam,
           limit: 20,
+          ...dateRange,
         }
-      ),
+      );
+    },
     getNextPageParam: (lastPage) => {
       const { page, totalPages } = lastPage.data.logs.metadata;
       return page < totalPages ? page + 1 : undefined;
@@ -442,6 +476,7 @@ export default function LogsTabContent() {
       app: 'all',
       product: 'all',
       status: 'all',
+      timeRange: '24h',
     });
     setSearchTerm('');
   };
@@ -554,10 +589,29 @@ export default function LogsTabContent() {
                   </SelectContent>
                 </Select>
 
+                <Select
+                  value={filters.timeRange}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, timeRange: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Select time range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeRangeOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 {(filters.component !== 'all' ||
                   filters.app !== 'all' ||
                   filters.product !== 'all' ||
                   filters.status !== 'all' ||
+                  filters.timeRange !== '24h' ||
                   searchTerm) && (
                   <button
                     onClick={clearFilters}
@@ -572,7 +626,8 @@ export default function LogsTabContent() {
               {(filters.component !== 'all' ||
                 filters.app !== 'all' ||
                 filters.product !== 'all' ||
-                filters.status !== 'all') && (
+                filters.status !== 'all' ||
+                filters.timeRange !== '24h') && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <span className="text-sm text-grey-600">Filtered by:</span>
                   {filters.component !== 'all' && (
@@ -595,6 +650,11 @@ export default function LogsTabContent() {
                   {filters.status !== 'all' && (
                     <Badge variant="outline" className="text-grey">
                       Status: {capitalizeFirst(filters.status)}
+                    </Badge>
+                  )}
+                  {filters.timeRange !== '24h' && (
+                    <Badge variant="outline" className="text-grey">
+                      Time: {timeRangeOptions.find((t) => t.id === filters.timeRange)?.name}
                     </Badge>
                   )}
                 </div>
@@ -627,6 +687,7 @@ export default function LogsTabContent() {
                   filters.app !== 'all' ||
                   filters.product !== 'all' ||
                   filters.status !== 'all' ||
+                  filters.timeRange !== '24h' ||
                   searchTerm) && (
                   <p className="text-grey-600 text-sm mt-2">
                     Try adjusting your filters or search terms

@@ -44,6 +44,7 @@ interface WorkbenchState {
     searchTerm: string;
     startDate: string;
     endDate: string;
+    timeRange: string;
   };
 
   // Actions - Workspaces
@@ -115,6 +116,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
     searchTerm: '',
     startDate: '',
     endDate: '',
+    timeRange: '24h',
   },
 
   // Workspace Actions

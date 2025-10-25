@@ -534,12 +534,19 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               </Button>
             </div>
 
-            <Input
-              placeholder="https://api.example.com/v1/users"
-              value={fullUrl}
-              onChange={(e) => setFullUrl(e.target.value)}
-              className="font-mono text-sm"
-            />
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-grey flex items-center gap-2">
+                <Globe className="h-4 w-4 text-primary" />
+                Full URL
+              </Label>
+              <Input
+                placeholder="https://api.example.com/v1/users"
+                value={fullUrl}
+                onChange={(e) => setFullUrl(e.target.value)}
+                className="font-mono text-lg h-12 border-grey-400 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                autoFocus
+              />
+            </div>
 
             {baseUrl && (
               <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">

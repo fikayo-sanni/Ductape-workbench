@@ -16,7 +16,7 @@ import {
   Plus,
   Search,
   Loader2,
-  Package,
+  Grid3x3,
 } from 'lucide-react';
 
 interface InternalAppSelectionModalProps {
@@ -96,7 +96,7 @@ export default function InternalAppSelectionModal({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Package className="h-5 w-5 text-primary" />
+              <Grid3x3 className="h-5 w-5 text-primary" />
             </div>
             <div>
               <DialogTitle>Select Internal App</DialogTitle>
@@ -183,7 +183,7 @@ export default function InternalAppSelectionModal({
               ))
             ) : (
               <div className="text-center py-8">
-                <Package className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <Grid3x3 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
                 <p className="text-sm text-grey-600 mb-2">No apps found</p>
                 <p className="text-xs text-grey-500">
                   {searchTerm ? 'Try adjusting your search terms' : 'Create your first app to get started'}
