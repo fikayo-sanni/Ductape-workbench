@@ -48,10 +48,33 @@ const fetchAppByTag = async (data: {
   return response.data;
 };
 
+const createApp = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  payload: {
+    app_name: string;
+    description: string;
+    tag: string;
+    base_url?: string;
+    workspace_id: string;
+    user_id: string;
+    public_key: string;
+  };
+}): Promise<AppResponse> => {
+  const { payload } = data;
+  const response = await apiClient.post<AppResponse>(
+    `/apps/v1/create`,
+    payload
+  );
+  return response.data;
+};
+
 const appServices = {
   fetchApps,
   fetchApp,
   fetchAppByTag,
+  createApp,
 };
 
 export default appServices;

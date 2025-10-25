@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { IApp } from '@/types/app';
-import { Grid3x3, Zap, Settings2, Key, FileCode, Globe, Pencil, Search, Folder } from 'lucide-react';
+import { Grid3x3, Zap, Settings2, Key, FileCode, Globe, Pencil, Search, Folder, Plus, ExternalLink, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
 import {
   Select,
   SelectTrigger,
@@ -27,16 +28,22 @@ interface AppTabContentProps {
 
 export default function AppTabContent({ app }: AppTabContentProps) {
   const { openTab } = useWorkbenchStore();
+  const { currentWorkspaceId } = useAuth();
   const [selectedVersionTag, setSelectedVersionTag] = useState<string>(
     app.versions?.find(v => v.latest)?.tag || app.versions?.[0]?.tag || ''
   );
   const [editingEnv, setEditingEnv] = useState<any | null>(null);
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
   const [isConstant, setIsConstant] = useState(false);
+  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
 
   // Actions search and filter state
   const [actionsSearch, setActionsSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+
+  // Determine if app is internal or third-party
+  const isInternalApp = app.workspace_id === currentWorkspaceId;
+  const appType = isInternalApp ? 'internal' : 'third-party';
 
   const getInitials = (name: string) => {
     return name
@@ -86,6 +93,20 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         constants: selectedVersion?.constants || [],
         auths: selectedVersion?.auths || [],
       },
+    });
+  };
+
+  const handleIntegrateApp = () => {
+    setShowIntegrationModal(true);
+  };
+
+  const handleCreateNewApp = () => {
+    openTab({
+      id: `app-${Date.now()}`,
+      type: 'app',
+      title: 'New App',
+      data: { isNew: true },
+      isDirty: true,
     });
   };
 
@@ -153,7 +174,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   }, [selectedFolderId, flattenedFolders]);
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="bg-grey-100 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* App Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
@@ -183,6 +204,25 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                     {app.status}
                   </span>
                 )}
+                {/* App Type Badge */}
+                <span className={cn(
+                  'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
+                  isInternalApp 
+                    ? 'bg-blue-500/10 text-blue-600' 
+                    : 'bg-orange-500/10 text-orange-600'
+                )}>
+                  {isInternalApp ? (
+                    <>
+                      <Building2 className="h-3 w-3" />
+                      Internal
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="h-3 w-3" />
+                      Third-party
+                    </>
+                  )}
+                </span>
                 {app.access_tag && (
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
                     {app.access_tag}
@@ -212,6 +252,29 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                   </Select>
                 </div>
               )}
+
+              {/* Integration Actions */}
+              <div className="flex items-center gap-3 mt-4">
+                {!isInternalApp && (
+                  <Button
+                    onClick={handleIntegrateApp}
+                    className="gap-2"
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Integrate App
+                  </Button>
+                )}
+                <Button
+                  onClick={handleCreateNewApp}
+                  variant="outline"
+                  className="gap-2"
+                  size="sm"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                  Create New App
+                </Button>
+              </div>
             </div>
           </div>
         </div>

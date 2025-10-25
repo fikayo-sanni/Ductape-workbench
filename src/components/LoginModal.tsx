@@ -91,7 +91,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
         </div>
 
         <div className="flex flex-col items-center text-center gap-1">
-          <h1 className="text-grey text-2xl font-bold">Automate your Integrations</h1>
+          <h1 className="text-grey text-2xl font-bold">Build Resilient Systems</h1>
           <p className="text-grey-600">Login to access the workbench</p>
         </div>
 

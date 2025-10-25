@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Zap, Save, Loader2 } from 'lucide-react';
+import { Zap, Save, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import productServicesReal from '@/services/productServicesReal';
 
 interface NewCacheTabContentProps {
   tabId: string;
@@ -16,23 +14,18 @@ interface NewCacheTabContentProps {
 
 export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
-  const { user, currentWorkspaceId } = useAuth();
+  const { currentWorkspaceId } = useAuth();
 
-  // Fetch product data if productId is provided
-  const { data: productsData, isLoading: loadingProducts } = useQuery({
-    queryKey: ['products', currentWorkspaceId, data?.productId],
-    queryFn: () =>
-      productServicesReal.fetchProducts({
-        workspace_id: currentWorkspaceId || '',
-        user_id: user?._id || '',
-        public_key: user?.public_key || '',
-        status: 'all',
-      }),
-    enabled: !!data?.productId,
-  });
+  // Extract product context from data
+  const product = data?.productId ? {
+    _id: data.productId,
+    name: data.productName,
+    tag: data.productTag,
+    logo: data.productLogo,
+    envs: data.productEnvs || []
+  } : null;
 
-  // Find the specific product from the fetched data
-  const product = productsData?.data?.find((p: any) => p._id === data?.productId);
+
 
   const [formData, setFormData] = useState({
     name: '',
@@ -107,21 +100,44 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
     return `${(ms / 86400000).toFixed(1)} days`;
   };
 
-  // Show loading state while fetching product
-  if (loadingProducts) {
-    return (
-      <div className="h-full flex items-center justify-center bg-grey-100">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-grey-600">Loading product data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        {/* Product Context Header */}
+        {product && (
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                {product.logo ? (
+                  <img
+                    src={product.logo}
+                    alt={product.name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-grey">Creating cache for {product.name}</h2>
+                  <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
+                    {product.tag}
+                  </span>
+                </div>
+                <p className="text-sm text-grey-600">
+                  This cache will be automatically connected to your product and configured for its environments
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-grey-600">
+                <CheckCircle className="h-4 w-4 text-green" />
+                <span>Auto-connect enabled</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3">

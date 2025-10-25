@@ -1,8 +1,8 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
-type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard';
+type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace';
 
 interface IconSidebarProps {
   activeView: SidebarView;
@@ -10,7 +10,7 @@ interface IconSidebarProps {
 }
 
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
-  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
+  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openMarketplaceTab, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
 
   const menuItems: Array<{
     id: SidebarView;
@@ -37,6 +37,11 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
       icon: LayoutDashboard,
       label: 'Dashboard',
     },
+    {
+      id: 'marketplace',
+      icon: Store,
+      label: 'Marketplace',
+    },
   ];
 
   return (
@@ -53,10 +58,16 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
               // Set this as the active icon
               setActiveIconSidebar(item.id);
 
-              // Dashboard opens as a tab, others change view
+              // Dashboard and marketplace open as tabs, others change view
               if (item.id === 'dashboard') {
                 openDashboardTab();
                 // Close sidebar on mobile when opening dashboard
+                if (!sidebarCollapsed) {
+                  toggleSidebar();
+                }
+              } else if (item.id === 'marketplace') {
+                openMarketplaceTab();
+                // Close sidebar on mobile when opening marketplace
                 if (!sidebarCollapsed) {
                   toggleSidebar();
                 }

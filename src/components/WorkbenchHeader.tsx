@@ -27,6 +27,7 @@ import ImportDialog from './ImportDialog';
 import ProductSelectionModal from './modals/ProductSelectionModal';
 import AppSelectionModal from './modals/AppSelectionModal';
 import CreateAccountModal from './CreateAccountModal';
+import CreateWorkspaceModal from './CreateWorkspaceModal';
 
 interface ApiError {
   message: string;
@@ -41,6 +42,7 @@ export default function WorkbenchHeader() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showAppModal, setShowAppModal] = useState(false);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [pendingItemType, setPendingItemType] = useState<string | null>(null);
 
@@ -287,6 +289,12 @@ export default function WorkbenchHeader() {
     });
   };
 
+  const handleWorkspaceCreated = (workspace: any) => {
+    // Switch to the newly created workspace
+    setCurrentWorkspaceId(workspace.workspace_id);
+    toast.success(`Switched to ${workspace.workspace_name}`);
+  };
+
   return (
     <header className="h-14 md:h-16 border-b border-grey-400 bg-white flex items-center px-3 md:px-6 flex-shrink-0 shadow-sm" data-intro="header">
       {/* Logo/Brand */}
@@ -320,10 +328,7 @@ export default function WorkbenchHeader() {
               <Button
                 className="pt-4.5 pl-4 h-fit gap-2 w-full items-center justify-start"
                 variant="ghost"
-                onClick={() => {
-                  // TODO: Open create workspace modal
-                  console.log('Create new workspace');
-                }}
+                onClick={() => setShowCreateWorkspaceModal(true)}
               >
                 <Plus className="h-5 w-5" />
                 <span className="text-grey text-xs font-semibold">
@@ -482,6 +487,13 @@ export default function WorkbenchHeader() {
           // Optionally handle success (e.g., redirect to login)
           toast.success("Account created! Please log in to continue.");
         }}
+      />
+
+      {/* Create Workspace Modal */}
+      <CreateWorkspaceModal
+        open={showCreateWorkspaceModal}
+        onOpenChange={setShowCreateWorkspaceModal}
+        onSuccess={handleWorkspaceCreated}
       />
     </header>
   );

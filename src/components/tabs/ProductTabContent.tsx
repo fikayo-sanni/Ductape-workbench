@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { IProduct } from '@/types/product';
-import { Package, Database, HardDrive, Activity, MessageSquare, Settings2, Zap, Box, Plus } from 'lucide-react';
+import { Database, HardDrive, Activity, MessageSquare, Settings2, Zap, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/store/useAuth';
+import productServices from '@/services/productServices';
+import AddAppModal from '@/components/modals/AddAppModal';
 
 interface ProductTabContentProps {
   product: IProduct;
@@ -10,6 +15,23 @@ interface ProductTabContentProps {
 
 export default function ProductTabContent({ product }: ProductTabContentProps) {
   const { openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const [showAddAppModal, setShowAddAppModal] = useState(false);
+
+  // Fetch connected apps
+  const { data: productAppsRes, status: productAppsStatus } = useQuery({
+    queryKey: ['product-apps', product._id],
+    queryFn: () =>
+      productServices.fetchProductApps({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        workspace_id: currentWorkspaceId || '',
+        product_id: product._id,
+      }),
+    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product._id,
+  });
+
+  const connectedApps = productAppsRes?.data || [];
 
   const getInitials = (name: string) => {
     return name
@@ -48,8 +70,8 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="bg-grey-100">
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
         {/* Product Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
@@ -102,11 +124,11 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <Package className="h-5 w-5 text-green" />
+                <Grid3x3 className="h-5 w-5 text-green" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-grey">{product.apps?.length || 0}</p>
-                <p className="text-sm text-grey-600">Apps</p>
+                <p className="text-2xl font-bold text-grey">{connectedApps.length}</p>
+                <p className="text-sm text-grey-600">Connected Apps</p>
               </div>
             </div>
           </div>
@@ -129,31 +151,162 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           </div>
         </div>
 
+        {/* Connected Apps */}
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Grid3x3 className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Connected Apps</h2>
+              <span className="text-sm text-grey-600">({connectedApps.length})</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowAddAppModal(true)}
+              className="h-8 gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          </div>
+          
+          {productAppsStatus === 'pending' ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-grey-600">Loading apps...</span>
+            </div>
+          ) : connectedApps.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {connectedApps.map((app: any) => (
+                <div
+                  key={app._id}
+                  className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* App Logo */}
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      {app.logo ? (
+                        <img
+                          src={app.logo}
+                          alt={app.app_name}
+                          className="w-8 h-8 rounded object-cover"
+                        />
+                      ) : (
+                        <span className="text-primary font-semibold text-sm">
+                          {app.app_name?.[0]?.toUpperCase() || 'A'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* App Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-grey truncate">
+                        {app.app_name || app.name}
+                      </h3>
+                      <p className="text-xs text-grey-600 truncate">
+                        {app.tag || app.app_tag}
+                      </p>
+                      {app.description && (
+                        <p className="text-xs text-grey-500 mt-1 line-clamp-2">
+                          {app.description}
+                        </p>
+                      )}
+                      
+                      {/* App Status */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={cn(
+                          'px-2 py-1 rounded text-xs font-medium',
+                          app.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
+                        )}>
+                          {app.status || 'Unknown'}
+                        </span>
+                        {app.access_tag && (
+                          <span className="text-xs text-grey-500">
+                            Access: {app.access_tag.split(':')[0]}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* External Link Icon */}
+                    <ExternalLink className="h-4 w-4 text-grey-400 flex-shrink-0" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Grid3x3 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <p className="text-sm text-grey-600 mb-2">No apps connected yet</p>
+              <p className="text-xs text-grey-500">
+                Connect apps and start building integrations
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Environments */}
-        {product.envs && product.envs.length > 0 && (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-grey mb-4">Environments</h2>
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Environments</h2>
+              <span className="text-sm text-grey-600">({product.envs?.length || 0})</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleAddComponent('environment')}
+              className="h-8 gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          </div>
+          
+          {product.envs && product.envs.length > 0 ? (
             <div className="space-y-3">
               {product.envs.map((env) => (
                 <div
                   key={env._id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-grey-400"
+                  className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
                 >
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-sm font-medium text-grey">{env.env_name}</h3>
                     <p className="text-xs text-grey-600">{env.slug}</p>
+                    {env.description && (
+                      <p className="text-xs text-grey-500 mt-1">{env.description}</p>
+                    )}
                   </div>
-                  <span className={cn(
-                    'px-2 py-1 rounded text-xs font-medium',
-                    env.active ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                  )}>
-                    {env.active ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'px-2 py-1 rounded text-xs font-medium',
+                      env.active ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
+                    )}>
+                      {env.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleOpenComponent(env, 'environment')}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-center py-8">
+              <Settings2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <p className="text-sm text-grey-600 mb-2">No environments configured yet</p>
+              <p className="text-xs text-grey-500">
+                Add environments to organize your product's different deployment stages
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Databases */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
@@ -379,6 +532,13 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         </div>
 
       </div>
+
+      {/* Add App Modal */}
+      <AddAppModal
+        open={showAddAppModal}
+        onOpenChange={setShowAddAppModal}
+        product={product}
+      />
     </div>
   );
 }

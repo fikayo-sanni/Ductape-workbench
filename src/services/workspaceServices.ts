@@ -21,6 +21,20 @@ interface WorkspacesResponse {
   data: Workspace[];
 }
 
+interface CreateWorkspaceResponse {
+  data: Workspace;
+  message: string;
+  status: boolean;
+  meta: any;
+}
+
+interface UploadUrlResponse {
+  data: {
+    url: string;
+    key: string;
+  };
+}
+
 const fetchWorkspaces = async (data: {
   user_id: string;
   public_key: string;
@@ -63,11 +77,11 @@ const createWorkspace = async (data: {
   name: string;
   public_key: string;
   description: string;
-}): Promise<WorkspacesResponse | null> => {
+}): Promise<CreateWorkspaceResponse | null> => {
   const {user_id, name, public_key, description} = data;
 
   try {
-    const response = await apiClient.post<WorkspacesResponse>(
+    const response = await apiClient.post<CreateWorkspaceResponse>(
       '/workspaces/v1/create',
       {user_id, name, public_key, description},
     );
@@ -122,6 +136,38 @@ const removeMember = async (data: {
   return response.data;
 };
 
+const createUploadUrl = async (data: {
+  file: File;
+  fileType: string;
+  visibility: string;
+  id: string;
+}): Promise<UploadUrlResponse> => {
+  const {fileType, visibility, id} = data;
+  const response = await apiClient.post<UploadUrlResponse>(
+    '/workspaces/v1/upload',
+    {fileType, visibility, id},
+  );
+  return response.data;
+};
+
+const uploadFileToUrl = async (data: {
+  url: string;
+  file: File;
+}): Promise<void> => {
+  const {url, file} = data;
+  const response = await fetch(url, {
+    method: 'PUT',
+    body: file,
+    headers: {
+      'Content-Type': file.type,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+};
+
 const workspaceServices = {
   fetchWorkspaces,
   changeDefaultWorkspace,
@@ -129,6 +175,8 @@ const workspaceServices = {
   inviteMember,
   fetchWorkspaceMembers,
   removeMember,
+  createUploadUrl,
+  uploadFileToUrl,
 };
 
 export default workspaceServices;

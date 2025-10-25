@@ -24,6 +24,7 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
   const { closeTab, openTab } = useWorkbenchStore();
   const { currentWorkspaceId } = useAuth();
 
+
   const [formData, setFormData] = useState({
     name: '',
     tag: '',

@@ -77,7 +77,7 @@ function WorkbenchContent() {
         <WorkbenchHeader />
 
         {/* Content Area - Icon Sidebar + Main Sidebar + Panels */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Icon Sidebar - Far left - Hidden on mobile */}
           <div className="hidden md:block" data-intro="sidebar">
             <IconSidebar activeView={activeView} onViewChange={setActiveView} />
@@ -148,7 +148,7 @@ function WorkbenchContent() {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 flex flex-col min-w-0 bg-grey-100">
+          <div className="flex-1 flex flex-col min-w-0 bg-grey-100 overflow-hidden">
             {/* Sidebar Toggle Bar or Dashboard Back Button */}
             {activeView === 'dashboard' ? (
               <div className="h-10 md:hidden border-b border-grey-400 bg-white flex items-center px-4 gap-2 flex-shrink-0 shadow-sm">
@@ -185,10 +185,10 @@ function WorkbenchContent() {
             )}
 
             {/* Tab Bar - Hidden when dashboard is active */}
-            {activeView !== 'dashboard' && <div data-intro="tabs"><TabBar /></div>}
+            {activeView !== 'dashboard' && <div data-intro="tabs" className="flex-shrink-0"><TabBar /></div>}
 
             {/* Content - Show Dashboard or Tab Content */}
-            <div data-intro="content">
+            <div data-intro="content" className="flex-1 min-h-0 max-h-[calc(100vh-8rem)] overflow-y-auto">
               {activeView === 'dashboard' ? (
                 <Dashboard />
               ) : (

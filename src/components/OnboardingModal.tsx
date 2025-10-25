@@ -1,15 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
 import {
   Dialog,
   DialogContent,
@@ -23,13 +18,14 @@ import {
   ArrowLeft,
   Building2,
   Package,
-  Grid3x3,
-  FileText,
-  Key,
-  Upload,
   Sparkles,
+  Loader,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/store/useAuth';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import workspaceServices from '@/services/workspaceServices';
+import productServices from '@/services/productServices';
 
 interface OnboardingStep {
   id: string;
@@ -79,14 +75,50 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
 
 // Step 2: Create Workspace
 function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: () => void }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     workspace_name: '',
     description: '',
   });
 
+  const { mutate: createWorkspace, status: creatingWorkspace } = useMutation({
+    mutationFn: (data: {
+      user_id: string;
+      name: string;
+      public_key: string;
+      description: string;
+    }) => workspaceServices.createWorkspace(data),
+    onSuccess: (response) => {
+      console.log('Workspace creation response:', response);
+      if (response?.data && response.data._id) {
+        queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+        toast.success('Workspace created successfully!');
+        onNext({ workspace: response.data });
+      } else {
+        console.error('Invalid workspace response:', response);
+        toast.error('Failed to create workspace - invalid response');
+      }
+    },
+    onError: (error: any) => {
+      console.error('Error creating workspace:', error);
+      toast.error('Error creating workspace, try again');
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNext(formData);
+    if (!user?._id || !user?.public_key) {
+      toast.error('User authentication required');
+      return;
+    }
+    
+    createWorkspace({
+      name: formData.workspace_name,
+      public_key: user.public_key,
+      user_id: user._id,
+      description: formData.description,
+    });
   };
 
   return (
@@ -122,7 +154,7 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
             id="description"
             placeholder="Describe your workspace..."
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             className="mt-2"
             rows={3}
           />
@@ -133,9 +165,18 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button type="submit" className="flex-1">
+          <Button type="submit" className="flex-1" disabled={creatingWorkspace === 'pending'}>
+            {creatingWorkspace === 'pending' ? (
+              <>
+                <Loader className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
             Create Workspace
             <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
           </Button>
         </div>
       </form>
@@ -144,16 +185,101 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
 }
 
 // Step 3: Create Product
-function ProductStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: () => void }) {
+function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data: any) => void; onBack: () => void; workspace: any; onComplete: () => void }) {
+  const { user } = useAuth();
+  const { openTab } = useWorkbenchStore();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     product_name: '',
     description: '',
-    category: 'api',
+  });
+
+  const { mutate: createProduct, status: creatingProduct } = useMutation({
+    mutationFn: (data: {
+      workspace_id: string;
+      user_id: string;
+      public_key: string;
+      payload: {
+        name: string;
+        description: string;
+        tag: string;
+        workspace_id: string;
+        user_id: string;
+        public_key: string;
+      };
+    }) => productServices.createProduct(data),
+    onSuccess: (response) => {
+      console.log('Product creation response:', response);
+      if (response?.data) {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        toast.success('Product created successfully!');
+        
+        // Open the created product in a tab
+        openTab({
+          id: `product-${response.data._id}-${Date.now()}`,
+          type: 'product',
+          title: response.data.name || response.data.tag || 'Product',
+          itemId: response.data._id,
+          data: response.data,
+        });
+        
+        onNext({ product: response.data });
+        // Complete onboarding after product creation
+        onComplete();
+      } else {
+        console.error('Invalid product response:', response);
+        toast.error('Failed to create product - invalid response');
+      }
+    },
+    onError: (error: any) => {
+      console.error('Error creating product:', error);
+      toast.error('Error creating product, try again');
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNext(formData);
+    if (!user?._id || !user?.public_key || !workspace?._id) {
+      console.error('Missing required data:', { user: !!user, workspace });
+      toast.error('Missing required data - please ensure workspace was created successfully');
+      return;
+    }
+    
+    console.log('Full workspace object:', workspace);
+    console.log('Workspace keys:', Object.keys(workspace));
+    
+    // Generate tag safely
+    const workspaceTag = workspace.workspace_name || workspace.name || 'workspace';
+    const productTag = formData.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const fullTag = `${workspaceTag.toLowerCase().replace(/[^a-z0-9]+/g, '_')}:${productTag}`;
+    
+    console.log('Creating product with:', {
+      workspace_id: workspace._id,
+      user_id: user._id,
+      public_key: user.public_key,
+      payload: {
+        name: formData.product_name,
+        description: formData.description,
+        tag: fullTag,
+        workspace_id: workspace._id,
+        user_id: user._id,
+        public_key: user.public_key,
+      },
+    });
+     
+     createProduct({
+      workspace_id: workspace._id,
+      user_id: user._id,
+      public_key: user.public_key,
+      payload: {
+        name: formData.product_name,
+        description: formData.description,
+        tag: fullTag,
+        workspace_id: workspace._id,
+        user_id: user._id,
+        public_key: user.public_key,
+      },
+    });
   };
 
   return (
@@ -183,23 +309,6 @@ function ProductStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: 
           />
         </div>
 
-        <div>
-          <Label htmlFor="category">Category</Label>
-          <Select
-            value={formData.category}
-            onValueChange={(value) => setFormData({ ...formData, category: value })}
-          >
-            <SelectTrigger className="mt-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="api">API Integration</SelectItem>
-              <SelectItem value="webhook">Webhook Service</SelectItem>
-              <SelectItem value="sdk">SDK/Client Library</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         <div>
           <Label htmlFor="description">Description (Optional)</Label>
@@ -207,7 +316,7 @@ function ProductStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: 
             id="description"
             placeholder="Describe your product..."
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             className="mt-2"
             rows={3}
           />
@@ -218,9 +327,18 @@ function ProductStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: 
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button type="submit" className="flex-1">
+          <Button type="submit" className="flex-1" disabled={creatingProduct === 'pending'}>
+            {creatingProduct === 'pending' ? (
+              <>
+                <Loader className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
             Create Product
             <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
           </Button>
         </div>
       </form>
@@ -228,264 +346,7 @@ function ProductStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: 
   );
 }
 
-// Step 4: Create App
-function AppStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: () => void }) {
-  const [formData, setFormData] = useState({
-    app_name: '',
-    tag: '',
-    description: '',
-    base_url: '',
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onNext(formData);
-  };
-
-  const generateTag = () => {
-    if (formData.app_name) {
-      const tag = formData.app_name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setFormData({ ...formData, tag });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-purple/10 flex items-center justify-center mb-4">
-          <Grid3x3 className="h-8 w-8 text-purple" />
-        </div>
-        <h2 className="text-xl font-bold text-grey mb-2">Create Your First App</h2>
-        <p className="text-grey-600">
-          An app contains your API endpoints, authentication, and configurations.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="app_name" className="required">
-            App Name
-          </Label>
-          <Input
-            id="app_name"
-            placeholder="e.g., GitHub API"
-            value={formData.app_name}
-            onChange={(e) => setFormData({ ...formData, app_name: e.target.value })}
-            onBlur={generateTag}
-            className="mt-2"
-            required
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="tag" className="required">
-            App Tag
-          </Label>
-          <div className="flex gap-2 mt-2">
-            <Input
-              id="tag"
-              placeholder="e.g., github-api"
-              value={formData.tag}
-              onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-              required
-            />
-            <Button type="button" variant="outline" onClick={generateTag} size="sm">
-              Auto-generate
-            </Button>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="base_url">Base URL (Optional)</Label>
-          <Input
-            id="base_url"
-            placeholder="https://api.github.com"
-            value={formData.base_url}
-            onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-            className="mt-2"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="description">Description (Optional)</Label>
-          <Textarea
-            id="description"
-            placeholder="Describe your app..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="mt-2"
-            rows={3}
-          />
-        </div>
-
-        <div className="flex gap-3 pt-4">
-          <Button type="button" variant="outline" onClick={onBack} className="flex-1">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <Button type="submit" className="flex-1">
-            Create App
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// Step 5: Import/Create Requests
-function RequestStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: () => void }) {
-  const [choice, setChoice] = useState<'import' | 'create' | null>(null);
-
-  const handleChoice = (selectedChoice: 'import' | 'create') => {
-    setChoice(selectedChoice);
-    onNext({ choice: selectedChoice });
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-orange/10 flex items-center justify-center mb-4">
-          <FileText className="h-8 w-8 text-orange" />
-        </div>
-        <h2 className="text-xl font-bold text-grey mb-2">Add Your First API Requests</h2>
-        <p className="text-grey-600">
-          You can either import existing API collections or create new requests from scratch.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => handleChoice('import')}
-          className="p-6 border border-grey-400 rounded-lg hover:border-primary hover:shadow-md transition-all text-left"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-lg bg-blue/10 flex items-center justify-center">
-              <Upload className="h-6 w-6 text-blue" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-grey">Import from Postman</h3>
-              <p className="text-sm text-grey-600">Upload your existing Postman collection</p>
-            </div>
-          </div>
-          <p className="text-sm text-grey-600">
-            Quickly import your existing API requests and start testing immediately.
-          </p>
-        </button>
-
-        <button
-          onClick={() => handleChoice('create')}
-          className="p-6 border border-grey-400 rounded-lg hover:border-primary hover:shadow-md transition-all text-left"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center">
-              <FileText className="h-6 w-6 text-green" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-grey">Create New Requests</h3>
-              <p className="text-sm text-grey-600">Start building requests from scratch</p>
-            </div>
-          </div>
-          <p className="text-sm text-grey-600">
-            Create and test API requests step by step with our guided interface.
-          </p>
-        </button>
-      </div>
-
-      <div className="flex gap-3 pt-4">
-        <Button variant="outline" onClick={onBack} className="flex-1">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <Button 
-          onClick={() => handleChoice('create')} 
-          className="flex-1"
-          disabled={!choice}
-        >
-          Continue
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Step 6: Create Auth
-function AuthStep({ onNext, onBack }: { onNext: (data: any) => void; onBack: () => void }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'api_key',
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onNext(formData);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-yellow/10 flex items-center justify-center mb-4">
-          <Key className="h-8 w-8 text-yellow" />
-        </div>
-        <h2 className="text-xl font-bold text-grey mb-2">Set Up Authentication</h2>
-        <p className="text-grey-600">
-          Configure how your app will authenticate with external APIs.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="name" className="required">
-            Auth Name
-          </Label>
-          <Input
-            id="name"
-            placeholder="e.g., API Key Authentication"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="mt-2"
-            required
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="type">Authentication Type</Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
-          >
-            <SelectTrigger className="mt-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="api_key">API Key</SelectItem>
-              <SelectItem value="bearer">Bearer Token</SelectItem>
-              <SelectItem value="basic">Basic Auth</SelectItem>
-              <SelectItem value="oauth2">OAuth 2.0</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex gap-3 pt-4">
-          <Button type="button" variant="outline" onClick={onBack} className="flex-1">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <Button type="submit" className="flex-1">
-            Create Auth
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// Step 7: Completion
+// Step 3: Completion
 function CompletionStep({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="text-center space-y-6">
@@ -517,6 +378,72 @@ function CompletionStep({ onComplete }: { onComplete: () => void }) {
 export default function OnboardingModal({ open, onComplete, onSkip }: OnboardingModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [onboardingData, setOnboardingData] = useState<{
+    workspace?: any;
+    product?: any;
+    app?: any;
+    auth?: any;
+  }>({});
+
+  // Load onboarding progress from localStorage on mount
+  useEffect(() => {
+    const savedStep = localStorage.getItem('ductape-onboarding-step');
+    const savedData = localStorage.getItem('ductape-onboarding-data');
+    
+    if (savedStep) {
+      setCurrentStep(parseInt(savedStep));
+    }
+    
+    if (savedData) {
+      try {
+        setOnboardingData(JSON.parse(savedData));
+      } catch (error) {
+        console.error('Error parsing saved onboarding data:', error);
+      }
+    }
+  }, []);
+
+  // Save onboarding progress to localStorage
+  useEffect(() => {
+    localStorage.setItem('ductape-onboarding-step', currentStep.toString());
+    
+    // Create a safe copy of onboardingData to avoid cyclic references
+    const safeData = {
+      workspace: onboardingData.workspace ? {
+        _id: onboardingData.workspace._id,
+        workspace_id: onboardingData.workspace.workspace_id,
+        workspace_name: onboardingData.workspace.workspace_name,
+        description: onboardingData.workspace.description,
+        default: onboardingData.workspace.default,
+        created_at: onboardingData.workspace.created_at,
+        updated_at: onboardingData.workspace.updated_at
+      } : undefined,
+      product: onboardingData.product ? {
+        _id: onboardingData.product._id,
+        name: onboardingData.product.name,
+        description: onboardingData.product.description,
+        tag: onboardingData.product.tag,
+        workspace_id: onboardingData.product.workspace_id
+      } : undefined,
+      app: onboardingData.app ? {
+        _id: onboardingData.app._id,
+        app_name: onboardingData.app.app_name,
+        description: onboardingData.app.description,
+        tag: onboardingData.app.tag,
+        base_url: onboardingData.app.base_url,
+        workspace_id: onboardingData.app.workspace_id
+      } : undefined,
+      auth: onboardingData.auth ? {
+        _id: onboardingData.auth._id,
+        name: onboardingData.auth.name,
+        tag: onboardingData.auth.tag,
+        description: onboardingData.auth.description,
+        setup_type: onboardingData.auth.setup_type
+      } : undefined
+    };
+    
+    localStorage.setItem('ductape-onboarding-data', JSON.stringify(safeData));
+  }, [currentStep, onboardingData]);
 
   const steps: OnboardingStep[] = [
     {
@@ -544,30 +471,6 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
       completed: completedSteps.has(2),
     },
     {
-      id: 'app',
-      title: 'Create App',
-      description: 'Set up your first app',
-      icon: Grid3x3,
-      component: AppStep,
-      completed: completedSteps.has(3),
-    },
-    {
-      id: 'requests',
-      title: 'Add Requests',
-      description: 'Import or create API requests',
-      icon: FileText,
-      component: RequestStep,
-      completed: completedSteps.has(4),
-    },
-    {
-      id: 'auth',
-      title: 'Set Up Auth',
-      description: 'Configure authentication',
-      icon: Key,
-      component: AuthStep,
-      completed: completedSteps.has(5),
-    },
-    {
       id: 'complete',
       title: 'Complete',
       description: 'You\'re ready to go!',
@@ -577,12 +480,20 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
     },
   ];
 
-  const handleNext = () => {
+  const handleNext = (data?: any) => {
     setCompletedSteps(prev => new Set([...prev, currentStep]));
+    
+    // Update onboarding data with new data
+    if (data) {
+      setOnboardingData(prev => ({ ...prev, ...data }));
+    }
     
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
+      // Clear onboarding data when completed
+      localStorage.removeItem('ductape-onboarding-step');
+      localStorage.removeItem('ductape-onboarding-data');
       onComplete();
     }
   };
@@ -620,6 +531,10 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
             onNext={handleNext} 
             onBack={currentStep > 0 ? handleBack : undefined}
             onComplete={onComplete}
+            workspace={onboardingData.workspace}
+            product={onboardingData.product}
+            app={onboardingData.app}
+            auth={onboardingData.auth}
           />
         </div>
 

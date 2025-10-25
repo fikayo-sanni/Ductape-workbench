@@ -15,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -193,8 +192,8 @@ export default function TeamsTabContent() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="bg-grey-100">
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start justify-between">
@@ -427,32 +426,39 @@ export default function TeamsTabContent() {
 
       {/* Invite Member Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-        <DialogContent className="max-w-[95vw] md:max-w-[730px] border-b-4 border-b-primary">
-          <DialogHeader>
-            <DialogTitle className="text-lg md:text-2xl font-bold text-grey">
-              Invite new member
-            </DialogTitle>
-            <DialogDescription className="text-grey">
-              Add people to work with you by email address
-            </DialogDescription>
+        <DialogContent className="max-w-md border-b-4 border-b-primary sm:rounded-lg">
+          <DialogHeader className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <UserPlus className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-grey">Invite Team Member</DialogTitle>
+                <DialogDescription className="text-grey-600">
+                  Add people to work with you by email address
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onInviteMemberSubmit)}
-              className="mt-3 space-y-4"
+              className="space-y-6"
             >
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email address</FormLabel>
+                    <FormLabel className="text-grey-700 font-medium">Email Address</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter email address"
+                        placeholder="colleague@company.com"
                         {...field}
                         disabled={invitingMember === 'pending'}
+                        className="h-11"
+                        type="email"
                       />
                     </FormControl>
                     <FormMessage />
@@ -460,29 +466,45 @@ export default function TeamsTabContent() {
                 )}
               />
 
-              <DialogFooter className="!mt-7 pt-6 flex justify-end gap-4">
-                <DialogClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="px-7 font-bold text-sm"
-                    disabled={invitingMember === 'pending'}
-                  >
-                    Cancel
-                  </Button>
-                </DialogClose>
+              <div className="bg-grey-50 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Shield className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-grey mb-1">Access Level</h4>
+                    <p className="text-xs text-grey-600">
+                      New members will be added as <span className="font-medium text-green">Collaborators</span> with read and write access to this workspace.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowInviteDialog(false)}
+                  disabled={invitingMember === 'pending'}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
                 <Button
                   type="submit"
                   disabled={invitingMember === 'pending'}
-                  className="font-bold px-12"
+                  className="flex-1 gap-2"
                 >
                   {invitingMember === 'pending' ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Inviting...
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending Invite...
                     </>
                   ) : (
-                    'Invite member'
+                    <>
+                      <Mail className="h-4 w-4" />
+                      Send Invite
+                    </>
                   )}
                 </Button>
               </DialogFooter>

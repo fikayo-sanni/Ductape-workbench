@@ -32,8 +32,8 @@ interface WorkbenchState {
   sidebarCollapsed: boolean;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
-  activeView: 'products' | 'apps' | 'environments' | 'dashboard';
-  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | null;
+  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace';
+  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'marketplace' | null;
 
   // Logs Filter State
   logsFilters: {
@@ -76,6 +76,7 @@ interface WorkbenchState {
   openDashboardTab: () => void;
   openTokensTab: () => void;
   openTeamsTab: () => void;
+  openMarketplaceTab: () => void;
 
   // Actions - UI
   toggleSidebar: () => void;
@@ -327,6 +328,29 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       return {
         tabs: [...state.tabs, newTeamsTab],
         activeTabId: newTeamsTab.id,
+      };
+    }),
+
+  openMarketplaceTab: () =>
+    set((state) => {
+      // Check if marketplace tab already exists
+      const existingMarketplaceTab = state.tabs.find((t) => t.type === 'marketplace');
+
+      if (existingMarketplaceTab) {
+        // Tab already exists, just switch to it
+        return { activeTabId: existingMarketplaceTab.id };
+      }
+
+      // Create new marketplace tab
+      const newMarketplaceTab: Tab = {
+        id: `marketplace-${Date.now()}`,
+        type: 'marketplace',
+        title: 'Marketplace',
+      };
+
+      return {
+        tabs: [...state.tabs, newMarketplaceTab],
+        activeTabId: newMarketplaceTab.id,
       };
     }),
 

@@ -79,8 +79,8 @@ export default function ImportDialog({ open, onOpenChange, onImport }: ImportDia
 
         <Tabs value={importType} onValueChange={(v) => setImportType(v as 'postman' | 'openapi')}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="postman">Postman Collection</TabsTrigger>
-            <TabsTrigger value="openapi">OpenAPI Spec</TabsTrigger>
+            <TabsTrigger value="postman">Postman</TabsTrigger>
+            <TabsTrigger value="openapi">OpenAPI</TabsTrigger>
           </TabsList>
 
           <TabsContent value="postman" className="space-y-4 mt-4">

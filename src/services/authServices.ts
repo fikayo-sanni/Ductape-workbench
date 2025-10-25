@@ -57,9 +57,36 @@ const signup = async (data: SignupPayload): Promise<LoginResponse> => {
   return response.data;
 };
 
+const createAuth = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  payload: {
+    name: string;
+    tag: string;
+    description: string;
+    setup_type: string;
+    action_tag?: string;
+    expiry?: number;
+    period?: string;
+    tokens?: Record<string, Record<string, string>>;
+    workspace_id: string;
+    user_id: string;
+    public_key: string;
+  };
+}): Promise<any> => {
+  const { payload } = data;
+  const response = await apiClient.post(
+    `/auth/v1/create`,
+    payload
+  );
+  return response.data;
+};
+
 export const authServices = {
   login,
   resetPassword,
   createNewPassword,
   signup,
+  createAuth,
 };

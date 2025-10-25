@@ -16,7 +16,8 @@ export type TabType =
   | 'logs'
   | 'dashboard'
   | 'tokens'
-  | 'teams';
+  | 'teams'
+  | 'marketplace';
 
 export interface Tab {
   id: string;

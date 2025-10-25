@@ -8,6 +8,7 @@ import Logs from './Logs';
 import Dashboard from './Dashboard';
 import TokensTabContent from './tabs/TokensTabContent';
 import TeamsTabContent from './tabs/TeamsTabContent';
+import MarketplaceTabContent from './tabs/MarketplaceTabContent';
 import ActionViewTabContent from './tabs/ActionViewTabContent';
 import AuthTabContent from './tabs/AuthTabContent';
 import NewAuthTabContent from './tabs/NewAuthTabContent';
@@ -207,6 +208,9 @@ export default function TabContent() {
         }
         return <FeatureTabContent tab={activeTab} />;
 
+      case 'marketplace':
+        return <MarketplaceTabContent />;
+
       default:
         return (
           <div className="p-6">
@@ -216,5 +220,5 @@ export default function TabContent() {
     }
   };
 
-  return <div className="flex-1 flex flex-col min-h-0">{renderTabContent()}</div>;
+  return <div className="flex-1 flex flex-col min-h-0 overflow-hidden">{renderTabContent()}</div>;
 }

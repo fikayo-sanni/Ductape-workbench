@@ -18,6 +18,7 @@ import {
   ListTree,
   LayoutDashboard,
   Key,
+  Store,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -40,6 +41,7 @@ const getTabIcon = (type: Tab['type']) => {
     dashboard: LayoutDashboard,
     tokens: Key,
     teams: Users,
+    marketplace: Store,
   };
   return icons[type] || FileText;
 };

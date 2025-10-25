@@ -31,7 +31,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
   const envVariables = environment.variables || environment.envs || [];
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
