@@ -72,18 +72,6 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
 
       {/* Modal */}
       <div className="relative bg-white border border-grey-400 rounded-10px px-4 sm:px-7 py-8 w-full max-w-[456px] shadow-xl">
-        {/* Close Button - TEMPORARY: Remove this later */}
-        {onClose && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 h-8 w-8"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
 
         {/* Ductape Logo */}
         <div className="flex justify-center mb-6">

@@ -445,22 +445,22 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   };
 
   return (
-    <div className="h-full overflow-hidden bg-grey-100 flex">
+    <div className="h-full overflow-hidden bg-grey-100 flex flex-col lg:flex-row">
       {/* Left Panel - URL & Environments */}
-      <div className="w-2/5 border-r border-grey-400 bg-white overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="w-full lg:w-2/5 border-b lg:border-b-0 lg:border-r border-grey-400 bg-white overflow-auto">
+        <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
           {/* Header */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
-                <Globe className="h-6 w-6 text-blue" />
+          <div className="space-y-3 lg:space-y-4">
+            <div className="flex items-center gap-2 lg:gap-3">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
+                <Globe className="h-5 w-5 lg:h-6 lg:w-6 text-blue" />
               </div>
               <div className="flex-1">
                 <Input
                   placeholder="Action Name"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="text-xl font-bold border-none p-0 h-auto focus-visible:ring-0"
+                  className="text-lg lg:text-xl font-bold border-none p-0 h-auto focus-visible:ring-0"
                 />
               </div>
             </div>
@@ -534,12 +534,12 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
           <div className="space-y-3 pt-4 border-t border-grey-400">
             <Label className="text-sm font-semibold text-grey">Request URL</Label>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Select
                 value={formData.method}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, method: value }))}
               >
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-full sm:w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -556,7 +556,7 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
               <Button
                 onClick={handleTest}
                 disabled={isLoadingRequest || !fullUrl || !baseUrl}
-                className="bg-primary text-white hover:bg-primary/90"
+                className="bg-primary text-white hover:bg-primary/90 w-full sm:w-auto"
                 size="sm"
               >
                 <Send className="h-4 w-4 mr-1" />
@@ -672,37 +672,37 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       {/* Right Panel - Request/Response */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="border-b border-grey-400 bg-white px-6">
-            <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto">
+          <div className="border-b border-grey-400 bg-white px-4 lg:px-6">
+            <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto overflow-x-auto">
               <TabsTrigger
                 value="query"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
               >
                 Query
               </TabsTrigger>
               <TabsTrigger
                 value="params"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
               >
                 Params
               </TabsTrigger>
               <TabsTrigger
                 value="headers"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
               >
                 Headers
               </TabsTrigger>
               {['POST', 'PUT', 'PATCH'].includes(formData.method) && (
                 <TabsTrigger
                   value="body"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
                 >
                   Body
                 </TabsTrigger>
               )}
               <TabsTrigger
                 value="response"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
                 disabled={!response}
               >
                 Response
@@ -711,7 +711,7 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
           </div>
 
           <div className="flex-1 overflow-auto">
-            <TabsContent value="query" className="p-6 space-y-4 m-0">
+            <TabsContent value="query" className="p-4 lg:p-6 space-y-4 m-0">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <Hash className="h-4 w-4 text-primary" />
@@ -729,13 +729,23 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                   </p>
                 ) : (
                   query.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <input
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
-                        className="w-4 h-4 rounded border-grey-400"
-                      />
+                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
+                          className="w-4 h-4 rounded border-grey-400"
+                        />
+                        <Button
+                          onClick={() => removeKeyValue(index, setQuery)}
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <Input
                         placeholder="Key"
                         value={item.key}
@@ -748,21 +758,13 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                         onChange={(e) => updateKeyValue(index, 'value', e.target.value, setQuery)}
                         className="flex-1 h-9"
                       />
-                      <Button
-                        onClick={() => removeKeyValue(index, setQuery)}
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   ))
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="params" className="p-6 space-y-4 m-0">
+            <TabsContent value="params" className="p-4 lg:p-6 space-y-4 m-0">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <FileCode className="h-4 w-4 text-primary" />
@@ -780,13 +782,23 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                   </p>
                 ) : (
                   params.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <input
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
-                        className="w-4 h-4 rounded border-grey-400"
-                      />
+                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
+                          className="w-4 h-4 rounded border-grey-400"
+                        />
+                        <Button
+                          onClick={() => removeKeyValue(index, setParams)}
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <Input
                         placeholder="Key"
                         value={item.key}
@@ -799,21 +811,13 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                         onChange={(e) => updateKeyValue(index, 'value', e.target.value, setParams)}
                         className="flex-1 h-9"
                       />
-                      <Button
-                        onClick={() => removeKeyValue(index, setParams)}
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   ))
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="headers" className="p-6 space-y-4 m-0">
+            <TabsContent value="headers" className="p-4 lg:p-6 space-y-4 m-0">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <Code className="h-4 w-4 text-primary" />
@@ -831,13 +835,23 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                   </p>
                 ) : (
                   headers.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <input
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
-                        className="w-4 h-4 rounded border-grey-400"
-                      />
+                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
+                          className="w-4 h-4 rounded border-grey-400"
+                        />
+                        <Button
+                          onClick={() => removeKeyValue(index, setHeaders)}
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <Input
                         placeholder="Key"
                         value={item.key}
@@ -850,14 +864,6 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                         onChange={(e) => updateKeyValue(index, 'value', e.target.value, setHeaders)}
                         className="flex-1 h-9"
                       />
-                      <Button
-                        onClick={() => removeKeyValue(index, setHeaders)}
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   ))
                 )}
@@ -865,7 +871,7 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
             </TabsContent>
 
             {['POST', 'PUT', 'PATCH'].includes(formData.method) && (
-              <TabsContent value="body" className="p-6 space-y-4 m-0">
+              <TabsContent value="body" className="p-4 lg:p-6 space-y-4 m-0">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <FileCode className="h-4 w-4 text-primary" />
                   Request Body
@@ -879,16 +885,16 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
               </TabsContent>
             )}
 
-            <TabsContent value="response" className="p-6 space-y-4 m-0">
+            <TabsContent value="response" className="p-4 lg:p-6 space-y-4 m-0">
               <Label className="text-base font-semibold text-grey flex items-center gap-2">
                 <Code className="h-4 w-4 text-primary" />
                 Response
               </Label>
               {response ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
                     <span className={cn(
-                      'px-2 py-1 rounded font-medium',
+                      'px-2 py-1 rounded font-medium inline-block w-fit',
                       response.status >= 200 && response.status < 300
                         ? 'bg-green/10 text-green'
                         : response.status >= 400
@@ -897,10 +903,12 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                     )}>
                       {response.status} {response.statusText}
                     </span>
-                    <span className="text-grey-600">{response.time}ms</span>
-                    <span className="text-grey-600">{response.size} bytes</span>
+                    <div className="flex flex-wrap gap-2 sm:gap-4">
+                      <span className="text-grey-600">{response.time}ms</span>
+                      <span className="text-grey-600">{response.size} bytes</span>
+                    </div>
                     {response.url && (
-                      <span className="text-grey-500 text-xs font-mono truncate max-w-xs">
+                      <span className="text-grey-500 text-xs font-mono break-all">
                         {response.method} {response.url}
                       </span>
                     )}
