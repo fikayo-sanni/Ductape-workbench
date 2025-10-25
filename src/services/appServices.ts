@@ -58,8 +58,11 @@ const createApp = async (data: {
     tag: string;
     base_url?: string;
     workspace_id: string;
+    version: string;
+    logo: string;
     user_id: string;
     public_key: string;
+    envs: Array<any>;
   };
 }): Promise<AppResponse> => {
   const { payload } = data;
