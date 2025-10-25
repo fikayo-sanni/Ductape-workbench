@@ -18,7 +18,10 @@
     "node": ">=20.0.0 <21.0.0"
   },
   "overrides": {
-    "node-expat": "npm:noop2@latest"
+    "node-expat": "npm:noop2@latest",
+    "xml2json": {
+      "node-expat": "npm:noop2@latest"
+    }
   },
   "dependencies": {
     "@ductape/sdk": "^0.0.4-v19",
