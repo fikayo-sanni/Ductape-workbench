@@ -13,8 +13,7 @@ export default function AuthTabContent({ auth }: AuthTabContentProps) {
 
   const toggleShowValue = (key: string) => {
     setShowValues(prev => ({
-      ...prev,
-      [key]: !prev[key]
+      ...prev, [key]: !prev[key]
     }));
   };
 
