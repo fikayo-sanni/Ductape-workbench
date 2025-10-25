@@ -21,6 +21,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useQuery } from '@tanstack/react-query';
+import productServicesReal from '@/services/productServicesReal';
+import { IntegrationProvider } from '@/context/integration-context';
+import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 
 interface AppTabContentProps {
   app: IApp;

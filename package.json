@@ -17,6 +17,9 @@
   "engines": {
     "node": ">=20.0.0 <21.0.0"
   },
+  "overrides": {
+    "node-expat": "npm:noop2@latest"
+  },
   "dependencies": {
     "@ductape/sdk": "^0.0.4-v19",
     "@hookform/resolvers": "^3.9.0",
