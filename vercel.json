@@ -1,12 +1,12 @@
 {
+  "installCommand": "bash scripts/vercel-install.sh",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
   "build": {
     "env": {
       "NODE_VERSION": "20.11.0",
-      "PYTHON_VERSION": "3.11"
+      "NPM_CONFIG_OPTIONAL": "false"
     }
-  },
-  "installCommand": "npm install --legacy-peer-deps --no-optional --ignore-scripts"
+  }
 }
