@@ -272,7 +272,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       openTab({
         id: `app-${newApp._id}-${Date.now()}`,
         type: 'app',
-        title: newApp.app_name || newApp.name,
+        title: newApp.app_name,
         itemId: newApp._id,
         data: newApp,
       });

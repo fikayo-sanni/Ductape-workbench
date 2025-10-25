@@ -17,7 +17,7 @@ import { useAuth } from "@/store/useAuth";
 import { authServices } from "@/services/authServices";
 import { User } from "@/types/auth";
 import toast from "react-hot-toast";
-import { Loader, Eye, EyeOff, X } from "lucide-react";
+import { Loader, Eye, EyeOff } from "lucide-react";
 import CreateAccountModal from "./CreateAccountModal";
 
 const loginSchema = z.object({
