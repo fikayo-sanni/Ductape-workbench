@@ -21,10 +21,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useQuery } from '@tanstack/react-query';
-import productServicesReal from '@/services/productServicesReal';
-import { IntegrationProvider } from '@/context/integration-context';
-import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 
 interface AppTabContentProps {
   app: IApp;
@@ -39,7 +35,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   const [editingEnv, setEditingEnv] = useState<any | null>(null);
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
   const [isConstant, setIsConstant] = useState(false);
-  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
 
   // Actions search and filter state
   const [actionsSearch, setActionsSearch] = useState('');
@@ -47,7 +42,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
 
   // Determine if app is internal or third-party
   const isInternalApp = app.workspace_id === currentWorkspaceId;
-  const appType = isInternalApp ? 'internal' : 'third-party';
 
   const getInitials = (name: string) => {
     return name
@@ -101,7 +95,8 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   };
 
   const handleIntegrateApp = () => {
-    setShowIntegrationModal(true);
+    // TODO: Implement integration modal
+    console.log('Integrate app');
   };
 
   const handleCreateNewApp = () => {
