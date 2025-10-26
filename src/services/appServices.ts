@@ -48,6 +48,19 @@ const fetchAppByTag = async (data: {
   return response.data;
 };
 
+const fetchWorkspaceApps = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<AppsResponse> => {
+  const { workspace_id, user_id, public_key } = data;
+  const response = await apiClient.get<AppsResponse>(
+    `/apps/v1/access/${workspace_id}`,
+    { params: { public_key, user_id } }
+  );
+  return response.data;
+};
+
 const createApp = async (data: {
   workspace_id: string;
   user_id: string;
@@ -77,6 +90,7 @@ const appServices = {
   fetchApps,
   fetchApp,
   fetchAppByTag,
+  fetchWorkspaceApps,
   createApp,
 };
 

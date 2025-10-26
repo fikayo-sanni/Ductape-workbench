@@ -19,6 +19,12 @@ interface FetchAppParams {
   public_key: string;
 }
 
+interface FetchWorkspaceAppsParams {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}
+
 const appServicesReal = {
   fetchApps: async (params: FetchAppsParams) => {
     return await appServices.fetchApps(params);
@@ -30,6 +36,10 @@ const appServicesReal = {
 
   fetchApp: async (params: FetchAppParams) => {
     return await appServices.fetchApp(params);
+  },
+
+  fetchWorkspaceApps: async (params: FetchWorkspaceAppsParams) => {
+    return await appServices.fetchWorkspaceApps(params);
   },
 };
 

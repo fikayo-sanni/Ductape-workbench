@@ -51,9 +51,9 @@ export default function AppsSidebar() {
     });
   };
 
-  // Fetch apps
-  const { data: appsData, isLoading } = useQuery({
-    queryKey: ['apps', currentWorkspaceId],
+  // Fetch internal workspace apps
+  const { data: internalAppsData, isLoading: isLoadingInternal } = useQuery({
+    queryKey: ['apps', 'internal', currentWorkspaceId],
     queryFn: () =>
       appServicesReal.fetchApps({
         workspace_id: currentWorkspaceId || '',
@@ -61,15 +61,24 @@ export default function AppsSidebar() {
         public_key: user?.public_key || '',
         status: 'all',
       }),
-    // Always enabled
-    enabled: true,
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
   });
 
-  const apps = appsData?.data || [];
+  // Fetch third-party apps using the new access endpoint
+  const { data: thirdPartyAppsData, isLoading: isLoadingThirdParty } = useQuery({
+    queryKey: ['apps', 'third-party', currentWorkspaceId],
+    queryFn: () =>
+      appServicesReal.fetchWorkspaceApps({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      }),
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
 
-  // Split apps into workspace and third-party
-  const workspaceApps = apps.filter((app: IApp) => !app.access_tag || app.access_tag === 'workspace');
-  const thirdPartyApps = apps.filter((app: IApp) => app.access_tag === 'third-party' || app.access_tag === 'public');
+  const workspaceApps = internalAppsData?.data || [];
+  const thirdPartyApps = thirdPartyAppsData?.data || [];
+  const isLoading = isLoadingInternal || isLoadingThirdParty;
 
   const filteredWorkspaceApps = workspaceApps.filter((app: IApp) => {
     if (!searchQuery) return true;
@@ -87,7 +96,8 @@ export default function AppsSidebar() {
     );
   });
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | undefined) => {
+    if (!name) return 'NA';
     return name
       .split(' ')
       .map(word => word[0])

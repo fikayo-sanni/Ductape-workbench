@@ -27,19 +27,20 @@ const getEnvironmentType = (): EnvType => {
 
 export function useDuctape(config: DuctapeConfig) {
   // Validate required fields
-  if (!config.workspace_id || !config.user_id || !config.token || !config.public_key) {
-    return null;
-  }
+  const isValidConfig = config.workspace_id && config.user_id && config.token && config.public_key;
 
-  return useMemo(
-    () => connectDuctape({
+  return useMemo(() => {
+    if (!isValidConfig) {
+      return null;
+    }
+
+    return connectDuctape({
       workspace_id: config.workspace_id,
       user_id: config.user_id,
       token: config.token,
       public_key: config.public_key,
       env_type: config.env_type || getEnvironmentType(),
       type: config.type,
-    }),
-    [config.workspace_id, config.user_id, config.token, config.public_key, config.env_type, config.type]
-  );
+    });
+  }, [isValidConfig, config.workspace_id, config.user_id, config.token, config.public_key, config.env_type, config.type]);
 }
