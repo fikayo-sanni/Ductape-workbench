@@ -97,6 +97,16 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
     setShowUpdateEnvModal(true);
   };
 
+  const handleOpenApp = (app: any) => {
+    openTab({
+      id: `app-${app._id || app.app_id}-${Date.now()}`,
+      type: 'app',
+      title: app.app_name || app.name,
+      itemId: app._id || app.app_id,
+      data: app,
+    });
+  };
+
   return (
     <div className="bg-grey-100">
       <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -551,7 +561,8 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               {connectedApps.map((app: any) => (
                 <div
                   key={app._id}
-                  className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
+                  onClick={() => handleOpenApp(app)}
+                  className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start gap-3">
                     {/* App Logo */}
