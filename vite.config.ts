@@ -7,46 +7,26 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      buffer: "buffer",
-      ioredis: path.resolve(__dirname, "./empty-module-file.js"),
-      redis: path.resolve(__dirname, "./empty-module-file.js"),
-      bullmq: path.resolve(__dirname, "./empty-module-file.js"),
+      buffer: "buffer", // 👈 add this line
+      ioredis: path.resolve(__dirname, "./empty-module-file.js"), // 👈 alias for ioredis
+      bullmq: path.resolve(__dirname, "./empty-module-file.js"), // 👈 alias for ioredis
     },
-  },
-  build: {
-    rollupOptions: {
-      external: [
-        // Removed @ductape/sdk - it should be bundled, not externalized
-        'worker_threads',
-        'child_process',
-        'fs',
-        'path',
-        'os',
-        'crypto',
-        'stream',
-        'net',
-        'tls',
-        'dns',
-        'http',
-        'https',
-        'assert',
-        'util',
-        'events',
-        'timers',
-        'zlib',
-        'node:stream',
-        'node:util',
-        'node:events',
-        'node:process'
-      ]
-    }
+    dedupe: ['axios'], // Ensure single version of axios across @ductape/sdk and workbench
   },
   define: {
-    global: 'window',
-    'process.env': '{}',
+    global: "window", // 👈 this helps some node packages expecting a global
   },
   optimizeDeps: {
-    include: ["buffer"],
-    // Removed exclude for @ductape/sdk - let Vite optimize it normally
-  }
+    include: ["buffer", "axios"], // 👈 ensures Vite optimizes it properly
+    exclude: ['bullmq'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
+  ssr: {
+    external: ['bullmq'],
+    noExternal: ['@ductape/sdk'],
+  },
 });

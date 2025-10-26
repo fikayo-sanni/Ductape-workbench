@@ -33,13 +33,14 @@ export interface IProduct {
   storage: any[];
   brokers: any[];
   sessions: any[];
-  notifications: any[];
   messageBroker: any[];
   functions: any[];
   variables?: any[];
   auths?: any[];
   databases: any[];
   jobs: any[];
+  healthchecks?: any[];
+  notifications?: any[];
   __v: number;
   logo?: string;
   steps: number;

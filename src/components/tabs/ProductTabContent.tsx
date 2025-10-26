@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Activity, MessageSquare, Settings2, Zap, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer } from 'lucide-react';
+import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
@@ -232,51 +232,222 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 <Timer className="h-4 w-4" />
                 Quotas ({product.quota?.length || 0})
               </Button>
+              <Button
+                variant={activeFilter === 'healthchecks' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('healthchecks')}
+                className="gap-2"
+              >
+                <Heart className="h-4 w-4" />
+                Health Checks ({product.healthchecks?.length || 0})
+              </Button>
+              <Button
+                variant={activeFilter === 'notifications' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('notifications')}
+                className="gap-2"
+              >
+                <Bell className="h-4 w-4" />
+                Notifiers ({product.notifications?.length || 0})
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Product Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Settings2 className="h-5 w-5 text-primary" />
+        <div className="overflow-x-auto -mx-6 px-6">
+          <div className="flex gap-4 min-w-max pb-2">
+            {/* Environments */}
+            <button
+              onClick={() => setActiveFilter('environments')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Settings2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.envs?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Environments</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{product.envs?.length || 0}</p>
-                <p className="text-sm text-grey-600">Environments</p>
-              </div>
-            </div>
-          </div>
+            </button>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <Grid3x3 className="h-5 w-5 text-green" />
+            {/* Connected Apps */}
+            <button
+              onClick={() => setActiveFilter('apps')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                  <Grid3x3 className="h-5 w-5 text-green" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{connectedApps.length}</p>
+                  <p className="text-sm text-grey-600">Connected Apps</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{connectedApps.length}</p>
-                <p className="text-sm text-grey-600">Connected Apps</p>
-              </div>
-            </div>
-          </div>
+            </button>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-purple-500" />
+            {/* Databases */}
+            <button
+              onClick={() => setActiveFilter('databases')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Database className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.databases?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Databases</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">
-                  {(product.databases?.length || 0) +
-                   (product.storage?.length || 0) +
-                   (product.caches?.length || 0) +
-                   (product.features?.length || 0)}
-                </p>
-                <p className="text-sm text-grey-600">Total Features</p>
+            </button>
+
+            {/* Storage */}
+            <button
+              onClick={() => setActiveFilter('storage')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <HardDrive className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.storage?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Storage</p>
+                </div>
               </div>
-            </div>
+            </button>
+
+            {/* Caches */}
+            <button
+              onClick={() => setActiveFilter('caches')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.caches?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Caches</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Message Brokers */}
+            <button
+              onClick={() => setActiveFilter('messageBrokers')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5 text-cyan-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.messageBroker?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Message Brokers</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Jobs */}
+            <button
+              onClick={() => setActiveFilter('jobs')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                  <Box className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.jobs?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Jobs</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Features */}
+            <button
+              onClick={() => setActiveFilter('features')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                  <Workflow className="h-5 w-5 text-pink-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.features?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Features</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Fallbacks */}
+            <button
+              onClick={() => setActiveFilter('fallbacks')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-red" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.fallback?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Fallbacks</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Quotas */}
+            <button
+              onClick={() => setActiveFilter('quotas')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange/10 flex items-center justify-center">
+                  <Timer className="h-5 w-5 text-orange" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.quota?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Quotas</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Healthchecks */}
+            <button
+              onClick={() => setActiveFilter('healthchecks')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
+                  <Heart className="h-5 w-5 text-red" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.healthchecks?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Health Checks</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Notifiers */}
+            <button
+              onClick={() => setActiveFilter('notifications')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
+                  <Bell className="h-5 w-5 text-red" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.notifications?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Notifiers</p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -294,6 +465,8 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             {renderFeaturesCard()}
             {renderFallbacksCard()}
             {renderQuotasCard()}
+            {renderHealthchecksCard()}
+            {renderNotificationsCard()}
           </div>
         )}
 
@@ -307,6 +480,8 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         {activeFilter === 'features' && renderFeaturesCard()}
         {activeFilter === 'fallbacks' && renderFallbacksCard()}
         {activeFilter === 'quotas' && renderQuotasCard()}
+        {activeFilter === 'healthchecks' && renderHealthchecksCard()}
+        {activeFilter === 'notifications' && renderNotificationsCard()}
       </div>
 
       {/* Add App Modal */}
@@ -932,6 +1107,112 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             </div>
           )}
         </div>
+    );
+  }
+
+  function renderHealthchecksCard() {
+    const healthchecksCount = product.healthchecks?.length || 0;
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Heart className="h-5 w-5 text-red" />
+            <h2 className="text-lg font-semibold text-grey">Health Checks</h2>
+            <span className="text-sm text-grey-600">({healthchecksCount})</span>
+          </div>
+          <Button
+            size="sm"
+            className="gap-2"
+            variant="outline"
+            onClick={() => handleAddComponent('healthcheck')}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+
+        {product.healthchecks && product.healthchecks.length > 0 ? (
+          <div className="space-y-3">
+            {product.healthchecks.map((healthcheck: any) => (
+              <button
+                key={healthcheck._id}
+                onClick={() => handleOpenComponent(healthcheck, 'healthcheck')}
+                className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Heart className="h-4 w-4 text-red" />
+                  <h3 className="text-sm font-medium text-grey">{healthcheck.name}</h3>
+                </div>
+                <p className="text-xs text-grey-600">{healthcheck.tag}</p>
+                {healthcheck.description && (
+                  <p className="text-xs text-grey-600 mt-1">{healthcheck.description}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Heart className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No health checks configured yet</p>
+            <p className="text-xs text-grey-500">
+              Add health checks to monitor the status of your endpoints
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderNotificationsCard() {
+    const notificationsCount = product.notifications?.length || 0;
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-red" />
+            <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
+            <span className="text-sm text-grey-600">({notificationsCount})</span>
+          </div>
+          <Button
+            size="sm"
+            className="gap-2"
+            variant="outline"
+            onClick={() => handleAddComponent('notification')}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+
+        {product.notifications && product.notifications.length > 0 ? (
+          <div className="space-y-3">
+            {product.notifications.map((notification: any) => (
+              <button
+                key={notification._id}
+                onClick={() => handleOpenComponent(notification, 'notification')}
+                className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Bell className="h-4 w-4 text-red" />
+                  <h3 className="text-sm font-medium text-grey">{notification.name}</h3>
+                </div>
+                <p className="text-xs text-grey-600">{notification.tag}</p>
+                {notification.description && (
+                  <p className="text-xs text-grey-600 mt-1">{notification.description}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No notifiers configured yet</p>
+            <p className="text-xs text-grey-500">
+              Add notifiers to send push notifications, emails, SMS, or webhooks
+            </p>
+          </div>
+        )}
+      </div>
     );
   }
 }

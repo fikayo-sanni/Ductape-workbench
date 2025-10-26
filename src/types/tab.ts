@@ -13,11 +13,14 @@ export type TabType =
   | 'fallback'
   | 'quota'
   | 'job'
+  | 'webhook'
+  | 'auth'
   | 'logs'
   | 'dashboard'
   | 'tokens'
   | 'teams'
-  | 'marketplace';
+  | 'marketplace'
+  | 'notifier';
 
 export interface Tab {
   id: string;

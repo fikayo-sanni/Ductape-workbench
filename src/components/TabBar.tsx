@@ -35,6 +35,7 @@ const getTabIcon = (type: Tab['type']) => {
     database: Database,
     'message-broker': MessageSquare,
     notification: Bell,
+    notifier: Bell,
     fallback: Shield,
     quota: BarChart3,
     job: ListTree,
@@ -43,6 +44,8 @@ const getTabIcon = (type: Tab['type']) => {
     tokens: Key,
     teams: Users,
     marketplace: Store,
+    webhook: MessageSquare,
+    auth: Key,
   };
   return icons[type] || FileText;
 };

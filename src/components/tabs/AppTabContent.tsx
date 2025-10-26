@@ -24,6 +24,9 @@ import { Label } from '@/components/ui/label';
 import { IntegrationProvider } from '@/context/integration-context';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
+import CreateAppEnvironmentModal from '@/components/modals/CreateAppEnvironmentModal';
+import CreateVariableModal from '@/components/modals/CreateVariableModal';
+import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import { useQuery } from '@tanstack/react-query';
 import appServices from '@/services/appServices';
 
@@ -39,9 +42,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   );
   const [editingEnv, setEditingEnv] = useState<any | null>(null);
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
-  const [isConstant, setIsConstant] = useState(false);
+  const [editingConstant, setEditingConstant] = useState<any | null>(null);
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [showAppCreatedModal, setShowAppCreatedModal] = useState(false);
+  const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
+  const [showCreateVariableModal, setShowCreateVariableModal] = useState(false);
+  const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
 
   // Actions search and filter state
   const [actionsSearch, setActionsSearch] = useState('');
@@ -83,9 +89,9 @@ export default function AppTabContent({ app }: AppTabContentProps) {
 
   const actionsCount = selectedVersion?.actions?.length || currentApp.actions_count || 0;
   const envsCount = selectedVersion?.envs?.length || currentApp.envs_count || 0;
-  const authsCount = selectedVersion?.auths_count || 0;
-  const variablesCount = selectedVersion?.variables_count || 0;
-  const constantsCount = selectedVersion?.constants_count || 0;
+  const authsCount = selectedVersion?.auths?.length || 0;
+  const variablesCount = selectedVersion?.variables?.length || 0;
+  const constantsCount = selectedVersion?.constants?.length|| 0;
   const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any).webhooks_count || 0;
 
   // Auto-select latest version when app data changes
@@ -120,8 +126,13 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   };
 
   const handleOpenVariable = (variable: any, constant: boolean = false) => {
-    setEditingVariable(variable);
-    setIsConstant(constant);
+    if (constant) {
+      setEditingConstant(variable);
+      setShowCreateConstantModal(true);
+    } else {
+      setEditingVariable(variable);
+      setShowCreateVariableModal(true);
+    }
   };
 
   const handleOpenAction = (action: any) => {
@@ -489,6 +500,38 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         {activeFilter === 'actions' && renderActionsCard()}
         {activeFilter === 'variables' && renderVariablesCard()}
       </div>
+
+      {/* Create Environment Modal */}
+      <CreateAppEnvironmentModal
+        open={showCreateEnvModal}
+        onOpenChange={setShowCreateEnvModal}
+        appTag={currentApp.tag}
+        appId={currentApp._id}
+      />
+
+      {/* Create Variable Modal */}
+      <CreateVariableModal
+        open={showCreateVariableModal}
+        onOpenChange={(open) => {
+          setShowCreateVariableModal(open);
+          if (!open) setEditingVariable(null);
+        }}
+        appTag={currentApp.tag}
+        appId={currentApp._id}
+        variable={editingVariable}
+      />
+
+      {/* Create Constant Modal */}
+      <CreateConstantModal
+        open={showCreateConstantModal}
+        onOpenChange={(open) => {
+          setShowCreateConstantModal(open);
+          if (!open) setEditingConstant(null);
+        }}
+        appTag={currentApp.tag}
+        appId={currentApp._id}
+        constant={editingConstant}
+      />
     </div>
   );
 
@@ -503,7 +546,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <span className="text-sm text-grey-600">({envsCount})</span>
           </div>
           {isInternalApp && (
-            <Button size="sm" className="gap-2" variant="outline">
+            <Button
+              size="sm"
+              className="gap-2"
+              variant="outline"
+              onClick={() => setShowCreateEnvModal(true)}
+            >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add</span>
             </Button>
@@ -555,12 +603,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <p className="text-xs text-grey-500">
               Add environments to organize your app's different deployment stages
             </p>
-            {isInternalApp && (
-              <Button size="sm" className="mt-2" variant="outline">
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            )}
           </div>
         )}
       </div>
@@ -577,7 +619,20 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <span className="text-sm text-grey-600">({webhooksCount})</span>
           </div>
           {isInternalApp && (
-            <Button size="sm" className="gap-2" variant="outline">
+            <Button 
+              size="sm" 
+              className="gap-2" 
+              variant="outline"
+              onClick={() => {
+                openTab({
+                  id: `new-webhook-${Date.now()}`,
+                  type: 'webhook',
+                  title: 'New Webhook',
+                  data: { isNew: true, app: currentApp, product: null },
+                  isDirty: true,
+                });
+              }}
+            >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add</span>
             </Button>
@@ -587,20 +642,25 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         {selectedVersion?.webhooks && selectedVersion.webhooks.length > 0 ? (
           <div className="space-y-3">
             {selectedVersion.webhooks.map((webhook: any) => (
-              <div
+              <button
                 key={webhook._id}
-                className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
+                onClick={() => {
+                  openTab({
+                    id: `webhook-${webhook._id}-${Date.now()}`,
+                    type: 'webhook',
+                    title: webhook.name || webhook.tag,
+                    itemId: webhook._id,
+                    data: { ...webhook, appName: currentApp.app_name, version: selectedVersionTag },
+                  });
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
               >
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-grey">{webhook.name || webhook.tag}</h3>
-                  <p className="text-xs text-grey-600">{webhook.url}</p>
+                  <p className="text-xs text-grey-600">{webhook.url || webhook.tag}</p>
                 </div>
-                {isInternalApp && (
-                  <Button variant="ghost" size="sm">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+                <Pencil className="h-4 w-4 text-grey-400" />
+              </button>
             ))}
           </div>
         ) : (
@@ -610,12 +670,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <p className="text-xs text-grey-500">
               Add webhooks to receive real-time notifications from external services
             </p>
-            {isInternalApp && (
-              <Button size="sm" className="mt-2" variant="outline">
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            )}
           </div>
         )}
       </div>
@@ -632,7 +686,29 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <span className="text-sm text-grey-600">({authsCount})</span>
           </div>
           {isInternalApp && (
-            <Button size="sm" className="gap-2" variant="outline">
+            <Button 
+              size="sm" 
+              className="gap-2" 
+              variant="outline"
+              onClick={() => {
+                openTab({
+                  id: `new-auth-${Date.now()}`,
+                  type: 'auth',
+                  title: 'New Authorization',
+                  data: { 
+                    isNew: true, 
+                    app: currentApp, 
+                    product: null,
+                    actions: selectedVersion?.actions || [],
+                    appId: currentApp._id,
+                    appTag: currentApp.tag,
+                    appName: currentApp.app_name,
+                    workspaceId: currentApp.workspace_id,
+                  },
+                  isDirty: true,
+                });
+              }}
+            >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add</span>
             </Button>
@@ -665,12 +741,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             <p className="text-xs text-grey-500">
               Add authentication methods to secure your app's API endpoints
             </p>
-            {isInternalApp && (
-              <Button size="sm" className="mt-2" variant="outline">
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            )}
           </div>
         )}
       </div>
@@ -688,7 +758,31 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <span className="text-sm text-grey-600">({actionsCount})</span>
             </div>
             {isInternalApp && (
-              <Button size="sm" className="gap-2" variant="outline">
+              <Button 
+                size="sm" 
+                className="gap-2" 
+                variant="outline"
+                onClick={() => {
+                  openTab({
+                    id: `new-action-${Date.now()}`,
+                    type: 'request',
+                    title: 'New Action',
+                    data: {
+                      isNew: true,
+                      app: currentApp,
+                      appId: currentApp._id,
+                      appTag: currentApp.tag,
+                      appName: currentApp.app_name,
+                      version: selectedVersionTag,
+                      envs: selectedVersion?.envs || [],
+                      variables: selectedVersion?.variables || [],
+                      constants: selectedVersion?.constants || [],
+                      auths: selectedVersion?.auths || [],
+                    },
+                    isDirty: true,
+                  });
+                }}
+              >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Add</span>
               </Button>
@@ -759,12 +853,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <p className="text-sm">
                 {actionsSearch || selectedFolderId ? 'No matching actions' : 'No actions configured'}
               </p>
-              {isInternalApp && !actionsSearch && !selectedFolderId && (
-                <Button size="sm" className="mt-2" variant="outline">
-                  <Plus className="h-4 w-4" />
-                  Add
-                </Button>
-              )}
+     
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -823,7 +912,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <span className="text-sm text-grey-600">({variablesCount})</span>
             </div>
             {isInternalApp && (
-              <Button size="sm" className="gap-2" variant="outline">
+              <Button 
+                size="sm" 
+                className="gap-2" 
+                variant="outline"
+                onClick={() => {
+                  setEditingVariable(null);
+                  setShowCreateVariableModal(true);
+                }}
+              >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Add</span>
               </Button>
@@ -861,12 +958,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <p className="text-xs text-grey-500">
                 Add variables to store dynamic configuration values
               </p>
-              {isInternalApp && (
-                <Button size="sm" className="mt-2" variant="outline">
-                  <Plus className="h-4 w-4" />
-                  Add
-                </Button>
-              )}
+
             </div>
           )}
         </div>
@@ -880,7 +972,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <span className="text-sm text-grey-600">({constantsCount})</span>
             </div>
             {isInternalApp && (
-              <Button size="sm" className="gap-2" variant="outline">
+              <Button 
+                size="sm" 
+                className="gap-2" 
+                variant="outline"
+                onClick={() => {
+                  setEditingConstant(null);
+                  setShowCreateConstantModal(true);
+                }}
+              >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Add</span>
               </Button>
@@ -913,12 +1013,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               <p className="text-xs text-grey-500">
                 Add constants to store fixed configuration values
               </p>
-              {isInternalApp && (
-                <Button size="sm" className="mt-2" variant="outline">
-                  <Plus className="h-4 w-4" />
-                  Add
-                </Button>
-              )}
+
             </div>
           )}
         </div>
@@ -1288,83 +1383,23 @@ export default function AppTabContent({ app }: AppTabContentProps) {
     );
   }
 
-  // Variable Edit Dialog
-  if (editingVariable) {
-    return (
-      <Dialog open={!!editingVariable} onOpenChange={() => setEditingVariable(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isConstant ? 'Edit Constant' : 'Edit Variable'}</DialogTitle>
-            <DialogDescription>
-              Update the {isConstant ? 'constant' : 'variable'} configuration
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="key">Key</Label>
-              <Input
-                id="key"
-                value={editingVariable.key || ''}
-                onChange={(e) => setEditingVariable({ ...editingVariable, key: e.target.value })}
-                placeholder="e.g., API_KEY"
-              />
-            </div>
-            <div>
-              <Label htmlFor="type">Type</Label>
-              <Select
-                value={editingVariable.type || 'string'}
-                onValueChange={(value) => setEditingVariable({ ...editingVariable, type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="string">String</SelectItem>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="boolean">Boolean</SelectItem>
-                  <SelectItem value="array">Array</SelectItem>
-                  <SelectItem value="object">Object</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                value={editingVariable.description || ''}
-                onChange={(e) => setEditingVariable({ ...editingVariable, description: e.target.value })}
-                placeholder="Variable description"
-              />
-            </div>
-            {!isConstant && (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="required"
-                  checked={editingVariable.required || false}
-                  onChange={(e) => setEditingVariable({ ...editingVariable, required: e.target.checked })}
-                  className="rounded"
-                />
-                <Label htmlFor="required">Required</Label>
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditingVariable(null)}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
-                // TODO: Implement variable/constant update
-                console.log('Update variable/constant:', editingVariable);
-                setEditingVariable(null);
-              }}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  // Integration Modal
+  if (showIntegrationModal) {
+    const marketplaceApp = {
+      _id: currentApp._id,
+      app_name: currentApp.app_name,
+      domain_name: currentApp.domains?.[0] || currentApp.app_name.toLowerCase().replace(/\s+/g, '-'),
+      description: currentApp.description,
+      logo: currentApp.logo,
+      versions: (currentApp.versions || []).map((v: any) => ({
+        _id: v._id || v.tag,
+        version: v.tag,
+        latest: v.latest || false,
+        created_at: v.created_at || new Date().toISOString(),
+      })),
+      created_at: currentApp.created_at || new Date().toISOString(),
+      updated_at: currentApp.updated_at || new Date().toISOString(),
+  };
 
   // Integration Modal
   if (showIntegrationModal) {
@@ -1405,4 +1440,311 @@ export default function AppTabContent({ app }: AppTabContentProps) {
       />
     );
   }
+
+  return (
+      <IntegrationProvider>
+        <AppIntegrationModal
+          app={marketplaceApp as any}
+          open={showIntegrationModal}
+          onOpenChange={setShowIntegrationModal}
+        />
+      </IntegrationProvider>
+    );
+  }
+
+  // AppCreatedModal for internal apps with no actions
+  if (showAppCreatedModal) {
+    return (
+      <AppCreatedModal
+        app={currentApp}
+        open={showAppCreatedModal}
+        onOpenChange={setShowAppCreatedModal}
+      />
+    );
+  }
+
+  // Render the main content
+  return (
+    <>
+      <div className="bg-grey-100 p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* App Header */}
+          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              {/* Logo */}
+              <div className="w-16 h-16 rounded-lg bg-green/10 flex items-center justify-center text-green text-xl font-semibold flex-shrink-0">
+                {currentApp.logo ? (
+                  <img
+                    src={currentApp.logo}
+                    alt={currentApp.app_name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  getInitials(currentApp.app_name)
+                )}
+              </div>
+
+              {/* App Info */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-grey">{currentApp.app_name}</h1>
+                  {currentApp.status && (
+                    <span className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium',
+                      currentApp.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
+                    )}>
+                      {currentApp.status}
+                    </span>
+                  )}
+                  {/* App Type Badge */}
+                  <span className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
+                    isInternalApp
+                      ? 'bg-blue-500/10 text-blue-600'
+                      : 'bg-orange-500/10 text-orange-600'
+                  )}>
+                    {isInternalApp ? (
+                      <>
+                        <Building2 className="h-3 w-3" />
+                        Internal
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="h-3 w-3" />
+                        Third-party
+                      </>
+                    )}
+                  </span>
+                  {currentApp.access_tag && (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
+                      {currentApp.access_tag}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
+                {currentApp.description && (
+                  <p className="text-grey-600 mb-4">{currentApp.description}</p>
+                )}
+
+                {/* Version Selector */}
+                {currentApp.versions && currentApp.versions.length > 0 && (
+                  <div className="flex items-center gap-3 mt-4">
+                    <label className="text-sm font-medium text-grey-600">Version:</label>
+                    <Select value={selectedVersionTag} onValueChange={setSelectedVersionTag}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select version" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentApp.versions.map((version) => (
+                          <SelectItem key={version.tag} value={version.tag}>
+                            {version.tag} {version.latest && '(Latest)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Integration Actions */}
+                <div className="flex items-center gap-3 mt-4">
+                  <Button
+                    onClick={handleIntegrateApp}
+                    className="gap-2"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Integrate
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content Filter Navigation */}
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-grey-600" />
+              <span className="text-sm font-medium text-grey-600">Quick Access:</span>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={activeFilter === 'overview' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('overview')}
+                  className="gap-2"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                  Overview
+                </Button>
+                <Button
+                  variant={activeFilter === 'actions' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('actions')}
+                  className="gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  Actions ({actionsCount})
+                </Button>
+                <Button
+                  variant={activeFilter === 'environments' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('environments')}
+                  className="gap-2"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  Environments ({envsCount})
+                </Button>
+                <Button
+                  variant={activeFilter === 'webhooks' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('webhooks')}
+                  className="gap-2"
+                >
+                  <Webhook className="h-4 w-4" />
+                  Webhooks ({webhooksCount})
+                </Button>
+                <Button
+                  variant={activeFilter === 'auths' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('auths')}
+                  className="gap-2"
+                >
+                  <Key className="h-4 w-4" />
+                  Auth ({authsCount})
+                </Button>
+                <Button
+                  variant={activeFilter === 'variables' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('variables')}
+                  className="gap-2"
+                >
+                  <FileCode className="h-4 w-4" />
+                  Variables ({variablesCount + constantsCount})
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* App Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <button
+              onClick={() => setActiveFilter('actions')}
+              className={cn(
+                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
+                activeFilter === 'actions' ? 'border-primary bg-primary/5' : 'border-grey-400'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{actionsCount}</p>
+                  <p className="text-sm text-grey-600">Actions</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('environments')}
+              className={cn(
+                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
+                activeFilter === 'environments' ? 'border-primary bg-primary/5' : 'border-grey-400'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                  <Settings2 className="h-5 w-5 text-green" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{envsCount}</p>
+                  <p className="text-sm text-grey-600">Environments</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('webhooks')}
+              className={cn(
+                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
+                activeFilter === 'webhooks' ? 'border-primary bg-primary/5' : 'border-grey-400'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Webhook className="h-5 w-5 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{webhooksCount}</p>
+                  <p className="text-sm text-grey-600">Webhooks</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('auths')}
+              className={cn(
+                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
+                activeFilter === 'auths' ? 'border-primary bg-primary/5' : 'border-grey-400'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
+                  <Key className="h-5 w-5 text-yellow" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{authsCount}</p>
+                  <p className="text-sm text-grey-600">Auths</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('variables')}
+              className={cn(
+                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
+                activeFilter === 'variables' ? 'border-primary bg-primary/5' : 'border-grey-400'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <FileCode className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{variablesCount + constantsCount}</p>
+                  <p className="text-sm text-grey-600">Variables</p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Content Sections with Filtering */}
+          {activeFilter === 'overview' && (
+            <div className="space-y-6">
+              {/* Show all sections in overview mode */}
+              {renderEnvironmentsCard()}
+              {renderWebhooksCard()}
+              {renderAuthsCard()}
+              {renderActionsCard()}
+              {renderVariablesCard()}
+            </div>
+          )}
+
+          {activeFilter === 'environments' && renderEnvironmentsCard()}
+          {activeFilter === 'webhooks' && renderWebhooksCard()}
+          {activeFilter === 'auths' && renderAuthsCard()}
+          {activeFilter === 'actions' && renderActionsCard()}
+          {activeFilter === 'variables' && renderVariablesCard()}
+        </div>
+      </div>
+
+      {/* Create Environment Modal */}
+      <CreateAppEnvironmentModal
+        open={showCreateEnvModal}
+        onOpenChange={setShowCreateEnvModal}
+        appTag={currentApp.tag}
+        appId={currentApp._id}
+      />
+    </>
+  );
 }

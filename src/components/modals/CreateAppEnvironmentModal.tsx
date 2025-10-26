@@ -7,6 +7,13 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Checkbox } from '../ui/checkbox';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,22 +23,23 @@ import {
 import { Settings2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
+import { DataFormats } from '@ductape/sdk/dist/types';
 
-interface CreateEnvironmentModalProps {
+interface CreateAppEnvironmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  productTag: string;
-  productId: string;
+  appTag: string;
+  appId: string;
   onSuccess?: (environment: any) => void;
 }
 
-export default function CreateEnvironmentModal({
+export default function CreateAppEnvironmentModal({
   open,
   onOpenChange,
-  productTag,
-  productId,
+  appTag,
+  appId,
   onSuccess,
-}: CreateEnvironmentModalProps) {
+}: CreateAppEnvironmentModalProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -40,6 +48,8 @@ export default function CreateEnvironmentModal({
     slug: '',
     description: '',
     active: true,
+    base_url: '',
+    request_type: DataFormats.JSON,
   });
 
   // Initialize Ductape SDK
@@ -48,7 +58,7 @@ export default function CreateEnvironmentModal({
     user_id: user?._id || '',
     token: user?.auth_token || '',
     public_key: user?.public_key || '',
-    type: 'product',
+    type: 'app',
   }) as any;
 
   const handleNameChange = (value: string) => {
@@ -77,25 +87,27 @@ export default function CreateEnvironmentModal({
 
   const { mutate: createEnvironment, isPending: isCreating } = useMutation({
     mutationFn: async (data: typeof formData) => {
-      if (!ductape) throw new Error('Product not initialized');
-      if (!productTag) throw new Error('Product tag not found');
+      if (!ductape) throw new Error('App not initialized');
+      if (!appTag) throw new Error('App tag not found');
+      if (!data.base_url.trim()) throw new Error('Base URL is required');
       if (data.slug.length !== 3) throw new Error('Slug must be exactly 3 letters');
 
-      await ductape.init(productTag);
+      await ductape.init(appTag);
 
       const payload = {
         env_name: data.env_name,
         slug: data.slug,
         description: data.description,
         active: data.active,
+        base_url: data.base_url,
+        request_type: data.request_type,
       };
 
       const environment = await ductape.envs.create(payload);
       return environment;
     },
     onSuccess: (environment) => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      queryClient.invalidateQueries({ queryKey: ['app', appId] });
       toast.success('Environment created successfully!');
       onSuccess?.(environment);
       onOpenChange(false);
@@ -105,6 +117,8 @@ export default function CreateEnvironmentModal({
         slug: '',
         description: '',
         active: true,
+        base_url: '',
+        request_type: DataFormats.JSON,
       });
     },
     onError: (error: any) => {
@@ -121,8 +135,13 @@ export default function CreateEnvironmentModal({
       return;
     }
 
-    if (!formData.slug.trim()) {
-      toast.error('Please enter a slug');
+    if (formData.slug.length !== 3) {
+      toast.error('Slug must be exactly 3 letters');
+      return;
+    }
+
+    if (!formData.base_url.trim()) {
+      toast.error('Base URL is required');
       return;
     }
 
@@ -205,6 +224,47 @@ export default function CreateEnvironmentModal({
             />
           </div>
 
+          <div>
+            <Label htmlFor="base_url" className="required">
+              Base URL
+            </Label>
+            <Input
+              id="base_url"
+              placeholder="https://api.example.com"
+              value={formData.base_url}
+              onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
+              className="mt-2"
+              type="url"
+            />
+            <p className="text-xs text-grey-600 mt-1">
+              The base URL for this environment
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="request_type">
+              Request Type
+            </Label>
+            <Select
+              value={formData.request_type}
+              onValueChange={(value) => setFormData({ ...formData, request_type: value as DataFormats })}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DataFormats.JSON}>JSON</SelectItem>
+                <SelectItem value={DataFormats.URLENCODED}>URL Encoded</SelectItem>
+                <SelectItem value={DataFormats.FORMDATA}>Form Data</SelectItem>
+                <SelectItem value={DataFormats.SOAP}>SOAP</SelectItem>
+                <SelectItem value={DataFormats.HTML}>HTML</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-grey-600 mt-1">
+              The data format for requests in this environment
+            </p>
+          </div>
+
           <div className="flex items-center gap-3 rounded-lg border border-grey-400 p-4">
             <Checkbox
               id="active"
@@ -247,5 +307,5 @@ export default function CreateEnvironmentModal({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
+    );
+  }

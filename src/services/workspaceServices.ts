@@ -168,6 +168,22 @@ const uploadFileToUrl = async (data: {
   }
 };
 
+const updateWorkspaceEnvs = async (data: {
+  workspace_id: string;
+  payload: {
+    user_id: string;
+    public_key: string;
+    envs: any[];
+  };
+}): Promise<any> => {
+  const {workspace_id, payload} = data;
+  const response = await apiClient.put<any>(
+    `/workspaces/v1/update/${workspace_id}/defaults/envs`,
+    payload,
+  );
+  return response.data;
+};
+
 const workspaceServices = {
   fetchWorkspaces,
   changeDefaultWorkspace,
@@ -177,6 +193,7 @@ const workspaceServices = {
   removeMember,
   createUploadUrl,
   uploadFileToUrl,
+  updateWorkspaceEnvs,
 };
 
 export default workspaceServices;

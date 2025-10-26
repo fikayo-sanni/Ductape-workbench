@@ -1,21 +1,38 @@
 import { useState } from 'react';
 import { useAuth } from '@/store/useAuth';
 import { Input } from './ui/input';
-import { Search, Settings2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Search, Settings2, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IEnvironment } from '@/types/environment';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import workspaceServices from '@/services/workspaceServices';
+import CreateWorkspaceEnvironmentModal from '@/components/modals/CreateWorkspaceEnvironmentModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 
 export default function EnvironmentsSidebar() {
   const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingEnv, setEditingEnv] = useState<IEnvironment | null>(null);
+  const [envToDelete, setEnvToDelete] = useState<IEnvironment | null>(null);
 
   // Get current workspace environments from user
   const currentWorkspace = user?.workspaces?.find(w => w.workspace_id === currentWorkspaceId);
-  const environments: IEnvironment[] = (currentWorkspace?.defaultEnvs || []).map((env, idx) => ({
-    ...env,
-    _id: env.slug || `env-${idx}`,
-    description: '',
+  const environments: IEnvironment[] = (currentWorkspace?.defaultEnvs || []).map((env: any, idx) => ({
+    env_name: env.env_name,
+    slug: env.slug,
+    description: env.description || '',
+    _id: env._id || env.slug || `env-${idx}`, // Keep existing _id if available
   }));
 
   const filteredEnvironments = environments.filter(env => {
@@ -26,12 +43,70 @@ export default function EnvironmentsSidebar() {
     );
   });
 
+  // Delete environment mutation
+  const { mutate: deleteEnvironment, isPending: isDeleting } = useMutation({
+    mutationFn: async (slug: string) => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing workspace or user information');
+      }
+
+      const updatedEnvs = environments.filter(env => env.slug !== slug);
+
+      await workspaceServices.updateWorkspaceEnvs({
+        workspace_id: currentWorkspaceId,
+        payload: {
+          user_id: user._id,
+          public_key: user.public_key,
+          envs: updatedEnvs,
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      toast.success('Environment deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete environment');
+    },
+  });
+
+  const handleDeleteEnv = (env: IEnvironment) => {
+    setEnvToDelete(env);
+  };
+
+  const confirmDelete = () => {
+    if (envToDelete) {
+      deleteEnvironment(envToDelete.slug);
+    }
+  };
+
+  const handleEditEnv = (env: IEnvironment) => {
+    setEditingEnv(env);
+    setShowCreateModal(true);
+  };
+
+  const handleAddEnv = () => {
+    setEditingEnv(null);
+    setShowCreateModal(true);
+  };
+
 
   return (
     <div className="h-full flex flex-col bg-white border-r border-grey-400">
       {/* Header */}
       <div className="p-4 border-b border-grey-400">
-        <h2 className="text-lg font-semibold text-grey mb-2">Environments</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-grey">Environments</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAddEnv}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </Button>
+        </div>
         <p className="text-xs text-grey-600">
           Manage your workspace environments
         </p>
@@ -82,19 +157,32 @@ export default function EnvironmentsSidebar() {
                     <p className="text-xs text-grey-600 truncate">{env.slug}</p>
                   </div>
 
-                  {/* Active Badge */}
-                  {env.active !== undefined && (
-                    <span
-                      className={cn(
-                        'px-2 py-0.5 rounded text-xs font-medium flex-shrink-0',
-                        env.active
-                          ? 'bg-green text-white'
-                          : 'bg-grey-400 text-grey'
-                      )}
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditEnv(env);
+                      }}
+                      className="h-7 w-7 p-0"
                     >
-                      {env.active ? 'Active' : 'Inactive'}
-                    </span>
-                  )}
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteEnv(env);
+                      }}
+                      className="h-7 w-7 p-0 text-red hover:text-red"
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -108,6 +196,70 @@ export default function EnvironmentsSidebar() {
           </div>
         )}
       </div>
+
+      {/* Create/Edit Environment Modal */}
+      <CreateWorkspaceEnvironmentModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        editingEnv={editingEnv}
+        environments={environments}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!envToDelete} onOpenChange={(open) => !open && setEnvToDelete(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-red" />
+              </div>
+              <div>
+                <DialogTitle>Delete Environment</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-grey-600">
+              Are you sure you want to delete <strong>{envToDelete?.env_name}</strong> ({envToDelete?.slug})?
+              This will remove the environment from your workspace.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEnvToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="gap-2"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Delete Environment
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

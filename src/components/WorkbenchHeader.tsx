@@ -194,7 +194,7 @@ export default function WorkbenchHeader() {
       const authTabId = `auth-${Date.now()}`;
       openTab({
         id: authTabId,
-        type: 'feature',
+        type: 'auth',
         title: 'New Auth',
         data: {
           appId,

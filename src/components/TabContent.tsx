@@ -16,7 +16,13 @@ import EnvironmentTabContent from './tabs/EnvironmentTabContent';
 import StorageTabContent from './tabs/StorageTabContent';
 import DatabaseTabContent from './tabs/DatabaseTabContent';
 import CacheTabContent from './tabs/CacheTabContent';
+import WebhookTabContent from './tabs/WebhookTabContent';
+import NewWebhookTabContent from './tabs/NewWebhookTabContent';
+import HealthcheckTabContent from './tabs/HealthcheckTabContent';
+import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewRequestTabContent from './tabs/NewRequestTabContent';
+import NotificationTabContent from './tabs/NotificationTabContent';
+import NewNotificationTabContent from './tabs/NewNotificationTabContent';
 import RequestBuilder from './tabs/RequestBuilder';
 import NewProductTabContent from './tabs/NewProductTabContent';
 import NewAppTabContent from './tabs/NewAppTabContent';
@@ -33,23 +39,35 @@ import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import GenericComponentContent from './tabs/GenericComponentContent';
 
 function FeatureTabContent({ tab }: { tab: Tab }) {
-  // Check if this is a component from product (not app)
-  if (tab.data?.componentType) {
-    const componentType = tab.data.componentType;
+    // Check if this is a component from product (not app)
+    if (tab.data?.componentType) {
+      const componentType = tab.data.componentType;
 
-    // App-level components (from app versions)
-    if (['auth', 'environment'].includes(componentType)) {
-      switch (componentType) {
-        case 'auth':
-          // Check if this is a new auth creation tab
-          if (tab.data?.isNew) {
-            return <NewAuthTabContent tabId={tab.id} data={tab.data} />;
-          }
-          return <AuthTabContent auth={tab.data} />;
-        case 'environment':
-          return <EnvironmentTabContent environment={tab.data} />;
+      // App-level components (from app versions)
+      if (['auth', 'environment', 'webhook', 'healthcheck'].includes(componentType)) {
+        switch (componentType) {
+          case 'auth':
+            // Check if this is a new auth creation tab
+            if (tab.data?.isNew) {
+              return <NewAuthTabContent tabId={tab.id} data={tab.data} />;
+            }
+            return <AuthTabContent auth={tab.data} />;
+          case 'environment':
+            return <EnvironmentTabContent environment={tab.data} />;
+          case 'webhook':
+            // Check if this is a new webhook creation tab
+            if (tab.isDirty && tab.data?.isNew) {
+              return <NewWebhookTabContent tabId={tab.id} data={tab.data} />;
+            }
+            return <WebhookTabContent webhook={tab.data} />;
+          case 'healthcheck':
+            // Check if this is a new healthcheck creation tab
+            if (tab.isDirty && tab.data?.isNew) {
+              return <NewHealthcheckTabContent data={tab.data} />;
+            }
+            return <HealthcheckTabContent data={tab.data} />;
+        }
       }
-    }
 
     // Product-level components with dedicated displays
     switch (componentType) {
@@ -60,13 +78,23 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
       case 'database':
         return <DatabaseComponentContent database={tab.data} />;
       case 'session':
-      case 'healthcheck':
-      case 'notification':
       case 'fallback':
       case 'quota':
       case 'job':
       case 'message-broker':
         return <GenericComponentContent component={tab.data} type={componentType} />;
+      case 'healthcheck':
+        // Check if this is a new healthcheck creation tab
+        if (tab.isDirty && tab.data?.isNew) {
+          return <NewHealthcheckTabContent data={tab.data} />;
+        }
+        return <HealthcheckTabContent data={tab.data} />;
+      case 'notification':
+        // Check if this is a new notification creation tab
+        if (tab.isDirty && tab.data?.isNew) {
+          return <NewNotificationTabContent tabId={tab.id} data={tab.data} />;
+        }
+        return <NotificationTabContent data={tab.data} />;
     }
   }
 
@@ -155,6 +183,14 @@ export default function TabContent() {
         }
         return <ProductTabContent product={activeTab.data} />;
 
+      case 'auth':
+        // Check if this is a new auth creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewAuthTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        // This would handle viewing an auth, but for now just show the new auth content
+        return <NewAuthTabContent tabId={activeTab.id} data={activeTab.data} />;
+
       case 'logs':
         return <Logs />;
 
@@ -194,6 +230,28 @@ export default function TabContent() {
           return <NewMessageBrokerTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <FeatureTabContent tab={activeTab} />;
+
+      case 'webhook':
+        // Check if this is a new webhook creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewWebhookTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <WebhookTabContent webhook={activeTab.data} />;
+
+      case 'healthcheck':
+        // Check if this is a new healthcheck creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewHealthcheckTabContent data={activeTab.data} />;
+        }
+        return <HealthcheckTabContent data={activeTab.data} />;
+
+      case 'notification':
+      case 'notifier':
+        // Check if this is a new notification creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewNotificationTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <NotificationTabContent data={activeTab.data} />;
 
       case 'feature':
         // Check if this is a new feature creation tab

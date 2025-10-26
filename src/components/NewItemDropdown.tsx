@@ -114,7 +114,7 @@ const newItemOptions: NewItemOption[] = [
   },
   {
     id: 'notification',
-    label: 'Notification',
+    label: 'Notifier',
     icon: Bell,
     description: 'Add notification service',
     category: 'product',
