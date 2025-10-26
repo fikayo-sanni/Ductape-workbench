@@ -12,19 +12,12 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { IntegrationProvider } from '@/context/integration-context';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
 import CreateAppEnvironmentModal from '@/components/modals/CreateAppEnvironmentModal';
+import UpdateAppEnvironmentModal from '@/components/modals/UpdateAppEnvironmentModal';
 import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import { useQuery } from '@tanstack/react-query';
@@ -46,6 +39,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [showAppCreatedModal, setShowAppCreatedModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
+  const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
   const [showCreateVariableModal, setShowCreateVariableModal] = useState(false);
   const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
 
@@ -509,6 +503,20 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         appId={currentApp._id}
       />
 
+      {/* Update Environment Modal */}
+      <UpdateAppEnvironmentModal
+        open={showUpdateEnvModal}
+        onOpenChange={(open) => {
+          setShowUpdateEnvModal(open);
+          if (!open) setEditingEnv(null);
+        }}
+        appTag={currentApp.tag}
+        environment={editingEnv}
+        onSuccess={() => {
+          setEditingEnv(null);
+        }}
+      />
+
       {/* Create Variable Modal */}
       <CreateVariableModal
         open={showCreateVariableModal}
@@ -587,7 +595,10 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setEditingEnv(env)}
+                    onClick={() => {
+                      setEditingEnv(env);
+                      setShowUpdateEnvModal(true);
+                    }}
                     className="ml-3"
                   >
                     <Pencil className="h-4 w-4" />
@@ -1294,94 +1305,6 @@ export default function AppTabContent({ app }: AppTabContentProps) {
       </div>
     </div>
   );
-
-  // Environment Edit Dialog
-  if (editingEnv) {
-    return (
-      <Dialog open={!!editingEnv} onOpenChange={() => setEditingEnv(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Environment</DialogTitle>
-            <DialogDescription>
-              Update the environment configuration
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="env_name">Environment Name</Label>
-              <Input
-                id="env_name"
-                value={editingEnv.env_name || ''}
-                onChange={(e) => setEditingEnv({ ...editingEnv, env_name: e.target.value })}
-                placeholder="e.g., Development"
-              />
-            </div>
-            <div>
-              <Label htmlFor="slug">Slug (3 characters)</Label>
-              <Input
-                id="slug"
-                value={editingEnv.slug || ''}
-                disabled
-                placeholder="e.g., DEV"
-                className="bg-grey-100"
-              />
-              <p className="text-xs text-grey-600 mt-1">Slug cannot be changed</p>
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                value={editingEnv.description || ''}
-                onChange={(e) => setEditingEnv({ ...editingEnv, description: e.target.value })}
-                placeholder="Environment description"
-              />
-            </div>
-            <div>
-              <Label htmlFor="base_url">Base URL</Label>
-              <Input
-                id="base_url"
-                value={editingEnv.base_url || ''}
-                onChange={(e) => setEditingEnv({ ...editingEnv, base_url: e.target.value })}
-                placeholder="https://api.example.com"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="active"
-                checked={editingEnv.active || false}
-                onChange={(e) => setEditingEnv({ ...editingEnv, active: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="active">Active</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="whitelist"
-                checked={editingEnv.whitelist || false}
-                onChange={(e) => setEditingEnv({ ...editingEnv, whitelist: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="whitelist">Whitelist</Label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditingEnv(null)}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
-                // TODO: Implement environment update
-                console.log('Update environment:', editingEnv);
-                setEditingEnv(null);
-              }}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   // Integration Modal
   if (showIntegrationModal) {
