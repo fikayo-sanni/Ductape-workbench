@@ -9,6 +9,7 @@ import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
+import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
 
 interface ProductTabContentProps {
   product: IProduct;
@@ -19,6 +20,8 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
   const [showAddAppModal, setShowAddAppModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
+  const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
+  const [selectedEnvironment, setSelectedEnvironment] = useState<any>(null);
 
   // Content filter state
   const [activeFilter, setActiveFilter] = useState<string>('overview');
@@ -87,6 +90,11 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
       },
       isDirty: true, // Mark as dirty to trigger new component forms
     });
+  };
+
+  const handleEditEnvironment = (env: any) => {
+    setSelectedEnvironment(env);
+    setShowUpdateEnvModal(true);
   };
 
   return (
@@ -498,6 +506,17 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         productTag={product.tag}
         productId={product._id}
       />
+
+      {/* Update Environment Modal */}
+      <UpdateProductEnvironmentModal
+        open={showUpdateEnvModal}
+        onOpenChange={setShowUpdateEnvModal}
+        productTag={product.tag}
+        environment={selectedEnvironment}
+        onSuccess={() => {
+          setSelectedEnvironment(null);
+        }}
+      />
     </div>
   );
 
@@ -643,7 +662,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleOpenComponent(env, 'environment')}
+                      onClick={() => handleEditEnvironment(env)}
                       className="h-6 w-6 p-0"
                     >
                       <Edit2 className="h-3 w-3" />
