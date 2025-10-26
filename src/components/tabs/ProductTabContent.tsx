@@ -4,12 +4,14 @@ import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, Ext
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
+import appServicesReal from '@/services/appServicesReal';
+import toast from 'react-hot-toast';
 
 interface ProductTabContentProps {
   product: IProduct;
@@ -22,6 +24,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
   const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
   const [selectedEnvironment, setSelectedEnvironment] = useState<any>(null);
+  const [loadingAppTag, setLoadingAppTag] = useState<string | null>(null);
 
   // Content filter state
   const [activeFilter, setActiveFilter] = useState<string>('overview');
@@ -97,13 +100,36 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
     setShowUpdateEnvModal(true);
   };
 
+  // Mutation to fetch full app data by tag
+  const { mutate: fetchFullApp } = useMutation({
+    mutationFn: (params: { tag: string; user_id: string; public_key: string }) =>
+      appServicesReal.fetchAppByTag(params),
+    onSuccess: (response) => {
+      const fullApp = response.data;
+      openTab({
+        id: `app-${fullApp._id}`,
+        type: 'app',
+        title: fullApp.app_name,
+        itemId: fullApp._id,
+        data: fullApp,
+      });
+      setLoadingAppTag(null);
+    },
+    onError: (error: any) => {
+      toast.error('Failed to load app details');
+      console.error('Failed to fetch full app:', error);
+      setLoadingAppTag(null);
+    },
+  });
+
   const handleOpenApp = (app: any) => {
-    openTab({
-      id: `app-${app._id || app.app_id}-${Date.now()}`,
-      type: 'app',
-      title: app.app_name || app.name,
-      itemId: app._id || app.app_id,
-      data: app,
+    setLoadingAppTag(app.tag || app.app_tag);
+
+    // Fetch full app data by tag
+    fetchFullApp({
+      tag: app.tag || app.app_tag,
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
     });
   };
 
@@ -558,16 +584,23 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             </div>
           ) : connectedApps.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {connectedApps.map((app: any) => (
+              {connectedApps.map((app: any) => {
+                const isLoadingThisApp = loadingAppTag === (app.tag || app.app_tag);
+                return (
                 <div
                   key={app._id}
-                  onClick={() => handleOpenApp(app)}
-                  className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => !isLoadingThisApp && handleOpenApp(app)}
+                  className={cn(
+                    "p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer",
+                    isLoadingThisApp && "opacity-70 cursor-wait"
+                  )}
                 >
                   <div className="flex items-start gap-3">
                     {/* App Logo */}
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      {app.logo ? (
+                      {isLoadingThisApp ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      ) : app.logo ? (
                         <img
                           src={app.logo}
                           alt={app.app_name}
@@ -611,10 +644,11 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                     </div>
                     
                     {/* External Link Icon */}
-                    <ExternalLink className="h-4 w-4 text-grey-400 flex-shrink-0" />
+                    {!isLoadingThisApp && <ExternalLink className="h-4 w-4 text-grey-400 flex-shrink-0" />}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">
