@@ -497,11 +497,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
     return (
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-grey">Environments</h2>
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Environments</h2>
+            <span className="text-sm text-grey-600">({envsCount})</span>
+          </div>
           {isInternalApp && (
             <Button size="sm" className="gap-2" variant="outline">
               <Plus className="h-4 w-4" />
-              Add
+              <span className="hidden sm:inline">Add</span>
             </Button>
           )}
         </div>
@@ -511,7 +515,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             {selectedVersion.envs.map((env) => (
               <div
                 key={env._id}
-                className="flex items-center justify-between p-3 rounded-lg border border-grey-400"
+                className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -545,9 +549,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-grey-600">
-            <Settings2 className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-            <p className="text-sm">No environments configured</p>
+          <div className="text-center py-8">
+            <Settings2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No environments configured yet</p>
+            <p className="text-xs text-grey-500">
+              Add environments to organize your app's different deployment stages
+            </p>
             {isInternalApp && (
               <Button size="sm" className="mt-2" variant="outline">
                 <Plus className="h-4 w-4" />
@@ -564,11 +571,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
     return (
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-grey">Webhooks</h2>
+          <div className="flex items-center gap-2">
+            <Webhook className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Webhooks</h2>
+            <span className="text-sm text-grey-600">({webhooksCount})</span>
+          </div>
           {isInternalApp && (
             <Button size="sm" className="gap-2" variant="outline">
               <Plus className="h-4 w-4" />
-              Add
+              <span className="hidden sm:inline">Add</span>
             </Button>
           )}
         </div>
@@ -578,7 +589,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             {selectedVersion.webhooks.map((webhook: any) => (
               <div
                 key={webhook._id}
-                className="flex items-center justify-between p-3 rounded-lg border border-grey-400"
+                className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
               >
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-grey">{webhook.name || webhook.tag}</h3>
@@ -593,9 +604,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-grey-600">
-            <Webhook className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-            <p className="text-sm">No webhooks configured</p>
+          <div className="text-center py-8">
+            <Webhook className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No webhooks configured yet</p>
+            <p className="text-xs text-grey-500">
+              Add webhooks to receive real-time notifications from external services
+            </p>
             {isInternalApp && (
               <Button size="sm" className="mt-2" variant="outline">
                 <Plus className="h-4 w-4" />
@@ -612,11 +626,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
     return (
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-grey">Authentication Methods</h2>
+          <div className="flex items-center gap-2">
+            <Key className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Authentication Methods</h2>
+            <span className="text-sm text-grey-600">({authsCount})</span>
+          </div>
           {isInternalApp && (
             <Button size="sm" className="gap-2" variant="outline">
               <Plus className="h-4 w-4" />
-              Add
+              <span className="hidden sm:inline">Add</span>
             </Button>
           )}
         </div>
@@ -641,9 +659,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-grey-600">
-            <Key className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-            <p className="text-sm">No authentication methods configured</p>
+          <div className="text-center py-8">
+            <Key className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No authentication methods configured yet</p>
+            <p className="text-xs text-grey-500">
+              Add authentication methods to secure your app's API endpoints
+            </p>
             {isInternalApp && (
               <Button size="sm" className="mt-2" variant="outline">
                 <Plus className="h-4 w-4" />
@@ -661,11 +682,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
       <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden flex flex-col" style={actionsCount > 10 ? { height: '600px' } : { height: 'auto' }}>
         <div className="p-6 border-b border-grey-400">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-grey">Actions</h2>
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Actions</h2>
+              <span className="text-sm text-grey-600">({actionsCount})</span>
+            </div>
             {isInternalApp && (
               <Button size="sm" className="gap-2" variant="outline">
                 <Plus className="h-4 w-4" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             )}
           </div>
@@ -792,11 +817,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         {/* Variables */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-grey">Variables</h2>
+            <div className="flex items-center gap-2">
+              <FileCode className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Variables</h2>
+              <span className="text-sm text-grey-600">({variablesCount})</span>
+            </div>
             {isInternalApp && (
               <Button size="sm" className="gap-2" variant="outline">
                 <Plus className="h-4 w-4" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             )}
           </div>
@@ -826,9 +855,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-grey-600">
-              <FileCode className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-              <p className="text-sm">No variables configured</p>
+            <div className="text-center py-8">
+              <FileCode className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <p className="text-sm text-grey-600 mb-2">No variables configured yet</p>
+              <p className="text-xs text-grey-500">
+                Add variables to store dynamic configuration values
+              </p>
               {isInternalApp && (
                 <Button size="sm" className="mt-2" variant="outline">
                   <Plus className="h-4 w-4" />
@@ -842,11 +874,15 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         {/* Constants */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-grey">Constants</h2>
+            <div className="flex items-center gap-2">
+              <FileCode className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Constants</h2>
+              <span className="text-sm text-grey-600">({constantsCount})</span>
+            </div>
             {isInternalApp && (
               <Button size="sm" className="gap-2" variant="outline">
                 <Plus className="h-4 w-4" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             )}
           </div>
@@ -871,9 +907,12 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-grey-600">
-              <FileCode className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-              <p className="text-sm">No constants configured</p>
+            <div className="text-center py-8">
+              <FileCode className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <p className="text-sm text-grey-600 mb-2">No constants configured yet</p>
+              <p className="text-xs text-grey-500">
+                Add constants to store fixed configuration values
+              </p>
               {isInternalApp && (
                 <Button size="sm" className="mt-2" variant="outline">
                   <Plus className="h-4 w-4" />

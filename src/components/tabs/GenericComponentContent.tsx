@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, Edit, Trash2, Activity, MessageSquare, Settings2, Box, Timer, Bell } from 'lucide-react';
+import { Copy, Eye, EyeOff, Edit, Trash2, Activity, Heart, MessageSquare, Settings2, Box, Timer, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -26,7 +26,7 @@ const componentConfig: Record<string, {
     ],
   },
   healthcheck: {
-    icon: Activity,
+    icon: Heart,
     title: 'Health Check',
     color: 'bg-green/10 text-green',
     fields: [

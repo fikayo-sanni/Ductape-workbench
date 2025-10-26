@@ -14,6 +14,7 @@ import {
   Shield,
   BarChart3,
   Activity,
+  Heart,
   ListTree,
   Key
 } from 'lucide-react';
@@ -71,7 +72,7 @@ const newItemOptions: NewItemOption[] = [
   },
   {
     id: 'storage',
-    label: 'Storage',
+    label: 'Storage Bucket',
     icon: HardDrive,
     description: 'Add cloud storage to product',
     category: 'product',
@@ -93,7 +94,7 @@ const newItemOptions: NewItemOption[] = [
   {
     id: 'healthcheck',
     label: 'Healthcheck',
-    icon: Activity,
+    icon: Heart,
     description: 'Add health monitoring',
     category: 'product',
   },

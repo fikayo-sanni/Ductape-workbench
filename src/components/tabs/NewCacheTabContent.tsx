@@ -3,9 +3,11 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Zap, Save, CheckCircle } from 'lucide-react';
+import { Zap, Save, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+import { useDuctape } from '@/hooks/useDuctape';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface NewCacheTabContentProps {
   tabId: string;
@@ -14,7 +16,8 @@ interface NewCacheTabContentProps {
 
 export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
-  const { currentWorkspaceId } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
 
   // Extract product context from data
   const product = data?.productId ? {
@@ -22,15 +25,54 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
     name: data.productName,
     tag: data.productTag,
     logo: data.productLogo,
-    envs: data.productEnvs || []
+    envs: data.productEnvs || [],
+    workspace_id: data.workspaceId || currentWorkspaceId
   } : null;
 
-
+  // Initialize Ductape SDK
+  const ductape = useDuctape({
+    workspace_id: product?.workspace_id || currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product'
+  }) as any;
 
   const [formData, setFormData] = useState({
     name: '',
     tag: '',
     expiry: '3600000', // Default: 1 hour in milliseconds
+  });
+
+  // Create cache mutation
+  const { mutateAsync: createCache, isPending: isCreating } = useMutation({
+    mutationFn: async (values: { name: string; tag: string; expiry: number }) => {
+      if (!ductape) throw new Error('Product not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
+
+      await ductape.init(product.tag);
+      const cache = await ductape.caches.create({
+        name: values.name,
+        tag: values.tag,
+        expiry: values.expiry,
+      });
+      return cache;
+    },
+    onSuccess: (cache) => {
+      queryClient.invalidateQueries({ queryKey: ['caches'] });
+      closeTab(tabId);
+      openTab({
+        id: `cache-${cache._id}-${Date.now()}`,
+        type: 'cache',
+        title: cache.name,
+        itemId: cache._id,
+        data: { ...cache, componentType: 'cache', productName: product?.name },
+      });
+      toast.success('Cache created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create cache');
+    },
   });
 
   const handleSave = async () => {
@@ -50,35 +92,19 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
       return;
     }
 
-    if (!data?.productId) {
+    if (!data?.productId || !product) {
       toast.error('No product selected');
       return;
     }
 
     try {
-      const newCache = {
-        _id: `cache-${Date.now()}`,
+      await createCache({
         name: formData.name,
         tag: formData.tag,
         expiry: expiryNum,
-        product_id: data.productId,
-        workspace_id: currentWorkspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      closeTab(tabId);
-      openTab({
-        id: `cache-${newCache._id}-${Date.now()}`,
-        type: 'cache',
-        title: formData.name,
-        itemId: newCache._id,
-        data: { ...newCache, componentType: 'cache', productName: data.productName, ttl: expiryNum.toString() },
       });
-
-      toast.success('Cache created successfully');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create cache');
+      // Error already handled in mutation
     }
   };
 
@@ -175,14 +201,20 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
             <Label htmlFor="tag" className="required">
               Tag
             </Label>
-            <Input
-              id="tag"
-              placeholder="e.g., api_response_cache"
-              value={formData.tag}
-              onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-              className="mt-2"
-            />
-            <p className="text-xs text-grey-600 mt-1">Unique identifier (auto-generated from name)</p>
+            <div className="flex gap-2 mt-2">
+              <Input
+                id="tag"
+                placeholder="e.g., my-product:api-response-cache"
+                value={formData.tag}
+                onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+              />
+              <Button variant="outline" onClick={() => handleNameChange(formData.name)} size="sm">
+                Auto-generate
+              </Button>
+            </div>
+            <p className="text-xs text-grey-600 mt-1">
+              Format: product-name:cache-name (auto-generated from cache name)
+            </p>
           </div>
 
           {/* Expiry */}
@@ -254,12 +286,21 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
-            <Button variant="outline" onClick={handleCancel}>
+            <Button variant="outline" onClick={handleCancel} disabled={isCreating}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="gap-2">
-              <Save className="h-4 w-4" />
-              Create Cache
+            <Button onClick={handleSave} className="gap-2" disabled={isCreating}>
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Create Cache
+                </>
+              )}
             </Button>
           </div>
         </div>

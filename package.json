@@ -18,10 +18,7 @@
     "node": ">=20.0.0 <21.0.0"
   },
   "overrides": {
-    "node-expat": "npm:noop2@latest",
-    "xml2json": {
-      "node-expat": "npm:noop2@latest"
-    }
+    "node-expat": "npm:noop2@latest"
   },
   "dependencies": {
     "@ductape/sdk": "^0.0.4-v19",
@@ -46,6 +43,7 @@
     "@types/intro.js": "^5.1.5",
     "@wojtekmaj/react-hooks": "^2.0.4",
     "axios": "^1.7.7",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",

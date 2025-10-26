@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Database as DatabaseIcon, Save, ChevronRight, Loader2, CheckCircle } fr
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
+import { useDuctape } from '@/hooks/useDuctape';
 
 interface NewDatabaseTabContentProps {
   tabId: string;
@@ -24,6 +25,7 @@ interface EnvConnection {
 export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
 
   // Extract product context from data
   const product = data?.productId ? {
@@ -31,8 +33,18 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
     name: data.productName,
     tag: data.productTag,
     logo: data.productLogo,
-    envs: data.productEnvs || []
+    envs: data.productEnvs || [],
+    workspace_id: data.workspaceId || currentWorkspaceId
   } : null;
+
+  // Initialize Ductape SDK
+  const ductape = useDuctape({
+    workspace_id: product?.workspace_id || currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product'
+  }) as any;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -86,11 +98,39 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
       port: '27017',
       example: 'mongodb://username:password@localhost:27017/database_name',
     },
-    redis: {
-      port: '6379',
-      example: 'redis://username:password@localhost:6379',
-    },
   };
+
+  // Create database mutation
+  const { mutateAsync: createDatabase, isPending: isCreating } = useMutation({
+    mutationFn: async (values: { name: string; tag: string; type: string; envs: Array<{ slug: string; connection_url: string }> }) => {
+      if (!ductape) throw new Error('Product not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
+
+      await ductape.init(product.tag);
+      const database = await ductape.databases.create({
+        name: values.name,
+        tag: values.tag,
+        type: values.type.toLowerCase(),
+        envs: values.envs,
+      });
+      return database;
+    },
+    onSuccess: (database) => {
+      queryClient.invalidateQueries({ queryKey: ['databases'] });
+      closeTab(tabId);
+      openTab({
+        id: `database-${database._id}-${Date.now()}`,
+        type: 'database',
+        title: database.name,
+        itemId: database._id,
+        data: { ...database, componentType: 'database', productName: product?.name },
+      });
+      toast.success('Database created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create database');
+    },
+  });
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
@@ -122,14 +162,13 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
       }
     }
 
-    if (!data?.productId) {
+    if (!data?.productId || !product) {
       toast.error('No product selected');
       return;
     }
 
     try {
-      const newDatabase = {
-        _id: `database-${Date.now()}`,
+      await createDatabase({
         name: formData.name,
         tag: formData.tag,
         type: formData.type,
@@ -139,24 +178,9 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
             slug: env.slug,
             connection_url: env.connection_url,
           })),
-        product_id: data.productId,
-        workspace_id: currentWorkspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      closeTab(tabId);
-      openTab({
-        id: `database-${newDatabase._id}-${Date.now()}`,
-        type: 'database',
-        title: formData.name,
-        itemId: newDatabase._id,
-        data: { ...newDatabase, componentType: 'database', productName: data.productName },
       });
-
-      toast.success('Database created successfully');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create database');
+      // Error already handled in mutation
     }
   };
 
@@ -270,14 +294,20 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
               <Label htmlFor="tag" className="required">
                 Tag
               </Label>
-              <Input
-                id="tag"
-                placeholder="e.g., production_database"
-                value={formData.tag}
-                onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                className="mt-2"
-              />
-              <p className="text-xs text-grey-600 mt-1">Unique identifier (auto-generated from name)</p>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="tag"
+                  placeholder="e.g., my-product:production-database"
+                  value={formData.tag}
+                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                />
+                <Button variant="outline" onClick={() => handleNameChange(formData.name)} size="sm">
+                  Auto-generate
+                </Button>
+              </div>
+              <p className="text-xs text-grey-600 mt-1">
+                Format: product-name:database-name (auto-generated from database name)
+              </p>
             </div>
 
             <div>
@@ -299,7 +329,7 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
             </div>
 
             {!showEnvs && (
-              <Button onClick={handleContinue} className="w-full gap-2">
+              <Button onClick={handleContinue} className="gap-2">
                 Continue to Connection URLs
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -350,13 +380,22 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
 
           {/* Actions */}
           {showEnvs && (
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
-              <Button variant="outline" onClick={handleCancel}>
+            <div className="flex items-center justify-end gap-3 pt-4 border-grey-400">
+              <Button variant="outline" onClick={handleCancel} disabled={isCreating}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="gap-2">
-                <Save className="h-4 w-4" />
-                Create Database
+              <Button onClick={handleSave} className="gap-2" disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Create Database
+                  </>
+                )}
               </Button>
             </div>
           )}

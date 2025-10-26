@@ -4,6 +4,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFetchWorkspaces } from '@/hooks/useWorkspaceQueries';
 import workspaceServices from '@/services/workspaceServices';
+import productServices from '@/services/productServices';
 import toast from 'react-hot-toast';
 import { Button } from './ui/button';
 import {
@@ -19,7 +20,6 @@ import {
   Settings,
   User,
   Plus,
-  Upload,
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import NewItemDropdown from './NewItemDropdown';
@@ -34,7 +34,7 @@ interface ApiError {
 }
 
 export default function WorkbenchHeader() {
-  const { user, logout, setUser, setCurrentWorkspaceId } = useAuth();
+  const { user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId } = useAuth();
   const { openTab, activeView, setActiveView } = useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -132,7 +132,7 @@ export default function WorkbenchHeader() {
     window.location.reload(); // Refresh to show login modal
   };
 
-  const handleNewItem = (itemId: string) => {
+  const handleNewItem = async (itemId: string) => {
     // If on dashboard, switch to products view first
     if (activeView === 'dashboard') {
       setActiveView('products');
@@ -149,7 +149,7 @@ export default function WorkbenchHeader() {
 
     // For "product" and "app", don't need product selection modal
     if (itemId === 'product' || itemId === 'app') {
-      createTab(itemId, null, null);
+      await createTab(itemId, null, null);
       return;
     }
 
@@ -157,7 +157,7 @@ export default function WorkbenchHeader() {
     setShowProductModal(true);
   };
 
-  const handleProductSelect = (productId: string) => {
+  const handleProductSelect = async (productId: string) => {
     setSelectedProductId(productId);
     setShowProductModal(false);
 
@@ -166,13 +166,13 @@ export default function WorkbenchHeader() {
       setShowAppModal(true);
     } else {
       // For other items, create the tab directly
-      createTab(pendingItemType!, productId, null);
+      await createTab(pendingItemType!, productId, null);
       setPendingItemType(null);
       setSelectedProductId(null);
     }
   };
 
-  const handleAppSelect = (appId: string, app?: any) => {
+  const handleAppSelect = async (appId: string, app?: any) => {
     setShowAppModal(false);
 
     // For requests, create a request tab with app context (no product required)
@@ -206,7 +206,7 @@ export default function WorkbenchHeader() {
         isDirty: true,
       });
     } else {
-      createTab(pendingItemType!, selectedProductId, appId);
+      await createTab(pendingItemType!, selectedProductId, appId);
     }
 
     setPendingItemType(null);
@@ -242,7 +242,7 @@ export default function WorkbenchHeader() {
     // Don't clear pendingItemType - we'll reopen the modal after product is created
   };
 
-  const createTab = (itemType: string, productId: string | null, appId: string | null) => {
+  const createTab = async (itemType: string, productId: string | null, appId: string | null) => {
     const tabId = `${itemType}-${Date.now()}`;
     const titleMap: Record<string, string> = {
       request: 'New Request',
@@ -261,15 +261,73 @@ export default function WorkbenchHeader() {
       job: 'New Job',
     };
 
+    let productData = null;
+    
+    // Fetch complete product data if productId is provided
+    if (productId && user?._id && user?.public_key) {
+      try {
+        const productResponse = await productServices.fetchProduct({
+          product_id: productId,
+          user_id: user._id,
+          public_key: user.public_key,
+          workspace_id: currentWorkspaceId || '',
+        });
+        
+        if (productResponse?.data) {
+          productData = productResponse.data;
+        }
+      } catch (error) {
+        console.error('Failed to fetch product data:', error);
+        toast.error('Failed to load product information');
+      }
+    }
+
+    // Fetch connected apps if we have product data
+    let connectedApps = [];
+    if (productData && user?._id && user?.public_key) {
+      try {
+        const appsResponse = await productServices.fetchProductApps({
+          product_id: productId!,
+          user_id: user._id,
+          public_key: user.public_key,
+          workspace_id: currentWorkspaceId || '',
+        });
+        connectedApps = appsResponse?.data || [];
+      } catch (error) {
+        console.error('Failed to fetch product apps:', error);
+        // Don't show error toast for apps, just continue with empty array
+      }
+    }
+
     openTab({
       id: tabId,
       type: itemType as any,
       title: titleMap[itemType] || `New ${itemType}`,
       data: {
+        // Basic data
         productId,
         appId,
         isNew: true,
         componentType: itemType,
+        
+        // Complete product context (if available)
+        ...(productData && {
+          productName: productData.name,
+          productTag: productData.tag,
+          productLogo: productData.logo,
+          productEnvs: productData.envs || [],
+          workspaceId: currentWorkspaceId || '',
+          productApps: connectedApps,
+          productDatabases: productData.databases || [],
+          productMessageBroker: productData.messageBroker || [],
+          productNotifications: productData.notifications || [],
+          productStorage: productData.storage || [],
+          productJobs: productData.jobs || [],
+          productQuota: productData.quota || [],
+          productFallback: productData.fallback || [],
+          productCaches: productData.caches || [],
+          productFeatures: productData.features || [],
+        }),
       },
       isDirty: true,
     });
@@ -346,7 +404,7 @@ export default function WorkbenchHeader() {
       {/* Action Buttons - Compact on mobile */}
       <div className="flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
         <NewItemDropdown onSelect={handleNewItem} />
-        <Button
+        {/*<Button
           onClick={() => setShowImportDialog(true)}
           variant="outline"
           size="sm"
@@ -354,7 +412,7 @@ export default function WorkbenchHeader() {
         >
           <Upload className="h-4 w-4 md:mr-2" />
           <span className="hidden md:inline">Import</span>
-        </Button>
+        </Button>*/}
       </div>
 
       {/* User Section */}

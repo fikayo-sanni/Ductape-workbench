@@ -1,29 +1,18 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  HardDrive,
-  Database,
-  Zap,
-  Activity,
-  MessageSquare,
-  Settings2,
-  Box,
-  Timer,
-  Save,
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save } from 'lucide-react';
+import { DataTypes, FeatureEventTypes } from '@ductape/sdk/dist/types';
+import { IFeatureInput } from '@ductape/sdk/dist/types';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+import { useDuctape } from '@/hooks/useDuctape';
 
 interface NewFeatureTabContentProps {
   tabId: string;
@@ -31,427 +20,2226 @@ interface NewFeatureTabContentProps {
   data?: any;
 }
 
-const featureConfig: Record<
-  string,
-  {
-    icon: any;
-    title: string;
-    description: string;
-    color: string;
-    fields: Array<{
+interface Component {
+  id: string;
+  type: FeatureEventTypes;
+  tag: string;
       name: string;
-      label: string;
-      type: 'text' | 'textarea' | 'select';
-      required?: boolean;
-      placeholder?: string;
-      options?: Array<{ value: string; label: string }>;
-      description?: string;
-    }>;
-  }
-> = {
-  storage: {
-    icon: HardDrive,
-    title: 'Storage Configuration',
-    description: 'Configure cloud storage for file uploads and management',
-    color: 'bg-blue-500/10 text-blue-500',
-    fields: [
-      { name: 'name', label: 'Storage Name', type: 'text', required: true, placeholder: 'e.g., Production Storage' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., prod-storage' },
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'aws-s3', label: 'AWS S3' },
-          { value: 'azure-blob', label: 'Azure Blob Storage' },
-          { value: 'gcp-cloud-storage', label: 'Google Cloud Storage' },
-        ],
-      },
-      { name: 'bucket', label: 'Bucket/Container Name', type: 'text', required: true, placeholder: 'my-bucket' },
-      { name: 'region', label: 'Region', type: 'text', placeholder: 'us-east-1' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this storage configuration...' },
-    ],
-  },
-  cache: {
-    icon: Zap,
-    title: 'Cache Configuration',
-    description: 'Set up caching to improve performance',
-    color: 'bg-yellow/10 text-yellow',
-    fields: [
-      { name: 'name', label: 'Cache Name', type: 'text', required: true, placeholder: 'e.g., API Cache' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., api-cache' },
-      {
-        name: 'provider',
-        label: 'Provider',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'redis', label: 'Redis' },
-          { value: 'memcached', label: 'Memcached' },
-          { value: 'in-memory', label: 'In-Memory' },
-        ],
-      },
-      { name: 'ttl', label: 'TTL (seconds)', type: 'text', placeholder: '3600', description: 'Time to live for cached items' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this cache configuration...' },
-    ],
-  },
-  database: {
-    icon: Database,
-    title: 'Database Configuration',
-    description: 'Configure database connections',
-    color: 'bg-green/10 text-green',
-    fields: [
-      { name: 'name', label: 'Database Name', type: 'text', required: true, placeholder: 'e.g., Production DB' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., prod-db' },
-      {
-        name: 'type',
-        label: 'Database Type',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'postgresql', label: 'PostgreSQL' },
-          { value: 'mysql', label: 'MySQL' },
-          { value: 'mongodb', label: 'MongoDB' },
-          { value: 'redis', label: 'Redis' },
-        ],
-      },
-      { name: 'host', label: 'Host', type: 'text', required: true, placeholder: 'localhost' },
-      { name: 'port', label: 'Port', type: 'text', placeholder: '5432' },
-      { name: 'database', label: 'Database Name', type: 'text', required: true, placeholder: 'mydb' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this database...' },
-    ],
-  },
-  'message-broker': {
-    icon: MessageSquare,
-    title: 'Message Broker Configuration',
-    description: 'Set up message queues and pub/sub systems',
-    color: 'bg-purple-500/10 text-purple-500',
-    fields: [
-      { name: 'name', label: 'Broker Name', type: 'text', required: true, placeholder: 'e.g., Production Queue' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., prod-queue' },
-      {
-        name: 'type',
-        label: 'Broker Type',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'rabbitmq', label: 'RabbitMQ' },
-          { value: 'kafka', label: 'Apache Kafka' },
-          { value: 'redis', label: 'Redis Pub/Sub' },
-          { value: 'sqs', label: 'AWS SQS' },
-        ],
-      },
-      { name: 'host', label: 'Host', type: 'text', required: true, placeholder: 'localhost' },
-      { name: 'port', label: 'Port', type: 'text', placeholder: '5672' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this message broker...' },
-    ],
-  },
-  session: {
-    icon: Activity,
-    title: 'Session Configuration',
-    description: 'Configure session management',
-    color: 'bg-orange-500/10 text-orange-500',
-    fields: [
-      { name: 'name', label: 'Session Name', type: 'text', required: true, placeholder: 'e.g., User Sessions' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., user-sessions' },
-      {
-        name: 'store',
-        label: 'Session Store',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'redis', label: 'Redis' },
-          { value: 'memory', label: 'Memory' },
-          { value: 'mongodb', label: 'MongoDB' },
-        ],
-      },
-      { name: 'ttl', label: 'Session TTL (seconds)', type: 'text', placeholder: '86400', description: 'Session expiry time' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe session configuration...' },
-    ],
-  },
-  healthcheck: {
-    icon: Activity,
-    title: 'Health Check Configuration',
-    description: 'Set up health monitoring for your services',
-    color: 'bg-green/10 text-green',
-    fields: [
-      { name: 'name', label: 'Health Check Name', type: 'text', required: true, placeholder: 'e.g., API Health' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., api-health' },
-      { name: 'endpoint', label: 'Endpoint', type: 'text', required: true, placeholder: '/health' },
-      { name: 'interval', label: 'Check Interval (seconds)', type: 'text', placeholder: '60' },
-      { name: 'timeout', label: 'Timeout (seconds)', type: 'text', placeholder: '10' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this health check...' },
-    ],
-  },
-  notification: {
-    icon: MessageSquare,
-    title: 'Notification Configuration',
-    description: 'Configure notification channels',
-    color: 'bg-blue-500/10 text-blue-500',
-    fields: [
-      { name: 'name', label: 'Notification Name', type: 'text', required: true, placeholder: 'e.g., Email Notifications' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., email-notif' },
-      {
-        name: 'channel',
-        label: 'Channel',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'email', label: 'Email' },
-          { value: 'sms', label: 'SMS' },
-          { value: 'push', label: 'Push Notification' },
-          { value: 'webhook', label: 'Webhook' },
-        ],
-      },
-      { name: 'provider', label: 'Provider', type: 'text', placeholder: 'e.g., SendGrid, Twilio' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this notification setup...' },
-    ],
-  },
-  fallback: {
-    icon: Settings2,
-    title: 'Fallback Configuration',
-    description: 'Define fallback behavior for failed requests',
-    color: 'bg-red/10 text-red',
-    fields: [
-      { name: 'name', label: 'Fallback Name', type: 'text', required: true, placeholder: 'e.g., API Fallback' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., api-fallback' },
-      {
-        name: 'strategy',
-        label: 'Strategy',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'retry', label: 'Retry' },
-          { value: 'cache', label: 'Use Cache' },
-          { value: 'default', label: 'Default Response' },
-        ],
-      },
-      { name: 'max_retries', label: 'Max Retries', type: 'text', placeholder: '3' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe fallback behavior...' },
-    ],
-  },
-  quota: {
-    icon: Timer,
-    title: 'Quota Configuration',
-    description: 'Set up rate limiting and quotas',
-    color: 'bg-orange-500/10 text-orange-500',
-    fields: [
-      { name: 'name', label: 'Quota Name', type: 'text', required: true, placeholder: 'e.g., API Rate Limit' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., api-quota' },
-      { name: 'limit', label: 'Request Limit', type: 'text', required: true, placeholder: '1000' },
-      {
-        name: 'window',
-        label: 'Time Window',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'minute', label: 'Per Minute' },
-          { value: 'hour', label: 'Per Hour' },
-          { value: 'day', label: 'Per Day' },
-          { value: 'month', label: 'Per Month' },
-        ],
-      },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe quota rules...' },
-    ],
-  },
-  job: {
-    icon: Box,
-    title: 'Job Configuration',
-    description: 'Configure scheduled or background jobs',
-    color: 'bg-purple-500/10 text-purple-500',
-    fields: [
-      { name: 'name', label: 'Job Name', type: 'text', required: true, placeholder: 'e.g., Daily Report' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'e.g., daily-report' },
-      {
-        name: 'type',
-        label: 'Job Type',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'scheduled', label: 'Scheduled (Cron)' },
-          { value: 'recurring', label: 'Recurring' },
-          { value: 'one-time', label: 'One-time' },
-        ],
-      },
-      { name: 'schedule', label: 'Schedule (Cron)', type: 'text', placeholder: '0 0 * * *', description: 'Cron expression for scheduling' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe what this job does...' },
-    ],
-  },
+  app?: string;
+  database?: string;
+  category: string;
+  action?: any; // IAppAction from the SDK
+}
+
+interface FeatureBuilderState {
+  // Feature Details
+  featureName: string;
+  featureDescription: string;
+  featureTag: string;
+  storeEventResults: boolean;
+
+  // Session
+  selectedSession: string;
+  includeSession: boolean;
+
+  // Components
+  selectedComponents: Component[];
+
+  // Feature Inputs
+  featureInputs: Record<string, IFeatureInput>;
+
+  // Sequences
+  sequences: Array<{
+    id: string;
+    name: string;
+    components: string[];
+  }>;
+
+  // Component Inputs
+  componentInputs: Record<string, Record<string, any>>;
+
+  // Feature Output
+  featureOutput: Record<string, string | Record<string, string | object>>;
+
+  // Cache Configuration
+  componentCache: Record<string, string>;
+}
+
+const INITIAL_STATE: FeatureBuilderState = {
+  featureName: '',
+  featureDescription: '',
+  featureTag: '',
+  storeEventResults: false,
+  selectedSession: '',
+  includeSession: false,
+  selectedComponents: [],
+  featureInputs: {},
+  sequences: [{ id: 'main', name: 'First sequence', components: [] }],
+  componentInputs: {},
+  featureOutput: {},
+  componentCache: {},
 };
 
-export default function NewFeatureTabContent({ tabId, type, data }: NewFeatureTabContentProps) {
+const DATA_TYPES = [
+  { value: DataTypes.STRING, label: 'String' },
+  { value: DataTypes.NOSPACES_STRING, label: 'No Spaces String' },
+  { value: DataTypes.EMAIL_STRING, label: 'Email String' },
+  { value: DataTypes.NUMBER_STRING, label: 'Number String' },
+  { value: DataTypes.DATE_STRING, label: 'Date String' },
+  { value: DataTypes.INTEGER, label: 'Integer' },
+  { value: DataTypes.FLOAT, label: 'Float' },
+  { value: DataTypes.DOUBLE, label: 'Double' },
+  { value: DataTypes.UUID, label: 'UUID' },
+  { value: DataTypes.DATE, label: 'Date' },
+  { value: DataTypes.ARRAY, label: 'Array' },
+  { value: DataTypes.OBJECT, label: 'Object' },
+  { value: DataTypes.BOOLEAN, label: 'Boolean' },
+  { value: DataTypes.STRING_ARRAY, label: 'String Array' },
+  { value: DataTypes.INTEGER_ARRAY, label: 'Integer Array' },
+  { value: DataTypes.FLOAT_ARRAY, label: 'Float Array' },
+  { value: DataTypes.DOUBLE_ARRAY, label: 'Double Array' },
+  { value: DataTypes.UUID_ARRAY, label: 'UUID Array' },
+  { value: DataTypes.BOOLEAN_ARRAY, label: 'Boolean Array' },
+];
+
+// Ductape Operators with adaptive argument configuration
+// const DUCTAPE_OPERATORS = [
+//   { 
+//     value: 'Add', 
+//     label: 'Add - Sum multiple numeric values', 
+//     minArgs: 1, 
+//     maxArgs: 10, 
+//     argTypes: ['value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value'],
+//     canAddArgs: true
+//   },
+//   // ... other operators
+// ];
+
+// Animated Arrow Component
+const AnimatedArrow = () => (
+  <div className="flex justify-center items-center py-6">
+    <div className="animate-bounce text-grey-400">
+      <ArrowDown className="w-5 h-5" />
+    </div>
+  </div>
+);
+
+export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
-  const { currentWorkspaceId } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
 
-  const config = featureConfig[type] || {
-    icon: Settings2,
-    title: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-    description: `Configure ${type}`,
-    color: 'bg-primary/10 text-primary',
-    fields: [
-      { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Enter name' },
-      { name: 'tag', label: 'Tag', type: 'text', required: true, placeholder: 'Enter tag' },
-      { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter description' },
-    ],
-  };
+  // Extract product context from data
+  const product = data?.productId ? {
+    _id: data.productId,
+    name: data.productName,
+    tag: data.productTag,
+    logo: data.productLogo,
+    envs: data.productEnvs || [],
+    workspace_id: data.workspaceId || currentWorkspaceId,
+    apps: data.productApps || [],
+    features: data.productFeatures || [],
+    databases: data.productDatabases || [],
+    storage: data.productStorage || [],
+    notifications: data.productNotifications || [],
+    messageBroker: data.productMessageBroker || [],
+    jobs: data.productJobs || [],
+    quota: data.productQuota || [],
+    fallback: data.productFallback || [],
+    caches: data.productCaches || [],
+  } : null;
 
-  const Icon = config.icon;
+  const [state, setState] = useState<FeatureBuilderState>(INITIAL_STATE);
+  const [showAddComponent, setShowAddComponent] = useState(false);
+  const [newComponent, setNewComponent] = useState({
+    type: '',
+    parentId: '',
+    childId: ''
+  });
+  const [, setDraggedComponent] = useState<string | null>(null);
+  const [, setDraggedFromSequence] = useState<string | null>(null);
+  const [newInputName, setNewInputName] = useState<string>('');
+  const [showAddInput, setShowAddInput] = useState<boolean>(false);
+  const [actionSearchTerm, setActionSearchTerm] = useState<string>('');
+  const [editingActionSearch, setEditingActionSearch] = useState<string>('');
+  const [addInputFromMapping, setAddInputFromMapping] = useState<boolean>(false);
+  const [mappingVariableKey, setMappingVariableKey] = useState<string>('');
+  const [mappingComponentId, setMappingComponentId] = useState<string>('');
+  const [newInputType, setNewInputType] = useState<DataTypes>(DataTypes.STRING);
+  const [newInputMinLength, setNewInputMinLength] = useState<number>(0);
+  const [newInputMaxLength, setNewInputMaxLength] = useState<number>(0);
+  const [sourceVariable, setSourceVariable] = useState<any>(null);
+  const addInputFormRef = useRef<HTMLDivElement>(null);
+  const [editingComponent, setEditingComponent] = useState<string | null>(null);
+  const [editingComponentName, setEditingComponentName] = useState<string>('');
+  // const [selectedAppId, setSelectedAppId] = useState<string>('');
 
-  const [formData, setFormData] = useState<Record<string, string>>(
-    config.fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
+  // Update form values when sourceVariable changes
+  useEffect(() => {
+    if (sourceVariable && addInputFromMapping) {
+      setNewInputType(sourceVariable.dataType || DataTypes.STRING);
+      setNewInputMinLength(sourceVariable.minLength || 0);
+      setNewInputMaxLength(sourceVariable.maxLength || 0);
+    }
+  }, [sourceVariable, addInputFromMapping]);
+
+  const [dataMappings, setDataMappings] = useState<Record<string, Record<string, {
+    source: 'input' | 'sequence' | 'session' | 'auth' | 'variables' | 'constants' | 'data' | 'filterData' | 'hardcode' | 'default' | 'operator';
+    inputField?: string;
+    sequenceId?: string;
+    eventId?: string;
+    responseField?: string;
+    selectedValue?: string;
+    authField?: string;
+    operatorType?: string;
+    operatorArgs?: Array<{
+      source: string;
+      code: string;
+      argType?: string;
+      inputField?: string;
+      sequenceId?: string;
+      eventId?: string;
+      responseField?: string;
+      selectedValue?: string;
+      operatorType?: string;
+      operatorArgs?: Array<{
+        source: string;
+        code: string;
+        argType?: string;
+      }>;
+    }>;
+    code: string;
+  }>>>({});
+  const [currentSequenceId, setCurrentSequenceId] = useState<string>('main');
+  const [editingFieldNames, setEditingFieldNames] = useState<Record<string, string>>({});
+
+  // Initialize Ductape SDK
+  const ductape = useDuctape({
+    workspace_id: product?.workspace_id || currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product',
+  }) as any;
+
+  // Auto-generate tag from name
+  useEffect(() => {
+    if (state.featureName) {
+      const tag = state.featureName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+      setState(prev => ({ ...prev, featureTag: tag }));
+    }
+  }, [state.featureName]);
+
+  // Cache options
+  const cacheOptions = useMemo(() =>
+    product?.caches?.map((cache: any) => ({
+      value: cache._id,
+      label: cache.name || cache.tag,
+      tag: cache.tag
+    })) || [],
+    [product?.caches]
   );
 
-  const handleSave = async () => {
-    // Validate required fields
-    const missingFields = config.fields
-      .filter((field) => field.required && !formData[field.name]?.trim())
-      .map((field) => field.label);
+  // Available events organized hierarchically
+  const availableComponents = useMemo(() => {
+    const components: Record<string, Record<string, Component[]>> = {};
 
-    if (missingFields.length > 0) {
-      toast.error(`Please fill in: ${missingFields.join(', ')}`);
-      return;
+    // Add database actions
+    product?.databases?.forEach((db: any) => {
+      if (db.actions?.length > 0) {
+        if (!components['Databases']) components['Databases'] = {};
+        components['Databases'][db.name || db.tag] = db.actions.map((action: any) => ({
+          id: `db-${db._id}-${action._id}`,
+          type: FeatureEventTypes.DB_ACTION,
+          tag: `${db.tag}:${action.tag}`,
+          name: action.name,
+          database: db.tag,
+          category: 'Databases',
+          action: action
+        }));
+      }
+    });
+
+    // Add actions from product apps
+    if (product?.apps && product.apps.length > 0) {
+      product.apps.forEach((app: any) => {
+        if (!components['Applications']) components['Applications'] = {};
+        components['Applications'][app.app_name] = [{
+          id: `app-${app.app_id}`,
+          type: FeatureEventTypes.ACTION,
+          tag: app.access_tag,
+          name: app.app_name,
+          app: app.access_tag,
+          category: 'Applications'
+        }];
+      });
     }
 
-    if (!data?.productId) {
-      toast.error('No product selected');
-      return;
-    }
-
-    try {
-      // TODO: Implement actual API call
-      const newFeature = {
-        _id: `${type}-${Date.now()}`,
-        ...formData,
-        type,
-        product_id: data.productId,
-        workspace_id: currentWorkspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    // Add notifications
+    if (product?.notifications?.length && product.notifications.length > 0) {
+      components['Notifications'] = {
+        'Notifications': product.notifications.map((notification: any) => ({
+          id: `notification-${notification._id}`,
+          type: FeatureEventTypes.NOTIFICATION,
+          tag: notification.tag,
+          name: notification.name,
+          category: 'Notifications'
+        }))
       };
+    }
 
-      closeTab(tabId);
+    // Add storage
+    if (product?.storage?.length && product.storage.length > 0) {
+      components['Storage'] = {
+        'Storage': product.storage.map((storage: any) => ({
+          id: `storage-${storage._id}`,
+          type: FeatureEventTypes.STORAGE,
+          tag: storage.tag,
+          name: storage.name,
+          category: 'Storage'
+        }))
+      };
+    }
 
-      openTab({
-        id: `${type}-${newFeature._id}-${Date.now()}`,
-        type: type as any,
-        title: formData.name,
-        itemId: newFeature._id,
-        data: { ...newFeature, componentType: type, productName: data.productName },
+    // Add message brokers
+    product?.messageBroker?.forEach((broker: any) => {
+      if (broker.messages?.length > 0) {
+        if (!components['Message Brokers']) components['Message Brokers'] = {};
+        components['Message Brokers'][broker.name || broker.tag] = broker.messages.map((message: any) => ({
+          id: `broker-${broker._id}-${message._id}`,
+          type: FeatureEventTypes.PUBLISH,
+          tag: `${broker.tag}:${message.tag}`,
+          name: message.name,
+          category: 'Message Brokers'
+        }));
+      }
+    });
+
+    // Add jobs
+    if (product?.jobs?.length && product.jobs.length > 0) {
+      components['Jobs'] = {
+        'Jobs': product.jobs.map((job: any) => ({
+          id: `job-${job._id}`,
+          type: FeatureEventTypes.JOB,
+          tag: job.tag,
+          name: job.name,
+          category: 'Jobs'
+        }))
+      };
+    }
+
+    // Add quotas
+    if (product?.quota?.length && product.quota.length > 0) {
+      components['Quotas'] = {
+        'Quotas': product.quota.map((quota: any) => ({
+          id: `quota-${quota._id}`,
+          type: FeatureEventTypes.QUOTA,
+          tag: quota.tag,
+          name: quota.name,
+          category: 'Quotas'
+        }))
+      };
+    }
+
+    // Add fallbacks
+    if (product?.fallback?.length && product.fallback.length > 0) {
+      components['Fallbacks'] = {
+        'Fallbacks': product.fallback.map((fallback: any) => ({
+          id: `fallback-${fallback._id}`,
+          type: FeatureEventTypes.FALLBACK,
+          tag: fallback.tag,
+          name: fallback.name,
+          category: 'Fallbacks'
+        }))
+      };
+    }
+
+    // Ensure Applications is always available
+    if (!components['Applications']) {
+      components['Applications'] = {};
+    }
+
+    return components;
+  }, [product]);
+
+  const extractActionVariables = (action: any) => {
+    const variables: any[] = [];
+
+    // Extract from params
+    if (action.params?.data && Array.isArray(action.params.data)) {
+      action.params.data.forEach((param: any) => {
+        variables.push({
+          ...param,
+          category: 'params',
+          source: 'params'
+        });
+      });
+    }
+
+    // Extract from query
+    if (action.query?.data && Array.isArray(action.query.data)) {
+      action.query.data.forEach((query: any) => {
+        variables.push({
+          ...query,
+          category: 'query',
+          source: 'query'
+        });
+      });
+    }
+
+    // Extract from headers
+    if (action.headers?.data && Array.isArray(action.headers.data)) {
+      action.headers.data.forEach((header: any) => {
+        variables.push({
+          ...header,
+          category: 'headers',
+          source: 'headers'
+        });
+      });
+    }
+
+    // Extract from body
+    if (action.body?.data && Array.isArray(action.body.data)) {
+      action.body.data.forEach((body: any) => {
+        variables.push({
+          ...body,
+          category: 'body',
+          source: 'body'
+        });
+      });
+    }
+
+    // Extract from database action data array
+    if (action.data && Array.isArray(action.data)) {
+      action.data.forEach((dataItem: any) => {
+        variables.push({
+          ...dataItem,
+          key: dataItem.key,
+          name: dataItem.key,
+          category: 'data',
+          source: 'data'
+        });
+      });
+    }
+
+    // Extract from database action filterData array
+    if (action.filterData && Array.isArray(action.filterData)) {
+      action.filterData.forEach((filterItem: any) => {
+        variables.push({
+          ...filterItem,
+          key: filterItem.key,
+          name: filterItem.key,
+          category: 'filterData',
+          source: 'filterData'
+        });
+      });
+    }
+
+    return variables;
+  };
+
+  const addComponentFromForm = () => {
+    if (!newComponent.type || !newComponent.parentId) return;
+    if (newComponent.type !== 'Storage' && !newComponent.childId) return;
+
+    let component;
+
+    if (newComponent.type === 'Notifications' || newComponent.type === 'Applications' ||
+      newComponent.type === 'Databases' || newComponent.type === 'Storage') {
+      component = getChildOptions().find((c: any) => c.id === newComponent.childId);
+    } else {
+      const categoryComponents = availableComponents[newComponent.type];
+      if (!categoryComponents) return;
+
+      const parentComponents = categoryComponents[newComponent.parentId];
+      if (!parentComponents) return;
+
+      component = parentComponents.find((c: any) => c.id === newComponent.childId);
+    }
+
+    if (!component) return;
+
+    // If it's an action-based component, extract variables and set up component inputs
+    let componentInputs: Record<string, string> = {};
+    if ((newComponent.type === 'Applications' || newComponent.type === 'Databases' || newComponent.type === 'Storage') && component.action) {
+      const actionVariables = extractActionVariables(component.action);
+      actionVariables.forEach((variable: any) => {
+        const key = variable.key || variable.name;
+        if (key) {
+          componentInputs[key] = '';
+        }
+      });
+    }
+
+    // Special handling for Storage actions
+    if (newComponent.type === 'Storage' && component.action) {
+      componentInputs['buffer'] = '';
+      componentInputs['fileName'] = '';
+      componentInputs['mimeType'] = '';
+    }
+
+    setState({
+      ...state,
+      selectedComponents: [...state.selectedComponents, component],
+      sequences: state.sequences.map(seq =>
+        seq.id === currentSequenceId
+          ? { ...seq, components: [...seq.components, component.id] }
+          : seq
+      ),
+      componentInputs: {
+        ...state.componentInputs,
+        [component.id]: componentInputs
+      }
+    });
+
+    setNewComponent({ type: '', parentId: '', childId: '' });
+    setShowAddComponent(false);
+  };
+
+  const getParentOptions = () => {
+    if (!newComponent.type) return [];
+
+    if (newComponent.type === 'Notifications') {
+      return product?.notifications?.filter((notification: any) => notification.messages && notification.messages.length > 0).map((notification: any) => notification.name || notification.tag) || [];
+    }
+
+    if (newComponent.type === 'Applications') {
+      const appNames = product?.apps?.map((app: any) => app.app_name) || [];
+      return appNames;
+    }
+
+    if (newComponent.type === 'Storage') {
+      return product?.storage?.map((storage: any) => storage.name || storage.tag) || [];
+    }
+
+    if (newComponent.type === 'Databases') {
+      return product?.databases?.filter((db: any) => db.actions && db.actions.length > 0).map((db: any) => db.name || db.tag) || [];
+    }
+
+    const categoryComponents = availableComponents[newComponent.type];
+    return categoryComponents ? Object.keys(categoryComponents) : [];
+  };
+
+  const getFilteredChildOptions = () => {
+    const allOptions = getChildOptions();
+    if (!actionSearchTerm.trim()) return allOptions;
+
+    return allOptions.filter((option: any) =>
+      option.name.toLowerCase().includes(actionSearchTerm.toLowerCase()) ||
+      option.tag.toLowerCase().includes(actionSearchTerm.toLowerCase())
+    );
+  };
+
+  const getChildOptions = () => {
+    if (!newComponent.type || !newComponent.parentId) return [];
+
+    if (newComponent.type === 'Notifications') {
+      const notification = product?.notifications?.find((n: any) => (n.name || n.tag) === newComponent.parentId);
+      return notification?.messages?.map((message: any) => ({
+        id: `${notification._id}-${message._id}`,
+        type: FeatureEventTypes.NOTIFICATION,
+        tag: `${notification.tag}:${message.tag}`,
+        name: message.name,
+        category: 'Notifications'
+      })) || [];
+    }
+
+    if (newComponent.type === 'Applications') {
+      // For applications, we'll need to fetch app data
+      return [];
+    }
+
+    if (newComponent.type === 'Databases') {
+      const database = product?.databases?.find((db: any) =>
+        (db.name || db.tag) === newComponent.parentId
+      );
+      if (database?.actions?.length > 0) {
+        return database.actions.map((action: any) => ({
+          id: `db-${database._id}-${action._id}`,
+          type: FeatureEventTypes.DB_ACTION,
+          tag: `${database.tag}:${action.tag}`,
+          name: action.name,
+          database: database.tag,
+          category: 'Database',
+          action: action
+        }));
+      }
+      return [];
+    }
+
+    if (newComponent.type === 'Storage') {
+      const storage = product?.storage?.find((storage: any) =>
+        (storage.name || storage.tag) === newComponent.parentId
+      );
+      if (storage) {
+        return [{
+          id: `storage-${storage._id}`,
+          type: FeatureEventTypes.STORAGE,
+          tag: storage.tag,
+          name: storage.name || storage.tag,
+          storage: storage.tag,
+          category: 'Storage',
+          action: storage
+        }];
+      }
+      return [];
+    }
+
+    const categoryComponents = availableComponents[newComponent.type];
+    if (!categoryComponents) return [];
+    const parentComponents = categoryComponents[newComponent.parentId];
+    return parentComponents || [];
+  };
+
+  const addInputField = () => {
+    if (newInputName.trim()) {
+      setState({
+        ...state,
+        featureInputs: {
+          ...state.featureInputs,
+          [newInputName.trim()]: {
+            type: newInputType,
+            minlength: newInputMinLength || undefined,
+            maxlength: newInputMaxLength || undefined
+          }
+        }
       });
 
-      toast.success(`${config.title.replace(' Configuration', '')} created successfully`);
-    } catch (error: any) {
-      toast.error(error.message || `Failed to create ${type}`);
+      // If adding from data mapping, automatically assign the new input
+      if (addInputFromMapping) {
+        setDataMappings(prev => ({
+          ...prev,
+          [mappingComponentId]: {
+            ...prev[mappingComponentId],
+            [mappingVariableKey]: {
+              ...prev[mappingComponentId]?.[mappingVariableKey],
+              inputField: newInputName.trim(),
+              code: `$Input{${newInputName.trim()}}`
+            }
+          }
+        }));
+        setAddInputFromMapping(false);
+        setMappingVariableKey('');
+        setMappingComponentId('');
+      }
+
+      setNewInputName('');
+      setNewInputType(DataTypes.STRING);
+      setNewInputMinLength(0);
+      setNewInputMaxLength(0);
+      setShowAddInput(false);
     }
   };
 
-  const handleCancel = () => {
-    closeTab(tabId);
+  const removeInputField = (fieldName: string) => {
+    const newInputs = { ...state.featureInputs };
+    delete newInputs[fieldName];
+    setState({ ...state, featureInputs: newInputs });
   };
 
-  const generateTag = () => {
-    if (formData.name) {
-      const tag = formData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setFormData({ ...formData, tag });
+  const removeComponent = (componentId: string) => {
+    setState({
+      ...state,
+      selectedComponents: state.selectedComponents.filter(c => c.id !== componentId),
+      sequences: state.sequences.map(seq => ({
+        ...seq,
+        components: seq.components.filter(id => id !== componentId)
+      })),
+      componentInputs: Object.fromEntries(
+        Object.entries(state.componentInputs).filter(([key]) => key !== componentId)
+      ),
+      componentCache: Object.fromEntries(
+        Object.entries(state.componentCache).filter(([key]) => key !== componentId)
+      )
+    });
+  };
+
+  const getOrdinalSequenceName = (index: number) => {
+    const ordinals = [
+      'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth',
+      'Eleventh', 'Twelfth', 'Thirteenth', 'Fourteenth', 'Fifteenth', 'Sixteenth', 'Seventeenth', 'Eighteenth', 'Nineteenth', 'Twentieth',
+      'Twenty-first', 'Twenty-second', 'Twenty-third', 'Twenty-fourth', 'Twenty-fifth', 'Twenty-sixth', 'Twenty-seventh', 'Twenty-eighth', 'Twenty-ninth', 'Thirtieth'
+    ];
+
+    if (index < ordinals.length) {
+      return `${ordinals[index]} sequence`;
     }
+
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const lastDigit = index % 10;
+    const suffix = (index % 100 >= 11 && index % 100 <= 13) ? 'th' : suffixes[lastDigit] || 'th';
+    return `${index + 1}${suffix} sequence`;
+  };
+
+  const addSequence = () => {
+    const newSequence = {
+      id: `sequence_${Date.now()}`,
+      name: getOrdinalSequenceName(state.sequences.length),
+      components: []
+    };
+    setState({
+      ...state,
+      sequences: [...state.sequences, newSequence]
+    });
+    setCurrentSequenceId(newSequence.id);
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Code copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      toast.error('Failed to copy code');
+    }
+  };
+
+  const generateCode = () => {
+    const ductapeCode = `// Do this once in a ductape.ts file and reuse in other components
+
+import Ductape from '@ductape/sdk';
+import { config } from 'dotenv';
+import { InputTypes, IProductFeature, IFeatureInput, IFeatureSequence, FeatureEventTypes } from '@ductape/sdk/types';
+
+config();
+
+const credentials = {
+  user_id: process.env.DUCTAPE_USER_ID,
+  workspace_id: process.env.DUCTAPE_WORKSPACE_ID,
+  private_key: process.env.DUCTAPE_PRIVATE_KEY,
+  redis_url: 'redis://localhost:6379'
+};
+
+const ductape = new Ductape(credentials);`;
+
+    const inputObject = Object.entries(state.featureInputs).map(([key, input]) =>
+      `  ${key}: { type: '${input.type}', ${input.minlength ? `minlength: ${input.minlength}, ` : ''}${input.maxlength ? `maxlength: ${input.maxlength}` : ''} }`
+    ).join(',\n');
+
+    const sequencesArray = state.sequences.map(sequence => {
+      const events = sequence.components.map(componentId => {
+        const component = state.selectedComponents.find(c => c.id === componentId);
+        if (!component) return '';
+
+        const inputs = state.componentInputs[componentId] || {};
+        const inputEntries = Object.entries(inputs).map(([key, value]) =>
+          `    ${key}: '${value}'`
+        ).join(',\n');
+
+        const cacheConfig = state.componentCache[componentId] ?
+          `,\n    cache: '${state.componentCache[componentId]}'` : '';
+
+        const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
+
+        return `  {
+    type: FeatureEventTypes.${component.type},
+    event: '${eventTag}',
+    input: {
+${inputEntries}
+    },
+    retries: 2,
+    allow_fail: false${cacheConfig}
+  }`;
+      }).filter(Boolean);
+
+      return `  {
+    tag: '${sequence.name.toLowerCase().replace(/\s+/g, '_')}',
+    events: [
+${events.join(',\n')}
+    ]
+  }`;
+    });
+
+    const outputObject = Object.entries(state.featureOutput).map(([key, value]) => {
+      if (typeof value === 'string') {
+        return `  ${key}: '${value}'`;
+      } else {
+        const nestedEntries = Object.entries(value).map(([nestedKey, nestedValue]) =>
+          `    ${nestedKey}: '${nestedValue}'`
+        ).join(',\n');
+        return `  ${key}: {\n${nestedEntries}\n  }`;
+      }
+    }).join(',\n');
+
+    const featureCode = `// Feature Definition
+
+const input_object: Record<string, IFeatureInput> = {
+${inputObject}
+};
+
+const sequence_array: IFeatureSequence[] = [
+${sequencesArray.join(',\n')}
+];
+
+const output_object: Record<string, string | Record<string, string | object>> = {
+${outputObject}
+};
+
+const details: IProductFeature = {
+  name: '${state.featureName}',
+  description: '${state.featureDescription}',
+  tag: '${state.featureTag}',
+  input_type: InputTypes.JSON,
+  input: input_object,
+  sequence: sequence_array,
+  output: output_object,
+  store_event_results: ${state.storeEventResults}
+};
+
+await ductape.product.features.create(details);`;
+
+    const sampleCode = `// Sample Usage
+
+const input = {
+${Object.keys(state.featureInputs).map(key => `  ${key}: "sample_value"`).join(',\n')}
+};
+
+const result = await ductape.product.features.run({
+  product: '${product?.tag}',
+  feature: '${state.featureTag}',
+  input${state.includeSession ? ',\n  session: {\n    tag: \'session_tag\',\n    token: \'your_token_here\'\n  }' : ''}
+});
+
+console.log('Feature result:', result);`;
+
+    return {
+      ductape: ductapeCode,
+      feature: featureCode,
+      sample: sampleCode,
+      full: `${ductapeCode}\n\n${featureCode}\n\n${sampleCode}`
+    };
+  };
+
+  const codeSnippets = useMemo(() => generateCode(), [state, product]);
+
+  const { mutateAsync: createFeature, isPending: isCreating } = useMutation({
+    mutationFn: async () => {
+      if (!ductape) throw new Error('Product not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
+
+      await ductape.init(product.tag);
+
+      const payload = {
+        name: state.featureName,
+        description: state.featureDescription,
+        tag: state.featureTag,
+        input_type: 'JSON',
+        input: state.featureInputs,
+        sequence: state.sequences.map(seq => ({
+          tag: seq.name.toLowerCase().replace(/\s+/g, '_'),
+          events: seq.components.map(componentId => {
+            const component = state.selectedComponents.find(c => c.id === componentId);
+            if (!component) return null;
+
+            const inputs = state.componentInputs[componentId] || {};
+            const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
+
+            return {
+              type: component.type,
+              event: eventTag,
+              input: inputs,
+              retries: 2,
+              allow_fail: false,
+              cache: state.componentCache[componentId] || undefined
+            };
+          }).filter(Boolean)
+        })),
+        output: state.featureOutput,
+        store_event_results: state.storeEventResults
+      };
+
+      const feature = await ductape.features.create(payload);
+      return feature;
+    },
+    onSuccess: (feature) => {
+      queryClient.invalidateQueries({ queryKey: ['features'] });
+      closeTab(tabId);
+      openTab({
+        id: `feature-${feature._id}-${Date.now()}`,
+        type: 'feature',
+        title: feature.name,
+        itemId: feature._id,
+        data: { ...feature, componentType: 'feature', productName: product?.name },
+      });
+      toast.success('Feature created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create feature');
+    },
+  });
+
+  const handleSave = async () => {
+    if (!state.featureName.trim() || !state.featureDescription.trim()) {
+      toast.error('Please fill in feature name and description');
+      return;
+    }
+
+    if (state.selectedComponents.length === 0) {
+      toast.error('At least one component must be selected');
+      return;
+    }
+
+    await createFeature();
   };
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Product Context Header */}
+        {product && (
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                {product.logo ? (
+                  <img
+                    src={product.logo}
+                    alt={product.name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-grey">Creating feature for {product.name}</h2>
+                  <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
+                    {product.tag}
+                  </span>
+                </div>
+                <p className="text-sm text-grey-600">
+                  Build a feature by adding events and defining their flow
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${config.color}`}>
-              <Icon className="h-6 w-6" />
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+              <Zap className="h-6 w-6 text-yellow" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-grey">{config.title}</h1>
-              <p className="text-sm text-grey-600">{config.description}</p>
+              <h1 className="text-2xl font-bold text-grey">Create New Feature</h1>
+              <p className="text-sm text-grey-600">
+                {product?.name ? `Adding to ${product.name}` : 'Build a feature by adding events and defining their flow'}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
-          {config.fields.map((field) => (
-            <div key={field.name}>
-              <Label htmlFor={field.name} className={field.required ? 'required' : ''}>
-                {field.label}
-              </Label>
+        {/* Step 1: Feature Details */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                1
+              </div>
+              <div>
+                <CardTitle>Feature Details</CardTitle>
+                <CardDescription>Define the basic information for your feature</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-grey mb-2">Feature Name</label>
+                <Input
+                  value={state.featureName}
+                  onChange={(e) => setState({ ...state, featureName: e.target.value })}
+                  placeholder="Enter feature name"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-grey mb-2">Feature Tag (Auto-generated)</label>
+                <Input
+                  value={state.featureTag}
+                  readOnly
+                  className="w-full bg-grey-50"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-grey mb-2">Description</label>
+              <Textarea
+                value={state.featureDescription}
+                onChange={(e) => setState({ ...state, featureDescription: e.target.value })}
+                placeholder="Describe what this feature does"
+                rows={3}
+                className="w-full"
+              />
+            </div>
+            <div className="flex items-center space-x-4">
+              <input
+                type="checkbox"
+                id="storeEventResults"
+                checked={state.storeEventResults}
+                onChange={(e) => setState({ ...state, storeEventResults: e.target.checked })}
+                className="w-4 h-4 text-primary"
+              />
+              <label htmlFor="storeEventResults" className="text-grey-700 text-sm">
+                Store event results for debugging
+              </label>
+            </div>
+          </CardContent>
+        </Card>
 
-              {field.type === 'select' ? (
+        {/* Step 2: Select Events */}
+        {state.featureDescription && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  2
+                </div>
+                <div>
+                  <CardTitle>Select Events</CardTitle>
+                  <CardDescription>Choose the actions that will make up your feature from available integrations</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              {/* Add Component Form */}
+              {showAddComponent && (
+                <div className="p-4 border border-grey-300 rounded-lg bg-grey-50 animate-in slide-in-from-top-2 duration-300">
+                  <h4 className="text-grey font-medium mb-3">Add New Event</h4>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="text-xs text-grey font-medium">Target Sequence</label>
                 <Select
-                  value={formData[field.name]}
-                  onValueChange={(value) => setFormData({ ...formData, [field.name]: value })}
+                        value={currentSequenceId}
+                        onValueChange={(value) => setCurrentSequenceId(value)}
                 >
-                  <SelectTrigger id={field.name} className="mt-2">
-                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Select sequence" />
                   </SelectTrigger>
                   <SelectContent>
-                    {field.options?.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                          {state.sequences.map(seq => (
+                            <SelectItem key={seq.id} value={seq.id}>{seq.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-sm font-medium text-grey mb-1">Type</label>
+                      <Select
+                        value={newComponent.type}
+                        onValueChange={(value) => {
+                          setActionSearchTerm('');
+                          setNewComponent({ type: value, parentId: '', childId: '' });
+                        }}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(availableComponents).map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {newComponent.type && (
+                      <div className="flex-1 min-w-[150px]">
+                        <label className="block text-sm font-medium text-grey mb-1">
+                          {newComponent.type === 'Databases' ? 'Database' :
+                            newComponent.type === 'Applications' ? 'App' :
+                              newComponent.type === 'Notifications' ? 'Notification' :
+                                newComponent.type === 'Storage' ? 'Storage' :
+                                  newComponent.type === 'Message Brokers' ? 'Message Broker' :
+                                    newComponent.type === 'Jobs' ? 'Job' :
+                                      newComponent.type === 'Quotas' ? 'Quota' :
+                                        newComponent.type === 'Fallbacks' ? 'Fallback' : 'Parent'}
+                        </label>
+                        <Select
+                          value={newComponent.parentId}
+                          onValueChange={(value) => {
+                            setActionSearchTerm('');
+                            let childId = '';
+                            if (newComponent.type === 'Storage') {
+                              const storage = product?.storage?.find((storage: any) =>
+                                (storage.name || storage.tag) === value
+                              );
+                              childId = storage ? `storage-${storage._id}` : '';
+                            }
+                            setNewComponent({ ...newComponent, parentId: value, childId });
+                          }}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder={`Select ${newComponent.type === 'Databases' ? 'database' :
+                              newComponent.type === 'Applications' ? 'app' :
+                                newComponent.type === 'Notifications' ? 'notification' :
+                                  newComponent.type === 'Storage' ? 'storage' :
+                                    newComponent.type === 'Message Brokers' ? 'message broker' :
+                                      newComponent.type === 'Jobs' ? 'job' :
+                                        newComponent.type === 'Quotas' ? 'quota' :
+                                          newComponent.type === 'Fallbacks' ? 'fallback' : 'parent'}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getParentOptions().map((parent: any) => (
+                              <SelectItem key={parent} value={parent}>{parent}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {newComponent.parentId && newComponent.type !== 'Storage' && (
+                      <div className="flex-1 min-w-[150px]">
+                        <label className="block text-sm font-medium text-grey mb-1">
+                          {newComponent.type === 'Databases' ? 'Action' :
+                            newComponent.type === 'Applications' ? 'Action' :
+                              newComponent.type === 'Notifications' ? 'Message' :
+                                newComponent.type === 'Message Brokers' ? 'Message' :
+                                  newComponent.type === 'Jobs' ? 'Action' :
+                                    newComponent.type === 'Quotas' ? 'Action' :
+                                      newComponent.type === 'Fallbacks' ? 'Action' : 'Action'}
+                        </label>
+                        <Select
+                          value={newComponent.childId}
+                          onValueChange={(value) => setNewComponent({ ...newComponent, childId: value })}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder={`Select ${newComponent.type === 'Notifications' ? 'message' :
+                              newComponent.type === 'Message Brokers' ? 'message' : 'action'}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2">
+                              <Input
+                                placeholder={`Search ${newComponent.type === 'Notifications' ? 'messages' : 'actions'}...`}
+                                value={editingActionSearch !== undefined ? editingActionSearch : actionSearchTerm}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setEditingActionSearch(newValue);
+                                  setActionSearchTerm(newValue);
+                                }}
+                                onFocus={() => {
+                                  setEditingActionSearch(actionSearchTerm);
+                                }}
+                                onBlur={() => {
+                                  setEditingActionSearch('');
+                                }}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="max-h-60 overflow-y-auto">
+                              {getFilteredChildOptions().map((component: any) => (
+                                <SelectItem key={component.id} value={component.id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{component.name}</span>
+                                    {component.tag && component.tag !== component.name && (
+                                      <span className="text-xs text-grey-500">{component.tag}</span>
+                                    )}
+                                  </div>
                       </SelectItem>
                     ))}
+                              {getFilteredChildOptions().length === 0 && actionSearchTerm && (
+                                <div className="p-2 text-sm text-grey-500 text-center">
+                                  No {newComponent.type === 'Notifications' ? 'messages' : 'actions'} found
+                                </div>
+                              )}
+                            </div>
                   </SelectContent>
                 </Select>
-              ) : field.type === 'textarea' ? (
-                <Textarea
-                  id={field.name}
-                  placeholder={field.placeholder}
-                  value={formData[field.name]}
-                  onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                  rows={4}
-                  className="mt-2"
-                />
-              ) : (
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    id={field.name}
-                    placeholder={field.placeholder}
-                    value={formData[field.name]}
-                    onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                    onBlur={field.name === 'name' ? generateTag : undefined}
-                  />
-                  {field.name === 'tag' && (
-                    <Button variant="outline" onClick={generateTag} size="sm">
-                      Auto
-                    </Button>
-                  )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={addComponentFromForm}
+                        disabled={!newComponent.type || !newComponent.parentId || (newComponent.type !== 'Storage' && !newComponent.childId)}
+                        size="sm"
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowAddComponent(false);
+                          setNewComponent({ type: '', parentId: '', childId: '' });
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {field.description && <p className="text-xs text-grey-600 mt-1">{field.description}</p>}
+              {/* Add Component Button */}
+              {!showAddComponent && (
+                <Button
+                  onClick={() => setShowAddComponent(true)}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Component
+                </Button>
+              )}
+
+              {/* Selected Events */}
+              {state.selectedComponents.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-grey font-medium">Selected Events</h4>
+                  {state.selectedComponents.map((component) => (
+                    <div
+                      key={component.id}
+                      className="flex items-center justify-between p-3 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedComponent(component.id);
+                        setDraggedFromSequence(null);
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', component.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedComponent(null);
+                        setDraggedFromSequence(null);
+                      }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <GripVertical className="w-4 h-4 text-grey-400" />
+                        {editingComponent === component.id ? (
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              value={editingComponentName}
+                              onChange={(e) => setEditingComponentName(e.target.value)}
+                              className="h-7 text-sm"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={() => {
+                                if (editingComponentName.trim()) {
+                                  setState({
+                                    ...state,
+                                    selectedComponents: state.selectedComponents.map(c =>
+                                      c.id === component.id
+                                        ? { ...c, name: editingComponentName.trim() }
+                                        : c
+                                    )
+                                  });
+                                  setEditingComponent(null);
+                                  setEditingComponentName('');
+                                }
+                              }}
+                              size="sm"
+                              disabled={!editingComponentName.trim()}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setEditingComponent(null);
+                                setEditingComponentName('');
+                              }}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-sm font-medium text-grey">{component.name}</span>
+                            <Button
+                              onClick={() => {
+                                setEditingComponent(component.id);
+                                setEditingComponentName(component.name);
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="p-1 h-6 w-6"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                        <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                          {component.tag}
+                        </span>
+                        {state.componentCache[component.id] && state.componentCache[component.id] !== '' && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Cached
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Select
+                          value={state.componentCache[component.id] || 'no-cache'}
+                          onValueChange={(value) => setState({
+                            ...state,
+                            componentCache: {
+                              ...state.componentCache,
+                              [component.id]: value === 'no-cache' ? '' : value
+                            }
+                          })}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue placeholder="No cache" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no-cache">No cache</SelectItem>
+                            {cacheOptions.map((cache: any) => (
+                              <SelectItem key={cache.value} value={cache.value}>
+                                {cache.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={() => removeComponent(component.id)}
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Order Events */}
+        {state.selectedComponents.length > 0 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  3
+                </div>
+                <div>
+                  <CardTitle>Order Events</CardTitle>
+                  <CardDescription>Organize your events into sequences that flow into each other</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              <div className="space-y-4">
+                {/* Unassigned Events Drop Zone */}
+                <div
+                  className="border-2 border-dashed border-grey-300 rounded-lg p-4 bg-grey-50 min-h-[60px]"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const componentId = e.dataTransfer.getData('text/plain');
+                    if (componentId) {
+                      const newSequences = state.sequences.map(seq => ({
+                        ...seq,
+                        components: seq.components.filter(id => id !== componentId)
+                      }));
+                      setState({ ...state, sequences: newSequences });
+                    }
+                  }}
+                >
+                  <p className="text-grey-500 text-sm italic text-center">
+                    {state.selectedComponents.filter(comp =>
+                      !state.sequences.some(seq => seq.components.includes(comp.id))
+                    ).length > 0
+                      ? 'Unassigned events - drag to sequences below'
+                      : 'Drop events here to unassign them from sequences'
+                    }
+                  </p>
+                </div>
+
+                {state.sequences.map((sequence, index) => (
+                  <div key={sequence.id}>
+                    {index > 0 && <AnimatedArrow />}
+                    <div className="border border-grey-300 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-grey text-base">{sequence.name}</h4>
+                          {currentSequenceId === sequence.id && (
+                            <span className="text-xs bg-primary text-white px-2 py-1 rounded">
+                              Adding to this sequence
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            onClick={() => setCurrentSequenceId(sequence.id)}
+                            size="sm"
+                            variant={currentSequenceId === sequence.id ? "default" : "outline"}
+                            className={currentSequenceId === sequence.id ? "bg-primary text-white" : ""}
+                          >
+                            {currentSequenceId === sequence.id ? "Selected" : "Select for Adding"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              const newName = prompt('Enter new sequence name:', sequence.name);
+                              if (newName) {
+                                setState({
+                                  ...state,
+                                  sequences: state.sequences.map(s =>
+                                    s.id === sequence.id ? { ...s, name: newName } : s
+                                  )
+                                });
+                              }
+                            }}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Rename
+                          </Button>
+                          {state.sequences.length > 1 && (
+                            <Button
+                              onClick={() => {
+                                setState({
+                                  ...state,
+                                  sequences: state.sequences.filter(s => s.id !== sequence.id)
+                                });
+                              }}
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        className="space-y-2 min-h-[50px] p-2 border-2 border-dashed border-grey-200 rounded-lg"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const componentId = e.dataTransfer.getData('text/plain');
+                          if (componentId) {
+                            let newSequences = state.sequences.map(seq => ({
+                              ...seq,
+                              components: seq.components.filter(id => id !== componentId)
+                            }));
+
+                            if (!newSequences.find(seq => seq.id === sequence.id)?.components.includes(componentId)) {
+                              newSequences = newSequences.map(seq => {
+                                if (seq.id === sequence.id) {
+                                  return { ...seq, components: [...seq.components, componentId] };
+                                }
+                                return seq;
+                              });
+                            }
+
+                            setState({ ...state, sequences: newSequences });
+                          }
+                        }}
+                      >
+                        {sequence.components.map((componentId) => {
+                          const component = state.selectedComponents.find(c => c.id === componentId);
+                          if (!component) return null;
+
+                          return (
+                            <div
+                              key={componentId}
+                              className="flex items-center justify-between p-2 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedComponent(componentId);
+                                setDraggedFromSequence(sequence.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', componentId);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedComponent(null);
+                                setDraggedFromSequence(null);
+                              }}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <GripVertical className="w-4 h-4 text-grey-400" />
+                                <span className="text-sm font-medium text-grey">{component.name}</span>
+                                <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                  {component.tag}
+                                </span>
+                              </div>
+                              <Button
+                                onClick={() => removeComponent(componentId)}
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        {sequence.components.length === 0 && (
+                          <p className="text-grey-500 text-sm italic text-center py-4">Drop events here</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addSequence}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add New Sequence
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Map Data Between Events */}
+        {state.selectedComponents.length > 0 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  4
+                </div>
+                <div>
+                  <CardTitle>Map Data Between Events</CardTitle>
+                  <CardDescription>Define how data flows between events in your sequences</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              <div className="space-y-4">
+                {/* Feature Inputs Section */}
+                <div className="border border-grey-300 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-grey font-medium">Feature Inputs</h4>
+                      <p className="text-xs text-grey-600 mt-1">External data that will be passed to your feature when it's called</p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setShowAddInput(true);
+                        setAddInputFromMapping(false);
+                        setSourceVariable(null);
+                        setNewInputName('');
+                        setNewInputType(DataTypes.STRING);
+                        setNewInputMinLength(0);
+                        setNewInputMaxLength(0);
+                      }}
+                      size="sm"
+                      className="flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Input Field</span>
+                    </Button>
+                  </div>
+
+                  {/* Add Input Form */}
+                  {showAddInput && (
+                    <div ref={addInputFormRef} className="mb-4 p-3 border border-grey-300 rounded-lg bg-grey-50">
+                      <h5 className="text-grey font-medium mb-3">Add New Input Field</h5>
+                      <div className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Field Name</label>
+                  <Input
+                            value={newInputName}
+                            onChange={(e) => setNewInputName(e.target.value)}
+                            placeholder="Enter field name"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Data Type</label>
+                          <Select
+                            value={newInputType}
+                            onValueChange={(value) => setNewInputType(value as DataTypes)}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DATA_TYPES.map((dataType) => (
+                                <SelectItem key={dataType.value} value={dataType.value}>
+                                  {dataType.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Min Length</label>
+                          <Input
+                            type="number"
+                            value={newInputMinLength}
+                            onChange={(e) => setNewInputMinLength(parseInt(e.target.value) || 0)}
+                            placeholder="Min length"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Max Length</label>
+                          <Input
+                            type="number"
+                            value={newInputMaxLength}
+                            onChange={(e) => setNewInputMaxLength(parseInt(e.target.value) || 0)}
+                            placeholder="Max length"
+                            className="h-8"
+                          />
+                        </div>
+                        <Button
+                          onClick={addInputField}
+                          disabled={!newInputName || !newInputType}
+                          size="sm"
+                        >
+                          Add
+                    </Button>
+                        <Button
+                          onClick={() => {
+                            setShowAddInput(false);
+                            setNewInputName('');
+                            setNewInputType(DataTypes.STRING);
+                            setNewInputMinLength(0);
+                            setNewInputMaxLength(0);
+                          }}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {Object.entries(state.featureInputs).map(([fieldName, input]) => (
+                      <div key={fieldName} className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Variable</label>
+                          <Input
+                            value={fieldName}
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Type</label>
+                          <Input
+                            value={input.type}
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Min Length</label>
+                          <Input
+                            value={input.minlength || ''}
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Max Length</label>
+                          <Input
+                            value={input.maxlength || ''}
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-grey font-medium">Value</label>
+                          <Input
+                            value={`$Input{${fieldName}}`}
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeInputField(fieldName)}
+                          className="h-8 px-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sequences with Events */}
+                <div className="mb-3">
+                  <h4 className="text-grey font-medium mb-1">Sequences with Events</h4>
+                  <p className="text-xs text-grey-600">Each sequence represents a logical group of events. Data flows from one sequence to the next</p>
+                </div>
+                {state.sequences.map((sequence, sequenceIndex) => (
+                  <div key={sequence.id}>
+                    <div className="border border-grey-300 rounded-lg p-4">
+                      <h4 className="text-grey font-medium mb-4">{sequence.name}</h4>
+
+                      {sequence.components.map((componentId) => {
+                        const component = state.selectedComponents.find(c => c.id === componentId);
+                        if (!component) return null;
+
+                        return (
+                          <div key={componentId} className="mb-4 p-3 bg-grey-50 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="text-grey font-medium">{component.name}</h5>
+                              <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                {component.tag}
+                              </span>
+                            </div>
+
+                            {/* Event Input Mapping Form */}
+                            <div className="mb-3">
+                              <p className="text-xs text-grey-600">Map each variable to a data source. Use the dropdowns to select from available options or enter custom values</p>
+                            </div>
+                            <div className="space-y-3">
+                              {(() => {
+                                // Get action variables if this is an action-based component
+                                const actionVariables = component.action ? extractActionVariables(component.action) : [];
+
+                                // Get component inputs for this component
+                                const componentInputs = state.componentInputs[component.id] || {};
+
+                                // Combine action variables and custom inputs
+                                const allVariables = [
+                                  ...actionVariables.map((variable: any) => ({
+                                    ...variable,
+                                    key: variable.key || variable.name,
+                                    type: 'action',
+                                    source: variable.source,
+                                    required: variable.required,
+                                    description: variable.description,
+                                    dataType: variable.type
+                                  })),
+                                  ...Object.keys(componentInputs)
+                                    .filter(key => !actionVariables.some((v: any) => (v.key || v.name) === key))
+                                    .map(key => ({
+                                      key,
+                                      type: 'custom',
+                                      source: 'custom',
+                                      required: false,
+                                      description: '',
+                                      dataType: 'string'
+                                    }))
+                                ];
+
+                                return allVariables.map((variable, index) => (
+                                  <div key={index} className="space-y-3">
+                                    <div className="flex gap-2 items-end p-3 bg-white rounded-lg border border-grey-200 overflow-x-auto">
+                                      <div className="flex-shrink-0 min-w-[200px]">
+                                        <label className="text-xs text-grey font-medium">Variable</label>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-medium text-grey">{variable.key}</span>
+                                          {variable.type === 'action' && (
+                                            <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                              {variable.source}
+                                            </span>
+                                          )}
+                                          {variable.required && (
+                                            <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded">
+                                              Required
+                                            </span>
+                                          )}
+                                        </div>
+                                        {variable.description && (
+                                          <p className="text-xs text-grey-600 mt-1">{variable.description}</p>
+                                        )}
+                                      </div>
+
+                                      <div className="flex-shrink-0 min-w-[200px]">
+                                        <label className="text-xs text-grey font-medium">Value Source</label>
+                                        <Select
+                                          value={dataMappings[component.id]?.[variable.key]?.source || ''}
+                                          onValueChange={(value) => {
+                                            let code = '';
+                                            if (value === 'input') {
+                                              code = '';
+                                            } else if (value === 'sequence') {
+                                              const currentSequence = state.sequences.find(seq => seq.id === currentSequenceId);
+                                              const sequenceName = currentSequence?.name?.toLowerCase().replace(/\s+/g, '_') || 'first_sequence';
+                                              code = `$Sequence{${sequenceName}}{${component.tag}}{${variable.key}}`;
+                                            } else if (value === 'session') {
+                                              code = `$Session{${variable.key}}`;
+                                            } else if (value === 'auth') {
+                                              code = `$Auth{${variable.key}}`;
+                                            } else if (value === 'variables') {
+                                              code = `$Variables{${variable.key}}`;
+                                            } else if (value === 'constants') {
+                                              code = `$Constants{${variable.key}}`;
+                                            } else if (value === 'hardcode') {
+                                              code = variable.defaultValue || variable.sampleValue || '';
+                                            } else if (value === 'default') {
+                                              code = variable.defaultValue || '';
+                                            } else if (value === 'data') {
+                                              code = `$Data{${variable.key}}`;
+                                            } else if (value === 'filterData') {
+                                              code = `$FilterData{${variable.key}}`;
+                                            } else if (value === 'operator') {
+                                              code = '';
+                                            }
+
+                                            setDataMappings(prev => ({
+                                              ...prev,
+                                              [component.id]: {
+                                                ...prev[component.id],
+                                                [variable.key]: {
+                                                  ...prev[component.id]?.[variable.key],
+                                                  source: value as 'input' | 'sequence' | 'session' | 'auth' | 'variables' | 'constants' | 'hardcode' | 'default' | 'data' | 'filterData',
+                                                  selectedValue: undefined,
+                                                  authField: undefined,
+                                                  code: code
+                                                }
+                                              }
+                                            }));
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="Select source" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="input">Feature Input - External data passed to your feature</SelectItem>
+                                            {sequenceIndex > 0 && (
+                                              <SelectItem value="sequence">Previous Event - Data from earlier events in sequences</SelectItem>
+                                            )}
+                                            <SelectItem value="session">Session - User session information</SelectItem>
+                                            <SelectItem value="auth">Authorization - User authentication data</SelectItem>
+                                            <SelectItem value="hardcode">Hard Code - Static value</SelectItem>
+                                            <SelectItem value="operator">Operator - Use Ductape operators</SelectItem>
+                                            {variable.source === 'data' && (
+                                              <SelectItem value="data">Database Data - Field from database action data array</SelectItem>
+                                            )}
+                                            {variable.source === 'filterData' && (
+                                              <SelectItem value="filterData">Database Filter - Field from database action filterData array</SelectItem>
+                                            )}
+                                            {variable.defaultValue !== undefined && variable.defaultValue !== null && variable.defaultValue !== '' && (
+                                              <SelectItem value="default">Default Value - Use field's default value</SelectItem>
+                                            )}
+                                          </SelectContent>
+                                        </Select>
             </div>
-          ))}
+
+                                      <div className="flex-shrink-0 min-w-[200px]">
+                                        <label className="text-xs text-grey font-medium">Value</label>
+                                        {dataMappings[component.id]?.[variable.key]?.source === 'input' ? (
+                                          <Select
+                                            value={dataMappings[component.id]?.[variable.key]?.inputField || ''}
+                                            onValueChange={(value) => {
+                                              if (value === 'add-new') {
+                                                setSourceVariable(variable);
+                                                setNewInputType(variable.dataType || DataTypes.STRING);
+                                                setNewInputMinLength(variable.minLength || 0);
+                                                setNewInputMaxLength(variable.maxLength || 0);
+                                                setAddInputFromMapping(true);
+                                                setMappingVariableKey(variable.key);
+                                                setMappingComponentId(component.id);
+                                                setShowAddInput(true);
+                                                setNewInputName(variable.key);
+                                                setTimeout(() => {
+                                                  if (addInputFormRef.current) {
+                                                    addInputFormRef.current.scrollIntoView({
+                                                      behavior: 'smooth',
+                                                      block: 'start'
+                                                    });
+                                                  }
+                                                }, 100);
+                                              } else {
+                                                setDataMappings(prev => ({
+                                                  ...prev,
+                                                  [component.id]: {
+                                                    ...prev[component.id],
+                                                    [variable.key]: {
+                                                      ...prev[component.id]?.[variable.key],
+                                                      inputField: value,
+                                                      code: `$Input{${value}}`
+                                                    }
+                                                  }
+                                                }));
+                                              }
+                                            }}
+                                          >
+                                            <SelectTrigger className="h-8">
+                                              <SelectValue placeholder="Select feature input" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {Object.keys(state.featureInputs).map(inputKey => (
+                                                <SelectItem key={inputKey} value={inputKey}>
+                                                  {inputKey}
+                                                </SelectItem>
+                                              ))}
+                                              <SelectItem value="add-new" className="text-primary font-medium">
+                                                + Add New Feature Input
+                                              </SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'hardcode' ? (
+                                          <Input
+                                            value={dataMappings[component.id]?.[variable.key]?.code || variable.defaultValue || variable.sampleValue || ''}
+                                            onChange={(e) => {
+                                              setDataMappings(prev => ({
+                                                ...prev,
+                                                [component.id]: {
+                                                  ...prev[component.id],
+                                                  [variable.key]: {
+                                                    ...prev[component.id]?.[variable.key],
+                                                    code: e.target.value
+                                                  }
+                                                }
+                                              }));
+                                            }}
+                                            placeholder="Enter hardcoded value"
+                                            className="h-8"
+                                          />
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'default' ? (
+                                          <div className="flex items-center h-8 px-3 bg-grey-100 border border-grey-300 rounded text-sm text-grey-600">
+                                            {variable.defaultValue}
+                                            <span className="ml-2 text-xs text-grey-500">(Default Value)</span>
+                                          </div>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'data' ? (
+                                          <div className="flex items-center h-8 px-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                                            <span className="font-medium">Database Data Field</span>
+                                            <span className="ml-2 text-xs text-blue-500">({variable.key})</span>
+                                          </div>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'filterData' ? (
+                                          <div className="flex items-center h-8 px-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                                            <span className="font-medium">Database Filter Field</span>
+                                            <span className="ml-2 text-xs text-green-500">({variable.key})</span>
+                                          </div>
+                                        ) : (
+                                          <Input
+                                            value={dataMappings[component.id]?.[variable.key]?.code || ''}
+                                            onChange={(e) => {
+                                              setDataMappings(prev => ({
+                                                ...prev,
+                                                [component.id]: {
+                                                  ...prev[component.id],
+                                                  [variable.key]: {
+                                                    ...prev[component.id]?.[variable.key],
+                                                    code: e.target.value
+                                                  }
+                                                }
+                                              }));
+                                            }}
+                                            placeholder={`e.g., $${dataMappings[component.id]?.[variable.key]?.source?.charAt(0).toUpperCase() + dataMappings[component.id]?.[variable.key]?.source?.slice(1)}{${variable.key}}`}
+                                            className="h-8"
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+
+                              {(() => {
+                                const actionVariables = component.action ? extractActionVariables(component.action) : [];
+                                const componentInputs = state.componentInputs[component.id] || {};
+                                const allVariables = [
+                                  ...actionVariables.map((v: any) => v.key || v.name),
+                                  ...Object.keys(componentInputs).filter(key => !actionVariables.some((v: any) => (v.key || v.name) === key))
+                                ];
+
+                                return allVariables.length === 0 ? (
+                                  <div className="text-center py-4 text-grey-500 text-sm">
+                                    No variables to map for this event
+                                  </div>
+                                ) : null;
+                              })()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Arrow between sequences */}
+                    {sequenceIndex < state.sequences.length - 1 && (
+                      <div className="flex justify-center items-center py-6">
+                        <div className="animate-bounce text-grey-400">
+                          <ArrowDown className="w-5 h-5" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 5: Define Feature Output */}
+        {state.sequences.length > 0 && state.sequences.some(seq => seq.components.length > 0) && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  5
+                </div>
+                <div>
+                  <CardTitle>Define Feature Output</CardTitle>
+                  <CardDescription>Define what your feature returns to the caller</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              <div className="space-y-4">
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <strong>📤 Output Definition:</strong> Define what your feature returns to the caller.
+                    Map output fields to response values from your sequences using the dropdown selectors below.
+                  </p>
+                </div>
+
+                {Object.entries(state.featureOutput).map(([fieldName, value]) => (
+                  <div key={fieldName} className="p-4 border border-grey-300 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-grey text-base">{fieldName}</h4>
+                      <Button
+                        onClick={() => {
+                          const newOutput = { ...state.featureOutput };
+                          delete newOutput[fieldName];
+                          setState({ ...state, featureOutput: newOutput });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="text-xs text-grey font-medium">Output Field Name</label>
+                        <Input
+                          value={editingFieldNames[fieldName] !== undefined ? editingFieldNames[fieldName] : fieldName}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setEditingFieldNames(prev => ({
+                              ...prev,
+                              [fieldName]: newValue
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            const newFieldName = e.target.value.trim();
+                            if (newFieldName !== fieldName && newFieldName !== '') {
+                              const newOutput = { ...state.featureOutput };
+                              const currentValue = newOutput[fieldName];
+                              delete newOutput[fieldName];
+                              newOutput[newFieldName] = currentValue;
+                              setState({ ...state, featureOutput: newOutput });
+                            }
+                            setEditingFieldNames(prev => {
+                              const newState = { ...prev };
+                              delete newState[fieldName];
+                              return newState;
+                            });
+                          }}
+                          onFocus={() => {
+                            setEditingFieldNames(prev => ({
+                              ...prev,
+                              [fieldName]: fieldName
+                            }));
+                          }}
+                          placeholder="Enter output field name"
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-grey font-medium">Value Source</label>
+                        <Select
+                          value={typeof value === 'string' && value.startsWith('$Sequence{') ? 'sequence' :
+                            typeof value === 'string' && value.startsWith('$') && !value.startsWith('$Sequence{') ? 'operator' : 'custom'}
+                          onValueChange={(source) => {
+                            if (source === 'sequence') {
+                              const firstSequence = state.sequences[0];
+                              const firstEvent = firstSequence?.components?.[0] ?
+                                state.selectedComponents.find(c => c.id === firstSequence.components[0]) : null;
+                              const eventTag = firstEvent?.tag || firstEvent?.name || 'event';
+
+                              setState({
+                                ...state,
+                                featureOutput: {
+                                  ...state.featureOutput,
+                                  [fieldName]: `$Sequence{${firstSequence?.name || 'first_sequence'}}{${eventTag}}{field}`
+                                }
+                              });
+                            } else if (source === 'operator') {
+                              setState({
+                                ...state,
+                                featureOutput: {
+                                  ...state.featureOutput,
+                                  [fieldName]: '$Add(, )'
+                                }
+                              });
+                            } else {
+                              setState({
+                                ...state,
+                                featureOutput: {
+                                  ...state.featureOutput,
+                                  [fieldName]: ''
+                                }
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select source" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sequence">From Sequence Response</SelectItem>
+                            <SelectItem value="operator">Use Ductape Operators</SelectItem>
+                            <SelectItem value="custom">Custom Value</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-grey font-medium">Value</label>
+                        <Input
+                          value={value as string}
+                          onChange={(e) => setState({
+                            ...state,
+                            featureOutput: {
+                              ...state.featureOutput,
+                              [fieldName]: e.target.value
+                            }
+                          })}
+                          placeholder="Enter custom value or data piping notation"
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  onClick={() => {
+                    const fieldName = `output_${Object.keys(state.featureOutput).length + 1}`;
+                    setState({
+                      ...state,
+                      featureOutput: {
+                        ...state.featureOutput,
+                        [fieldName]: ''
+                      }
+                    });
+                  }}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Output Field
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 6: Generated Code */}
+        {Object.keys(state.featureOutput).length > 0 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  6
+                </div>
+                <div>
+                  <CardTitle>Generated Code</CardTitle>
+                  <CardDescription>Review and copy the generated TypeScript code for your feature</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              <div className="space-y-4">
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-800">
+                    <strong>🚀 Ready to Use:</strong> Your feature code is generated and ready for integration.
+                    Copy the TypeScript code and integrate it into your application. The code includes all your configurations and data mappings.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => copyToClipboard(codeSnippets.ductape)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Ductape Setup
+                  </Button>
+                  <Button
+                    onClick={() => copyToClipboard(codeSnippets.feature)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Feature Definition
+                  </Button>
+                  <Button
+                    onClick={() => copyToClipboard(codeSnippets.sample)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Sample Usage
+                  </Button>
+                  <Button
+                    onClick={() => copyToClipboard(codeSnippets.full)}
+                    size="sm"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Full Code
+                  </Button>
+                </div>
+
+                <div className="bg-grey-50 rounded-lg p-4">
+                  <pre className="text-sm text-grey-600 whitespace-pre-wrap overflow-x-auto">
+                    {codeSnippets.full}
+                  </pre>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
-            <Button variant="outline" onClick={handleCancel}>
+        <div className="flex items-center justify-end gap-3 bg-white rounded-lg border border-grey-400 p-4 shadow-sm sticky bottom-0">
+          <Button variant="outline" onClick={() => closeTab(tabId)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="gap-2">
-              <Save className="h-4 w-4" />
-              Create {config.title.replace(' Configuration', '')}
+          <Button onClick={handleSave} disabled={isCreating || !state.featureName || !state.featureDescription || state.selectedComponents.length === 0} className="gap-2">
+            {isCreating ? (
+              <>Creating...</>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Create Feature
+              </>
+            )}
             </Button>
-          </div>
         </div>
 
         {/* Help Text */}
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-grey mb-2">Configuration Tips</h3>
+          <h3 className="text-sm font-semibold text-grey mb-2">How Features Work</h3>
           <ul className="text-sm text-grey-600 space-y-1 list-disc list-inside">
-            <li>Ensure all required fields are properly configured</li>
-            <li>Test the configuration in a development environment first</li>
-            <li>You can update these settings later from the product view</li>
+            <li>Features are reusable workflows that combine multiple actions and integrations</li>
+            <li>Each feature can have multiple sequences that run in parallel or sequentially</li>
+            <li>Data flows between events using variable mapping - reference previous outputs using <code className="text-xs bg-grey-200 px-1 rounded">$EventName.field</code></li>
+            <li>Use feature inputs to accept parameters from callers (e.g., <code className="text-xs bg-grey-200 px-1 rounded">$Input.userId</code>)</li>
+            <li>Feature outputs define what data is returned to the caller - map these to sequence responses or custom values</li>
+            <li>Generated code includes TypeScript interfaces and ready-to-use functions for your application</li>
           </ul>
         </div>
       </div>
     </div>
-  );
+
+  )
 }

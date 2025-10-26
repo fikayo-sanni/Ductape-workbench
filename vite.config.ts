@@ -7,12 +7,16 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      buffer: "buffer",
+      ioredis: path.resolve(__dirname, "./empty-module-file.js"),
+      redis: path.resolve(__dirname, "./empty-module-file.js"),
+      bullmq: path.resolve(__dirname, "./empty-module-file.js"),
     },
   },
   build: {
     rollupOptions: {
       external: [
-        '@ductape/sdk',
+        // Removed @ductape/sdk - it should be bundled, not externalized
         'worker_threads',
         'child_process',
         'fs',
@@ -38,9 +42,11 @@ export default defineConfig({
     }
   },
   define: {
-    global: 'globalThis',
+    global: 'window',
+    'process.env': '{}',
   },
   optimizeDeps: {
-    exclude: ['@ductape/sdk']
+    include: ["buffer"],
+    // Removed exclude for @ductape/sdk - let Vite optimize it normally
   }
 });

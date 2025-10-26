@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HardDrive, Save, ChevronRight, Loader2, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
+import { useDuctape } from '@/hooks/useDuctape';
+import { StorageProviders } from '@ductape/sdk/dist/types';
 
 interface NewStorageTabContentProps {
   tabId: string;
@@ -29,14 +32,23 @@ interface EnvConfig {
   connectionString: string;
   // GCP
   gcpBucketName: string;
+  gcpConfigType: string;
   gcpProjectId: string;
+  gcpPrivateKeyId: string;
   gcpPrivateKey: string;
   gcpClientEmail: string;
+  gcpClientId: string;
+  gcpAuthUri: string;
+  gcpTokenUri: string;
+  gcpAuthProviderX509CertUrl: string;
+  gcpClientX509CertUrl: string;
+  gcpUniverseDomain: string;
 }
 
 export default function NewStorageTabContent({ tabId, data }: NewStorageTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
 
   // Extract product context from data
   const product = data?.productId ? {
@@ -44,8 +56,18 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
     name: data.productName,
     tag: data.productTag,
     logo: data.productLogo,
-    envs: data.productEnvs || []
+    envs: data.productEnvs || [],
+    workspace_id: data.workspaceId || currentWorkspaceId
   } : null;
+
+  // Initialize Ductape SDK
+  const ductape = useDuctape({
+    workspace_id: product?.workspace_id || currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product'
+  }) as any;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -87,13 +109,93 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
           containerName: '',
           connectionString: '',
           gcpBucketName: '',
+          gcpConfigType: '',
           gcpProjectId: '',
+          gcpPrivateKeyId: '',
           gcpPrivateKey: '',
           gcpClientEmail: '',
+          gcpClientId: '',
+          gcpAuthUri: '',
+          gcpTokenUri: '',
+          gcpAuthProviderX509CertUrl: '',
+          gcpClientX509CertUrl: '',
+          gcpUniverseDomain: '',
         }))
       );
     }
   }, [productEnvs]);
+
+  // Build provider-specific config
+  const buildConfigForProvider = (env: EnvConfig, type: string) => {
+    switch (type.toLowerCase()) {
+      case 'aws':
+        return {
+          bucketName: env.bucketName,
+          accessKeyId: env.accessKeyId,
+          secretAccessKey: env.secretAccessKey,
+          region: env.region,
+        };
+      case 'azure':
+        return {
+          containerName: env.containerName,
+          connectionString: env.connectionString,
+        };
+      case 'gcp':
+        return {
+          bucketName: env.gcpBucketName,
+          config: {
+            type: env.gcpConfigType,
+            project_id: env.gcpProjectId,
+            private_key_id: env.gcpPrivateKeyId,
+            private_key: env.gcpPrivateKey,
+            client_email: env.gcpClientEmail,
+            client_id: env.gcpClientId,
+            auth_uri: env.gcpAuthUri,
+            token_uri: env.gcpTokenUri,
+            auth_provider_x509_cert_url: env.gcpAuthProviderX509CertUrl,
+            client_x509_cert_url: env.gcpClientX509CertUrl,
+            universe_domain: env.gcpUniverseDomain,
+          },
+        };
+      default:
+        return {};
+    }
+  };
+
+  // Create storage mutation
+  const { mutateAsync: createStorage, isPending: isCreating } = useMutation({
+    mutationFn: async (values: { name: string; tag: string; envs: Array<{ slug: string; type: string; config: any }> }) => {
+      if (!ductape) throw new Error('Product not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
+
+      await ductape.init(product.tag);
+      const storage = await ductape.storage.create({
+        name: values.name,
+        tag: values.tag,
+        envs: values.envs.map(env => ({
+          slug: env.slug,
+          type: env.type.toLowerCase() as StorageProviders,
+          config: env.config,
+        })),
+      });
+      return storage;
+    },
+    onSuccess: (storage) => {
+      queryClient.invalidateQueries({ queryKey: ['storages'] });
+      closeTab(tabId);
+      openTab({
+        id: `storage-${storage._id}-${Date.now()}`,
+        type: 'storage',
+        title: storage.name,
+        itemId: storage._id,
+        data: { ...storage, componentType: 'storage', productName: product?.name },
+      });
+      toast.success('Storage created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create storage');
+    },
+  });
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
@@ -131,54 +233,25 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
       }
     }
 
-    if (!data?.productId) {
+    if (!data?.productId || !product) {
       toast.error('No product selected');
       return;
     }
 
     try {
-      const newStorage = {
-        _id: `storage-${Date.now()}`,
+      await createStorage({
         name: formData.name,
         tag: formData.tag,
         envs: envConfigs
           .filter(env => env.type)
           .map(env => ({
             slug: env.slug,
-            type: env.type.toLowerCase(),
-            config: env.type === 'AWS' ? {
-              bucketName: env.bucketName,
-              accessKeyId: env.accessKeyId,
-              secretAccessKey: env.secretAccessKey,
-              region: env.region,
-            } : env.type === 'Azure' ? {
-              containerName: env.containerName,
-              connectionString: env.connectionString,
-            } : {
-              bucketName: env.gcpBucketName,
-              projectId: env.gcpProjectId,
-              privateKey: env.gcpPrivateKey,
-              clientEmail: env.gcpClientEmail,
-            }
+            type: env.type,
+            config: buildConfigForProvider(env, env.type),
           })),
-        product_id: data.productId,
-        workspace_id: currentWorkspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      closeTab(tabId);
-      openTab({
-        id: `storage-${newStorage._id}-${Date.now()}`,
-        type: 'storage',
-        title: formData.name,
-        itemId: newStorage._id,
-        data: { ...newStorage, componentType: 'storage', productName: data.productName },
       });
-
-      toast.success('Storage created successfully');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create storage');
+      // Error already handled in mutation
     }
   };
 
@@ -289,18 +362,24 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
 
             <div>
               <Label htmlFor="tag" className="required">Tag</Label>
-              <Input
-                id="tag"
-                placeholder="e.g., prod_storage"
-                value={formData.tag}
-                onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                className="mt-2"
-              />
-              <p className="text-xs text-grey-600 mt-1">Unique identifier (auto-generated from name)</p>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="tag"
+                  placeholder="e.g., my-product:prod-storage"
+                  value={formData.tag}
+                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                />
+                <Button variant="outline" onClick={() => handleNameChange(formData.name)} size="sm">
+                  Auto-generate
+                </Button>
+              </div>
+              <p className="text-xs text-grey-600 mt-1">
+                Format: product-name:storage-name (auto-generated from storage name)
+              </p>
             </div>
 
             {!showEnvs && (
-              <Button onClick={handleContinue} className="w-full gap-2">
+              <Button onClick={handleContinue} className="gap-2">
                 Continue to Environment Configuration
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -420,17 +499,17 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
                   {/* GCP Configuration */}
                   {env.type === 'GCP' && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
-                      <div>
-                        <Label htmlFor={`gcpBucketName-${index}`} className="required">Bucket Name</Label>
-                        <Input
-                          id={`gcpBucketName-${index}`}
-                          placeholder="my-bucket"
-                          value={env.gcpBucketName}
-                          onChange={(e) => updateEnvConfig(index, 'gcpBucketName', e.target.value)}
-                          className="mt-2 bg-white"
-                        />
-                      </div>
                       <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`gcpBucketName-${index}`} className="required">Bucket Name</Label>
+                          <Input
+                            id={`gcpBucketName-${index}`}
+                            placeholder="my-bucket"
+                            value={env.gcpBucketName}
+                            onChange={(e) => updateEnvConfig(index, 'gcpBucketName', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
                         <div>
                           <Label htmlFor={`gcpProjectId-${index}`}>Project ID</Label>
                           <Input
@@ -441,6 +520,43 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
                             className="mt-2 bg-white"
                           />
                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`gcpConfigType-${index}`}>Config Type</Label>
+                          <Input
+                            id={`gcpConfigType-${index}`}
+                            placeholder="service_account"
+                            value={env.gcpConfigType}
+                            onChange={(e) => updateEnvConfig(index, 'gcpConfigType', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`gcpPrivateKeyId-${index}`}>Private Key ID</Label>
+                          <Input
+                            id={`gcpPrivateKeyId-${index}`}
+                            placeholder="your-private-key-id"
+                            value={env.gcpPrivateKeyId}
+                            onChange={(e) => updateEnvConfig(index, 'gcpPrivateKeyId', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor={`gcpPrivateKey-${index}`}>Private Key</Label>
+                        <Textarea
+                          id={`gcpPrivateKey-${index}`}
+                          placeholder="-----BEGIN PRIVATE KEY-----&#10;..."
+                          value={env.gcpPrivateKey}
+                          onChange={(e) => updateEnvConfig(index, 'gcpPrivateKey', e.target.value)}
+                          className="mt-2 bg-white min-h-20 font-mono text-sm"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`gcpClientEmail-${index}`}>Client Email</Label>
                           <Input
@@ -451,17 +567,73 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
                             className="mt-2 bg-white"
                           />
                         </div>
+                        <div>
+                          <Label htmlFor={`gcpClientId-${index}`}>Client ID</Label>
+                          <Input
+                            id={`gcpClientId-${index}`}
+                            placeholder="your-client-id"
+                            value={env.gcpClientId}
+                            onChange={(e) => updateEnvConfig(index, 'gcpClientId', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`gcpAuthUri-${index}`}>Auth URI</Label>
+                          <Input
+                            id={`gcpAuthUri-${index}`}
+                            placeholder="https://accounts.google.com/o/oauth2/auth"
+                            value={env.gcpAuthUri}
+                            onChange={(e) => updateEnvConfig(index, 'gcpAuthUri', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`gcpTokenUri-${index}`}>Token URI</Label>
+                          <Input
+                            id={`gcpTokenUri-${index}`}
+                            placeholder="https://oauth2.googleapis.com/token"
+                            value={env.gcpTokenUri}
+                            onChange={(e) => updateEnvConfig(index, 'gcpTokenUri', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <Label htmlFor={`gcpPrivateKey-${index}`}>Private Key</Label>
+                        <Label htmlFor={`gcpAuthProviderX509CertUrl-${index}`}>Auth Provider X509 Cert URL</Label>
                         <Input
-                          id={`gcpPrivateKey-${index}`}
-                          type="password"
-                          placeholder="-----BEGIN PRIVATE KEY-----..."
-                          value={env.gcpPrivateKey}
-                          onChange={(e) => updateEnvConfig(index, 'gcpPrivateKey', e.target.value)}
+                          id={`gcpAuthProviderX509CertUrl-${index}`}
+                          placeholder="https://www.googleapis.com/oauth2/v1/certs"
+                          value={env.gcpAuthProviderX509CertUrl}
+                          onChange={(e) => updateEnvConfig(index, 'gcpAuthProviderX509CertUrl', e.target.value)}
                           className="mt-2 bg-white"
                         />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`gcpClientX509CertUrl-${index}`}>Client X509 Cert URL</Label>
+                          <Input
+                            id={`gcpClientX509CertUrl-${index}`}
+                            placeholder="https://www.googleapis.com/robot/v1/metadata/x509/..."
+                            value={env.gcpClientX509CertUrl}
+                            onChange={(e) => updateEnvConfig(index, 'gcpClientX509CertUrl', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`gcpUniverseDomain-${index}`}>Universe Domain</Label>
+                          <Input
+                            id={`gcpUniverseDomain-${index}`}
+                            placeholder="googleapis.com"
+                            value={env.gcpUniverseDomain}
+                            onChange={(e) => updateEnvConfig(index, 'gcpUniverseDomain', e.target.value)}
+                            className="mt-2 bg-white"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -473,12 +645,21 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
           {/* Actions */}
           {showEnvs && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} disabled={isCreating}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="gap-2">
-                <Save className="h-4 w-4" />
-                Create Storage
+              <Button onClick={handleSave} className="gap-2" disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Create Storage
+                  </>
+                )}
               </Button>
             </div>
           )}

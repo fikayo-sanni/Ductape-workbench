@@ -21,6 +21,8 @@ import RequestBuilder from './tabs/RequestBuilder';
 import NewProductTabContent from './tabs/NewProductTabContent';
 import NewAppTabContent from './tabs/NewAppTabContent';
 import NewFeatureTabContent from './tabs/NewFeatureTabContent';
+import NewQuotaTabContent from './tabs/NewQuotaTabContent';
+import NewFallbackTabContent from './tabs/NewFallbackTabContent';
 import NewDatabaseTabContent from './tabs/NewDatabaseTabContent';
 import NewStorageTabContent from './tabs/NewStorageTabContent';
 import NewCacheTabContent from './tabs/NewCacheTabContent';
@@ -194,14 +196,36 @@ export default function TabContent() {
         return <FeatureTabContent tab={activeTab} />;
 
       case 'feature':
+        // Check if this is a new feature creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
+        }
+        return <FeatureTabContent tab={activeTab} />;
+
+      case 'quota':
+        // Check if this is a new quota creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewQuotaTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <FeatureTabContent tab={activeTab} />;
+
+      case 'fallback':
+        // Check if this is a new fallback creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewFallbackTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <FeatureTabContent tab={activeTab} />;
+
+      case 'job':
+        // Check if this is a new component creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
+        }
         return <FeatureTabContent tab={activeTab} />;
 
       case 'session':
       case 'healthcheck':
       case 'notification':
-      case 'fallback':
-      case 'quota':
-      case 'job':
         // Check if this is a new component creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
