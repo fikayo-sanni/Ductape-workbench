@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Box, Save, CheckCircle, ChevronRight } from 'lucide-react';
+import { Box, Save, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
@@ -337,7 +337,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                     <SelectValue placeholder="Select parent component" />
                   </SelectTrigger>
                   <SelectContent>
-                    {parentOptions.map((option) => (
+                    {parentOptions.map((option: any) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -361,7 +361,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                     <SelectValue placeholder="Select event" />
                   </SelectTrigger>
                   <SelectContent>
-                    {eventOptions.map((option) => (
+                    {eventOptions.map((option: any) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
