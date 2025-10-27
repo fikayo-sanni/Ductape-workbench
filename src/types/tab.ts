@@ -10,6 +10,8 @@ export type TabType =
   | 'database'
   | 'message-broker'
   | 'notification'
+  | 'message'
+  | 'new-message'
   | 'fallback'
   | 'quota'
   | 'job'

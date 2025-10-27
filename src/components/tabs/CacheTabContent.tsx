@@ -7,6 +7,12 @@ interface CacheTabContentProps {
 }
 
 export default function CacheTabContent({ cache }: CacheTabContentProps) {
+  // Extract product info for header
+  const product = cache?.productName && cache?.productTag ? {
+    name: cache.productName,
+    tag: cache.productTag,
+    logo: cache.productLogo,
+  } : null;
   const formatExpiry = (seconds: number) => {
     if (seconds < 60) return `${seconds} seconds`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
@@ -17,6 +23,36 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Product Context Header */}
+        {product && (
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                {product.logo ? (
+                  <img
+                    src={product.logo}
+                    alt={product.name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-grey">Cache for {product.name}</h2>
+                  <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
+                    {product.tag}
+                  </span>
+                </div>
+                <p className="text-sm text-grey-600">
+                  This cache is connected to your product and configured for its environments
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">

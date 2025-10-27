@@ -1,10 +1,13 @@
-import { Database, Server, Link, Copy, Check, Eye, EyeOff, Table, GitBranch, Zap } from 'lucide-react';
+import { Database, Server, Link, Copy, Check, Eye, EyeOff, Table, GitBranch, Zap, Loader2, CheckCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { useDuctape } from '@/hooks/useDuctape';
+import { useAuth } from '@/store/useAuth';
 
 interface DatabaseTabContentProps {
   database: any;
@@ -13,6 +16,50 @@ interface DatabaseTabContentProps {
 export default function DatabaseTabContent({ database }: DatabaseTabContentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConnections, setShowConnections] = useState<Record<number, boolean>>({});
+  
+  const { user, currentWorkspaceId } = useAuth();
+  const productTag = database?.productTag;
+  
+  // Initialize SDK
+  const ductape = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product',
+  });
+
+  // Fetch database details from SDK
+  const { data: databaseData, isLoading } = useQuery({
+    queryKey: ['database', productTag, database?.tag],
+    queryFn: async () => {
+      if (!ductape || !productTag || !database?.tag) return database;
+      const productBuilder = ductape as any;
+      await productBuilder.init(productTag);
+      return await productBuilder.databases.fetch(database.tag);
+    },
+    enabled: !!ductape && !!productTag && !!database?.tag,
+  });
+
+  const displayData = databaseData || database;
+  
+  // Extract product info for header
+  const product = database?.productName && database?.productTag ? {
+    name: database.productName,
+    tag: database.productTag,
+    logo: database.productLogo,
+  } : null;
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-grey-600">Loading database details...</p>
+        </div>
+      </div>
+    );
+  }
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -48,6 +95,40 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Product Context Header */}
+        {product && (
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                {product.logo ? (
+                  <img
+                    src={product.logo}
+                    alt={product.name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-grey">Database for {product.name}</h2>
+                  <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
+                    {product.tag}
+                  </span>
+                </div>
+                <p className="text-sm text-grey-600">
+                  This database is connected to your product and configured for its environments
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-grey-600">
+                <CheckCircle className="h-4 w-4 text-green" />
+                <span>Auto-connect enabled</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
@@ -55,27 +136,27 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
               <Database className="h-6 w-6 text-blue" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-grey mb-2">{database.name}</h1>
+              <h1 className="text-2xl font-bold text-grey mb-2">{displayData.name}</h1>
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{database.tag}</span></span>
-                {database.type && (
-                  <span className={cn('px-3 py-1 rounded text-xs font-medium uppercase', getDatabaseTypeColor(database.type))}>
-                    {database.type}
+                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{displayData.tag}</span></span>
+                {displayData.type && (
+                  <span className={cn('px-3 py-1 rounded text-xs font-medium uppercase', getDatabaseTypeColor(displayData.type))}>
+                    {displayData.type}
                   </span>
                 )}
               </div>
-              {database.description && (
-                <p className="text-sm text-grey-600">{database.description}</p>
+              {displayData.description && (
+                <p className="text-sm text-grey-600">{displayData.description}</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Database Environments */}
-        {database.envs && database.envs.length > 0 && (
+        {displayData.envs && displayData.envs.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-grey">Environment Connections</h2>
-            {database.envs.map((env: any, index: number) => (
+            {displayData.envs.map((env: any, index: number) => (
               <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -143,14 +224,14 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         )}
 
         {/* Database Tables */}
-        {database.tables && database.tables.length > 0 && (
+        {displayData.tables && displayData.tables.length > 0 && (
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Table className="h-5 w-5 text-blue" />
               <h2 className="text-lg font-semibold text-grey">Tables</h2>
             </div>
             <div className="space-y-2">
-              {database.tables.map((table: any, index: number) => (
+              {displayData.tables.map((table: any, index: number) => (
                 <div
                   key={index}
                   className="p-3 rounded-lg border border-grey-400 hover:border-blue hover:bg-blue/5 transition-colors"
@@ -171,14 +252,14 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         )}
 
         {/* Database Actions */}
-        {database.actions && database.actions.length > 0 && (
+        {displayData.actions && displayData.actions.length > 0 && (
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Zap className="h-5 w-5 text-yellow" />
               <h2 className="text-lg font-semibold text-grey">Actions</h2>
             </div>
             <div className="space-y-2">
-              {database.actions.map((action: any, index: number) => (
+              {displayData.actions.map((action: any, index: number) => (
                 <div
                   key={index}
                   className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
@@ -206,14 +287,14 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         )}
 
         {/* Database Migrations */}
-        {database.migrations && database.migrations.length > 0 && (
+        {displayData.migrations && displayData.migrations.length > 0 && (
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <GitBranch className="h-5 w-5 text-green" />
               <h2 className="text-lg font-semibold text-grey">Migrations</h2>
             </div>
             <div className="space-y-2">
-              {database.migrations.map((migration: any, index: number) => (
+              {displayData.migrations.map((migration: any, index: number) => (
                 <div
                   key={index}
                   className="p-3 rounded-lg border border-grey-400 hover:border-green hover:bg-green/5 transition-colors"
@@ -251,7 +332,7 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         )}
 
         {/* Empty State */}
-        {(!database.envs || database.envs.length === 0) && (
+        {(!displayData.envs || displayData.envs.length === 0) && (
           <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
             <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Configured</h3>

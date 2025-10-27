@@ -59,7 +59,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
       type: type as any,
       title: component.name || component.tag || `${type}`,
       itemId: component._id,
-      data: { ...component, componentType: type, productName: product.name },
+      data: { ...component, componentType: type, productName: product.name, productTag: product.tag, productLogo: product.logo },
     });
   };
 

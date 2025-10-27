@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Input } from './ui/input';
-import { Search, Loader2, Database, HardDrive, Activity, MessageSquare, Box } from 'lucide-react';
+import { Search, Loader2, Database, HardDrive, Activity, MessageSquare, Box, Shield, Timer, Workflow, Bell, Heart, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IProduct } from '@/types/product';
 import productServicesReal from '@/services/productServicesReal';
@@ -84,23 +84,43 @@ export default function ProductsSidebar() {
     products.forEach((product: IProduct) => {
       // Databases
       product.databases?.forEach((db: any) => {
-        components.push({ type: 'database', name: db.name || db.tag, productName: product.name, data: { ...db, componentType: 'database', productName: product.name } });
+        components.push({ type: 'database', name: db.name || db.tag, productName: product.name, data: { ...db, componentType: 'database', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Storage
       product.storage?.forEach((storage: any) => {
-        components.push({ type: 'storage', name: storage.name || storage.tag, productName: product.name, data: { ...storage, componentType: 'storage', productName: product.name } });
+        components.push({ type: 'storage', name: storage.name || storage.tag, productName: product.name, data: { ...storage, componentType: 'storage', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Caches
       product.caches?.forEach((cache: any) => {
-        components.push({ type: 'cache', name: cache.name || cache.tag, productName: product.name, data: { ...cache, componentType: 'cache', productName: product.name } });
+        components.push({ type: 'cache', name: cache.name || cache.tag, productName: product.name, data: { ...cache, componentType: 'cache', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Message Brokers
       product.messageBroker?.forEach((broker: any) => {
-        components.push({ type: 'message-broker', name: broker.name || broker.tag, productName: product.name, data: { ...broker, componentType: 'message-broker', productName: product.name } });
+        components.push({ type: 'message-broker', name: broker.name || broker.tag, productName: product.name, data: { ...broker, componentType: 'message-broker', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Jobs
       product.jobs?.forEach((job: any) => {
-        components.push({ type: 'job', name: job.name || job.tag, productName: product.name, data: { ...job, componentType: 'job', productName: product.name } });
+        components.push({ type: 'job', name: job.name || job.tag, productName: product.name, data: { ...job, componentType: 'job', productName: product.name, productTag: product.tag, productLogo: product.logo } });
+      });
+      // Notifications
+      product.notifications?.forEach((notification: any) => {
+        components.push({ type: 'notification', name: notification.name || notification.tag, productName: product.name, data: { ...notification, componentType: 'notification', productName: product.name, productTag: product.tag, productLogo: product.logo } });
+      });
+      // Features
+      product.features?.forEach((feature: any) => {
+        components.push({ type: 'feature', name: feature.name || feature.tag, productName: product.name, data: { ...feature, componentType: 'feature', productName: product.name, productTag: product.tag, productLogo: product.logo } });
+      });
+      // Fallbacks
+      product.fallback?.forEach((fallback: any) => {
+        components.push({ type: 'fallback', name: fallback.name || fallback.tag, productName: product.name, data: { ...fallback, componentType: 'fallback', productName: product.name, productTag: product.tag, productLogo: product.logo } });
+      });
+      // Quotas
+      product.quota?.forEach((quota: any) => {
+        components.push({ type: 'quota', name: quota.name || quota.tag, productName: product.name, data: { ...quota, componentType: 'quota', productName: product.name, productTag: product.tag, productLogo: product.logo } });
+      });
+      // Healthchecks
+      product.healthchecks?.forEach((healthcheck: any) => {
+        components.push({ type: 'healthcheck', name: healthcheck.name || healthcheck.tag, productName: product.name, data: { ...healthcheck, componentType: 'healthcheck', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
     });
 
@@ -131,6 +151,12 @@ export default function ProductsSidebar() {
       cache: Activity,
       'message-broker': MessageSquare,
       job: Box,
+      notification: Bell,
+      feature: Workflow,
+      fallback: Shield,
+      quota: Timer,
+      healthcheck: Heart,
+      webhook: Settings2,
     };
     return icons[type] || Box;
   };

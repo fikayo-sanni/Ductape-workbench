@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { connectDuctape } from '@/helpers/ductape';
+import { getEnvironmentType } from '@/helpers/index';
 import { EnvType } from '@ductape/sdk/dist/types';
 
 export interface DuctapeConfig {
@@ -11,22 +12,8 @@ export interface DuctapeConfig {
   type: 'product' | 'app';
 }
 
-const getEnvironmentType = (): EnvType => {
-  const hostname = window.location.hostname;
-
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'dev' as EnvType;
-  }
-
-  if (hostname.includes('staging') || hostname.includes('stg')) {
-    return 'stg' as EnvType;
-  }
-
-  return 'prd' as EnvType;
-};
-
 export function useDuctape(config: DuctapeConfig) {
-  // Validate required fields
+  // Validate required fields - return null if invalid (like frontend-app does)
   const isValidConfig = config.workspace_id && config.user_id && config.token && config.public_key;
 
   return useMemo(() => {

@@ -94,12 +94,13 @@ export default function UpdateProductEnvironmentModal({
 
       const payload = {
         env_name: data.env_name,
-        slug: data.slug,
         description: data.description,
         active: data.active,
       };
 
-      await ductape.envs.update(environment.slug, payload);
+      console.dir(ductape);
+
+      await ductape.environments.update(environment.slug, payload);
       return payload;
     },
     onSuccess: () => {
@@ -174,6 +175,7 @@ export default function UpdateProductEnvironmentModal({
                 id="slug"
                 placeholder="e.g., prd, stg, dev"
                 value={formData.slug}
+                disabled={true}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 maxLength={3}
                 className="font-mono"
@@ -181,6 +183,7 @@ export default function UpdateProductEnvironmentModal({
               <Button
                 type="button"
                 variant="outline"
+                disabled={true}
                 onClick={handleAutoGenerateSlug}
                 size="sm"
               >

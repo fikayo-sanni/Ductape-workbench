@@ -23,6 +23,8 @@ import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewRequestTabContent from './tabs/NewRequestTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
+import NewMessageTabContent from './tabs/NewMessageTabContent';
+import MessageTabContent from './tabs/MessageTabContent';
 import RequestBuilder from './tabs/RequestBuilder';
 import NewProductTabContent from './tabs/NewProductTabContent';
 import NewAppTabContent from './tabs/NewAppTabContent';
@@ -36,6 +38,7 @@ import NewMessageBrokerTabContent from './tabs/NewMessageBrokerTabContent';
 import StorageComponentContent from './tabs/StorageComponentContent';
 import CacheComponentContent from './tabs/CacheComponentContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
+import JobTabContent from './tabs/JobTabContent';
 import GenericComponentContent from './tabs/GenericComponentContent';
 
 function FeatureTabContent({ tab }: { tab: Tab }) {
@@ -80,9 +83,10 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
       case 'session':
       case 'fallback':
       case 'quota':
-      case 'job':
       case 'message-broker':
         return <GenericComponentContent component={tab.data} type={componentType} />;
+      case 'job':
+        return <JobTabContent job={tab.data} />;
       case 'healthcheck':
         // Check if this is a new healthcheck creation tab
         if (tab.isDirty && tab.data?.isNew) {
@@ -208,21 +212,21 @@ export default function TabContent() {
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewStorageTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <FeatureTabContent tab={activeTab} />;
+        return <StorageTabContent storage={activeTab.data} />;
 
       case 'cache':
         // Check if this is a new cache creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewCacheTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <FeatureTabContent tab={activeTab} />;
+        return <CacheTabContent cache={activeTab.data} />;
 
       case 'database':
         // Check if this is a new database creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewDatabaseTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <FeatureTabContent tab={activeTab} />;
+        return <DatabaseTabContent database={activeTab.data} />;
 
       case 'message-broker':
         // Check if this is a new message broker creation tab
@@ -253,6 +257,14 @@ export default function TabContent() {
         }
         return <NotificationTabContent data={activeTab.data} />;
 
+      case 'message':
+        // View message details
+        return <MessageTabContent data={activeTab.data} />;
+
+      case 'new-message':
+        // Create new message
+        return <NewMessageTabContent tabId={activeTab.id} data={activeTab.data} />;
+
       case 'feature':
         // Check if this is a new feature creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
@@ -275,11 +287,11 @@ export default function TabContent() {
         return <FeatureTabContent tab={activeTab} />;
 
       case 'job':
-        // Check if this is a new component creation tab
+        // Check if this is a new job creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
         }
-        return <FeatureTabContent tab={activeTab} />;
+        return <JobTabContent job={activeTab.data} />;
 
       case 'session':
       case 'healthcheck':
