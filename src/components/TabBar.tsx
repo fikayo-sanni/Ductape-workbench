@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   Key,
   Store,
+  Mail,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -36,6 +37,8 @@ const getTabIcon = (type: Tab['type']) => {
     'message-broker': MessageSquare,
     notification: Bell,
     notifier: Bell,
+    message: Mail,
+    'new-message': Mail,
     fallback: Shield,
     quota: BarChart3,
     job: ListTree,
