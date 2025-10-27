@@ -184,6 +184,24 @@ const updateWorkspaceEnvs = async (data: {
   return response.data;
 };
 
+const fetchDashboardData = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<any> => {
+  const {workspace_id, user_id, public_key} = data;
+  try {
+    const response = await apiClient.get<any>(
+      `/workspaces/v1/dashboard/${workspace_id}`,
+      {params: {public_key, user_id}},
+    );
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Failed to fetch dashboard data:', error);
+    return null;
+  }
+};
+
 const workspaceServices = {
   fetchWorkspaces,
   changeDefaultWorkspace,
@@ -194,6 +212,7 @@ const workspaceServices = {
   createUploadUrl,
   uploadFileToUrl,
   updateWorkspaceEnvs,
+  fetchDashboardData,
 };
 
 export default workspaceServices;
