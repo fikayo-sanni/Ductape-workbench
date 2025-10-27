@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
   Card,
   CardContent,
@@ -324,29 +324,41 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
 
             <div>
               <Label htmlFor="tag">Tag</Label>
-              <Input
-                id="tag"
-                value={state.tag}
-                readOnly
-                className="mt-2 bg-grey-100"
-                placeholder="Auto-generated from name"
-              />
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="tag"
+                  value={state.tag}
+                  readOnly
+                  className="bg-grey-100"
+                  placeholder="Auto-generated from name"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const tag = state.name
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '_')
+                      .replace(/^_+|_+$/g, '')
+                      .slice(0, 50);
+                    setState(prev => ({ ...prev, tag: product?.tag ? `${product.tag}:${tag}` : tag }));
+                  }}
+                  disabled={!state.name}
+                >
+                  Auto-generate
+                </Button>
+              </div>
               <p className="text-xs text-grey-600 mt-1">
                 Auto-generated from quota name (max 50 characters)
               </p>
             </div>
 
             <div>
-              <Label htmlFor="description" className="required">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                placeholder="e.g., Limits the number of API calls per user per month"
+              <MarkdownEditor
                 value={state.description}
-                onChange={(e) => setState(prev => ({ ...prev, description: e.target.value }))}
-                rows={3}
-                className="mt-2"
+                onChange={(value) => setState(prev => ({ ...prev, description: value }))}
+                placeholder="e.g., Limits the number of API calls per user per month"
+                label="Description"
               />
               <p className="text-xs text-grey-600 mt-1">
                 Fill in the description to unlock the next steps

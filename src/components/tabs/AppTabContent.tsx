@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import { IntegrationProvider } from '@/context/integration-context';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
@@ -275,7 +276,9 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               </div>
               <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
               {currentApp.description && (
-                <p className="text-grey-600 mb-4">{currentApp.description}</p>
+                <div className="text-grey-600 mb-4">
+                  <MarkdownViewer content={currentApp.description} />
+                </div>
               )}
 
               {/* Version Selector */}
@@ -1091,7 +1094,9 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               </div>
               <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
               {currentApp.description && (
-                <p className="text-grey-600 mb-4">{currentApp.description}</p>
+                <div className="text-grey-600 mb-4">
+                  <MarkdownViewer content={currentApp.description} />
+                </div>
               )}
 
               {/* Version Selector */}

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
 import { useQuery } from '@tanstack/react-query';
@@ -80,7 +81,9 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                   {notifierTag}:{displayData.tag}
                 </p>
                 {displayData.description && (
-                  <p className="text-grey-600">{displayData.description}</p>
+                  <div className="text-grey-600">
+                    <MarkdownViewer content={displayData.description} />
+                  </div>
                 )}
               </div>
             </div>

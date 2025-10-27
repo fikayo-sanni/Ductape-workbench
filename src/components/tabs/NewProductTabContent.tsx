@@ -3,7 +3,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
   Select,
   SelectContent,
@@ -155,17 +155,12 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
           </div>
 
           {/* Description */}
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Describe what this product does..."
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={4}
-              className="mt-2"
-            />
-          </div>
+          <MarkdownEditor
+            value={formData.description}
+            onChange={(value) => setFormData({ ...formData, description: value })}
+            placeholder="Describe what this product does..."
+            label="Description"
+          />
 
           {/* Status */}
           <div>

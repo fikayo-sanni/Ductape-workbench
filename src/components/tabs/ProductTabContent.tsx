@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
+import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
@@ -165,7 +166,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               </div>
               <p className="text-sm text-grey-600 mb-3">{product.tag}</p>
               {product.description && (
-                <p className="text-grey-600">{product.description}</p>
+                <div className="text-grey-600">
+                  <MarkdownViewer content={product.description} />
+                </div>
               )}
             </div>
           </div>

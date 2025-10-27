@@ -1,5 +1,6 @@
 import { Copy, Eye, EyeOff, Edit, Trash2, Activity, Heart, MessageSquare, Settings2, Box, Timer, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -172,7 +173,9 @@ export default function GenericComponentContent({ component, type }: GenericComp
           </div>
 
           {component.description && (
-            <p className="text-grey-600 mt-4">{component.description}</p>
+            <div className="text-grey-600 mt-4">
+              <MarkdownViewer content={component.description} />
+            </div>
           )}
         </div>
 

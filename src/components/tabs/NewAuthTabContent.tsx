@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
   Select,
   SelectContent,
@@ -335,18 +335,11 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
 
             {/* Description */}
             <div>
-              <Label htmlFor="description" className="required">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                placeholder="Describe this authorization method..."
+              <MarkdownEditor
                 value={state.description}
-                onChange={(e) =>
-                  setState(prev => ({ ...prev, description: e.target.value }))
-                }
-                rows={3}
-                className="mt-2"
+                onChange={(value) => setState(prev => ({ ...prev, description: value }))}
+                placeholder="Describe this authorization method..."
+                label="Description"
               />
             </div>
           </CardContent>

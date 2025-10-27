@@ -4,7 +4,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save } from 'lucide-react';
@@ -948,33 +948,46 @@ console.log('Feature result:', result);`;
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-grey mb-2">Feature Name</label>
-                <Input
-                  value={state.featureName}
-                  onChange={(e) => setState({ ...state, featureName: e.target.value })}
-                  placeholder="Enter feature name"
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-grey mb-2">Feature Tag (Auto-generated)</label>
+            <div>
+              <label className="block text-sm font-medium text-grey mb-2">Feature Name</label>
+              <Input
+                value={state.featureName}
+                onChange={(e) => setState({ ...state, featureName: e.target.value })}
+                placeholder="Enter feature name"
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-grey mb-2">Feature Tag</label>
+              <div className="flex gap-2">
                 <Input
                   value={state.featureTag}
                   readOnly
                   className="w-full bg-grey-50"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const tag = state.featureName
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '_')
+                      .replace(/^_+|_+$/g, '')
+                      .slice(0, 50);
+                    setState({ ...state, featureTag: product?.tag ? `${product.tag}:${tag}` : tag });
+                  }}
+                  disabled={!state.featureName}
+                >
+                  Auto-generate
+                </Button>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-grey mb-2">Description</label>
-              <Textarea
+              <MarkdownEditor
                 value={state.featureDescription}
-                onChange={(e) => setState({ ...state, featureDescription: e.target.value })}
+                onChange={(value) => setState({ ...state, featureDescription: value })}
                 placeholder="Describe what this feature does"
-                rows={3}
-                className="w-full"
+                label="Description"
               />
             </div>
             <div className="flex items-center space-x-4">

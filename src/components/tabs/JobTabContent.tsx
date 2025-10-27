@@ -1,11 +1,8 @@
-import { Clock, Zap, RefreshCw, Loader2, Tag, CheckCircle, Database, Mail, Terminal, HardDrive, Layers, GitBranch, Server, Webhook, FolderTree } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Clock, Zap, RefreshCw, Loader2, Tag, CheckCircle, Database, Mail, Terminal, HardDrive, Layers, GitBranch, Server, Webhook } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import toast from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
 
@@ -14,7 +11,6 @@ interface JobTabContentProps {
 }
 
 export default function JobTabContent({ job }: JobTabContentProps) {
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   
   const { user, currentWorkspaceId } = useAuth();
   const productTag = job?.productTag;
@@ -59,13 +55,6 @@ export default function JobTabContent({ job }: JobTabContentProps) {
       </div>
     );
   }
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
 
   const getJobStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {

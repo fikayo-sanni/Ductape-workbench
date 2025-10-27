@@ -3,7 +3,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
   Select,
   SelectContent,
@@ -327,16 +327,11 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
               </div>
 
               <div>
-                <Label htmlFor="description">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  placeholder="Describe this health check..."
+                <MarkdownEditor
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="mt-2"
+                  onChange={(value) => setFormData({ ...formData, description: value })}
+                  placeholder="Describe this health check..."
+                  label="Description"
                 />
               </div>
 

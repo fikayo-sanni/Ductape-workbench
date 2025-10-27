@@ -20,6 +20,7 @@ import WebhookTabContent from './tabs/WebhookTabContent';
 import NewWebhookTabContent from './tabs/NewWebhookTabContent';
 import HealthcheckTabContent from './tabs/HealthcheckTabContent';
 import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
+import NewSessionTabContent from './tabs/NewSessionTabContent';
 import NewRequestTabContent from './tabs/NewRequestTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
@@ -294,13 +295,25 @@ export default function TabContent() {
         return <JobTabContent job={activeTab.data} />;
 
       case 'session':
-      case 'healthcheck':
-      case 'notification':
-        // Check if this is a new component creation tab
+        // Check if this is a new session creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
-          return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
+          return <NewSessionTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <FeatureTabContent tab={activeTab} />;
+
+      case 'healthcheck':
+        // Check if this is a new healthcheck creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewHealthcheckTabContent data={activeTab.data} />;
+        }
+        return <FeatureTabContent tab={activeTab} />;
+
+      case 'notification':
+        // Check if this is a new notification creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewNotificationTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <NotificationTabContent data={activeTab.data} />;
 
       case 'marketplace':
         return <MarketplaceTabContent />;

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KeyRound, Save, CheckCircle, Loader2 } from 'lucide-react';
@@ -249,15 +250,11 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
 
           {/* Description */}
           <div>
-            <Label htmlFor="description" className="required">
-              Description
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Describe the purpose of this session"
+            <MarkdownEditor
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="mt-2 min-h-20"
+              onChange={(value) => setFormData({ ...formData, description: value })}
+              placeholder="Describe the purpose of this session"
+              label="Description"
             />
             <p className="text-xs text-grey-600 mt-1">Detailed description of this session's purpose</p>
           </div>
