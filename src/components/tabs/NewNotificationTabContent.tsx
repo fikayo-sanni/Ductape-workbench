@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bell, Loader2, CheckCircle, Plus, X, Upload, Trash2 } from 'lucide-react';
+import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
@@ -162,19 +162,27 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
         }),
         ...(selectedNotifiers.find(n => n.id === 'callback')?.selected && config.callbacks && {
           callbacks: {
-            ...config.callbacks,
-            headers: config.callbacks.headers?.reduce((acc, item) => {
-              if (item.key && item.value) acc[item.key] = item.value;
-              return acc;
-            }, {} as Record<string, string>),
-            query: config.callbacks.query?.reduce((acc, item) => {
-              if (item.key && item.value) acc[item.key] = item.value;
-              return acc;
-            }, {} as Record<string, string>),
-            params: config.callbacks.params?.reduce((acc, item) => {
-              if (item.key && item.value) acc[item.key] = item.value;
-              return acc;
-            }, {} as Record<string, string>),
+            url: config.callbacks.url,
+            method: config.callbacks.method,
+            headers: config.callbacks.headers?.length ? {
+              ...config.callbacks.headers.reduce((acc, item) => {
+                if (item.key && item.value) acc[item.key] = item.value;
+                return acc;
+              }, {} as Record<string, string>)
+            } : undefined,
+            query: config.callbacks.query?.length ? {
+              ...config.callbacks.query.reduce((acc, item) => {
+                if (item.key && item.value) acc[item.key] = item.value;
+                return acc;
+              }, {} as Record<string, string>)
+            } : undefined,
+            params: config.callbacks.params?.length ? {
+              ...config.callbacks.params.reduce((acc, item) => {
+                if (item.key && item.value) acc[item.key] = item.value;
+                return acc;
+              }, {} as Record<string, string>)
+            } : undefined,
+            body: config.callbacks.body,
           },
         }),
       }));
@@ -900,23 +908,36 @@ function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; o
   const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>([]);
 
   useEffect(() => {
-    // Build request config object similar to NewAuthTabContent tokenConfig
-    const requestConfigObj: Record<string, Record<string, string>> = {
-      headers: {},
-      body: {},
-      params: {},
-      query: {},
-    };
+    // Build headers, query, params, and body arrays to match the interface
+    const headers: Array<{ key: string; value: string }> = [];
+    const query: Array<{ key: string; value: string }> = [];
+    const params: Array<{ key: string; value: string }> = [];
+    let body = '';
 
     requestFields.forEach(item => {
-      if (item.key && item.addTo) {
-        requestConfigObj[item.addTo][item.key] = item.value;
+      if (item.key && item.value) {
+        if (item.addTo === 'headers') {
+          headers.push({ key: item.key, value: item.value });
+        } else if (item.addTo === 'query') {
+          query.push({ key: item.key, value: item.value });
+        } else if (item.addTo === 'params') {
+          params.push({ key: item.key, value: item.value });
+        } else if (item.addTo === 'body') {
+          body = item.value;
+        }
       }
     });
 
     onConfigChange({
       ...envConfig,
-      callbacks: { url, method, request: requestConfigObj },
+      callbacks: { 
+        url, 
+        method, 
+        headers: headers.length > 0 ? headers : undefined,
+        query: query.length > 0 ? query : undefined,
+        params: params.length > 0 ? params : undefined,
+        body: body || undefined,
+      },
     });
   }, [url, method, requestFields, envConfig, onConfigChange]);
 
