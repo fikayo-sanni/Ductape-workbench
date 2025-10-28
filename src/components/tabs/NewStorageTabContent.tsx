@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HardDrive, Save, ChevronRight, Loader2, CheckCircle } from 'lucide-react';
+import { HardDrive, Save, ChevronRight, Loader2, CheckCircle, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
@@ -395,7 +395,7 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
               </div>
 
               {envConfigs.map((env, index) => (
-                <div key={env.slug} className="p-4 bg-grey-100 rounded-lg space-y-4">
+                <div key={env.slug} className="p-4 rounded-lg space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-grey">{env.env_name}</h4>
                     <span className="text-xs text-grey-600">{env.slug}</span>
@@ -499,6 +499,77 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
                   {/* GCP Configuration */}
                   {env.type === 'GCP' && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-sm font-medium text-grey">Service Account Credentials</h5>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  try {
+                                    const json = JSON.parse(event.target?.result as string);
+                                    // Update all fields at once
+                                    const updated = [...envConfigs];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      gcpConfigType: json.type || 'service_account',
+                                      gcpProjectId: json.project_id || '',
+                                      gcpPrivateKeyId: json.private_key_id || '',
+                                      gcpPrivateKey: json.private_key || '',
+                                      gcpClientEmail: json.client_email || '',
+                                      gcpClientId: json.client_id || '',
+                                      gcpAuthUri: json.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
+                                      gcpTokenUri: json.token_uri || 'https://oauth2.googleapis.com/token',
+                                      gcpAuthProviderX509CertUrl: json.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
+                                      gcpClientX509CertUrl: json.client_x509_cert_url || '',
+                                      gcpUniverseDomain: json.universe_domain || 'googleapis.com',
+                                    };
+                                    setEnvConfigs(updated);
+                                    toast.success('Service account file loaded successfully');
+                                  } catch (error) {
+                                    toast.error('Failed to parse JSON file');
+                                  }
+                                };
+                                reader.readAsText(file);
+                              }
+                            }}
+                            className="hidden"
+                            id={`gcp-service-account-${index}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById(`gcp-service-account-${index}`)?.click()}
+                            className="gap-2"
+                          >
+                            <Upload className="h-4 w-4" />
+                            Upload Service Account JSON
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Info box explaining what the upload does */}
+                      <div className="border border-grey-300 rounded-lg p-4 bg-grey-100/50">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary text-sm font-semibold">i</span>
+                          </div>
+                          <div className="flex-1">
+                            <h5 className="text-sm font-medium text-grey mb-1">Upload Service Account File</h5>
+                            <p className="text-sm text-grey-600 leading-relaxed">
+                              Save time by uploading your Google Cloud service account JSON file. The upload will automatically populate
+                              all credential fields below (project ID, private key, client email, etc.), eliminating the need to
+                              manually copy and paste each value. You can still edit any field after uploading.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`gcpBucketName-${index}`} className="required">Bucket Name</Label>

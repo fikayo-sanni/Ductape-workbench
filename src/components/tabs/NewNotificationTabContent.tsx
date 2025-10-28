@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
   Select,
   SelectContent,
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bell, Loader2, CheckCircle, Plus, X } from 'lucide-react';
+import { Bell, Loader2, CheckCircle, Plus, X, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
@@ -95,19 +96,19 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
   const ductape = useDuctape(
     shouldInitDuctape
       ? {
-          workspace_id: product.workspace_id,
-          user_id: user._id,
-          token: user.auth_token,
-          public_key: user.public_key,
-          type: 'product',
-        }
+        workspace_id: product.workspace_id,
+        user_id: user._id,
+        token: user.auth_token,
+        public_key: user.public_key,
+        type: 'product',
+      }
       : {
-          workspace_id: '',
-          user_id: '',
-          token: '',
-          public_key: '',
-          type: 'product',
-        }
+        workspace_id: '',
+        user_id: '',
+        token: '',
+        public_key: '',
+        type: 'product',
+      }
   ) as any;
 
   // Auto-generate tag from name
@@ -219,7 +220,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       toast.error('Please select at least one notifier type');
       return;
     }
-    
+
     createNotification();
   };
 
@@ -307,14 +308,11 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
               </div>
 
               <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Describe this notifier..."
+                <MarkdownEditor
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="mt-2"
+                  onChange={(value) => setFormData({ ...formData, description: value })}
+                  placeholder="Describe this notifier..."
+                  label="Description"
                 />
               </div>
             </div>
@@ -375,6 +373,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
                       setEnvConfigs(newConfigs);
                     }}
                     previousConfigs={envIndex > 0 ? envConfigs.slice(0, envIndex) : []}
+                    envIndex={envIndex}
                   />
                 ))}
               </div>
@@ -422,59 +421,52 @@ function EnvironmentConfigCard({
   selectedNotifiers,
   onConfigChange,
   previousConfigs,
+  envIndex,
 }: {
   env: any;
   envConfig: EnvConfig;
   selectedNotifiers: NotifierType[];
   onConfigChange: (config: EnvConfig) => void;
   previousConfigs?: EnvConfig[];
+  envIndex?: number;
 }) {
   const selectedChannels = selectedNotifiers.filter(n => n.selected);
 
   return (
-    <div className="border border-grey-400 rounded-lg overflow-hidden bg-white shadow-sm">
-      {/* Header */}
-      <div className="bg-grey-100 px-6 py-4 border-b border-grey-400">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Bell className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-grey">{env?.env_name || envConfig.slug}</h3>
-              <p className="text-xs text-grey-600">{selectedChannels.length} channel{selectedChannels.length !== 1 ? 's' : ''} configured</p>
-            </div>
+    <div className="p-4 rounded-lg space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold text-grey">{env?.env_name || envConfig.slug}</h4>
+        <span className="text-xs text-grey-600">{selectedChannels.length} channel{selectedChannels.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {previousConfigs && previousConfigs.length > 0 && (
+        <div className="flex items-center gap-2 pb-2 border-b border-grey-300">
+          <span className="text-sm text-grey-600">Quick copy:</span>
+          <div className="flex gap-2 flex-wrap">
+            {previousConfigs.map((prevConfig, idx) => (
+              <Button
+                key={idx}
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onConfigChange({ ...prevConfig, slug: envConfig.slug });
+                  toast.success(`Copied configuration from ${prevConfig.slug}`);
+                }}
+                className="h-7 text-xs gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                {prevConfig.slug}
+              </Button>
+            ))}
           </div>
         </div>
-        {previousConfigs && previousConfigs.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-grey-600">Quick copy:</span>
-            <div className="flex gap-2 flex-wrap">
-              {previousConfigs.map((prevConfig, idx) => (
-                <Button
-                  key={idx}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onConfigChange({ ...prevConfig, slug: envConfig.slug });
-                    toast.success(`Copied configuration from ${prevConfig.slug}`);
-                  }}
-                  className="h-7 text-xs gap-1"
-                >
-                  <Plus className="h-3 w-3" />
-                  {prevConfig.slug}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Channels - Progressive Disclosure */}
       <Accordion type="multiple" className="w-full">
         {selectedNotifiers.find(n => n.id === 'push')?.selected && (
-          <AccordionItem value="push" className="border-b border-grey-400 last:border-b-0">
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+          <AccordionItem value="push" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
                   <Bell className="h-4 w-4 text-purple-500" />
@@ -485,15 +477,15 @@ function EnvironmentConfigCard({
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6">
-              <NotificationTypeConfig envConfig={envConfig} onConfigChange={onConfigChange} />
+            <AccordionContent className="py-4">
+              <NotificationTypeConfig envConfig={envConfig} onConfigChange={onConfigChange} envIndex={envIndex} />
             </AccordionContent>
           </AccordionItem>
         )}
 
         {selectedNotifiers.find(n => n.id === 'email')?.selected && (
-          <AccordionItem value="email" className="border-b border-grey-400 last:border-b-0">
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+          <AccordionItem value="email" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                   <Bell className="h-4 w-4 text-blue-500" />
@@ -504,15 +496,15 @@ function EnvironmentConfigCard({
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6">
+            <AccordionContent className="py-4">
               <EmailConfig envConfig={envConfig} onConfigChange={onConfigChange} />
             </AccordionContent>
           </AccordionItem>
         )}
 
         {selectedNotifiers.find(n => n.id === 'sms')?.selected && (
-          <AccordionItem value="sms" className="border-b border-grey-400 last:border-b-0">
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+          <AccordionItem value="sms" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
                   <Bell className="h-4 w-4 text-green-500" />
@@ -523,15 +515,15 @@ function EnvironmentConfigCard({
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6">
+            <AccordionContent className="py-4">
               <SmsConfig envConfig={envConfig} onConfigChange={onConfigChange} />
             </AccordionContent>
           </AccordionItem>
         )}
 
         {selectedNotifiers.find(n => n.id === 'callback')?.selected && (
-          <AccordionItem value="callback" className="border-b border-grey-400 last:border-b-0">
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+          <AccordionItem value="callback" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                   <Bell className="h-4 w-4 text-orange-500" />
@@ -542,7 +534,7 @@ function EnvironmentConfigCard({
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6">
+            <AccordionContent className="py-4">
               <CallbackConfig envConfig={envConfig} onConfigChange={onConfigChange} />
             </AccordionContent>
           </AccordionItem>
@@ -553,9 +545,9 @@ function EnvironmentConfigCard({
 }
 
 // Individual configuration components for each notifier type
-function NotificationTypeConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void }) {
+function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void; envIndex?: number }) {
   const [notificationType, setNotificationType] = useState<'firebase' | 'expo'>('firebase');
-  
+
   const [credentials, setCredentials] = useState({
     type: 'service_account',
     project_id: '',
@@ -607,7 +599,81 @@ function NotificationTypeConfig({ envConfig, onConfigChange }: { envConfig: EnvC
 
       {notificationType === 'firebase' && (
         <div className="space-y-4">
-          <h4 className="text-sm font-medium">Firebase Credentials</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Firebase Credentials</h4>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const json = JSON.parse(event.target?.result as string);
+                        setCredentials({
+                          type: json.type || 'service_account',
+                          project_id: json.project_id || '',
+                          private_key_id: json.private_key_id || '',
+                          private_key: json.private_key || '',
+                          client_email: json.client_email || '',
+                          client_id: json.client_id || '',
+                          auth_uri: json.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
+                          token_uri: json.token_uri || 'https://oauth2.googleapis.com/token',
+                          auth_provider_x509_cert_url: json.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
+                          client_x509_cert_url: json.client_x509_cert_url || '',
+                        });
+                        toast.success('Service account file loaded successfully');
+                      } catch (error) {
+                        toast.error('Failed to parse JSON file');
+                      }
+                    };
+                    reader.readAsText(file);
+                  }
+                }}
+                className="hidden"
+                id={`firebase-json-upload-${envIndex ?? 0}`}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById(`firebase-json-upload-${envIndex ?? 0}`)?.click()}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload Service Account JSON
+              </Button>
+            </div>
+          </div>
+
+          {/* Info box explaining what the upload does */}
+          <div className="border border-grey-300 rounded-lg p-4 bg-grey-100/50">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary text-sm font-semibold">i</span>
+              </div>
+              <div className="flex-1">
+                <h5 className="text-sm font-medium text-grey mb-1">Upload Service Account File</h5>
+                <p className="text-sm text-grey-600 leading-relaxed">
+                  Save time by uploading your Firebase service account JSON file. The upload will automatically populate
+                  all credential fields below (project ID, private key, client email, etc.), eliminating the need to
+                  manually copy and paste each value. You can still edit any field after uploading.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="col-span-2">
+              <Label>Database URL</Label>
+              <Input
+                value={databaseUrl}
+                onChange={(e) => setDatabaseUrl(e.target.value)}
+                className="mt-1"
+                placeholder="https://project.firebaseio.com"
+              />
+            </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Type</Label>
@@ -684,15 +750,6 @@ function NotificationTypeConfig({ envConfig, onConfigChange }: { envConfig: EnvC
                 className="mt-1"
                 placeholder="-----BEGIN PRIVATE KEY-----..."
                 rows={4}
-              />
-            </div>
-            <div className="col-span-2">
-              <Label>Database URL</Label>
-              <Input
-                value={databaseUrl}
-                onChange={(e) => setDatabaseUrl(e.target.value)}
-                className="mt-1"
-                placeholder="https://project.firebaseio.com"
               />
             </div>
           </div>
@@ -840,52 +897,47 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
 function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void }) {
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('POST');
-  const [headers, setHeaders] = useState<Array<{ key: string; value: string }>>([]);
-  const [query, setQuery] = useState<Array<{ key: string; value: string }>>([]);
-  const [params, setParams] = useState<Array<{ key: string; value: string }>>([]);
-  const [body, setBody] = useState('');
+  const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>([]);
 
   useEffect(() => {
+    // Build request config object similar to NewAuthTabContent tokenConfig
+    const requestConfigObj: Record<string, Record<string, string>> = {
+      headers: {},
+      body: {},
+      params: {},
+      query: {},
+    };
+
+    requestFields.forEach(item => {
+      if (item.key && item.addTo) {
+        requestConfigObj[item.addTo][item.key] = item.value;
+      }
+    });
+
     onConfigChange({
       ...envConfig,
-      callbacks: { url, method, headers, query, params, body },
+      callbacks: { url, method, request: requestConfigObj },
     });
-  }, [url, method, headers, query, params, body, envConfig, onConfigChange]);
+  }, [url, method, requestFields, envConfig, onConfigChange]);
 
-  const handleAddPair = (type: 'headers' | 'query' | 'params') => {
-    const newPair = { key: '', value: '' };
-    if (type === 'headers') setHeaders([...headers, newPair]);
-    if (type === 'query') setQuery([...query, newPair]);
-    if (type === 'params') setParams([...params, newPair]);
+  const handleAddField = () => {
+    const newField = { 
+      id: `field_${Date.now()}`, 
+      key: '', 
+      value: '', 
+      addTo: 'headers' as const 
+    };
+    setRequestFields([...requestFields, newField]);
   };
 
-  const handleUpdatePair = (
-    type: 'headers' | 'query' | 'params',
-    index: number,
-    field: 'key' | 'value',
-    value: string
-  ) => {
-    if (type === 'headers') {
-      const newHeaders = [...headers];
-      newHeaders[index] = { ...newHeaders[index], [field]: value };
-      setHeaders(newHeaders);
-    }
-    if (type === 'query') {
-      const newQuery = [...query];
-      newQuery[index] = { ...newQuery[index], [field]: value };
-      setQuery(newQuery);
-    }
-    if (type === 'params') {
-      const newParams = [...params];
-      newParams[index] = { ...newParams[index], [field]: value };
-      setParams(newParams);
-    }
+  const handleRemoveField = (id: string) => {
+    setRequestFields(requestFields.filter(f => f.id !== id));
   };
 
-  const handleRemovePair = (type: 'headers' | 'query' | 'params', index: number) => {
-    if (type === 'headers') setHeaders(headers.filter((_, i) => i !== index));
-    if (type === 'query') setQuery(query.filter((_, i) => i !== index));
-    if (type === 'params') setParams(params.filter((_, i) => i !== index));
+  const handleUpdateField = (id: string, updates: Partial<{ key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>) => {
+    setRequestFields(requestFields.map(f => 
+      f.id === id ? { ...f, ...updates } : f
+    ));
   };
 
   return (
@@ -912,127 +964,82 @@ function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; o
         </Select>
       </div>
 
-      {/* Headers */}
-      <div className="space-y-2">
-        <Label>Headers</Label>
-        {headers.map((pair, index) => (
-          <div key={index} className="flex gap-2">
-            <Input
-              placeholder="Key"
-              value={pair.key}
-              onChange={(e) => handleUpdatePair('headers', index, 'key', e.target.value)}
-            />
-            <Input
-              placeholder="Value"
-              value={pair.value}
-              onChange={(e) => handleUpdatePair('headers', index, 'value', e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemovePair('headers', index)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+      <div className="flex items-center justify-between">
+        <Label>Request Fields</Label>
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          onClick={() => handleAddPair('headers')}
+          onClick={handleAddField}
           className="gap-2"
+          size="sm"
         >
           <Plus className="h-4 w-4" />
-          Add Header
+          Add Field
         </Button>
       </div>
 
-      {/* Query Params */}
-      <div className="space-y-2">
-        <Label>Query Parameters</Label>
-        {query.map((pair, index) => (
-          <div key={index} className="flex gap-2">
+      {requestFields.map((field) => (
+        <div key={field.id} className="flex gap-2 items-end p-3 bg-grey-50 rounded-lg border border-grey-400">
+          <div className="flex-1">
+            <Label>Key</Label>
             <Input
-              placeholder="Key"
-              value={pair.key}
-              onChange={(e) => handleUpdatePair('query', index, 'key', e.target.value)}
+              placeholder="e.g., Authorization"
+              value={field.key}
+              onChange={(e) =>
+                handleUpdateField(field.id, { key: e.target.value })
+              }
+              className="mt-2"
             />
-            <Input
-              placeholder="Value"
-              value={pair.value}
-              onChange={(e) => handleUpdatePair('query', index, 'value', e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemovePair('query', index)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddPair('query')}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Query Param
-        </Button>
-      </div>
 
-      {/* Path Params */}
-      <div className="space-y-2">
-        <Label>Path Parameters</Label>
-        {params.map((pair, index) => (
-          <div key={index} className="flex gap-2">
+          <div className="flex-1">
+            <Label>Value</Label>
             <Input
-              placeholder="Key"
-              value={pair.key}
-              onChange={(e) => handleUpdatePair('params', index, 'key', e.target.value)}
+              placeholder="e.g., Bearer <token>"
+              value={field.value}
+              onChange={(e) =>
+                handleUpdateField(field.id, { value: e.target.value })
+              }
+              className="mt-2"
             />
-            <Input
-              placeholder="Value"
-              value={pair.value}
-              onChange={(e) => handleUpdatePair('params', index, 'value', e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemovePair('params', index)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddPair('params')}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Path Param
-        </Button>
-      </div>
 
-      {/* Body */}
-      <div className="space-y-2">
-        <Label>Request Body (JSON)</Label>
-        <Textarea
-          placeholder='{"key": "value"}'
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={4}
-        />
-      </div>
+          <div className="flex-1">
+            <Label>Add To</Label>
+            <Select
+              value={field.addTo}
+              onValueChange={(value) =>
+                handleUpdateField(field.id, { addTo: value as 'headers' | 'body' | 'params' | 'query' })
+              }
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="headers">Headers</SelectItem>
+                <SelectItem value="body">Body</SelectItem>
+                <SelectItem value="params">Params</SelectItem>
+                <SelectItem value="query">Query</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => handleRemoveField(field.id)}
+            disabled={requestFields.length === 0}
+            className="mb-0"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+
+      <p className="text-xs text-grey-600 mt-2">
+        Configure how the callback request should be constructed with fields that can be added to headers, query parameters, path parameters, or the request body.
+      </p>
     </div>
   );
 }
