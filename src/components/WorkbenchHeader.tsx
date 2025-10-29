@@ -20,7 +20,6 @@ import {
   Settings,
   User,
   Plus,
-  MessageCircle,
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import NewItemDropdown from './NewItemDropdown';
@@ -36,7 +35,7 @@ interface ApiError {
 
 export default function WorkbenchHeader() {
   const { user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId } = useAuth();
-  const { openTab, activeView, setActiveView, toggleChatbotSidebar, chatbotSidebarOpen } = useWorkbenchStore();
+  const { openTab, activeView, setActiveView } = useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);

@@ -72,6 +72,10 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
                   toggleSidebar();
                 }
               } else {
+                // Products, Apps, Environments - open sidebar if collapsed
+                if (sidebarCollapsed) {
+                  toggleSidebar();
+                }
                 onViewChange(item.id);
               }
             }}
