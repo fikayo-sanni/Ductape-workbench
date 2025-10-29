@@ -1,5 +1,5 @@
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { Tab } from '@/types/tab';
+import { Tab, TabType } from '@/types/tab';
 import { cn } from '@/lib/utils';
 import {
   X,
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
-  const icons = {
+  const icons: Partial<Record<TabType, typeof FileText>> = {
     request: FileText,
     app: Grid3x3,
     product: Package,

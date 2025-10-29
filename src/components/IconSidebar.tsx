@@ -1,4 +1,4 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -10,7 +10,7 @@ interface IconSidebarProps {
 }
 
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
-  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openMarketplaceTab, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
+  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
 
   const menuItems: Array<{
     id: SidebarView;
@@ -72,6 +72,10 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
                   toggleSidebar();
                 }
               } else {
+                // Products, Apps, Environments - open sidebar if collapsed
+                if (sidebarCollapsed) {
+                  toggleSidebar();
+                }
                 onViewChange(item.id);
               }
             }}
@@ -171,6 +175,32 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         {/* Tooltip on hover */}
         <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
           Team Members
+        </div>
+      </button>
+
+      {/* Chatbot Button - Opens sidebar */}
+      <button
+        onClick={() => {
+          setActiveIconSidebar('chatbot');
+          toggleChatbotSidebar();
+          // Close sidebar on mobile when opening chatbot
+          if (!sidebarCollapsed) {
+            toggleSidebar();
+          }
+        }}
+        className={cn(
+          'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
+          chatbotSidebarOpen
+            ? 'bg-primary text-white'
+            : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+        )}
+        aria-label="AI Assistant"
+      >
+        <MessageCircle className="h-5 w-5" />
+
+        {/* Tooltip on hover */}
+        <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+          AI Assistant
         </div>
       </button>
     </div>
