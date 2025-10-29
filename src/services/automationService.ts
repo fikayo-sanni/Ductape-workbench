@@ -8,7 +8,6 @@ import {
   TabInfo,
   TabCapabilities,
   AutomationContext,
-  TabAction,
   FormStateQuery,
   FormStateInfo,
   TabStateQuery,
@@ -724,8 +723,8 @@ export class AutomationService {
    * This is a placeholder that should be implemented with actual DOM inspection
    */
   private async extractFormStructure(
-    tabId: string,
-    formId?: string
+    _tabId: string,
+    _formId?: string
   ): Promise<FormStructure | null> {
     // TODO: Implement actual form extraction
     // This would need to:
@@ -743,10 +742,10 @@ export class AutomationService {
    * This should interact with React state or DOM elements
    */
   private async setFormFieldValue(
-    tabId: string,
-    formId: string,
-    fieldId: string,
-    value: any
+    _tabId: string,
+    _formId: string,
+    _fieldId: string,
+    _value: any
   ): Promise<void> {
     // TODO: Implement actual field value setting
     // This could:
@@ -759,9 +758,9 @@ export class AutomationService {
    * Wait for field validation to complete
    */
   private async waitForValidation(
-    tabId: string,
-    formId: string,
-    fieldId: string
+    _tabId: string,
+    _formId: string,
+    _fieldId: string
   ): Promise<void> {
     // TODO: Implement validation wait logic
     // Wait for React validation to run and complete
@@ -771,8 +770,8 @@ export class AutomationService {
    * Validate entire form
    */
   private async validateForm(
-    tabId: string,
-    formId: string
+    _tabId: string,
+    _formId: string
   ): Promise<Array<{ fieldId: string; error: string }>> {
     // TODO: Implement form validation
     // Return array of validation errors
@@ -782,7 +781,7 @@ export class AutomationService {
   /**
    * Submit a form
    */
-  private async submitForm(tabId: string, formId: string): Promise<boolean> {
+  private async submitForm(_tabId: string, _formId: string): Promise<boolean> {
     // TODO: Implement form submission
     // Trigger form submit button click or handle submit event
     return false;
@@ -792,7 +791,7 @@ export class AutomationService {
    * Get current form state
    */
   private async getFormState(
-    tabId: string,
+    _tabId: string,
     formId: string,
     structure: FormStructure
   ): Promise<FormStateInfo> {

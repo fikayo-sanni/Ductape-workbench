@@ -6,7 +6,6 @@ import {
   FillFormOptions,
   FillFormResult,
   FormInspectionResult,
-  AutomationContext,
   FormStateQuery,
   TabStateQuery,
   QueryResult,
