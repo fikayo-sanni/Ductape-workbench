@@ -14,6 +14,7 @@ import TabBar from './TabBar';
 import TabContent from './TabContent';
 import LoginModal from './LoginModal';
 import OnboardingModal from './OnboardingModal';
+import ChatbotSidebar from './ChatbotSidebar';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,8 @@ function WorkbenchContent() {
     toggleSidebar,
     activeView,
     setActiveView,
+    chatbotSidebarOpen,
+    toggleChatbotSidebar,
   } = useWorkbenchStore();
 
   // Fetch workspaces to check if user has any
@@ -204,6 +207,12 @@ function WorkbenchContent() {
         open={isOnboarding}
         onComplete={completeOnboarding}
         onSkip={skipOnboarding}
+      />
+
+      {/* Chatbot Sidebar */}
+      <ChatbotSidebar
+        isOpen={chatbotSidebarOpen}
+        onClose={toggleChatbotSidebar}
       />
     </>
   );

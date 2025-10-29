@@ -30,10 +30,11 @@ interface WorkbenchState {
 
   // UI State
   sidebarCollapsed: boolean;
+  chatbotSidebarOpen: boolean;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
   activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace';
-  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'marketplace' | null;
+  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'marketplace' | 'chatbot' | null;
 
   // Logs Filter State
   logsFilters: {
@@ -81,6 +82,7 @@ interface WorkbenchState {
 
   // Actions - UI
   toggleSidebar: () => void;
+  toggleChatbotSidebar: () => void;
   setRequestTab: (tab: 'params' | 'headers' | 'body' | 'auth') => void;
   setResponseTab: (tab: 'response' | 'headers' | 'code') => void;
   setActiveView: (view: WorkbenchState['activeView']) => void;
@@ -104,6 +106,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   tabs: [],
   activeTabId: null,
   sidebarCollapsed: false,
+  chatbotSidebarOpen: false,
   activeTab: 'params',
   responseTab: 'response',
   activeView: 'products',
@@ -356,8 +359,10 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       };
     }),
 
+
   // UI Actions
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  toggleChatbotSidebar: () => set((state) => ({ chatbotSidebarOpen: !state.chatbotSidebarOpen })),
   setRequestTab: (tab) => set({ activeTab: tab }),
   setResponseTab: (tab) => set({ responseTab: tab }),
   setActiveView: (view) => set({ activeView: view }),
@@ -379,6 +384,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         currentProjectId: state.currentProjectId,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
+        chatbotSidebarOpen: state.chatbotSidebarOpen,
       }),
     }
   )
