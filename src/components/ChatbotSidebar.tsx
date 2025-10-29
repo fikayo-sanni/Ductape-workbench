@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, Copy, Check, X, Minimize2, Maximize2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Copy, Check, X, Minimize2, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm your AI assistant for Ductape. I can help you build integrations, understand your workspace data, and answer questions about your products, apps, and environments. What would you like to work on today?",
+      content: "Hi! I'm your AI assistant for Ductape.\n\nThe chatbot feature is currently under construction. We're working hard to bring you an intelligent assistant that can help you build integrations, understand your workspace data, and answer questions about your products, apps, and environments.\n\nStay tuned for updates! 🚀",
       timestamp: new Date(),
     },
   ]);
@@ -263,30 +263,26 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
           <div className="border-t border-grey-400 p-3 bg-white">
             <div className="flex gap-2 items-end mb-2">
               <div className="flex-1">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    adjustTextareaHeight();
-                  }}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask me anything..."
-                  className="min-h-[36px] max-h-[100px] resize-none border-grey-400 focus:border-primary focus:ring-primary text-sm"
-                  disabled={isLoading}
-                />
-              </div>
-              <Button
-                onClick={handleSendMessage}
-                disabled={!input.trim() || isLoading}
-                className="h-9 w-9 p-0 bg-primary hover:bg-primary/90"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Send className="h-3 w-3" />
-                )}
-              </Button>
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                adjustTextareaHeight();
+              }}
+              onKeyPress={handleKeyPress}
+              placeholder="Feature coming soon..."
+              className="min-h-[36px] max-h-[100px] resize-none border-grey-400 focus:border-primary focus:ring-primary text-sm"
+              disabled={true}
+            />
+          </div>
+          <Button
+            onClick={handleSendMessage}
+            disabled={true}
+            className="h-9 w-9 p-0 bg-grey-300 cursor-not-allowed"
+          >
+            <Send className="h-3 w-3" />
+          </Button>
             </div>
 
             {/* Quick Actions */}
@@ -303,7 +299,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
                   size="sm"
                   onClick={() => handleQuickAction(suggestion.action)}
                   className="text-xs h-6 px-2"
-                  disabled={isLoading}
+                  disabled={true}
                 >
                   {suggestion.label}
                 </Button>
