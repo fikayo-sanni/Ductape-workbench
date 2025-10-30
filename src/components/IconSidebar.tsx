@@ -83,7 +83,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
               'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
               isActive
                 ? 'bg-primary text-white'
-                : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+                : 'text-grey-600 hover:bg-grey-100 hover:text-grey dark:hover:bg-grey-400/30'
             )}
             aria-label={item.label}
           >

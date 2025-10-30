@@ -56,9 +56,6 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
   const { mutateAsync: createSession, isPending: isCreating } = useMutation({
     mutationFn: async (values: typeof formData) => {
       if (!ductape) throw new Error('Product not initialized');
-      if (!product?.tag) throw new Error('Product tag not found');
-
-      await ductape.init(product.tag);
 
       // Parse and validate schema
       let parsedSchema;
@@ -68,7 +65,7 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
         throw new Error('Invalid JSON schema');
       }
 
-      const session = await ductape.sessions.create({
+      const payload = {
         name: values.name,
         tag: values.tag,
         description: values.description,
@@ -76,8 +73,15 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
         schema: parsedSchema,
         expiry: parseInt(values.expiry),
         period: values.period,
-      });
-      return session;
+      };
+      
+      try {
+        const session = await ductape.sessions.create(payload);
+        return session;
+      } catch (error) {
+        console.error('Error in create:', error);
+        throw error;
+      }
     },
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });

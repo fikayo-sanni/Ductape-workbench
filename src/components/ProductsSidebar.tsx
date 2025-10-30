@@ -210,8 +210,8 @@ export default function ProductsSidebar() {
                 <div
                   key={product._id}
                   className={cn(
-                    'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2',
-                    selectedProductId === product._id && 'border-primary bg-blue-400'
+                    'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 dark:hover:bg-grey-400/30',
+                    selectedProductId === product._id && 'border-primary bg-blue-400 dark:bg-primary/20'
                   )}
                 >
                   {/* Logo or Initials */}
@@ -270,7 +270,7 @@ export default function ProductsSidebar() {
                     <div
                       key={`${component.type}-${component.data._id}-${index}`}
                       onClick={() => handleComponentClick(component)}
-                      className="p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 cursor-pointer"
+                      className="p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 cursor-pointer dark:hover:bg-grey-400/30"
                     >
                       {/* Icon */}
                       <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">

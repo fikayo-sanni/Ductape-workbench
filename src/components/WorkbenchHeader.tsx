@@ -28,6 +28,7 @@ import ProductSelectionModal from './modals/ProductSelectionModal';
 import AppSelectionModal from './modals/AppSelectionModal';
 import CreateAccountModal from './CreateAccountModal';
 import CreateWorkspaceModal from './CreateWorkspaceModal';
+import ThemeToggle from './ThemeToggle';
 
 interface ApiError {
   message: string;
@@ -403,6 +404,7 @@ export default function WorkbenchHeader() {
 
       {/* Action Buttons - Compact on mobile */}
       <div className="flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
+        <ThemeToggle />
         <NewItemDropdown onSelect={handleNewItem} />
         {/*<Button
           onClick={() => setShowImportDialog(true)}

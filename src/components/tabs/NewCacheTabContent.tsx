@@ -48,15 +48,20 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
   const { mutateAsync: createCache, isPending: isCreating } = useMutation({
     mutationFn: async (values: { name: string; tag: string; expiry: number }) => {
       if (!ductape) throw new Error('Product not initialized');
-      if (!product?.tag) throw new Error('Product tag not found');
-
-      await ductape.init(product.tag);
-      const cache = await ductape.caches.create({
+      
+      const payload = {
         name: values.name,
         tag: values.tag,
         expiry: values.expiry,
-      });
-      return cache;
+      };
+      
+      try {
+        const cache = await ductape.caches.create(payload);
+        return cache;
+      } catch (error) {
+        console.error('Error in create:', error);
+        throw error;
+      }
     },
     onSuccess: (cache) => {
       queryClient.invalidateQueries({ queryKey: ['caches'] });

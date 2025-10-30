@@ -253,9 +253,14 @@ export default function NewMessageBrokerTabContent({ tabId, data }: NewMessageBr
           config: buildConfigForType(env),
         })),
       };
-
-      const messageBroker = await ductape.messageBrokers.create(payload);
-      return messageBroker;
+      
+      try {
+        const messageBroker = await ductape.messageBrokers.create(payload);
+        return messageBroker;
+      } catch (error) {
+        console.error('Error in create:', error);
+        throw error;
+      }
     },
     onSuccess: (messageBroker) => {
       queryClient.invalidateQueries({ queryKey: ['messageBrokers'] });

@@ -135,7 +135,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l border-grey-400 shadow-lg z-50 flex flex-col">
+    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l border-grey-400 shadow-lg z-50 flex flex-col dark:bg-background-secondary">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-grey-400 bg-gradient-to-r from-primary/5 to-primary/10">
         <div className="flex items-center gap-3">
@@ -189,7 +189,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
                     'w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0',
                     message.role === 'user'
                       ? 'bg-primary text-white'
-                      : 'bg-grey-100 text-grey-900'
+                      : 'bg-grey-100 text-grey dark:bg-grey-400 dark:text-grey'
                   )}
                 >
                   {message.role === 'user' ? (
@@ -206,18 +206,18 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
                       'inline-block px-3 py-2 rounded-lg max-w-full break-words text-sm',
                       message.role === 'user'
                         ? 'bg-primary text-white rounded-br-sm'
-                        : 'bg-grey-100 text-black rounded-bl-sm'
+                        : 'bg-grey-100 text-grey rounded-bl-sm dark:bg-grey-400 dark:text-grey'
                     )}
                   >
                     <div className={cn(
                       'whitespace-pre-wrap',
-                      message.role === 'user' ? 'text-white' : 'text-black'
+                      message.role === 'user' ? 'text-white' : 'text-grey dark:text-grey'
                     )}>{message.content}</div>
                   </div>
 
                   {/* Message Actions */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-grey-500">
+                    <span className="text-xs text-grey-500 dark:text-grey-700">
                       {message.timestamp.toLocaleTimeString()}
                     </span>
                     {message.role === 'assistant' && (
@@ -242,12 +242,12 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
             {/* Loading indicator */}
             {isLoading && (
               <div className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-grey-100 text-grey-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-grey-100 text-grey-600 flex items-center justify-center flex-shrink-0 dark:bg-grey-400 dark:text-grey">
                   <Bot className="h-3 w-3" />
                 </div>
                 <div className="flex-1">
-                  <div className="inline-block px-3 py-2 rounded-lg bg-grey-100 text-black rounded-bl-sm">
-                    <div className="flex items-center gap-2 text-sm text-black">
+                  <div className="inline-block px-3 py-2 rounded-lg bg-grey-100 text-grey rounded-bl-sm dark:bg-grey-400 dark:text-grey">
+                    <div className="flex items-center gap-2 text-sm text-grey dark:text-grey">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       <span>Thinking...</span>
                     </div>
@@ -260,7 +260,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-grey-400 p-3 bg-white">
+          <div className="border-t border-grey-400 p-3 bg-white dark:bg-background-secondary">
             <div className="flex gap-2 items-end mb-2">
               <div className="flex-1">
             <Textarea

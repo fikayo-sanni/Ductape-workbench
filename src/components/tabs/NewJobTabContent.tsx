@@ -157,22 +157,22 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
   const { mutateAsync: createJob, isPending: isCreating } = useMutation({
     mutationFn: async (values: typeof formData) => {
       if (!ductape) throw new Error('Product not initialized');
-      if (!product?.tag) throw new Error('Product tag not found');
-
-      await ductape.init(product.tag);
-
+      
       const payload = {
         name: values.name,
         tag: values.tag,
         event_type: values.event_type,
-        parent: values.parent || undefined,
-        event: values.event || undefined,
         executions: values.executions,
         intervals: values.intervals,
       };
-
-      const job = await ductape.jobs.create(payload);
-      return job;
+      
+      try {
+        const job = await ductape.jobs.create(payload);
+        return job;
+      } catch (error) {
+        console.error('Error in create:', error);
+        throw error;
+      }
     },
     onSuccess: (job) => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });

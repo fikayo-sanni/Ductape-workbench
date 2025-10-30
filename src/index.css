@@ -22,6 +22,20 @@
   --grey400: 212, 212, 212;
   --grey700: 151, 151, 151;
   --grey900: 217, 217, 217;
+
+  /* Background colors */
+  --background: 255, 255, 255;
+  --background-secondary: 249, 250, 252;
+  --background-tertiary: 245, 245, 245;
+
+  /* Border colors */
+  --border: 212, 212, 212;
+  --border-hover: 8, 70, 166;
+
+  /* Text colors */
+  --text-primary: 35, 40, 48;
+  --text-secondary: 143, 146, 161;
+  --text-tertiary: 151, 151, 151;
 }
 
 .light {
@@ -33,16 +47,45 @@
   --grey400: 212, 212, 212;
   --grey900: 217, 217, 217;
   --grey700: 151, 151, 151;
+
+  /* Background colors */
+  --background: 255, 255, 255;
+  --background-secondary: 249, 250, 252;
+  --background-tertiary: 245, 245, 245;
+
+  /* Border colors */
+  --border: 212, 212, 212;
+  --border-hover: 8, 70, 166;
+
+  /* Text colors */
+  --text-primary: 35, 40, 48;
+  --text-secondary: 143, 146, 161;
+  --text-tertiary: 151, 151, 151;
 }
 
 .dark {
-  --primary: 11, 100, 234;
-  --DEFAULT: 33, 35, 48;
-  --white700: 23, 25, 35;
-  --grey: 190, 192, 201;
-  --grey200: 240, 241, 245;
-  --grey400: 67, 69, 87;
-  --grey700: 190, 192, 201;
+  --primary: 59, 130, 246;
+  --DEFAULT: 17, 24, 39;
+  --white700: 31, 41, 55;
+  --grey: 229, 231, 235;
+  --grey200: 209, 213, 219;
+  --grey400: 55, 65, 81;
+  --grey700: 156, 163, 175;
+  --grey900: 75, 85, 99;
+
+  /* Background colors */
+  --background: 17, 24, 39;
+  --background-secondary: 31, 41, 55;
+  --background-tertiary: 24, 30, 42;
+
+  /* Border colors */
+  --border: 55, 65, 81;
+  --border-hover: 59, 130, 246;
+
+  /* Text colors */
+  --text-primary: 229, 231, 235;
+  --text-secondary: 156, 163, 175;
+  --text-tertiary: 107, 114, 128;
 }
 
 body {

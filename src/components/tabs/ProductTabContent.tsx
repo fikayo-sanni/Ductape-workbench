@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell } from 'lucide-react';
+import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         productMessageBroker: product.messageBroker || [],
         productNotifications: product.notifications || [],
         productStorage: product.storage || [],
+        productSessions: product.sessions || [],
         isNew: true
       },
       isDirty: true, // Mark as dirty to trigger new component forms
@@ -297,6 +298,15 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 <Bell className="h-4 w-4" />
                 Notifiers ({product.notifications?.length || 0})
               </Button>
+              <Button
+                variant={activeFilter === 'sessions' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('sessions')}
+                className="gap-2"
+              >
+                <KeyRound className="h-4 w-4" />
+                Sessions ({product.sessions?.length || 0})
+              </Button>
             </div>
           </div>
         </div>
@@ -495,6 +505,22 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 </div>
               </div>
             </button>
+
+            {/* Sessions */}
+            <button
+              onClick={() => setActiveFilter('sessions')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <KeyRound className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product.sessions?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Sessions</p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -514,6 +540,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             {renderQuotasCard()}
             {renderHealthchecksCard()}
             {renderNotificationsCard()}
+            {renderSessionsCard()}
           </div>
         )}
 
@@ -529,6 +556,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         {activeFilter === 'quotas' && renderQuotasCard()}
         {activeFilter === 'healthchecks' && renderHealthchecksCard()}
         {activeFilter === 'notifications' && renderNotificationsCard()}
+        {activeFilter === 'sessions' && renderSessionsCard()}
       </div>
 
       {/* Add App Modal */}
@@ -1276,6 +1304,60 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <p className="text-sm text-grey-600 mb-2">No notifiers configured yet</p>
             <p className="text-xs text-grey-500">
               Add notifiers to send push notifications, emails, SMS, or webhooks
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSessionsCard() {
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Sessions</h2>
+            <span className="text-sm text-grey-600">({product.sessions?.length || 0})</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleAddComponent('session')}
+            className="h-8 gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+        {product.sessions && product.sessions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {product.sessions.map((session: any) => (
+              <button
+                key={session._id}
+                onClick={() => handleOpenComponent(session, 'session')}
+                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  <p className="text-sm font-medium text-grey truncate">
+                    {session.name || session.tag}
+                  </p>
+                </div>
+                {session.expiry && session.period && (
+                  <p className="text-xs text-grey-600 mt-1">
+                    Expires in {session.expiry} {session.period}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <KeyRound className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No sessions added yet</p>
+            <p className="text-xs text-grey-500">
+              Add sessions to manage user authentication and tokens
             </p>
           </div>
         )}

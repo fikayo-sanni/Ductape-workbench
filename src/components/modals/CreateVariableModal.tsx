@@ -20,9 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { FileCode, Loader2 } from 'lucide-react';
+import { FileCode, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import appServices from '@/services/appServices';
 
 interface CreateVariableModalProps {
   open: boolean;
@@ -36,7 +36,7 @@ interface CreateVariableModalProps {
 export default function CreateVariableModal({
   open,
   onOpenChange,
-  appTag,
+  appTag: _appTag, // No longer used - kept for backward compatibility
   appId,
   variable,
   onSuccess,
@@ -76,56 +76,89 @@ export default function CreateVariableModal({
     }
   }, [variable, open]);
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'app',
-  }) as any;
-
   const handleKeyChange = (value: string) => {
-    // Auto-uppercase for variables
-    setFormData({ ...formData, key: value.toUpperCase() });
+    // Sanitize key: replace invalid chars with underscore (keep original case)
+    const sanitized = value.replace(/[^a-zA-Z0-9-_]/g, '_');
+    setFormData({ ...formData, key: sanitized });
   };
 
   const { mutate: createVariable, isPending: isCreating } = useMutation({
     mutationFn: async (data: typeof formData) => {
-      if (!ductape) throw new Error('App not initialized');
-      if (!appTag) throw new Error('App tag not found');
+      if (!appId) throw new Error('App ID not found');
+      if (!user?._id || !user?.public_key) throw new Error('User credentials not found');
+      if (!currentWorkspaceId) throw new Error('Workspace ID not found');
       if (!data.key.trim()) throw new Error('Key is required');
 
-      await ductape.init(appTag);
+      // Validate minLength < maxLength (unless maxLength is 0)
+      const minLength = parseInt(data.minlength) || 0;
+      const maxLength = parseInt(data.maxlength) || 0;
+      
+      if (maxLength !== 0 && minLength > maxLength) {
+        throw new Error('Minimum length must be less than or equal to maximum length');
+      }
 
       const payload: any = {
+        component: 'variables',
+        action: variable ? 'update' : 'create',
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
         key: data.key,
-        type: data.type.toUpperCase(),
-        description: data.description,
-        required: data.required,
+        type: data.type, // Keep lowercase as-is
+        description: data.description || '',
+        required: data.required || false,
       };
 
-      // Add minlength/maxlength only if provided
-      if (data.minlength) {
-        payload.minlength = parseInt(data.minlength);
-      }
-      if (data.maxlength) {
-        payload.maxlength = parseInt(data.maxlength);
-      }
+      // Add minlength/maxlength
+      payload.minlength = minLength;
+      payload.maxlength = maxLength;
 
-      if (variable) {
-        return ductape.variables.update(variable._id, payload);
-      }
-      return ductape.variables.create(payload);
+      return appServices.updateApp({
+        app_id: appId,
+        user_id: user._id,
+        public_key: user.public_key,
+        payload,
+      });
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
       toast.success(variable ? 'Variable updated successfully!' : 'Variable created successfully!');
-      onSuccess?.(result);
+      onSuccess?.({});
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to create variable');
+      toast.error(error.response?.data?.errors || error.message || 'Failed to create variable');
+    },
+  });
+
+  const { mutate: deleteVariable, isPending: isDeleting } = useMutation({
+    mutationFn: async () => {
+      if (!appId) throw new Error('App ID not found');
+      if (!user?._id || !user?.public_key) throw new Error('User credentials not found');
+      if (!variable?.key) throw new Error('Variable key not found');
+
+      const payload = {
+        component: 'variables',
+        action: 'delete',
+        key: variable.key,
+      };
+
+      return appServices.updateApp({
+        app_id: appId,
+        user_id: user._id,
+        public_key: user.public_key,
+        payload,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
+      toast.success('Variable deleted successfully!');
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.errors || error.message || 'Failed to delete variable');
     },
   });
 
@@ -135,7 +168,22 @@ export default function CreateVariableModal({
       return;
     }
 
+    // Validate minLength < maxLength (unless maxLength is 0)
+    const minLength = parseInt(formData.minlength) || 0;
+    const maxLength = parseInt(formData.maxlength) || 0;
+    
+    if (maxLength !== 0 && minLength > maxLength) {
+      toast.error('Minimum length must be less than or equal to maximum length');
+      return;
+    }
+
     createVariable(formData);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete the variable "${variable?.key || formData.key}"?`)) {
+      deleteVariable();
+    }
   };
 
   return (
@@ -201,7 +249,16 @@ export default function CreateVariableModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="string">STRING</SelectItem>
-                <SelectItem value="object">OBJECT</SelectItem>
+                <SelectItem value="nospaces_string">NO SPACES STRING</SelectItem>
+                <SelectItem value="email_string">EMAIL STRING</SelectItem>
+                <SelectItem value="number_string">NUMBER STRING</SelectItem>
+                <SelectItem value="number">NUMBER (Integer)</SelectItem>
+                <SelectItem value="float">FLOAT</SelectItem>
+                <SelectItem value="double">DOUBLE</SelectItem>
+                <SelectItem value="uuid">UUID</SelectItem>
+                <SelectItem value="date_string">DATE STRING</SelectItem>
+                <SelectItem value="date">DATE</SelectItem>
+                <SelectItem value="boolean">BOOLEAN</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-grey-600 mt-1">
@@ -256,32 +313,54 @@ export default function CreateVariableModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isCreating}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isCreating}
-              className="gap-2"
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {variable ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>
-                  <FileCode className="h-4 w-4" />
-                  {variable ? 'Update Variable' : 'Create Variable'}
-                </>
-              )}
-            </Button>
+          <div className="flex items-center justify-between pt-4 border-t border-grey-400">
+            {variable && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting || isCreating}
+                className="gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Delete Variable
+                  </>
+                )}
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isCreating || isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isCreating || isDeleting}
+                className="gap-2"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {variable ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  <>
+                    <FileCode className="h-4 w-4" />
+                    {variable ? 'Update Variable' : 'Create Variable'}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

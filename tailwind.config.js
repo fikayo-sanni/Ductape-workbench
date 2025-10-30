@@ -17,16 +17,25 @@ export default {
           DEFAULT: "rgba(var(--DEFAULT))",
         },
         grey: {
-          100: "#F5F5F5",
+          100: "rgba(var(--background-tertiary))",
           200: "rgba(var(--grey200))",
           400: "rgba(var(--grey400))",
-          300: "#D7D7D7",
-          800: "#78797A",
+          300: "rgba(var(--grey400))",
+          800: "rgba(var(--grey700))",
           900: "rgba(var(--grey900))",
-          500: "#D9D9D9",
-          600: "#78797A",
+          500: "rgba(var(--grey400))",
+          600: "rgba(var(--grey700))",
           700: "rgba(var(--grey700))",
           DEFAULT: "rgba(var(--grey))",
+        },
+        background: {
+          DEFAULT: "rgba(var(--background))",
+          secondary: "rgba(var(--background-secondary))",
+          tertiary: "rgba(var(--background-tertiary))",
+        },
+        border: {
+          DEFAULT: "rgba(var(--border))",
+          hover: "rgba(var(--border-hover))",
         },
         red: {
           DEFAULT: "#DC3444",
@@ -37,9 +46,13 @@ export default {
         yellow: {
           DEFAULT: "#FBBC05",
         },
+        orange: {
+          DEFAULT: "#FF9500",
+        },
         blue: {
           300: "#E8F0FD",
           400: "#E9ECF0",
+          500: "#3B82F6",
         },
       },
       spacing: {

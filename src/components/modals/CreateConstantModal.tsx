@@ -21,7 +21,7 @@ import {
 } from '../ui/dialog';
 import { FileCode, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import appServices from '@/services/appServices';
 
 interface CreateConstantModalProps {
   open: boolean;
@@ -35,7 +35,7 @@ interface CreateConstantModalProps {
 export default function CreateConstantModal({
   open,
   onOpenChange,
-  appTag,
+  appTag: _appTag, // No longer used - kept for backward compatibility
   appId,
   constant,
   onSuccess,
@@ -69,68 +69,107 @@ export default function CreateConstantModal({
     }
   }, [constant, open]);
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'app',
-  }) as any;
-
   const handleKeyChange = (value: string) => {
-    // Auto-uppercase for constants
-    setFormData({ ...formData, key: value.toUpperCase() });
+    // Sanitize key: replace invalid chars with underscore (keep original case)
+    const sanitized = value.replace(/[^a-zA-Z0-9-_]/g, '_');
+    setFormData({ ...formData, key: sanitized });
+  };
+
+  const handleValueChange = (value: string) => {
+    let processedValue = value;
+
+    // For nospaces_string: remove all spaces
+    if (formData.type === 'nospaces_string') {
+      processedValue = value.replace(/\s/g, '');
+    }
+    // For number and number_string: only allow digits, minus sign, and decimal point
+    else if (formData.type === 'number' || formData.type === 'number_string') {
+      // Only allow numbers, negative sign at start, and decimal point for integers we'll use the number input type
+      // But for number_string, it's a string type, so we filter
+      if (formData.type === 'number_string') {
+        processedValue = value.replace(/[^0-9-.]/g, '');
+        // Only allow one decimal point
+        const parts = processedValue.split('.');
+        if (parts.length > 2) {
+          processedValue = parts[0] + '.' + parts.slice(1).join('');
+        }
+        // Only allow minus at the start
+        if (processedValue.includes('-') && !processedValue.startsWith('-')) {
+          processedValue = processedValue.replace(/-/g, '');
+        }
+      }
+      // For regular number type, the input type="number" handles this
+    }
+
+    setFormData({ ...formData, value: processedValue });
   };
 
   const { mutate: createConstant, isPending: isCreating } = useMutation({
     mutationFn: async (data: typeof formData) => {
-      if (!ductape) throw new Error('App not initialized');
-      if (!appTag) throw new Error('App tag not found');
+      if (!appId) throw new Error('App ID not found');
+      if (!user?._id || !user?.public_key) throw new Error('User credentials not found');
+      if (!currentWorkspaceId) throw new Error('Workspace ID not found');
       if (!data.key.trim()) throw new Error('Key is required');
       if (!data.value.trim()) throw new Error('Value is required');
 
-      await ductape.init(appTag);
-
-      const payload = {
+      const payload: any = {
+        component: 'constants',
+        action: constant ? 'update' : 'create',
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
         key: data.key,
-        type: data.type.toUpperCase(),
-        description: data.description,
+        type: data.type, // Keep lowercase as-is
+        description: data.description || '',
         value: data.value,
       };
 
-      if (constant) {
-        return ductape.constants.update(constant._id, payload);
-      }
-      return ductape.constants.create(payload);
+      return appServices.updateApp({
+        app_id: appId,
+        user_id: user._id,
+        public_key: user.public_key,
+        payload,
+      });
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
       toast.success(constant ? 'Constant updated successfully!' : 'Constant created successfully!');
-      onSuccess?.(result);
+      onSuccess?.({});
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to create constant');
+      toast.error(error.response?.data?.errors || error.message || 'Failed to create constant');
     },
   });
 
   const { mutate: deleteConstant, isPending: isDeleting } = useMutation({
     mutationFn: async () => {
-      if (!ductape) throw new Error('App not initialized');
-      if (!appTag) throw new Error('App tag not found');
-      if (!constant?._id) throw new Error('Constant ID not found');
+      if (!appId) throw new Error('App ID not found');
+      if (!user?._id || !user?.public_key) throw new Error('User credentials not found');
+      if (!constant?.key) throw new Error('Constant key not found');
 
-      await ductape.init(appTag);
-      return ductape.constants.delete(constant._id);
+      const payload = {
+        component: 'constants',
+        action: 'delete',
+        key: constant.key,
+      };
+
+      return appServices.updateApp({
+        app_id: appId,
+        user_id: user._id,
+        public_key: user.public_key,
+        payload,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
       toast.success('Constant deleted successfully!');
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete constant');
+      toast.error(error.response?.data?.errors || error.message || 'Failed to delete constant');
     },
   });
 
@@ -145,11 +184,20 @@ export default function CreateConstantModal({
       return;
     }
 
+    // Validate email format for email_string type
+    if (formData.type === 'email_string') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.value)) {
+        toast.error('Please enter a valid email address');
+        return;
+      }
+    }
+
     createConstant(formData);
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete the constant "${formData.key}"?`)) {
+    if (window.confirm(`Are you sure you want to delete the constant "${constant?.key || formData.key}"?`)) {
       deleteConstant();
     }
   };
@@ -205,39 +253,128 @@ export default function CreateConstantModal({
           </div>
 
           <div>
-            <Label htmlFor="value" className="required">
-              Value
-            </Label>
-            <Input
-              id="value"
-              placeholder="Enter the constant value"
-              value={formData.value}
-              onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-              className="mt-2"
-            />
-            <p className="text-xs text-grey-600 mt-1">
-              The fixed value for this constant
-            </p>
-          </div>
-
-          <div>
             <Label htmlFor="type">
               Constant Type
             </Label>
             <Select
               value={formData.type}
-              onValueChange={(value) => setFormData({ ...formData, type: value })}
+              onValueChange={(value) => setFormData({ ...formData, type: value, value: '' })}
             >
               <SelectTrigger className="mt-2">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="string">STRING</SelectItem>
-                <SelectItem value="object">OBJECT</SelectItem>
+                <SelectItem value="nospaces_string">NO SPACES STRING</SelectItem>
+                <SelectItem value="email_string">EMAIL STRING</SelectItem>
+                <SelectItem value="number_string">NUMBER STRING</SelectItem>
+                <SelectItem value="number">NUMBER (Integer)</SelectItem>
+                <SelectItem value="float">FLOAT</SelectItem>
+                <SelectItem value="double">DOUBLE</SelectItem>
+                <SelectItem value="uuid">UUID</SelectItem>
+                <SelectItem value="date_string">DATE STRING</SelectItem>
+                <SelectItem value="date">DATE</SelectItem>
+                <SelectItem value="boolean">BOOLEAN</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-grey-600 mt-1">
               The data type for this constant
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="value" className="required">
+              Value
+            </Label>
+            {formData.type === 'boolean' ? (
+              <Select
+                value={formData.value}
+                onValueChange={(value) => setFormData({ ...formData, value })}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Select boolean value" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">true</SelectItem>
+                  <SelectItem value="false">false</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="value"
+                type={
+                  formData.type === 'number' || formData.type === 'float' || formData.type === 'double'
+                    ? 'number'
+                    : formData.type === 'email_string'
+                    ? 'email'
+                    : formData.type === 'date'
+                    ? 'date'
+                    : formData.type === 'date_string'
+                    ? 'date'
+                    : 'text'
+                }
+                placeholder={
+                  formData.type === 'boolean'
+                    ? 'true or false'
+                    : formData.type === 'number' || formData.type === 'float' || formData.type === 'double'
+                    ? 'Enter a number'
+                    : formData.type === 'email_string'
+                    ? 'Enter an email address'
+                    : formData.type === 'date' || formData.type === 'date_string'
+                    ? 'Select a date'
+                    : formData.type === 'uuid'
+                    ? 'Enter a UUID'
+                    : formData.type === 'nospaces_string'
+                    ? 'Enter text without spaces'
+                    : 'Enter the constant value'
+                }
+                value={formData.value}
+                onChange={(e) => handleValueChange(e.target.value)}
+                className="mt-2"
+                step={formData.type === 'float' || formData.type === 'double' ? 'any' : undefined}
+                onKeyDown={
+                  formData.type === 'number' || formData.type === 'number_string'
+                    ? (e) => {
+                        // Allow: backspace, delete, tab, escape, enter, and decimal point
+                        if (
+                          [8, 9, 27, 13, 46, 110, 190].indexOf(e.keyCode) !== -1 ||
+                          // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                          (e.keyCode === 65 && e.ctrlKey === true) ||
+                          (e.keyCode === 67 && e.ctrlKey === true) ||
+                          (e.keyCode === 86 && e.ctrlKey === true) ||
+                          (e.keyCode === 88 && e.ctrlKey === true) ||
+                          // Allow: home, end, left, right, down, up
+                          (e.keyCode >= 35 && e.keyCode <= 40)
+                        ) {
+                          return;
+                        }
+                        // Ensure that it is a number and stop the keypress for number_string
+                        if (
+                          formData.type === 'number_string' &&
+                          ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) &&
+                          e.keyCode !== 189 // minus sign
+                        ) {
+                          e.preventDefault();
+                        }
+                      }
+                    : undefined
+                }
+              />
+            )}
+            <p className="text-xs text-grey-600 mt-1">
+              {formData.type === 'boolean'
+                ? 'Select true or false'
+                : formData.type === 'number' || formData.type === 'float' || formData.type === 'double'
+                ? 'Enter a numeric value'
+                : formData.type === 'email_string'
+                ? 'Enter a valid email address'
+                : formData.type === 'date' || formData.type === 'date_string'
+                ? 'Select a date'
+                : formData.type === 'uuid'
+                ? 'Enter a valid UUID (e.g., 123e4567-e89b-12d3-a456-426614174000)'
+                : formData.type === 'nospaces_string'
+                ? 'Text without spaces'
+                : 'The fixed value for this constant'}
             </p>
           </div>
 

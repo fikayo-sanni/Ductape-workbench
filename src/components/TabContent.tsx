@@ -21,6 +21,7 @@ import NewWebhookTabContent from './tabs/NewWebhookTabContent';
 import HealthcheckTabContent from './tabs/HealthcheckTabContent';
 import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewSessionTabContent from './tabs/NewSessionTabContent';
+import SessionTabContent from './tabs/SessionTabContent';
 import NewRequestTabContent from './tabs/NewRequestTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
@@ -82,6 +83,7 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
       case 'database':
         return <DatabaseComponentContent database={tab.data} />;
       case 'session':
+        return <SessionTabContent session={tab.data} />;
       case 'fallback':
       case 'quota':
       case 'message-broker':
@@ -299,7 +301,7 @@ export default function TabContent() {
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewSessionTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <FeatureTabContent tab={activeTab} />;
+        return <SessionTabContent session={activeTab.data} />;
 
       case 'healthcheck':
         // Check if this is a new healthcheck creation tab

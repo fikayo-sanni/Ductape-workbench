@@ -86,12 +86,26 @@ const createApp = async (data: {
   return response.data;
 };
 
+const updateApp = async <T extends Record<string, any>>(data: {
+  app_id: string;
+  user_id: string;
+  public_key: string;
+  payload: T;
+}): Promise<AppResponse> => {
+  const { app_id, user_id, public_key, payload } = data;
+  const response = await apiClient.put<AppResponse>(`/apps/v1/${app_id}`, payload, {
+    params: { user_id, public_key },
+  });
+  return response.data;
+};
+
 const appServices = {
   fetchApps,
   fetchApp,
   fetchAppByTag,
   fetchWorkspaceApps,
   createApp,
+  updateApp,
 };
 
 export default appServices;
