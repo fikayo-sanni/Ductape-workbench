@@ -202,6 +202,28 @@ const fetchDashboardData = async (data: {
   }
 };
 
+const updateWorkspace = async (data: {
+  user_id: string;
+  public_key: string;
+  workspace_id: string;
+  logo?: string;
+  workspaceName?: string;
+  description?: string;
+}): Promise<ActionResponse> => {
+  const { user_id, public_key, workspace_id, logo, workspaceName, description } = data;
+  const body: any = {};
+  
+  if (logo) body.logo = logo;
+  if (workspaceName) body.workspace_name = workspaceName;
+  if (description) body.description = description;
+
+  const response = await apiClient.patch<ActionResponse>(
+    `/workspaces/v1/update/${workspace_id}?user_id=${user_id}&public_key=${public_key}`,
+    body
+  );
+  return response.data;
+};
+
 const workspaceServices = {
   fetchWorkspaces,
   changeDefaultWorkspace,
@@ -211,6 +233,7 @@ const workspaceServices = {
   removeMember,
   createUploadUrl,
   uploadFileToUrl,
+  updateWorkspace,
   updateWorkspaceEnvs,
   fetchDashboardData,
 };

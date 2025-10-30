@@ -22,6 +22,7 @@ import HealthcheckTabContent from './tabs/HealthcheckTabContent';
 import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewSessionTabContent from './tabs/NewSessionTabContent';
 import SessionTabContent from './tabs/SessionTabContent';
+import SettingsTabContent from './tabs/SettingsTabContent';
 import NewRequestTabContent from './tabs/NewRequestTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
@@ -319,6 +320,9 @@ export default function TabContent() {
 
       case 'marketplace':
         return <MarketplaceTabContent />;
+
+      case 'settings':
+        return <SettingsTabContent />;
 
       default:
         return (

@@ -18,7 +18,6 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  User,
   Plus,
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -457,11 +456,17 @@ export default function WorkbenchHeader() {
                   </div>
 
                   <div className="py-1">
-                    <button className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Profile
-                    </button>
-                    <button className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2">
+                    <button 
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        openTab({
+                          id: `settings-${Date.now()}`,
+                          type: 'settings',
+                          title: 'Settings',
+                        });
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2"
+                    >
                       <Settings className="h-4 w-4" />
                       Settings
                     </button>

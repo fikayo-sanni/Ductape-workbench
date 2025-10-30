@@ -22,7 +22,8 @@ export type TabType =
   | 'tokens'
   | 'teams'
   | 'marketplace'
-  | 'notifier';
+  | 'notifier'
+  | 'settings';
 
 export interface Tab {
   id: string;

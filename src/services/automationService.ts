@@ -382,6 +382,11 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
+      settings: {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
     };
 
     return capabilities[tab.type] || {
@@ -684,7 +689,7 @@ export class AutomationService {
   // Private helper methods
 
   private canTabBeAutomated(tabType: TabType): boolean {
-    const nonAutomatedTabs: TabType[] = ['logs', 'dashboard', 'tokens', 'teams', 'marketplace'];
+    const nonAutomatedTabs: TabType[] = ['logs', 'dashboard', 'tokens', 'teams', 'marketplace', 'settings'];
     return !nonAutomatedTabs.includes(tabType);
   }
 
@@ -714,6 +719,7 @@ export class AutomationService {
       tokens: 'Tokens',
       teams: 'Teams',
       marketplace: 'Marketplace',
+      settings: 'Settings',
     };
     return titles[tabType] || tabType;
   }
