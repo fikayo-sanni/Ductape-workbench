@@ -196,7 +196,6 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
           workspace_id: currentWorkspaceId || '',
           private_key: user?.public_key || '',
           user_id: user?._id || '',
-          env_type: 'production' as any
         });
         console.log('Ductape SDK loaded successfully');
       } catch (sdkError) {
