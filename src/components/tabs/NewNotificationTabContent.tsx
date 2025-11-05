@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2 } from 'lucide-react';
+import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
@@ -288,7 +288,17 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
                   id="name"
                   placeholder="e.g., User Notifications"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setFormData({
+                      ...formData,
+                      name,
+                      // Auto-populate description if it's empty or was previously auto-generated
+                      description: !formData.description || formData.description.endsWith(' notifier')
+                        ? `${name} notifier`
+                        : formData.description
+                    });
+                  }}
                   className="mt-2"
                   autoFocus
                 />
@@ -848,6 +858,7 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
     authToken: '',
     sender: '',
   });
+  const [showAuthToken, setShowAuthToken] = useState(false);
 
   useEffect(() => {
     onConfigChange({
@@ -866,8 +877,8 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="twilio">Twilio</SelectItem>
-            <SelectItem value="aws-sns">AWS SNS</SelectItem>
-            <SelectItem value="sendgrid">SendGrid</SelectItem>
+            <SelectItem value="nexmo">Nexmo</SelectItem>
+            <SelectItem value="plivo">Plivo</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -882,12 +893,26 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
       </div>
       <div>
         <Label>Auth Token</Label>
-        <Input
-          type="password"
-          value={smsConfig.authToken}
-          onChange={(e) => setSmsConfig({ ...smsConfig, authToken: e.target.value })}
-          className="mt-1"
-        />
+        <div className="relative mt-1">
+          <Input
+            type={showAuthToken ? 'text' : 'password'}
+            value={smsConfig.authToken}
+            onChange={(e) => setSmsConfig({ ...smsConfig, authToken: e.target.value })}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowAuthToken(prev => !prev)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+            aria-label={showAuthToken ? 'Hide auth token' : 'Show auth token'}
+          >
+            {showAuthToken ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </div>
       <div>
         <Label>Sender Number</Label>

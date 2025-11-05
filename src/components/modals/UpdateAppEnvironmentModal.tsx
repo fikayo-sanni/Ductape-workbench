@@ -114,7 +114,8 @@ export default function UpdateAppEnvironmentModal({
         request_type: data.request_type,
       };
 
-      await ductape.envs.update(environment.slug, payload);
+      delete (payload as any).slug;
+      await ductape.environments.update(environment.slug, payload);
       return payload;
     },
     onSuccess: () => {
@@ -194,12 +195,14 @@ export default function UpdateAppEnvironmentModal({
                 id="slug"
                 placeholder="e.g., prd, stg, dev"
                 value={formData.slug}
+                disabled={true}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 maxLength={3}
                 className="font-mono"
               />
               <Button
                 type="button"
+                disabled={true}
                 variant="outline"
                 onClick={handleAutoGenerateSlug}
                 size="sm"

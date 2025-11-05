@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,11 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Timer, Save, CheckCircle, Plus, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Timer, Save, CheckCircle, Plus, Trash2, Edit2, Database, Zap, Bell, Box, LayoutList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
-import { FeatureEventTypes, DataTypes } from '@ductape/sdk/dist/types';
+import { FeatureEventTypes } from '@ductape/sdk/dist/types';
+import { IFeatureInput } from '@ductape/sdk/dist/types';
+import appServicesReal from '@/services/appServicesReal';
 
 interface NewQuotaTabContentProps {
   tabId: string;
@@ -25,7 +29,7 @@ interface NewQuotaTabContentProps {
 
 interface QuotaOption {
   id: string;
-  type: FeatureEventTypes.FEATURE | FeatureEventTypes.ACTION;
+  type: FeatureEventTypes;
   app?: string;
   event: string;
   quota: number;
@@ -35,13 +39,9 @@ interface QuotaOption {
   healthcheck?: string;
   name: string;
   tag: string;
-}
-
-interface QuotaInput {
-  key: string;
-  type: DataTypes;
-  minlength?: number;
-  maxlength?: number;
+  category?: string;
+  action?: any;
+  database?: string;
 }
 
 interface QuotaBuilderState {
@@ -49,21 +49,33 @@ interface QuotaBuilderState {
   name: string;
   description: string;
   tag: string;
-  total_quota?: number;
-  total_init?: number;
-  
+
   // Step 2: Quota Inputs
-  quotaInputs: Record<string, QuotaInput>;
-  
-  // Step 3: Selected Components
-  selectedComponents: QuotaOption[];
-  
-  // Step 4: Component Inputs Mapping
-  componentInputs: Record<string, Record<string, any>>;
-  
-  // Step 5: Component Outputs Mapping
-  componentOutputs: Record<string, Record<string, any>>;
+  quotaInputs: Record<string, IFeatureInput>;
+
+  // Step 3: Shared Output Schema (same for all options)
+  sharedOutputSchema: Record<string, string>;
+
+  // Step 4: Selected Options
+  selectedOptions: QuotaOption[];
+
+  // Step 5: Option Inputs Mapping
+  optionInputs: Record<string, Record<string, any>>;
+
+  // Step 6: Option Outputs Mapping (must match shared schema)
+  optionOutputs: Record<string, Record<string, any>>;
 }
+
+const INITIAL_STATE: QuotaBuilderState = {
+  name: '',
+  description: '',
+  tag: '',
+  quotaInputs: {},
+  sharedOutputSchema: {},
+  selectedOptions: [],
+  optionInputs: {},
+  optionOutputs: {},
+};
 
 export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
@@ -80,25 +92,22 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     workspace_id: data.workspaceId || currentWorkspaceId,
     apps: data.productApps || [],
     features: data.productFeatures || [],
+    databases: data.productDatabases || [],
+    caches: data.productCaches || [],
+    storages: data.productStorages || [],
+    notifications: data.productNotifications || [],
   } : null;
 
-  const [state, setState] = useState<QuotaBuilderState>({
-    name: '',
-    description: '',
-    tag: '',
-    total_quota: undefined,
-    total_init: undefined,
-    quotaInputs: {},
-    selectedComponents: [],
-    componentInputs: {},
-    componentOutputs: {},
-  });
+  const [state, setState] = useState<QuotaBuilderState>(INITIAL_STATE);
+  const [editingInputKey, setEditingInputKey] = useState<string | null>(null);
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [selectedComponentType, setSelectedComponentType] = useState<string>('');
 
-
-  // Progressive disclosure steps
-  const showStep2 = state.description.trim().length > 0;
-  const showStep3 = state.selectedComponents.length > 0;
-  const showStep4 = Object.keys(state.componentInputs).length > 0;
+  // For action/database selection
+  const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [selectedDatabase, setSelectedDatabase] = useState<any>(null);
+  const [actionSearchTerm, setActionSearchTerm] = useState('');
+  const [databaseActionType, setDatabaseActionType] = useState<string>('');
 
   // Initialize Ductape SDK
   const ductape = useDuctape({
@@ -108,6 +117,42 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     public_key: user?.public_key || '',
     type: 'product',
   }) as any;
+
+  // Progressive disclosure - defined early to be available for useQuery hooks
+  const showStep2 = state.name.trim().length > 0 && state.description.trim().length > 0;
+  const showStep3 = Object.keys(state.quotaInputs).length > 0;
+  const showStep4 = Object.keys(state.sharedOutputSchema).length > 0;
+  const showStep5 = state.selectedOptions.length > 0;
+  const showStep6 = state.selectedOptions.length > 0 && editingOptionId;
+
+  // Fetch available apps with their actions
+  const { data: availableApps = [] } = useQuery({
+    queryKey: ['apps', currentWorkspaceId],
+    queryFn: async () => {
+      const response = await appServicesReal.fetchWorkspaceApps({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      });
+      return response.data || [];
+    },
+    enabled: !!currentWorkspaceId && showStep4,
+  });
+
+  // Fetch app details when an app is selected
+  const { data: selectedAppData } = useQuery({
+    queryKey: ['app', selectedApp?.app_id],
+    queryFn: async () => {
+      if (!selectedApp?.app_id) return null;
+      const response = await appServicesReal.fetchApp({
+        app_id: selectedApp.app_id,
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      });
+      return response.data;
+    },
+    enabled: !!selectedApp?.app_id,
+  });
 
   const handleNameChange = (value: string) => {
     const tag = value
@@ -119,56 +164,229 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     setState(prev => ({
       ...prev,
       name: value,
-      tag: product?.tag ? `${product.tag}:${tag}` : tag,
+      tag: tag,
+      description: prev.description || `${value} quota`,
     }));
   };
 
+  // Add/Edit Quota Input
+  const [newInputName, setNewInputName] = useState('');
+  const [newInputType, setNewInputType] = useState<string>('string');
+  const [newInputMinLength, setNewInputMinLength] = useState<number>(0);
+  const [newInputMaxLength, setNewInputMaxLength] = useState<number>(100);
 
-  // Add a new component (placeholder for now)
-  const handleAddComponent = () => {
-    const newComponent: QuotaOption = {
-      id: `component_${Date.now()}`,
-      type: FeatureEventTypes.ACTION,
-      name: 'New Component',
-      tag: 'new_component',
-      event: '',
-      quota: 100,
-      input: {},
-      output: {},
-      retries: 3,
-      healthcheck: '',
+  const handleAddInput = () => {
+    if (!newInputName.trim()) {
+      toast.error('Input name is required');
+      return;
+    }
+
+    if (state.quotaInputs[newInputName] && !editingInputKey) {
+      toast.error('Input with this name already exists');
+      return;
+    }
+
+    const newInput: IFeatureInput = {
+      type: newInputType as any,
+      minlength: newInputMinLength,
+      maxlength: newInputMaxLength,
     };
 
     setState(prev => ({
       ...prev,
-      selectedComponents: [...prev.selectedComponents, newComponent],
+      quotaInputs: {
+        ...prev.quotaInputs,
+        [newInputName]: newInput,
+      },
     }));
 
-    toast.success('Component added');
+    // Reset form
+    setNewInputName('');
+    setNewInputType('string');
+    setNewInputMinLength(0);
+    setNewInputMaxLength(100);
+    setEditingInputKey(null);
+
+    toast.success(editingInputKey ? 'Input updated' : 'Input added');
   };
 
-  // Remove component
-  const handleRemoveComponent = (componentId: string) => {
+  const handleRemoveInput = (key: string) => {
     setState(prev => ({
       ...prev,
-      selectedComponents: prev.selectedComponents.filter((c) => c.id !== componentId),
-      componentInputs: Object.fromEntries(
-        Object.entries(prev.componentInputs).filter(([key]) => key !== componentId)
+      quotaInputs: Object.fromEntries(
+        Object.entries(prev.quotaInputs).filter(([k]) => k !== key)
       ),
-      componentOutputs: Object.fromEntries(
-        Object.entries(prev.componentOutputs).filter(([key]) => key !== componentId)
+    }));
+    toast.success('Input removed');
+  };
+
+  // Shared Output Schema handlers
+  const [newOutputFieldName, setNewOutputFieldName] = useState('');
+  const [newOutputFieldDescription, setNewOutputFieldDescription] = useState('');
+
+  const handleAddOutputField = () => {
+    if (!newOutputFieldName.trim()) {
+      toast.error('Output field name is required');
+      return;
+    }
+
+    if (state.sharedOutputSchema[newOutputFieldName]) {
+      toast.error('Output field with this name already exists');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      sharedOutputSchema: {
+        ...prev.sharedOutputSchema,
+        [newOutputFieldName]: newOutputFieldDescription || 'Field description',
+      },
+    }));
+
+    setNewOutputFieldName('');
+    setNewOutputFieldDescription('');
+    toast.success('Output field added');
+  };
+
+  const handleRemoveOutputField = (key: string) => {
+    setState(prev => ({
+      ...prev,
+      sharedOutputSchema: Object.fromEntries(
+        Object.entries(prev.sharedOutputSchema).filter(([k]) => k !== key)
+      ),
+    }));
+    toast.success('Output field removed');
+  };
+
+  // Add Option
+  const handleAddOption = (type: FeatureEventTypes, selectedItem?: any) => {
+    const newOption: QuotaOption = {
+      id: `option_${Date.now()}`,
+      type,
+      name: selectedItem?.name || 'New Option',
+      tag: selectedItem?.tag || '',
+      event: selectedItem?.tag || '',
+      quota: 1,
+      input: {},
+      output: {},
+      retries: 1,
+      category: selectedComponentType,
+    };
+
+    if (type === FeatureEventTypes.ACTION && selectedItem) {
+      newOption.app = selectedItem.app;
+      newOption.action = selectedItem;
+    } else if (type === FeatureEventTypes.DB_ACTION && selectedItem) {
+      newOption.database = selectedItem._id;
+    } else if (type === FeatureEventTypes.FEATURE && selectedItem) {
+      newOption.event = selectedItem.tag;
+    }
+
+    setState(prev => ({
+      ...prev,
+      selectedOptions: [...prev.selectedOptions, newOption],
+      optionInputs: { ...prev.optionInputs, [newOption.id]: {} },
+      optionOutputs: { ...prev.optionOutputs, [newOption.id]: {} },
+    }));
+
+    setEditingOptionId(newOption.id);
+    toast.success('Option added');
+  };
+
+  const handleRemoveOption = (optionId: string) => {
+    setState(prev => ({
+      ...prev,
+      selectedOptions: prev.selectedOptions.filter(o => o.id !== optionId),
+      optionInputs: Object.fromEntries(
+        Object.entries(prev.optionInputs).filter(([key]) => key !== optionId)
+      ),
+      optionOutputs: Object.fromEntries(
+        Object.entries(prev.optionOutputs).filter(([key]) => key !== optionId)
+      ),
+    }));
+    toast.success('Option removed');
+  };
+
+  const handleUpdateOption = (optionId: string, updates: Partial<QuotaOption>) => {
+    setState(prev => ({
+      ...prev,
+      selectedOptions: prev.selectedOptions.map(opt =>
+        opt.id === optionId ? { ...opt, ...updates } : opt
       ),
     }));
   };
 
-  // Update component
-  const handleUpdateComponent = (componentId: string, updates: Partial<QuotaOption>) => {
+  // Input/Output Mapping helpers
+  const [newMappingKey, setNewMappingKey] = useState('');
+  const [newMappingValue, setNewMappingValue] = useState('');
+
+  const handleAddInputMapping = (optionId: string) => {
+    if (!newMappingKey.trim() || !newMappingValue.trim()) {
+      toast.error('Both key and value are required');
+      return;
+    }
+
     setState(prev => ({
       ...prev,
-      selectedComponents: prev.selectedComponents.map(comp =>
-        comp.id === componentId ? { ...comp, ...updates } : comp
-      ),
+      optionInputs: {
+        ...prev.optionInputs,
+        [optionId]: {
+          ...prev.optionInputs[optionId],
+          [newMappingKey]: newMappingValue,
+        },
+      },
     }));
+
+    setNewMappingKey('');
+    setNewMappingValue('');
+    toast.success('Input mapping added');
+  };
+
+  const handleAddOutputMapping = (optionId: string) => {
+    if (!newMappingKey.trim() || !newMappingValue.trim()) {
+      toast.error('Both key and value are required');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      optionOutputs: {
+        ...prev.optionOutputs,
+        [optionId]: {
+          ...prev.optionOutputs[optionId],
+          [newMappingKey]: newMappingValue,
+        },
+      },
+    }));
+
+    setNewMappingKey('');
+    setNewMappingValue('');
+    toast.success('Output mapping added');
+  };
+
+  const handleRemoveMapping = (optionId: string, key: string, type: 'input' | 'output') => {
+    if (type === 'input') {
+      setState(prev => ({
+        ...prev,
+        optionInputs: {
+          ...prev.optionInputs,
+          [optionId]: Object.fromEntries(
+            Object.entries(prev.optionInputs[optionId] || {}).filter(([k]) => k !== key)
+          ),
+        },
+      }));
+    } else {
+      setState(prev => ({
+        ...prev,
+        optionOutputs: {
+          ...prev.optionOutputs,
+          [optionId]: Object.fromEntries(
+            Object.entries(prev.optionOutputs[optionId] || {}).filter(([k]) => k !== key)
+          ),
+        },
+      }));
+    }
+    toast.success('Mapping removed');
   };
 
   const { mutateAsync: createQuota, isPending: isCreating } = useMutation({
@@ -182,15 +400,15 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
         name: state.name,
         tag: state.tag,
         description: state.description,
-        total_quota: state.total_quota,
-        total_init: state.total_init,
-        options: state.selectedComponents.map(opt => ({
+        input: state.quotaInputs,
+        options: state.selectedOptions.map(opt => ({
           type: opt.type,
           app: opt.app || undefined,
           event: opt.event,
+          database: opt.database || undefined,
           quota: opt.quota,
-          input: state.componentInputs[opt.id] || {},
-          output: state.componentOutputs[opt.id] || {},
+          input: state.optionInputs[opt.id] || {},
+          output: state.optionOutputs[opt.id] || {},
           retries: opt.retries,
           healthcheck: opt.healthcheck || undefined,
         })),
@@ -227,19 +445,53 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
       return;
     }
 
-    if (state.selectedComponents.length === 0) {
-      toast.error('At least one component must be selected');
+    if (Object.keys(state.quotaInputs).length === 0) {
+      toast.error('At least one input must be defined');
       return;
     }
 
-    // Validate all components have required fields
-    const invalidComponents = state.selectedComponents.filter(opt => !opt.event.trim() || opt.quota <= 0);
-    if (invalidComponents.length > 0) {
-      toast.error('All components must have an event and a positive quota limit');
+    if (Object.keys(state.sharedOutputSchema).length === 0) {
+      toast.error('Output schema must be defined');
+      return;
+    }
+
+    if (state.selectedOptions.length === 0) {
+      toast.error('At least one option must be selected');
+      return;
+    }
+
+    // Validate all options have required fields
+    const invalidOptions = state.selectedOptions.filter(opt => !opt.event.trim() || opt.quota <= 0);
+    if (invalidOptions.length > 0) {
+      toast.error('All options must have an event and a positive quota value');
+      return;
+    }
+
+    // Validate that all options have complete output mappings matching the schema
+    const requiredOutputFields = Object.keys(state.sharedOutputSchema);
+    const incompleteOptions = state.selectedOptions.filter(opt => {
+      const mappedFields = Object.keys(state.optionOutputs[opt.id] || {});
+      return requiredOutputFields.some(field => !mappedFields.includes(field));
+    });
+
+    if (incompleteOptions.length > 0) {
+      toast.error(`All options must map all output fields. Incomplete: ${incompleteOptions.map(o => o.name).join(', ')}`);
       return;
     }
 
     await createQuota();
+  };
+
+  // Get icon for component type
+  const getComponentIcon = (type: string) => {
+    switch (type) {
+      case 'action': return <Zap className="h-4 w-4" />;
+      case 'database': return <Database className="h-4 w-4" />;
+      case 'feature': return <LayoutList className="h-4 w-4" />;
+      case 'notification': return <Bell className="h-4 w-4" />;
+      case 'storage': return <Box className="h-4 w-4" />;
+      default: return <Zap className="h-4 w-4" />;
+    }
   };
 
   return (
@@ -268,7 +520,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                   </span>
                 </div>
                 <p className="text-sm text-grey-600">
-                  Set usage limits and quotas for API providers
+                  Set up load balancing and failover between multiple providers
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-grey-600">
@@ -288,7 +540,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
             <div>
               <h1 className="text-2xl font-bold text-grey">Create New Quota</h1>
               <p className="text-sm text-grey-600">
-                {product?.name ? `Adding to ${product.name}` : 'Configure usage quotas and limits'}
+                {product?.name ? `Adding to ${product.name}` : 'Configure load balancing and provider failover'}
               </p>
             </div>
           </div>
@@ -314,7 +566,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
               </Label>
               <Input
                 id="name"
-                placeholder="e.g., Monthly API Limit"
+                placeholder="e.g., Payments"
                 value={state.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 className="mt-2"
@@ -341,7 +593,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                       .replace(/[^a-z0-9]+/g, '_')
                       .replace(/^_+|_+$/g, '')
                       .slice(0, 50);
-                    setState(prev => ({ ...prev, tag: product?.tag ? `${product.tag}:${tag}` : tag }));
+                    setState(prev => ({ ...prev, tag: tag }));
                   }}
                   disabled={!state.name}
                 >
@@ -357,7 +609,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
               <MarkdownEditor
                 value={state.description}
                 onChange={(value) => setState(prev => ({ ...prev, description: value }))}
-                placeholder="e.g., Limits the number of API calls per user per month"
+                placeholder="e.g., Paystack and Flutterwave Load Sharing"
                 label="Description"
               />
               <p className="text-xs text-grey-600 mt-1">
@@ -367,7 +619,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
           </CardContent>
         </Card>
 
-        {/* Step 2: Select Components */}
+        {/* Step 2: Define Quota Inputs */}
         {showStep2 && (
           <Card className="animate-in slide-in-from-top-2 duration-300">
             <CardHeader>
@@ -376,102 +628,563 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                   2
                 </div>
                 <div>
-                  <CardTitle>Select Options</CardTitle>
-                  <CardDescription>Add provider options for quota management</CardDescription>
+                  <CardTitle>Define Quota Inputs</CardTitle>
+                  <CardDescription>Configure the input parameters that will be distributed across options</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Add Component Button */}
-              <Button
-                onClick={handleAddComponent}
-                variant="outline"
-                className="w-full"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Component
-              </Button>
+              {/* Add Input Form */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                <Label className="text-sm font-semibold">Add Input Parameter</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs required">Input Name</Label>
+                    <Input
+                      value={newInputName}
+                      onChange={(e) => setNewInputName(e.target.value)}
+                      placeholder="e.g., amount"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs required">Data Type</Label>
+                    <Select value={newInputType} onValueChange={setNewInputType}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="string">String</SelectItem>
+                        <SelectItem value="number">Number</SelectItem>
+                        <SelectItem value="boolean">Boolean</SelectItem>
+                        <SelectItem value="uuid">UUID</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="nospaces_string">No Spaces String</SelectItem>
+                        <SelectItem value="number_string">Number String</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Min Length</Label>
+                    <Input
+                      type="number"
+                      value={newInputMinLength}
+                      onChange={(e) => setNewInputMinLength(parseInt(e.target.value) || 0)}
+                      className="mt-1"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Max Length</Label>
+                    <Input
+                      type="number"
+                      value={newInputMaxLength}
+                      onChange={(e) => setNewInputMaxLength(parseInt(e.target.value) || 100)}
+                      className="mt-1"
+                      min={1}
+                    />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleAddInput} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Input
+                </Button>
+              </div>
 
-              {/* Selected Components */}
-              {state.selectedComponents.length > 0 && (
+              {/* Existing Inputs */}
+              {Object.keys(state.quotaInputs).length > 0 && (
                 <div className="space-y-2">
-                  <Label>Selected Options ({state.selectedComponents.length})</Label>
+                  <Label>Defined Inputs ({Object.keys(state.quotaInputs).length})</Label>
                   <div className="space-y-2">
-                    {state.selectedComponents.map((component) => (
-                      <div key={component.id} className="p-3 bg-grey-100 rounded-lg space-y-3">
+                    {Object.entries(state.quotaInputs).map(([key, input]) => (
+                      <div key={key} className="flex items-center justify-between p-3 bg-grey-100 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-mono text-primary">{key}</code>
+                            <span className="text-xs text-grey-600">({input.type})</span>
+                          </div>
+                          {(input.minlength || input.maxlength) && (
+                            <p className="text-xs text-grey-600 mt-1">
+                              Length: {input.minlength || 0} - {input.maxlength || '∞'}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveInput(key)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Object.keys(state.quotaInputs).length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ Inputs configured. You can now define the output schema below.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Define Shared Output Schema */}
+        {showStep3 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  3
+                </div>
+                <div>
+                  <CardTitle>Define Output Schema</CardTitle>
+                  <CardDescription>Define the output structure that ALL options must return</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add Output Field Form */}
+              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200 space-y-3">
+                <Label className="text-sm font-semibold">Add Output Field</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs required">Field Name</Label>
+                    <Input
+                      value={newOutputFieldName}
+                      onChange={(e) => setNewOutputFieldName(e.target.value)}
+                      placeholder="e.g., transactionId"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description (optional)</Label>
+                    <Input
+                      value={newOutputFieldDescription}
+                      onChange={(e) => setNewOutputFieldDescription(e.target.value)}
+                      placeholder="e.g., Unique transaction identifier"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleAddOutputField} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Output Field
+                </Button>
+              </div>
+
+              {/* Existing Output Fields */}
+              {Object.keys(state.sharedOutputSchema).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Output Schema Fields ({Object.keys(state.sharedOutputSchema).length})</Label>
+                  <div className="space-y-2">
+                    {Object.entries(state.sharedOutputSchema).map(([key, description]) => (
+                      <div key={key} className="flex items-center justify-between p-3 bg-grey-100 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-mono text-primary">{key}</code>
+                          </div>
+                          {description && (
+                            <p className="text-xs text-grey-600 mt-1">{description}</p>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveOutputField(key)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Object.keys(state.sharedOutputSchema).length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ Output schema defined. All options will return these fields. You can now add options below.
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-xs text-grey-600">
+                  <strong>Important:</strong> All quota options must return data matching this schema.
+                  Each option will map its response to these exact fields.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Select Options */}
+        {showStep4 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  4
+                </div>
+                <div>
+                  <CardTitle>Select Quota Options</CardTitle>
+                  <CardDescription>Add provider options for load balancing and failover</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Component Type Selector */}
+              <div className="grid grid-cols-5 gap-2">
+                {availableApps.length > 0 && (
+                  <Button
+                    variant={selectedComponentType === 'action' ? 'default' : 'outline'}
+                    onClick={() => {
+                      setSelectedComponentType('action');
+                      setSelectedApp(null);
+                      setActionSearchTerm('');
+                    }}
+                    className="flex flex-col h-auto py-3 gap-1"
+                  >
+                    <Zap className="h-5 w-5" />
+                    <span className="text-xs">Actions</span>
+                  </Button>
+                )}
+                {product?.features && product.features.length > 0 && (
+                  <Button
+                    variant={selectedComponentType === 'feature' ? 'default' : 'outline'}
+                    onClick={() => setSelectedComponentType('feature')}
+                    className="flex flex-col h-auto py-3 gap-1"
+                  >
+                    <LayoutList className="h-5 w-5" />
+                    <span className="text-xs">Features</span>
+                  </Button>
+                )}
+                {product?.databases && product.databases.length > 0 && (
+                  <Button
+                    variant={selectedComponentType === 'database' ? 'default' : 'outline'}
+                    onClick={() => {
+                      setSelectedComponentType('database');
+                      setSelectedDatabase(null);
+                      setDatabaseActionType('');
+                    }}
+                    className="flex flex-col h-auto py-3 gap-1"
+                  >
+                    <Database className="h-5 w-5" />
+                    <span className="text-xs">Database</span>
+                  </Button>
+                )}
+                {product?.notifications && product.notifications.length > 0 && (
+                  <Button
+                    variant={selectedComponentType === 'notification' ? 'default' : 'outline'}
+                    onClick={() => setSelectedComponentType('notification')}
+                    className="flex flex-col h-auto py-3 gap-1"
+                  >
+                    <Bell className="h-5 w-5" />
+                    <span className="text-xs">Notifications</span>
+                  </Button>
+                )}
+                {product?.storages && product.storages.length > 0 && (
+                  <Button
+                    variant={selectedComponentType === 'storage' ? 'default' : 'outline'}
+                    onClick={() => setSelectedComponentType('storage')}
+                    className="flex flex-col h-auto py-3 gap-1"
+                  >
+                    <Box className="h-5 w-5" />
+                    <span className="text-xs">Storage</span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Action Selection (App -> Action) */}
+              {selectedComponentType === 'action' && (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Select App</Label>
+                    <Select
+                      value={selectedApp?._id}
+                      onValueChange={(value) => {
+                        const app = availableApps.find((a: any) => a._id === value);
+                        setSelectedApp(app || null);
+                        setActionSearchTerm('');
+                      }}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Choose an app..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableApps.map((app: any) => (
+                          <SelectItem key={app._id} value={app._id}>
+                            {app.app_name || app.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedApp && selectedAppData && (() => {
+                    const latestVersion = selectedAppData.versions?.find((v: any) => v.latest) || selectedAppData.versions?.[0];
+                    const actions = latestVersion?.actions || [];
+
+                    if (actions.length === 0) return null;
+
+                    return (
+                      <div>
+                        <Label>Select Action</Label>
+                        <div className="mt-2 border rounded-lg">
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Search actions..."
+                              value={actionSearchTerm}
+                              onChange={(e) => setActionSearchTerm(e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            {actions
+                              .filter((action: any) =>
+                                !actionSearchTerm ||
+                                action.name.toLowerCase().includes(actionSearchTerm.toLowerCase()) ||
+                                action.tag?.toLowerCase().includes(actionSearchTerm.toLowerCase())
+                              )
+                              .map((action: any) => (
+                                <div
+                                  key={action._id}
+                                  className="p-3 hover:bg-grey-100 cursor-pointer border-b last:border-b-0"
+                                  onClick={() => {
+                                    handleAddOption(FeatureEventTypes.ACTION, {
+                                      name: action.name,
+                                      tag: action.tag,
+                                      app: selectedApp.app_tag || selectedApp.tag,
+                                      _id: action._id,
+                                      ...action
+                                    });
+                                    setSelectedApp(null);
+                                    setActionSearchTerm('');
+                                  }}
+                                >
+                                  <div className="font-medium text-sm">{action.name}</div>
+                                  {action.tag && (
+                                    <div className="text-xs text-grey-600">{action.tag}</div>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Database Selection (Database -> Action Type) */}
+              {selectedComponentType === 'database' && product?.databases && (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Select Database</Label>
+                    <Select
+                      value={selectedDatabase?._id}
+                      onValueChange={(value) => {
+                        const db = product.databases.find((d: any) => d._id === value);
+                        setSelectedDatabase(db || null);
+                        setDatabaseActionType('');
+                      }}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Choose a database..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {product.databases.map((db: any) => (
+                          <SelectItem key={db._id} value={db._id}>
+                            {db.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedDatabase && (
+                    <div>
+                      <Label>Select Action</Label>
+                      <Select
+                        value={databaseActionType}
+                        onValueChange={(value) => {
+                          setDatabaseActionType(value);
+                          handleAddOption(FeatureEventTypes.DB_ACTION, {
+                            name: `${selectedDatabase.name} - ${value}`,
+                            tag: `${selectedDatabase.tag}:${value}`,
+                            _id: selectedDatabase._id,
+                            database: selectedDatabase._id,
+                            actionType: value,
+                          });
+                          setSelectedDatabase(null);
+                          setDatabaseActionType('');
+                        }}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Choose an action..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="create">Create</SelectItem>
+                          <SelectItem value="read">Read</SelectItem>
+                          <SelectItem value="update">Update</SelectItem>
+                          <SelectItem value="delete">Delete</SelectItem>
+                          <SelectItem value="list">List</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Feature Selection */}
+              {selectedComponentType === 'feature' && product?.features && (
+                <div className="space-y-2">
+                  <Label>Select Feature</Label>
+                  <Select onValueChange={(value) => {
+                    const feature = product.features.find((f: any) => f._id === value);
+                    if (feature) {
+                      handleAddOption(FeatureEventTypes.FEATURE, feature);
+                    }
+                  }}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a feature..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {product.features.map((feature: any) => (
+                        <SelectItem key={feature._id} value={feature._id}>
+                          {feature.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Notification, Storage options - simplified for now */}
+              {selectedComponentType === 'notification' && product?.notifications && (
+                <div className="space-y-2">
+                  <Label>Select Notification</Label>
+                  <Select onValueChange={(value) => {
+                    const notification = product.notifications.find((n: any) => n._id === value);
+                    if (notification) {
+                      handleAddOption(FeatureEventTypes.NOTIFICATION, notification);
+                    }
+                  }}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a notification..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {product.notifications.map((notif: any) => (
+                        <SelectItem key={notif._id} value={notif._id}>
+                          {notif.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {selectedComponentType === 'storage' && product?.storages && (
+                <div className="space-y-2">
+                  <Label>Select Storage</Label>
+                  <Select onValueChange={(value) => {
+                    const storage = product.storages.find((s: any) => s._id === value);
+                    if (storage) {
+                      handleAddOption(FeatureEventTypes.STORAGE, storage);
+                    }
+                  }}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a storage..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {product.storages.map((storage: any) => (
+                        <SelectItem key={storage._id} value={storage._id}>
+                          {storage.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Selected Options */}
+              {state.selectedOptions.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Selected Options ({state.selectedOptions.length})</Label>
+                  <div className="space-y-3">
+                    {state.selectedOptions.map((option) => (
+                      <div key={option.id} className="p-4 bg-grey-100 rounded-lg border border-grey-300 space-y-3">
                         <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-grey">{component.name}</p>
-                            <p className="text-xs text-grey-600 capitalize">{component.type}</p>
+                          <div className="flex items-center gap-2">
+                            {getComponentIcon(option.category || '')}
+                            <div>
+                              <p className="text-sm font-medium text-grey">{option.name}</p>
+                              <p className="text-xs text-grey-600 capitalize">{option.type}</p>
+                            </div>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveComponent(component.id)}
+                            onClick={() => handleRemoveOption(option.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red" />
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <Label htmlFor={`event-${component.id}`} className="required">
-                              Event
-                            </Label>
+                            <Label className="text-xs required">Quota Value</Label>
                             <Input
-                              id={`event-${component.id}`}
-                              placeholder="Event tag or name"
-                              value={component.event}
-                              onChange={(e) => handleUpdateComponent(component.id, { event: e.target.value })}
-                              className="mt-1"
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor={`quota-${component.id}`} className="required">
-                              Quota Limit
-                            </Label>
-                            <Input
-                              id={`quota-${component.id}`}
                               type="number"
-                              placeholder="100"
-                              value={component.quota}
-                              onChange={(e) => handleUpdateComponent(component.id, { quota: parseInt(e.target.value) || 0 })}
+                              placeholder="1"
+                              value={option.quota}
+                              onChange={(e) => handleUpdateOption(option.id, { quota: parseInt(e.target.value) || 1 })}
                               className="mt-1"
                               min="1"
                             />
+                            <p className="text-xs text-grey-600 mt-0.5">Weight for load distribution</p>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label htmlFor={`retries-${component.id}`} className="required">
-                              Max Retries
-                            </Label>
+                            <Label className="text-xs required">Max Retries</Label>
                             <Input
-                              id={`retries-${component.id}`}
                               type="number"
-                              placeholder="3"
-                              value={component.retries}
-                              onChange={(e) => handleUpdateComponent(component.id, { retries: parseInt(e.target.value) || 0 })}
+                              placeholder="1"
+                              value={option.retries}
+                              onChange={(e) => handleUpdateOption(option.id, { retries: parseInt(e.target.value) || 1 })}
                               className="mt-1"
                               min="0"
                             />
                           </div>
 
                           <div>
-                            <Label htmlFor={`healthcheck-${component.id}`}>
-                              Healthcheck URL
-                            </Label>
+                            <Label className="text-xs">Healthcheck URL</Label>
                             <Input
-                              id={`healthcheck-${component.id}`}
-                              placeholder="https://api.example.com/health"
-                              value={component.healthcheck || ''}
-                              onChange={(e) => handleUpdateComponent(component.id, { healthcheck: e.target.value })}
+                              placeholder="Optional"
+                              value={option.healthcheck || ''}
+                              onChange={(e) => handleUpdateOption(option.id, { healthcheck: e.target.value })}
                               className="mt-1"
                             />
                           </div>
                         </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingOptionId(option.id)}
+                          className="w-full"
+                        >
+                          <Edit2 className="h-3 w-3 mr-2" />
+                          Configure Input/Output Mapping
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -481,48 +1194,227 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
           </Card>
         )}
 
-        {/* Step 3: Component Inputs Mapping */}
-        {showStep3 && (
-          <Card className="animate-in slide-in-from-top-2 duration-300">
+        {/* Step 5: Input Mapping */}
+        {showStep5 && editingOptionId && (
+          <Card className="animate-in slide-in-from-top-2 duration-300 border-primary">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                  3
+                  5
                 </div>
-                <div>
-                  <CardTitle>Component Inputs Mapping</CardTitle>
-                  <CardDescription>Map quota inputs to component parameters</CardDescription>
+                <div className="flex-1">
+                  <CardTitle>Input Mapping</CardTitle>
+                  <CardDescription>
+                    Map quota inputs to {state.selectedOptions.find(o => o.id === editingOptionId)?.name}
+                  </CardDescription>
                 </div>
+                <Button variant="ghost" size="sm" onClick={() => setEditingOptionId(null)}>
+                  Done
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-grey-600">
-                Component input mapping will be auto-populated based on quota inputs and component requirements.
-                Each component's required parameters will be listed with their assigned values.
-              </p>
+            <CardContent className="space-y-4">
+              {/* Add Mapping Form */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                <Label className="text-sm font-semibold">Add Input Mapping</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs required">Parameter Name</Label>
+                    <Input
+                      value={newMappingKey}
+                      onChange={(e) => setNewMappingKey(e.target.value)}
+                      placeholder="e.g., amount"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs required">Value (Ductape notation)</Label>
+                    <Input
+                      value={newMappingValue}
+                      onChange={(e) => setNewMappingValue(e.target.value)}
+                      placeholder="e.g., $Input{amount}"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => handleAddInputMapping(editingOptionId)} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Mapping
+                </Button>
+              </div>
+
+              {/* Available Quota Inputs Reference */}
+              <div className="p-3 bg-grey-50 rounded-lg border border-grey-300">
+                <Label className="text-xs font-semibold mb-2 block">Available Quota Inputs:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(state.quotaInputs).map((key) => (
+                    <code
+                      key={key}
+                      className="text-xs bg-primary/10 text-primary px-2 py-1 rounded cursor-pointer hover:bg-primary/20"
+                      onClick={() => setNewMappingValue(`$Input{${key}}`)}
+                    >
+                      $Input{`{${key}}`}
+                    </code>
+                  ))}
+                </div>
+              </div>
+
+              {/* Existing Mappings */}
+              {state.optionInputs[editingOptionId] && Object.keys(state.optionInputs[editingOptionId]).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Configured Mappings ({Object.keys(state.optionInputs[editingOptionId]).length})</Label>
+                  <div className="space-y-2">
+                    {Object.entries(state.optionInputs[editingOptionId]).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between p-3 bg-grey-100 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{key}</span>
+                            <span className="text-xs text-grey-600">=</span>
+                            <code className="text-sm font-mono text-primary">{value as string}</code>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveMapping(editingOptionId, key, 'input')}
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Step 4: Component Outputs Mapping */}
-        {showStep4 && (
-          <Card className="animate-in slide-in-from-top-2 duration-300">
+        {/* Step 6: Output Mapping */}
+        {showStep6 && (
+          <Card className="animate-in slide-in-from-top-2 duration-300 border-green">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                  4
+                <div className="w-8 h-8 rounded-full bg-green text-white flex items-center justify-center text-sm font-bold">
+                  6
                 </div>
-                <div>
-                  <CardTitle>Component Outputs Mapping</CardTitle>
-                  <CardDescription>Define output fields for each component</CardDescription>
+                <div className="flex-1">
+                  <CardTitle>Output Mapping</CardTitle>
+                  <CardDescription>
+                    Map {state.selectedOptions.find(o => o.id === editingOptionId)?.name} response to output schema
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-grey-600">
-                Component output mapping will allow you to define what data each component returns.
-                This data can be used in subsequent components or as the final quota result.
-              </p>
+            <CardContent className="space-y-4">
+              {/* Available Output Fields (from shared schema) */}
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <Label className="text-xs font-semibold mb-2 block">Required Output Fields (must map all):</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(state.sharedOutputSchema).map((key) => (
+                    <code
+                      key={key}
+                      className="text-xs bg-purple/10 text-purple px-2 py-1 rounded"
+                    >
+                      {key}
+                    </code>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Output Mapping Form */}
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-3">
+                <Label className="text-sm font-semibold">Map Output Field</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs required">Field Name (from schema)</Label>
+                    <Select
+                      value={newMappingKey}
+                      onValueChange={setNewMappingKey}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select a field..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(state.sharedOutputSchema).map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {key}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs required">Value (Ductape notation)</Label>
+                    <Input
+                      value={newMappingValue}
+                      onChange={(e) => setNewMappingValue(e.target.value)}
+                      placeholder="e.g., $Response{transfer_code}"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => handleAddOutputMapping(editingOptionId)} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Output Field
+                </Button>
+              </div>
+
+              {/* Existing Output Mappings */}
+              {state.optionOutputs[editingOptionId] && Object.keys(state.optionOutputs[editingOptionId]).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Configured Output Fields ({Object.keys(state.optionOutputs[editingOptionId]).length} / {Object.keys(state.sharedOutputSchema).length})</Label>
+                  <div className="space-y-2">
+                    {Object.entries(state.optionOutputs[editingOptionId]).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between p-3 bg-grey-100 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{key}</span>
+                            <span className="text-xs text-grey-600">=</span>
+                            <code className="text-sm font-mono text-primary">{value as string}</code>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveMapping(editingOptionId, key, 'output')}
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Validation: Show missing fields */}
+              {editingOptionId && (() => {
+                const mappedFields = Object.keys(state.optionOutputs[editingOptionId] || {});
+                const requiredFields = Object.keys(state.sharedOutputSchema);
+                const missingFields = requiredFields.filter(f => !mappedFields.includes(f));
+
+                if (missingFields.length > 0) {
+                  return (
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <Label className="text-xs font-semibold text-orange-800 mb-2 block">Missing Fields:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {missingFields.map((field) => (
+                          <code key={field} className="text-xs bg-orange/20 text-orange-800 px-2 py-1 rounded">
+                            {field}
+                          </code>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        ✓ All output fields are mapped for this option
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
             </CardContent>
           </Card>
         )}
@@ -532,7 +1424,18 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
           <Button variant="outline" onClick={() => closeTab(tabId)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isCreating || !state.description.trim() || state.selectedComponents.length === 0} className="gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={
+              isCreating ||
+              !state.name.trim() ||
+              !state.description.trim() ||
+              Object.keys(state.quotaInputs).length === 0 ||
+              Object.keys(state.sharedOutputSchema).length === 0 ||
+              state.selectedOptions.length === 0
+            }
+            className="gap-2"
+          >
             {isCreating ? (
               <>Creating...</>
             ) : (
@@ -548,11 +1451,12 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-grey mb-2">How Quotas Work</h3>
           <ul className="text-sm text-grey-600 space-y-1 list-disc list-inside">
-            <li>Quotas enforce usage limits and track resource consumption in your workflows</li>
-            <li>Each component option has its own quota limit - Ductape tries them in order based on remaining quota</li>
-            <li>Reference quotas in workflows using the tag (e.g., <code className="text-xs bg-grey-200 px-1 rounded">monthly_api_limit</code>)</li>
-            <li>Quota outputs include <code className="text-xs bg-grey-200 px-1 rounded">remaining</code>, <code className="text-xs bg-grey-200 px-1 rounded">limit</code>, and <code className="text-xs bg-grey-200 px-1 rounded">success</code> fields you can use in subsequent steps</li>
-            <li>Use healthcheck URLs to monitor provider availability and automatically route to available providers</li>
+            <li>Quotas distribute requests across multiple providers based on weight values</li>
+            <li>Higher quota values receive more requests - use this for load balancing (e.g., quota: 2 for Paystack, quota: 1 for Flutterwave = 2:1 ratio)</li>
+            <li>If an option fails, Ductape automatically retries with the next available option</li>
+            <li>Use $Input{`{key}`} to reference quota inputs in mappings</li>
+            <li>Use $Response{`{field}`} to extract data from provider responses</li>
+            <li>Healthcheck URLs help determine provider availability before routing requests</li>
           </ul>
         </div>
       </div>

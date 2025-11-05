@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HardDrive, Save, ChevronRight, Loader2, CheckCircle, Upload } from 'lucide-react';
+import { HardDrive, Save, ChevronRight, Loader2, CheckCircle, Upload, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
+import productServices from '@/services/productServices';
 import { useDuctape } from '@/hooks/useDuctape';
 import { StorageProviders } from '@ductape/sdk/dist/types';
 
@@ -46,7 +47,7 @@ interface EnvConfig {
 }
 
 export default function NewStorageTabContent({ tabId, data }: NewStorageTabContentProps) {
-  const { closeTab, openTab } = useWorkbenchStore();
+  const { closeTab, openTab, tabs, updateTab, setActiveTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -76,6 +77,7 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
 
   const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
   const [showEnvs, setShowEnvs] = useState(false);
+  const [showSecretKeys, setShowSecretKeys] = useState<Record<string, boolean>>({});
 
   // Fetch product data if productId is provided but productEnvs is not
   const { data: productsData, isLoading: loadingProducts } = useQuery({
@@ -180,16 +182,75 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
       });
       return storage;
     },
-    onSuccess: (storage) => {
+    onSuccess: async () => {
+      if (!product?._id || !user?._id || !user?.public_key || !currentWorkspaceId) {
+        toast.error('Missing product or user information');
+        return;
+      }
+      
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['storages'] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      
+      // Close the storage creation tab
       closeTab(tabId);
-      openTab({
-        id: `storage-${storage._id}-${Date.now()}`,
-        type: 'storage',
-        title: storage.name,
-        itemId: storage._id,
-        data: { ...storage, componentType: 'storage', productName: product?.name },
-      });
+      
+      // Fetch updated product data
+      try {
+        const productResponse = await productServices.fetchProduct({
+          product_id: product._id,
+          user_id: user._id,
+          public_key: user.public_key,
+          workspace_id: currentWorkspaceId,
+        });
+
+        if (productResponse?.data) {
+          const updatedProduct = productResponse.data;
+          
+          // Find existing product tab
+          const existingProductTab = tabs.find(
+            (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+          );
+
+          if (existingProductTab) {
+            // Update existing product tab with fresh data
+            updateTab(existingProductTab.id, {
+              data: updatedProduct,
+            });
+            // Switch to the product tab
+            setActiveTab(existingProductTab.id);
+          } else {
+            // Open new product tab with fresh data
+            openTab({
+              id: `product-${product._id}-${Date.now()}`,
+              type: 'product',
+              title: updatedProduct.name || product.name || 'Product',
+              itemId: product._id,
+              data: updatedProduct,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch updated product:', error);
+        // Still try to open product tab even if fetch fails
+        const existingProductTab = tabs.find(
+          (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+        );
+        
+        if (existingProductTab) {
+          setActiveTab(existingProductTab.id);
+        } else {
+          // Fallback: open product tab with existing data
+          openTab({
+            id: `product-${product._id}-${Date.now()}`,
+            type: 'product',
+            title: product.name || 'Product',
+            itemId: product._id,
+            data: product,
+          });
+        }
+      }
+      
       toast.success('Storage created successfully');
     },
     onError: (error: any) => {
@@ -456,14 +517,28 @@ export default function NewStorageTabContent({ tabId, data }: NewStorageTabConte
                         </div>
                         <div>
                           <Label htmlFor={`secretAccessKey-${index}`}>Secret Access Key</Label>
-                          <Input
-                            id={`secretAccessKey-${index}`}
-                            type="password"
-                            placeholder="••••••••"
-                            value={env.secretAccessKey}
-                            onChange={(e) => updateEnvConfig(index, 'secretAccessKey', e.target.value)}
-                            className="mt-2 bg-white"
-                          />
+                          <div className="relative mt-2">
+                            <Input
+                              id={`secretAccessKey-${index}`}
+                              type={showSecretKeys[`${env.slug}-secretKey`] ? 'text' : 'password'}
+                              placeholder="••••••••"
+                              value={env.secretAccessKey}
+                              onChange={(e) => updateEnvConfig(index, 'secretAccessKey', e.target.value)}
+                              className="bg-white pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSecretKeys(prev => ({ ...prev, [`${env.slug}-secretKey`]: !prev[`${env.slug}-secretKey`] }))}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+                              aria-label={showSecretKeys[`${env.slug}-secretKey`] ? 'Hide secret key' : 'Show secret key'}
+                            >
+                              {showSecretKeys[`${env.slug}-secretKey`] ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

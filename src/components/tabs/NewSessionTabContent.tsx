@@ -159,7 +159,15 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
   const handleNameChange = (value: string) => {
     // Auto-generate tag from name
     const sanitizedTag = value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    setFormData({ ...formData, name: value, tag: sanitizedTag });
+    setFormData({
+      ...formData,
+      name: value,
+      tag: sanitizedTag,
+      // Auto-populate description if it's empty or was previously auto-generated
+      description: !formData.description || formData.description.endsWith(' session')
+        ? `${value} session`
+        : formData.description
+    });
   };
 
   return (

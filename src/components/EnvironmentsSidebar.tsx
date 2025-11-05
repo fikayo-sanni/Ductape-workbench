@@ -18,7 +18,7 @@ import {
 } from './ui/dialog';
 
 export default function EnvironmentsSidebar() {
-  const { user, currentWorkspaceId } = useAuth();
+  const { user, currentWorkspaceId, setUser } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function EnvironmentsSidebar() {
 
       const updatedEnvs = environments.filter(env => env.slug !== slug);
 
-      await workspaceServices.updateWorkspaceEnvs({
+      const response = await workspaceServices.updateWorkspaceEnvs({
         workspace_id: currentWorkspaceId,
         payload: {
           user_id: user._id,
@@ -60,9 +60,36 @@ export default function EnvironmentsSidebar() {
           envs: updatedEnvs,
         },
       });
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      if (response?.data && user) {
+        // Update workspaces query cache
+        queryClient.setQueryData(['workspaces', user._id], response);
+        
+        // Update user store with new workspaces data
+        const updatedWorkspaces = response.data.map((ws: any) => ({
+          workspace_id: ws.workspace_id,
+          workspace_name: ws.workspace_name,
+          user_id: ws.user_id,
+          default: ws.default || false,
+          accepted: ws.accepted || false,
+          access_level: ws.access_level || '',
+          defaultEnvs: ws.defaultEnvs || [],
+          logo: ws.logo,
+          description: ws.description,
+        }));
+        
+        setUser({
+          ...user,
+          workspaces: updatedWorkspaces,
+        });
+      }
+      
+      // Invalidate as fallback
       queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      
       toast.success('Environment deleted successfully');
     },
     onError: (error: any) => {

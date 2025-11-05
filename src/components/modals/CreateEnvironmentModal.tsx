@@ -90,12 +90,17 @@ export default function CreateEnvironmentModal({
         active: data.active,
       };
 
-      const environment = await ductape.envs.create(payload);
+      console.dir(ductape);
+
+      const environment = await ductape.environments.create(payload);
       return environment;
     },
     onSuccess: (environment) => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      // Invalidate products list query with workspaceId
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      // Invalidate any product-specific queries
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product', productTag] });
       toast.success('Environment created successfully!');
       onSuccess?.(environment);
       onOpenChange(false);

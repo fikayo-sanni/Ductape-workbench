@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import productServices from '@/services/productServices';
 
 interface NewCacheTabContentProps {
   tabId: string;
@@ -15,7 +16,7 @@ interface NewCacheTabContentProps {
 }
 
 export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentProps) {
-  const { closeTab, openTab } = useWorkbenchStore();
+  const { closeTab, openTab, tabs, updateTab, setActiveTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -56,6 +57,7 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
       };
       
       try {
+        await ductape.init(data.productTag);
         const cache = await ductape.caches.create(payload);
         return cache;
       } catch (error) {
@@ -63,16 +65,75 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
         throw error;
       }
     },
-    onSuccess: (cache) => {
+    onSuccess: async (_cache) => {
+      if (!product?._id || !user?._id || !user?.public_key || !currentWorkspaceId) {
+        toast.error('Missing product or user information');
+        return;
+      }
+      
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['caches'] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      
+      // Close the cache creation tab
       closeTab(tabId);
-      openTab({
-        id: `cache-${cache._id}-${Date.now()}`,
-        type: 'cache',
-        title: cache.name,
-        itemId: cache._id,
-        data: { ...cache, componentType: 'cache', productName: product?.name },
-      });
+      
+      // Fetch updated product data
+      try {
+        const productResponse = await productServices.fetchProduct({
+          product_id: product._id,
+          user_id: user._id,
+          public_key: user.public_key,
+          workspace_id: currentWorkspaceId,
+        });
+
+        if (productResponse?.data) {
+          const updatedProduct = productResponse.data;
+          
+          // Find existing product tab
+          const existingProductTab = tabs.find(
+            (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+          );
+
+          if (existingProductTab) {
+            // Update existing product tab with fresh data
+            updateTab(existingProductTab.id, {
+              data: updatedProduct,
+            });
+            // Switch to the product tab
+            setActiveTab(existingProductTab.id);
+          } else {
+            // Open new product tab with fresh data
+            openTab({
+              id: `product-${product._id}-${Date.now()}`,
+              type: 'product',
+              title: updatedProduct.name || product.name || 'Product',
+              itemId: product._id,
+              data: updatedProduct,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch updated product:', error);
+        // Still try to open product tab even if fetch fails
+        const existingProductTab = tabs.find(
+          (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+        );
+        
+        if (existingProductTab) {
+          setActiveTab(existingProductTab.id);
+        } else {
+          // Fallback: open product tab with existing data
+          openTab({
+            id: `product-${product._id}-${Date.now()}`,
+            type: 'product',
+            title: product.name || 'Product',
+            itemId: product._id,
+            data: product,
+          });
+        }
+      }
+      
       toast.success('Cache created successfully');
     },
     onError: (error: any) => {

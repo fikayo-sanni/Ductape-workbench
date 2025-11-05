@@ -126,7 +126,17 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
               id="name"
               placeholder="e.g., My API Service"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                const name = e.target.value;
+                setFormData({
+                  ...formData,
+                  name,
+                  // Auto-populate description if it's empty or was previously auto-generated
+                  description: !formData.description || formData.description.endsWith(' product')
+                    ? `${name} product`
+                    : formData.description
+                });
+              }}
               onBlur={generateTag}
               className="mt-2"
             />

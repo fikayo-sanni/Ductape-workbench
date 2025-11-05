@@ -13,12 +13,26 @@ export interface Workspace {
   logo?: string;
   user_id: string;
   default: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+  accepted?: boolean;
+  access_level?: string;
+  date_joined?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  defaultEnvs?: Array<{
+    env_name: string;
+    slug: string;
+    description: string;
+    _id: string;
+  }>;
 }
 
 interface WorkspacesResponse {
   data: Workspace[];
+  status?: boolean;
+  message?: string;
+  meta?: any;
 }
 
 interface CreateWorkspaceResponse {
@@ -175,9 +189,10 @@ const updateWorkspaceEnvs = async (data: {
     public_key: string;
     envs: any[];
   };
-}): Promise<any> => {
+}): Promise<WorkspacesResponse> => {
   const {workspace_id, payload} = data;
-  const response = await apiClient.put<any>(
+  console.log('payload!!', payload);
+  const response = await apiClient.put<WorkspacesResponse>(
     `/workspaces/v1/update/${workspace_id}/defaults/envs`,
     payload,
   );

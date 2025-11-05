@@ -1,18 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ConditionalModal from '@/components/modals/ConditionalModal';
 import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save } from 'lucide-react';
 import { DataTypes, FeatureEventTypes } from '@ductape/sdk/dist/types';
 import { IFeatureInput } from '@ductape/sdk/dist/types';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
+import appServicesReal from '@/services/appServicesReal';
 
 interface NewFeatureTabContentProps {
   tabId: string;
@@ -63,6 +66,20 @@ interface FeatureBuilderState {
 
   // Cache Configuration
   componentCache: Record<string, string>;
+
+  // Event Conditions
+  eventConditions: Record<string, {
+    type: 'loop' | 'check' | '';
+    valueSource: 'index' | 'input' | 'sequence' | '';  // Where the value comes from
+    inputKey?: string;  // For input source
+    sequenceId?: string;  // For sequence source
+    eventId?: string;  // For sequence source - which event in the sequence
+    valueKey?: string;  // For sequence source - the actual value key
+    operator?: '>' | '<' | '>=' | '<=' | '==' | '!=';  // Comparison operator
+    compareValue?: string;  // Value to compare against (for check type)
+    iter?: number;  // Iteration step
+    init?: number;  // Initial value
+  }>;
 }
 
 const INITIAL_STATE: FeatureBuilderState = {
@@ -78,6 +95,7 @@ const INITIAL_STATE: FeatureBuilderState = {
   componentInputs: {},
   featureOutput: {},
   componentCache: {},
+  eventConditions: {},
 };
 
 const DATA_TYPES = [
@@ -150,6 +168,38 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   } : null;
 
   const [state, setState] = useState<FeatureBuilderState>(INITIAL_STATE);
+
+  // Helper function to build check expression from condition properties
+  const buildCheckExpression = (cond: FeatureBuilderState['eventConditions'][string] | undefined) => {
+    if (!cond || !cond.type) return '';
+
+    let valueExpr = '';
+    if (cond.valueSource === 'index') {
+      valueExpr = '$Index';
+    } else if (cond.valueSource === 'input' && cond.inputKey) {
+      const input = state.featureInputs[cond.inputKey];
+      if (input && input.type?.toString().startsWith('array')) {
+        valueExpr = `$Length{$Input{${cond.inputKey}}}`;
+      } else {
+        valueExpr = `$Input{${cond.inputKey}}`;
+      }
+    } else if (cond.valueSource === 'sequence' && cond.sequenceId && cond.eventId && cond.valueKey) {
+      const valueRef = `$Sequence{${cond.sequenceId}:${cond.eventId}:${cond.valueKey}}`;
+      const isArray = cond.valueKey === 'data';
+      valueExpr = isArray ? `$Length{${valueRef}}` : valueRef;
+    }
+
+    if (cond.type === 'loop') {
+      if (cond.valueSource === 'index') {
+        return `i = ${cond.init || 0}; i < ${cond.iter || 10}; i++`;
+      } else {
+        return `i = 0; ${valueExpr} ${cond.operator || '<'} ${cond.compareValue || ''}; i++`;
+      }
+    } else {
+      return `${valueExpr} ${cond.operator || '=='} ${cond.compareValue || ''}`;
+    }
+  };
+
   const [showAddComponent, setShowAddComponent] = useState(false);
   const [newComponent, setNewComponent] = useState({
     type: '',
@@ -164,6 +214,8 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   const [editingActionSearch, setEditingActionSearch] = useState<string>('');
   const [addInputFromMapping, setAddInputFromMapping] = useState<boolean>(false);
   const [mappingVariableKey, setMappingVariableKey] = useState<string>('');
+  const [conditionalModalOpen, setConditionalModalOpen] = useState(false);
+  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [mappingComponentId, setMappingComponentId] = useState<string>('');
   const [newInputType, setNewInputType] = useState<DataTypes>(DataTypes.STRING);
   const [newInputMinLength, setNewInputMinLength] = useState<number>(0);
@@ -172,7 +224,7 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   const addInputFormRef = useRef<HTMLDivElement>(null);
   const [editingComponent, setEditingComponent] = useState<string | null>(null);
   const [editingComponentName, setEditingComponentName] = useState<string>('');
-  // const [selectedAppId, setSelectedAppId] = useState<string>('');
+  const [selectedAppId, setSelectedAppId] = useState<string>('');
 
   // Update form values when sourceVariable changes
   useEffect(() => {
@@ -212,6 +264,17 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   }>>>({});
   const [currentSequenceId, setCurrentSequenceId] = useState<string>('main');
   const [editingFieldNames, setEditingFieldNames] = useState<Record<string, string>>({});
+
+  // Fetch selected app data when an app is selected
+  const { data: selectedAppData } = useQuery({
+    queryKey: ['app', selectedAppId],
+    queryFn: () => appServicesReal.fetchApp({
+      app_id: selectedAppId,
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!selectedAppId && !!user?._id && !!user?.public_key,
+  });
 
   // Initialize Ductape SDK
   const ductape = useDuctape({
@@ -549,7 +612,27 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     }
 
     if (newComponent.type === 'Applications') {
-      // For applications, we'll need to fetch app data
+      // For applications, use the selected app data to get actions from the latest version
+      if (selectedAppData?.data) {
+        const app = selectedAppData.data;
+        
+        // Get the latest version of the app
+        const latestVersion = app.versions?.find((v: any) => v.latest) || app.versions?.[0];
+        
+        if (latestVersion?.actions?.length > 0) {
+          return latestVersion.actions.map((action: any) => ({
+            id: `app-${app._id}-${action._id}`,
+            type: FeatureEventTypes.ACTION,
+            tag: action.tag,
+            name: action.name,
+            method: action.method,
+            endpoint: action.resource,
+            app: app.tag,
+            category: 'Applications',
+            action: action // Include the full action object with params, body, query, headers
+          }));
+        }
+      }
       return [];
     }
 
@@ -698,12 +781,72 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     }
   };
 
+  // Helper function to extract sequence references from a string
+  const extractSequenceReferences = (text: string): string[] => {
+    if (!text || typeof text !== 'string') return [];
+    const matches = text.match(/\$Sequence\{([^}]+)\}/g);
+    if (!matches) return [];
+    return matches.map(match => {
+      const seqMatch = match.match(/\$Sequence\{([^}]+)\}/);
+      return seqMatch ? seqMatch[1] : '';
+    }).filter(Boolean);
+  };
+
+  // Helper function to detect parent sequences for a given sequence
+  const detectParentSequences = (sequenceIndex: number): string[] => {
+    const sequence = state.sequences[sequenceIndex];
+    if (!sequence) return [];
+
+    const parentTags = new Set<string>();
+
+    // Check all component inputs in this sequence
+    sequence.components.forEach(componentId => {
+      const inputs = state.componentInputs[componentId] || {};
+      Object.values(inputs).forEach((value: any) => {
+        if (typeof value === 'string') {
+          const refs = extractSequenceReferences(value);
+          refs.forEach(ref => {
+            // Only add as parent if it's from a previous sequence
+            const parentSeq = state.sequences.find((s, idx) => 
+              idx < sequenceIndex && s.name.toLowerCase().replace(/\s+/g, '_') === ref
+            );
+            if (parentSeq) {
+              parentTags.add(ref);
+            }
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          // Recursively check nested objects
+          const checkNested = (obj: any) => {
+            Object.values(obj).forEach((val: any) => {
+              if (typeof val === 'string') {
+                const refs = extractSequenceReferences(val);
+                refs.forEach(ref => {
+                  const parentSeq = state.sequences.find((s, idx) => 
+                    idx < sequenceIndex && s.name.toLowerCase().replace(/\s+/g, '_') === ref
+                  );
+                  if (parentSeq) {
+                    parentTags.add(ref);
+                  }
+                });
+              } else if (typeof val === 'object' && val !== null) {
+                checkNested(val);
+              }
+            });
+          };
+          checkNested(value);
+        }
+      });
+    });
+
+    return Array.from(parentTags);
+  };
+
   const generateCode = () => {
     const ductapeCode = `// Do this once in a ductape.ts file and reuse in other components
 
 import Ductape from '@ductape/sdk';
 import { config } from 'dotenv';
-import { InputTypes, IProductFeature, IFeatureInput, IFeatureSequence, FeatureEventTypes } from '@ductape/sdk/types';
+import { InputTypes, IProductFeature, IFeatureInput, IFeatureSequence, FeatureEventTypes, Conditions } from '@ductape/sdk/types';
 
 config();
 
@@ -720,18 +863,32 @@ const ductape = new Ductape(credentials);`;
       `  ${key}: { type: '${input.type}', ${input.minlength ? `minlength: ${input.minlength}, ` : ''}${input.maxlength ? `maxlength: ${input.maxlength}` : ''} }`
     ).join(',\n');
 
-    const sequencesArray = state.sequences.map(sequence => {
+    const sequencesArray = state.sequences.map((sequence, seqIndex) => {
       const events = sequence.components.map(componentId => {
         const component = state.selectedComponents.find(c => c.id === componentId);
         if (!component) return '';
 
         const inputs = state.componentInputs[componentId] || {};
-        const inputEntries = Object.entries(inputs).map(([key, value]) =>
-          `    ${key}: '${value}'`
-        ).join(',\n');
+        const inputEntries = Object.entries(inputs).map(([key, value]) => {
+          // Handle nested objects and arrays
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            const nestedEntries = Object.entries(value).map(([nestedKey, nestedValue]) =>
+              `      ${nestedKey}: ${typeof nestedValue === 'string' ? `'${nestedValue}'` : JSON.stringify(nestedValue)}`
+            ).join(',\n');
+            return `    ${key}: {\n${nestedEntries}\n    }`;
+          } else if (Array.isArray(value)) {
+            return `    ${key}: ${JSON.stringify(value)}`;
+          } else {
+            return `    ${key}: ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}`;
+          }
+        }).join(',\n');
 
         const cacheConfig = state.componentCache[componentId] ?
           `,\n    cache: '${state.componentCache[componentId]}'` : '';
+
+        const condition = state.eventConditions[componentId];
+        const checkExpression = buildCheckExpression(condition);
+        const conditionConfig = condition && condition.type && checkExpression ? `,\n    condition: {\n      type: Conditions.${condition.type.toUpperCase()},\n      check: '${checkExpression}'${condition.iter !== undefined ? `,\n      iter: ${condition.iter}` : ''}${condition.init !== undefined ? `,\n      init: ${condition.init}` : ''}\n    }` : '';
 
         const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
 
@@ -742,12 +899,17 @@ const ductape = new Ductape(credentials);`;
 ${inputEntries}
     },
     retries: 2,
-    allow_fail: false${cacheConfig}
+    allow_fail: false${cacheConfig}${conditionConfig}
   }`;
       }).filter(Boolean);
 
+      // Auto-detect parent sequences
+      const parents = detectParentSequences(seqIndex);
+      const parentsConfig = parents.length > 0 ? 
+        `,\n    parents: [${parents.map(p => `'${p}'`).join(', ')}]` : '';
+
       return `  {
-    tag: '${sequence.name.toLowerCase().replace(/\s+/g, '_')}',
+    tag: '${sequence.name.toLowerCase().replace(/\s+/g, '_')}',${parentsConfig}
     events: [
 ${events.join(',\n')}
     ]
@@ -829,25 +991,39 @@ console.log('Feature result:', result);`;
         tag: state.featureTag,
         input_type: 'JSON',
         input: state.featureInputs,
-        sequence: state.sequences.map(seq => ({
-          tag: seq.name.toLowerCase().replace(/\s+/g, '_'),
-          events: seq.components.map(componentId => {
-            const component = state.selectedComponents.find(c => c.id === componentId);
-            if (!component) return null;
+        sequence: state.sequences.map((seq, seqIndex) => {
+          const parents = detectParentSequences(seqIndex);
+          return {
+            tag: seq.name.toLowerCase().replace(/\s+/g, '_'),
+            ...(parents.length > 0 && { parents }),
+            events: seq.components.map(componentId => {
+              const component = state.selectedComponents.find(c => c.id === componentId);
+              if (!component) return null;
 
-            const inputs = state.componentInputs[componentId] || {};
-            const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
+              const inputs = state.componentInputs[componentId] || {};
+              const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
+              const condition = state.eventConditions[componentId];
+              const checkExpression = buildCheckExpression(condition);
 
-            return {
-              type: component.type,
-              event: eventTag,
-              input: inputs,
-              retries: 2,
-              allow_fail: false,
-              cache: state.componentCache[componentId] || undefined
-            };
-          }).filter(Boolean)
-        })),
+              return {
+                type: component.type,
+                event: eventTag,
+                input: inputs,
+                retries: 2,
+                allow_fail: false,
+                cache: state.componentCache[componentId] || undefined,
+                ...(condition && condition.type && checkExpression && {
+                  condition: {
+                    type: condition.type,
+                    check: checkExpression,
+                    ...(condition.iter !== undefined && { iter: condition.iter }),
+                    ...(condition.init !== undefined && { init: condition.init }),
+                  }
+                })
+              };
+            }).filter(Boolean)
+          };
+        }),
         output: state.featureOutput,
         store_event_results: state.storeEventResults
       };
@@ -884,6 +1060,91 @@ console.log('Feature result:', result);`;
     }
 
     await createFeature();
+  };
+
+  // Validation function to check if all required fields are filled
+  const isFormValid = () => {
+    // Check basic fields
+    if (!state.featureName || !state.featureDescription) {
+      return false;
+    }
+
+    // Check if at least one component is selected
+    if (state.selectedComponents.length === 0) {
+      return false;
+    }
+
+    // Check all feature inputs have types
+    for (const inputKey in state.featureInputs) {
+      const input = state.featureInputs[inputKey];
+      if (!inputKey || !input.type) {
+        return false;
+      }
+    }
+
+    // Check all selected components have required configurations
+    for (const component of state.selectedComponents) {
+      const inputs = state.componentInputs[component.id];
+      if (inputs) {
+        // Check all input fields have values
+        for (const inputKey in inputs) {
+          const inputValue = inputs[inputKey];
+          if (inputValue === '' || inputValue === null || inputValue === undefined) {
+            return false;
+          }
+        }
+      }
+
+      // Check conditionals are properly configured if they exist
+      const condition = state.eventConditions[component.id];
+      if (condition && condition.type) {
+        // If condition exists, check it's properly configured
+        if (!condition.valueSource) {
+          return false;
+        }
+
+        if (condition.type === 'loop') {
+          // Loop validation
+          if (condition.valueSource === 'index') {
+            // Index mode: check init and iter
+            if (condition.init === undefined || condition.iter === undefined) {
+              return false;
+            }
+          } else if (condition.valueSource === 'input') {
+            // Input mode: check inputKey and operator and compareValue
+            if (!condition.inputKey || !condition.operator || !condition.compareValue) {
+              return false;
+            }
+          } else if (condition.valueSource === 'sequence') {
+            // Sequence mode: check sequenceId, eventId, valueKey, operator, compareValue
+            if (!condition.sequenceId || !condition.eventId || !condition.valueKey || !condition.operator || !condition.compareValue) {
+              return false;
+            }
+          }
+        } else if (condition.type === 'check') {
+          // Check validation: must have value source, operator, and compare value
+          if (condition.valueSource === 'input') {
+            if (!condition.inputKey || !condition.operator || !condition.compareValue) {
+              return false;
+            }
+          } else if (condition.valueSource === 'sequence') {
+            if (!condition.sequenceId || !condition.eventId || !condition.valueKey || !condition.operator || !condition.compareValue) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+
+    // Check feature outputs are properly configured
+    for (const outputKey in state.featureOutput) {
+      const outputValue = state.featureOutput[outputKey];
+      if (!outputValue || outputValue === '') {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   return (
@@ -952,7 +1213,17 @@ console.log('Feature result:', result);`;
               <label className="block text-sm font-medium text-grey mb-2">Feature Name</label>
               <Input
                 value={state.featureName}
-                onChange={(e) => setState({ ...state, featureName: e.target.value })}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setState({
+                    ...state,
+                    featureName: name,
+                    // Auto-populate description if it's empty or was previously auto-generated
+                    featureDescription: !state.featureDescription || state.featureDescription.endsWith(' feature')
+                      ? `${name} feature`
+                      : state.featureDescription
+                  });
+                }}
                 placeholder="Enter feature name"
                 className="w-full"
               />
@@ -963,7 +1234,7 @@ console.log('Feature result:', result);`;
                 <Input
                   value={state.featureTag}
                   readOnly
-                  className="w-full bg-grey-50"
+                  className="w-full"
                 />
                 <Button
                   type="button"
@@ -1084,6 +1355,13 @@ console.log('Feature result:', result);`;
                                 (storage.name || storage.tag) === value
                               );
                               childId = storage ? `storage-${storage._id}` : '';
+                            }
+                            // For Applications, also set the selectedAppId to fetch app data
+                            if (newComponent.type === 'Applications') {
+                              const app = product?.apps?.find((app: any) => app.app_name === value);
+                              if (app?.app_id) {
+                                setSelectedAppId(app.app_id);
+                              }
                             }
                             setNewComponent({ ...newComponent, parentId: value, childId });
                           }}
@@ -1207,9 +1485,9 @@ console.log('Feature result:', result);`;
                 <div className="space-y-2">
                   <h4 className="text-grey font-medium">Selected Events</h4>
                   {state.selectedComponents.map((component) => (
-                    <div
-                      key={component.id}
-                      className="flex items-center justify-between p-3 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
+                    <div key={component.id} className="space-y-2">
+                      <div
+                        className="flex items-center justify-between p-3 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
                       draggable
                       onDragStart={(e) => {
                         setDraggedComponent(component.id);
@@ -1321,6 +1599,7 @@ console.log('Feature result:', result);`;
                         </Button>
                       </div>
                     </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1379,8 +1658,21 @@ console.log('Feature result:', result);`;
                     {index > 0 && <AnimatedArrow />}
                     <div className="border border-grey-300 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-semibold text-grey text-base">{sequence.name}</h4>
+                          {(() => {
+                            const parents = detectParentSequences(index);
+                            return parents.length > 0 && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-xs text-grey-500">depends on:</span>
+                                {parents.map((parent, idx) => (
+                                  <span key={idx} className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                    {parent}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           {currentSequenceId === sequence.id && (
                             <span className="text-xs bg-primary text-white px-2 py-1 rounded">
                               Adding to this sequence
@@ -1463,36 +1755,122 @@ console.log('Feature result:', result);`;
                           if (!component) return null;
 
                           return (
-                            <div
-                              key={componentId}
-                              className="flex items-center justify-between p-2 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
-                              draggable
-                              onDragStart={(e) => {
-                                setDraggedComponent(componentId);
-                                setDraggedFromSequence(sequence.id);
-                                e.dataTransfer.effectAllowed = 'move';
-                                e.dataTransfer.setData('text/plain', componentId);
-                              }}
-                              onDragEnd={() => {
-                                setDraggedComponent(null);
-                                setDraggedFromSequence(null);
-                              }}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <GripVertical className="w-4 h-4 text-grey-400" />
-                                <span className="text-sm font-medium text-grey">{component.name}</span>
-                                <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
-                                  {component.tag}
-                                </span>
-                              </div>
-                              <Button
-                                onClick={() => removeComponent(componentId)}
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600"
+                            <div key={componentId} className="space-y-2">
+                              <div
+                                className="flex items-center justify-between p-2 bg-grey-50 rounded-lg cursor-move hover:bg-grey-100 transition-colors"
+                                draggable
+                                onDragStart={(e) => {
+                                  setDraggedComponent(componentId);
+                                  setDraggedFromSequence(sequence.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', componentId);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedComponent(null);
+                                  setDraggedFromSequence(null);
+                                }}
                               >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                                <div className="flex items-center space-x-3">
+                                  <GripVertical className="w-4 h-4 text-grey-400" />
+                                  <span className="text-sm font-medium text-grey">{component.name}</span>
+                                  <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                    {component.tag}
+                                  </span>
+                                </div>
+                                <Button
+                                  onClick={() => removeComponent(componentId)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              {/* Condition Configuration */}
+                              <div className="mt-2 pt-2 border-t border-grey-300 ml-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label className="text-xs font-semibold text-grey">Condition (Optional)</Label>
+                                  <div className="flex gap-2">
+                                    {state.eventConditions[component.id]?.type && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setState({
+                                            ...state,
+                                            eventConditions: {
+                                              ...state.eventConditions,
+                                              [component.id]: {
+                                                type: '',
+                                                valueSource: '',
+                                              }
+                                            }
+                                          });
+                                        }}
+                                        className="h-6 text-xs text-red-600 hover:text-red-700"
+                                      >
+                                        Remove
+                                      </Button>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingComponentId(component.id);
+                                        setConditionalModalOpen(true);
+                                      }}
+                                      className="h-6 text-xs"
+                                    >
+                                      {state.eventConditions[component.id]?.type ? 'Edit Condition' : 'Add Condition'}
+                                    </Button>
+                                  </div>
+                                </div>
+                                {state.eventConditions[component.id]?.type && (
+                                  <div className="space-y-2 p-3 bg-grey-50 rounded-lg border border-grey-200">
+                                    <div className="flex items-start gap-2">
+                                      <div className="flex-1">
+                                        <div className="text-xs font-semibold text-grey-700 mb-1">
+                                          {state.eventConditions[component.id].type === 'loop' ? 'Loop Condition' : 'Check Condition'}
+                                        </div>
+                                        <div className="text-xs text-grey-600 font-mono bg-white px-2 py-1 rounded border border-grey-200">
+                                          {(() => {
+                                            const cond = state.eventConditions[component.id];
+                                            if (!cond.type) return 'No condition';
+
+                                            let valueExpr = '';
+                                            if (cond.valueSource === 'index') {
+                                              valueExpr = '$Index';
+                                            } else if (cond.valueSource === 'input' && cond.inputKey) {
+                                              const input = state.featureInputs[cond.inputKey];
+                                              if (input && input.type?.toString().startsWith('array')) {
+                                                valueExpr = `$Length{$Input{${cond.inputKey}}}`;
+                                              } else {
+                                                valueExpr = `$Input{${cond.inputKey}}`;
+                                              }
+                                            } else if (cond.valueSource === 'sequence' && cond.sequenceId && cond.eventId && cond.valueKey) {
+                                              const valueRef = `$Sequence{${cond.sequenceId}:${cond.eventId}:${cond.valueKey}}`;
+                                              const isArray = cond.valueKey === 'data';
+                                              valueExpr = isArray ? `$Length{${valueRef}}` : valueRef;
+                                            }
+
+                                            if (cond.type === 'loop') {
+                                              if (cond.valueSource === 'index') {
+                                                return `for (i = ${cond.init || 0}; i < ${cond.iter || 10}; i++)`;
+                                              } else {
+                                                return `for (i = 0; ${valueExpr} ${cond.operator || '<'} ${cond.compareValue || ''}; i++)`;
+                                              }
+                                            } else {
+                                              return `${valueExpr} ${cond.operator || '=='} ${cond.compareValue || ''}`;
+                                            }
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -2227,7 +2605,7 @@ console.log('Feature result:', result);`;
           <Button variant="outline" onClick={() => closeTab(tabId)}>
               Cancel
             </Button>
-          <Button onClick={handleSave} disabled={isCreating || !state.featureName || !state.featureDescription || state.selectedComponents.length === 0} className="gap-2">
+          <Button onClick={handleSave} disabled={isCreating || !isFormValid()} className="gap-2">
             {isCreating ? (
               <>Creating...</>
             ) : (
@@ -2252,6 +2630,49 @@ console.log('Feature result:', result);`;
           </ul>
         </div>
       </div>
+
+      {/* Conditional Modal */}
+      {editingComponentId && (
+        <ConditionalModal
+          isOpen={conditionalModalOpen}
+          onClose={() => {
+            setConditionalModalOpen(false);
+            setEditingComponentId(null);
+          }}
+          onSave={(config) => {
+            if (editingComponentId) {
+              setState({
+                ...state,
+                eventConditions: {
+                  ...state.eventConditions,
+                  [editingComponentId]: config
+                }
+              });
+            }
+            setConditionalModalOpen(false);
+            setEditingComponentId(null);
+          }}
+          currentConfig={state.eventConditions[editingComponentId] || null}
+          componentName={state.selectedComponents.find(c => c.id === editingComponentId)?.name || 'Event'}
+          featureInputs={state.featureInputs}
+          sequences={state.sequences}
+          selectedComponents={state.selectedComponents}
+          componentIndex={state.selectedComponents.findIndex(c => c.id === editingComponentId)}
+          onAddInput={(input: any) => {
+            // The modal passes an extended input with a name property
+            const { name, ...inputWithoutName } = input;
+            if (name) {
+              setState({
+                ...state,
+                featureInputs: {
+                  ...state.featureInputs,
+                  [name]: inputWithoutName
+                }
+              });
+            }
+          }}
+        />
+      )}
     </div>
 
   )

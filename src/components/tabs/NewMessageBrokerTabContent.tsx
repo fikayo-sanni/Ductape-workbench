@@ -156,7 +156,7 @@ export default function NewMessageBrokerTabContent({ tabId, data }: NewMessageBr
     // Auto-generate tag
     if (value && product?.tag) {
       const sanitizedValue = value.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-      setFormData(prev => ({ ...prev, name: value, tag: `${product.tag}:${sanitizedValue}` }));
+      setFormData(prev => ({ ...prev, name: value, tag: `${sanitizedValue}` }));
     }
   };
 

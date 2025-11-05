@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Database as DatabaseIcon, Save, ChevronRight, Loader2, CheckCircle } from 'lucide-react';
+import { Database as DatabaseIcon, Save, ChevronRight, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
+import productServices from '@/services/productServices';
 import { useDuctape } from '@/hooks/useDuctape';
 
 interface NewDatabaseTabContentProps {
@@ -23,7 +24,7 @@ interface EnvConnection {
 }
 
 export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabContentProps) {
-  const { closeTab, openTab } = useWorkbenchStore();
+  const { closeTab, openTab, tabs, updateTab, setActiveTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -54,6 +55,7 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
 
   const [envConnections, setEnvConnections] = useState<EnvConnection[]>([]);
   const [showEnvs, setShowEnvs] = useState(false);
+  const [showPasswords, setShowPasswords] = useState<Record<number, boolean>>({});
 
   // Fetch product data if productId is provided but productEnvs is not
   const { data: productsData, isLoading: loadingProducts } = useQuery({
@@ -115,16 +117,80 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
       });
       return database;
     },
-    onSuccess: (database) => {
+    onSuccess: async (_database) => {
+      /*if (!database) {
+        toast.error('Database creation succeeded but no data returned');
+        return;
+      }*/
+      
+      if (!product?._id || !user?._id || !user?.public_key || !currentWorkspaceId) {
+        toast.error('Missing product or user information');
+        return;
+      }
+      
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['databases'] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      
+      // Close the database creation tab
       closeTab(tabId);
-      openTab({
-        id: `database-${database._id}-${Date.now()}`,
-        type: 'database',
-        title: database.name,
-        itemId: database._id,
-        data: { ...database, componentType: 'database', productName: product?.name },
-      });
+      
+      // Fetch updated product data
+      try {
+        const productResponse = await productServices.fetchProduct({
+          product_id: product._id,
+          user_id: user._id,
+          public_key: user.public_key,
+          workspace_id: currentWorkspaceId,
+        });
+
+        if (productResponse?.data) {
+          const updatedProduct = productResponse.data;
+          
+          // Find existing product tab
+          const existingProductTab = tabs.find(
+            (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+          );
+
+          if (existingProductTab) {
+            // Update existing product tab with fresh data
+            updateTab(existingProductTab.id, {
+              data: updatedProduct,
+            });
+            // Switch to the product tab
+            setActiveTab(existingProductTab.id);
+          } else {
+            // Open new product tab with fresh data
+            openTab({
+              id: `product-${product._id}-${Date.now()}`,
+              type: 'product',
+              title: updatedProduct.name || product.name || 'Product',
+              itemId: product._id,
+              data: updatedProduct,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch updated product:', error);
+        // Still try to open product tab even if fetch fails
+        const existingProductTab = tabs.find(
+          (tab) => tab.type === 'product' && (tab.itemId === product._id || tab.data?._id === product._id)
+        );
+        
+        if (existingProductTab) {
+          setActiveTab(existingProductTab.id);
+        } else {
+          // Fallback: open product tab with existing data
+          openTab({
+            id: `product-${product._id}-${Date.now()}`,
+            type: 'product',
+            title: product.name || 'Product',
+            itemId: product._id,
+            data: product,
+          });
+        }
+      }
+      
       toast.success('Database created successfully');
     },
     onError: (error: any) => {
@@ -363,14 +429,28 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
 
                   <div>
                     <Label htmlFor={`connection-${index}`}>Connection URL</Label>
-                    <Input
-                      id={`connection-${index}`}
-                      type="password"
-                      placeholder={dbTypeDefaults[formData.type]?.example}
-                      value={env.connection_url}
-                      onChange={(e) => updateEnvConnection(index, e.target.value)}
-                      className="mt-2 bg-white font-mono text-sm"
-                    />
+                    <div className="relative mt-2">
+                      <Input
+                        id={`connection-${index}`}
+                        type={showPasswords[index] ? 'text' : 'password'}
+                        placeholder={dbTypeDefaults[formData.type]?.example}
+                        value={env.connection_url}
+                        onChange={(e) => updateEnvConnection(index, e.target.value)}
+                        className="bg-white font-mono text-sm pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords(prev => ({ ...prev, [index]: !prev[index] }))}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+                        aria-label={showPasswords[index] ? 'Hide password' : 'Show password'}
+                      >
+                        {showPasswords[index] ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                     <p className="text-xs text-grey-600 mt-1">Full database connection string with credentials</p>
                   </div>
                 </div>

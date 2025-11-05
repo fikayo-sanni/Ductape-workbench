@@ -426,7 +426,17 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
               id="app_name"
               placeholder="e.g., GitHub API"
               value={formData.app_name}
-              onChange={(e) => setFormData({ ...formData, app_name: e.target.value })}
+              onChange={(e) => {
+                const name = e.target.value;
+                setFormData({
+                  ...formData,
+                  app_name: name,
+                  // Auto-populate description if it's empty or was previously auto-generated
+                  description: !formData.description || formData.description.endsWith(' feature')
+                    ? `${name} feature`
+                    : formData.description
+                });
+              }}
               onBlur={generateTag}
               className="mt-2"
             />

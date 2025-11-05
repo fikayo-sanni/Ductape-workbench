@@ -291,7 +291,17 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   id="name"
                   placeholder="e.g., API Health Check"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setFormData({
+                      ...formData,
+                      name,
+                      // Auto-populate description if it's empty or was previously auto-generated
+                      description: !formData.description || formData.description.endsWith(' healthcheck')
+                        ? `${name} healthcheck`
+                        : formData.description
+                    });
+                  }}
                   className="mt-2"
                   autoFocus
                 />

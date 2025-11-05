@@ -16,11 +16,14 @@ import {
 import { Settings2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import productServices from '@/services/productServices';
 
 interface UpdateProductEnvironmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productTag: string;
+  productId?: string;
   environment: any;
   onSuccess?: () => void;
 }
@@ -29,11 +32,13 @@ export default function UpdateProductEnvironmentModal({
   open,
   onOpenChange,
   productTag,
+  productId,
   environment,
   onSuccess,
 }: UpdateProductEnvironmentModalProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
+  const { tabs, updateTab } = useWorkbenchStore();
 
   const [formData, setFormData] = useState({
     env_name: '',
@@ -97,14 +102,54 @@ export default function UpdateProductEnvironmentModal({
         description: data.description,
         active: data.active,
       };
-
-      console.dir(ductape);
-
       await ductape.environments.update(environment.slug, payload);
       return payload;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Fetch updated product data
+      if (productId && user?._id && user?.public_key && currentWorkspaceId) {
+        try {
+          const productResponse = await productServices.fetchProduct({
+            product_id: productId,
+            user_id: user._id,
+            public_key: user.public_key,
+            workspace_id: currentWorkspaceId,
+          });
+
+          if (productResponse?.data) {
+            const updatedProduct = productResponse.data;
+            
+            // Update all tabs that use this product
+            tabs.forEach((tab) => {
+              if (
+                tab.type === 'product' &&
+                (tab.data?._id === productId || tab.data?.tag === productTag || tab.itemId === productId)
+              ) {
+                updateTab(tab.id, {
+                  data: updatedProduct,
+                });
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch updated product:', error);
+          // Continue even if fetch fails - queries will still be invalidated
+        }
+      }
+
+      // Invalidate products list query with workspaceId
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      // Invalidate product-specific queries by tag
       queryClient.invalidateQueries({ queryKey: ['product', productTag] });
+      // Invalidate product-specific queries by ID if provided
+      if (productId) {
+        queryClient.invalidateQueries({ queryKey: ['product', productId] });
+        queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId, productId] });
+        queryClient.invalidateQueries({ queryKey: ['product-apps', productId] });
+      }
+      // Invalidate all product-related queries to ensure complete refresh
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      
       toast.success('Environment updated successfully!');
       onSuccess?.();
       onOpenChange(false);
@@ -127,7 +172,6 @@ export default function UpdateProductEnvironmentModal({
       toast.error('Slug must be exactly 3 letters');
       return;
     }
-
     updateEnvironment(formData);
   };
 

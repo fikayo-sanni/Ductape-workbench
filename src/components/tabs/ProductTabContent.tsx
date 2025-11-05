@@ -579,6 +579,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
         productTag={product.tag}
+        productId={product._id}
         environment={selectedEnvironment}
         onSuccess={() => {
           setSelectedEnvironment(null);
