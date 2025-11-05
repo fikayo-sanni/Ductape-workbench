@@ -17,7 +17,8 @@ export const connectDuctape = ({
     throw new Error('Missing required configuration for Ductape initialization');
   }
 
-  const ductape = new Ductape({ workspace_id, user_id, env_type });
+  console.log(env_type);
+  const ductape = new Ductape({ workspace_id, user_id });
   ductape.setPublicKey(public_key);
   ductape.setToken(token);
 
