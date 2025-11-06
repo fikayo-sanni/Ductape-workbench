@@ -2125,31 +2125,38 @@ console.log('Feature result:', result);`;
                                     }))
                                 ];
 
-                                return allVariables.map((variable, index) => (
+                                return allVariables.map((variable, index) => {
+                                  const currentMapping = dataMappings[component.id]?.[variable.key];
+                                  const hasValueSource = currentMapping?.source;
+
+                                  return (
                                   <div key={index} className="space-y-3">
-                                    <div className="flex gap-2 items-end p-3 bg-white rounded-lg border border-grey-200 overflow-x-auto">
-                                      <div className="flex-shrink-0 min-w-[200px]">
-                                        <label className="text-xs text-grey font-medium">Variable</label>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium text-grey">{variable.key}</span>
-                                          {variable.type === 'action' && (
-                                            <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
-                                              {variable.source}
-                                            </span>
-                                          )}
-                                          {variable.required && (
-                                            <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded">
-                                              Required
-                                            </span>
-                                          )}
-                                        </div>
-                                        {variable.description && (
-                                          <p className="text-xs text-grey-600 mt-1">{variable.description}</p>
+                                    {/* Variable Name Header */}
+                                    <div className="p-4 bg-white rounded-lg border border-grey-200">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <h3 className="text-base font-semibold text-grey-800">{variable.key}</h3>
+                                        {variable.type === 'action' && (
+                                          <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                            {variable.source}
+                                          </span>
+                                        )}
+                                        {variable.required && (
+                                          <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded">
+                                            Required
+                                          </span>
                                         )}
                                       </div>
 
-                                      <div className="flex-shrink-0 min-w-[200px]">
-                                        <label className="text-xs text-grey font-medium">Value Source</label>
+                                      {/* Variable Description */}
+                                      {variable.description && (
+                                        <p className="text-sm text-grey-600 mb-4">{variable.description}</p>
+                                      )}
+
+                                      {/* Progressive Disclosure: Fields */}
+                                      <div className="space-y-3">
+                                        {/* Step 1: Value Source */}
+                                        <div>
+                                          <label className="text-sm text-grey-800 font-medium mb-1 block">Value Source</label>
                                         <Select
                                           value={dataMappings[component.id]?.[variable.key]?.source || ''}
                                           onValueChange={(value) => {
@@ -2218,10 +2225,12 @@ console.log('Feature result:', result);`;
                                             )}
                                           </SelectContent>
                                         </Select>
-            </div>
+                                        </div>
 
-                                      <div className="flex-shrink-0 min-w-[200px]">
-                                        <label className="text-xs text-grey font-medium">Value</label>
+                                        {/* Step 2: Value (Progressive Disclosure - only show if source is selected) */}
+                                        {hasValueSource && (
+                                        <div>
+                                          <label className="text-sm text-grey-800 font-medium mb-1 block">Value</label>
                                         {dataMappings[component.id]?.[variable.key]?.source === 'input' ? (
                                           <Select
                                             value={dataMappings[component.id]?.[variable.key]?.inputField || ''}
@@ -2259,7 +2268,7 @@ console.log('Feature result:', result);`;
                                               }
                                             }}
                                           >
-                                            <SelectTrigger className="h-8">
+                                            <SelectTrigger>
                                               <SelectValue placeholder="Select feature input" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -2289,20 +2298,19 @@ console.log('Feature result:', result);`;
                                               }));
                                             }}
                                             placeholder="Enter hardcoded value"
-                                            className="h-8"
                                           />
                                         ) : dataMappings[component.id]?.[variable.key]?.source === 'default' ? (
-                                          <div className="flex items-center h-8 px-3 bg-grey-100 border border-grey-300 rounded text-sm text-grey-600">
+                                          <div className="flex items-center px-3 py-2 bg-grey-100 border border-grey-300 rounded text-sm text-grey-600">
                                             {variable.defaultValue}
                                             <span className="ml-2 text-xs text-grey-500">(Default Value)</span>
                                           </div>
                                         ) : dataMappings[component.id]?.[variable.key]?.source === 'data' ? (
-                                          <div className="flex items-center h-8 px-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                                          <div className="flex items-center px-3 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
                                             <span className="font-medium">Database Data Field</span>
                                             <span className="ml-2 text-xs text-blue-500">({variable.key})</span>
                                           </div>
                                         ) : dataMappings[component.id]?.[variable.key]?.source === 'filterData' ? (
-                                          <div className="flex items-center h-8 px-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                                          <div className="flex items-center px-3 py-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
                                             <span className="font-medium">Database Filter Field</span>
                                             <span className="ml-2 text-xs text-green-500">({variable.key})</span>
                                           </div>
@@ -2322,13 +2330,15 @@ console.log('Feature result:', result);`;
                                               }));
                                             }}
                                             placeholder={`e.g., $${dataMappings[component.id]?.[variable.key]?.source?.charAt(0).toUpperCase() + dataMappings[component.id]?.[variable.key]?.source?.slice(1)}{${variable.key}}`}
-                                            className="h-8"
                                           />
+                                        )}
+                                        </div>
                                         )}
                                       </div>
                                     </div>
                                   </div>
-                                ));
+                                  );
+                                });
                               })()}
 
                               {(() => {

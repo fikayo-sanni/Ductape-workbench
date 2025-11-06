@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useDuctape } from '@/hooks/useDuctape';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,10 +15,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, Save, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw } from 'lucide-react';
+import { Send, Save, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, Wand2, Copy, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import appServicesReal from '@/services/appServicesReal';
+import { DataFormats, DataTypes } from '@ductape/sdk/dist/types/enums';
 
 interface RequestBuilderProps {
   tabId: string;
@@ -33,6 +35,12 @@ interface KeyValue {
   value: string;
   description?: string;
   enabled: boolean;
+  metadata?: {
+    minLength?: number;
+    maxLength?: number;
+    required?: boolean;
+    type?: string; // DataTypes enum value
+  };
 }
 
 interface ICustomEnv {
@@ -42,9 +50,48 @@ interface ICustomEnv {
   active: boolean;
 }
 
+// Helper function to syntax highlight JSON
+const syntaxHighlightJSON = (jsonString: string) => {
+  try {
+    const obj = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    const formatted = JSON.stringify(obj, null, 2);
+
+    return formatted.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      (match) => {
+        let cls = 'text-purple-600'; // numbers
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'text-blue-600 font-semibold'; // keys
+          } else {
+            cls = 'text-green-700'; // string values
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'text-orange-600'; // boolean
+        } else if (/null/.test(match)) {
+          cls = 'text-red-600'; // null
+        }
+        return `<span class="${cls}">${match}</span>`;
+      }
+    );
+  } catch (e) {
+    return jsonString; // Return as-is if not valid JSON
+  }
+};
+
 export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
-  const { user } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
   const { updateTab } = useWorkbenchStore();
+
+  // Initialize Ductape SDK
+  const ductape = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'app',
+  }) as any;
+
 
   // Form state matching IAppAction interface
   const [formData, setFormData] = useState({
@@ -52,7 +99,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     tag: '',
     description: '',
     method: 'GET',
-    request_type: 'JSON',
+    request_type: DataFormats.JSON,
   });
 
   const [fullUrl, setFullUrl] = useState('');
@@ -64,15 +111,30 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     { key: 'Content-Type', value: 'application/json', enabled: true }
   ]);
   const [body, setBody] = useState('');
+  const [formDataFields, setFormDataFields] = useState<KeyValue[]>([]);
   const [response, setResponse] = useState<any>(null);
   const [isLoadingRequest, setIsLoadingRequest] = useState(false);
   const [activeTab, setActiveTab] = useState('query');
 
   // Custom envs that will be saved with the action (ICustomEnv[])
   const [customEnvs, setCustomEnvs] = useState<ICustomEnv[]>([]);
-  
+
   // State to track which CustomEnv is being updated for highlighting
   const [updatingEnvSlugs, setUpdatingEnvSlugs] = useState<Set<string>>(new Set());
+
+  // State for metadata editing - tracks which field in which category is being edited
+  const [editingMetadata, setEditingMetadata] = useState<{
+    category: 'params' | 'query' | 'headers' | 'body' | null;
+    index: number | null;
+  }>({ category: null, index: null });
+
+  // State for body field metadata (for JSON bodies)
+  const [bodyFieldsMetadata, setBodyFieldsMetadata] = useState<Record<string, {
+    minLength?: number;
+    maxLength?: number;
+    required?: boolean;
+    type?: string;
+  }>>({});
 
   // Fetch app data to get environments from latest version
   const { data: appData } = useQuery({
@@ -90,6 +152,9 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   // Get envs from latest version
   const latestVersion = app?.versions?.find((v: any) => v.latest === true);
   const environments = latestVersion?.envs || [];
+
+
+  ductape.init(app?.tag);
 
   // Auto-generate tag from name
   useEffect(() => {
@@ -137,12 +202,29 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
         setResource(extractedResource);
 
         // Extract query parameters
-        const extractedParams: KeyValue[] = [];
+        const extractedQueryParams: KeyValue[] = [];
         url.searchParams.forEach((value, key) => {
-          extractedParams.push({ key, value, enabled: true });
+          extractedQueryParams.push({ key, value, enabled: true });
         });
-        if (extractedParams.length > 0) {
-          setQuery(extractedParams);
+        if (extractedQueryParams.length > 0) {
+          setQuery(extractedQueryParams);
+        }
+
+        // Extract path parameters (e.g., /users/:id or /users/{{id}})
+        const extractedPathParams: KeyValue[] = [];
+        const pathSegments = extractedResource.split('/').filter(Boolean);
+        pathSegments.forEach(segment => {
+          // Match :param or {{param}} patterns
+          if (segment.startsWith(':')) {
+            const paramName = segment.substring(1);
+            extractedPathParams.push({ key: paramName, value: '', enabled: true });
+          } else if (segment.startsWith('{{') && segment.endsWith('}}')) {
+            const paramName = segment.substring(2, segment.length - 2);
+            extractedPathParams.push({ key: paramName, value: '', enabled: true });
+          }
+        });
+        if (extractedPathParams.length > 0) {
+          setParams(extractedPathParams);
         }
       } catch (e) {
         // Invalid URL, ignore
@@ -249,6 +331,27 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     }
   };
 
+  const formatJSON = () => {
+    try {
+      const parsed = JSON.parse(body);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setBody(formatted);
+      toast.success('JSON formatted successfully');
+    } catch (e) {
+      toast.error('Invalid JSON - cannot format');
+    }
+  };
+
+  const copyResponseToClipboard = () => {
+    try {
+      const jsonString = JSON.stringify(response.data || response, null, 2);
+      navigator.clipboard.writeText(jsonString);
+      toast.success('Response copied to clipboard');
+    } catch (e) {
+      toast.error('Failed to copy response');
+    }
+  };
+
   const addKeyValue = (
     setter: React.Dispatch<React.SetStateAction<KeyValue[]>>
   ) => {
@@ -275,6 +378,224 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
+  const updateMetadata = (
+    index: number,
+    metadataField: 'minLength' | 'maxLength' | 'required' | 'type',
+    value: any,
+    setter: React.Dispatch<React.SetStateAction<KeyValue[]>>
+  ) => {
+    setter(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        metadata: {
+          ...updated[index].metadata,
+          [metadataField]: value
+        }
+      };
+      return updated;
+    });
+  };
+
+  // Extract all field paths from a JSON object (including nested)
+  const extractJsonPaths = (obj: any, prefix = ''): string[] => {
+    const paths: string[] = [];
+
+    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+      Object.keys(obj).forEach(key => {
+        const path = prefix ? `${prefix}.${key}` : key;
+        paths.push(path);
+
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+          paths.push(...extractJsonPaths(obj[key], path));
+        }
+      });
+    }
+
+    return paths;
+  };
+
+  // Update body field metadata
+  const updateBodyFieldMetadata = (
+    fieldPath: string,
+    metadataField: 'minLength' | 'maxLength' | 'required' | 'type',
+    value: any
+  ) => {
+    setBodyFieldsMetadata(prev => ({
+      ...prev,
+      [fieldPath]: {
+        ...prev[fieldPath],
+        [metadataField]: value
+      }
+    }));
+  };
+
+  // Render metadata editing panel
+  const renderMetadataPanel = (
+    item: KeyValue,
+    index: number,
+    category: 'params' | 'query' | 'headers' | 'body',
+    setter: React.Dispatch<React.SetStateAction<KeyValue[]>>
+  ) => {
+    const isEditing = editingMetadata.category === category && editingMetadata.index === index;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Button
+            onClick={() => setEditingMetadata(isEditing ? { category: null, index: null } : { category, index })}
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+          >
+            <Settings className="h-3 w-3 mr-1" />
+            {isEditing ? 'Hide' : 'Metadata'}
+          </Button>
+        </div>
+
+        {isEditing && (
+          <div className="p-3 bg-grey-50 rounded border border-grey-300 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-grey-600 mb-1">Min Length</Label>
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={item.metadata?.minLength || ''}
+                  onChange={(e) => updateMetadata(index, 'minLength', e.target.value ? parseInt(e.target.value) : undefined, setter)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-grey-600 mb-1">Max Length</Label>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={item.metadata?.maxLength || ''}
+                  onChange={(e) => updateMetadata(index, 'maxLength', e.target.value ? parseInt(e.target.value) : undefined, setter)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs text-grey-600 mb-1">Type</Label>
+              <Select
+                value={item.metadata?.type || ''}
+                onValueChange={(value) => updateMetadata(index, 'type', value, setter)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(DataTypes).map(type => (
+                    <SelectItem key={type} value={type} className="text-xs">
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={`required-${category}-${index}`}
+                checked={item.metadata?.required || false}
+                onChange={(e) => updateMetadata(index, 'required', e.target.checked, setter)}
+                className="w-4 h-4 rounded border-grey-400"
+              />
+              <Label htmlFor={`required-${category}-${index}`} className="text-xs text-grey-700 cursor-pointer">
+                Required
+              </Label>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render body field metadata panel
+  const renderBodyFieldMetadata = (fieldPath: string) => {
+    const isEditing = editingMetadata.category === 'body' && editingMetadata.index?.toString() === fieldPath;
+    const metadata = bodyFieldsMetadata[fieldPath];
+
+    return (
+      <div className="space-y-2 ml-4">
+        <div className="flex items-center justify-between">
+          <Button
+            onClick={() => setEditingMetadata(isEditing ? { category: null, index: null } : { category: 'body', index: fieldPath as any })}
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+          >
+            <Settings className="h-3 w-3 mr-1" />
+            {isEditing ? 'Hide' : 'Metadata'}
+          </Button>
+        </div>
+
+        {isEditing && (
+          <div className="p-3 bg-grey-50 rounded border border-grey-300 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-grey-600 mb-1">Min Length</Label>
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={metadata?.minLength || ''}
+                  onChange={(e) => updateBodyFieldMetadata(fieldPath, 'minLength', e.target.value ? parseInt(e.target.value) : undefined)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-grey-600 mb-1">Max Length</Label>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={metadata?.maxLength || ''}
+                  onChange={(e) => updateBodyFieldMetadata(fieldPath, 'maxLength', e.target.value ? parseInt(e.target.value) : undefined)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs text-grey-600 mb-1">Type</Label>
+              <Select
+                value={metadata?.type || ''}
+                onValueChange={(value) => updateBodyFieldMetadata(fieldPath, 'type', value)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(DataTypes).map(type => (
+                    <SelectItem key={type} value={type} className="text-xs">
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={`required-body-${fieldPath}`}
+                checked={metadata?.required || false}
+                onChange={(e) => updateBodyFieldMetadata(fieldPath, 'required', e.target.checked)}
+                className="w-4 h-4 rounded border-grey-400"
+              />
+              <Label htmlFor={`required-body-${fieldPath}`} className="text-xs text-grey-700 cursor-pointer">
+                Required
+              </Label>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleTest = async () => {
     if (!fullUrl) {
       toast.error('Please enter a URL');
@@ -283,11 +604,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
     setIsLoadingRequest(true);
     try {
-      const url = new URL(fullUrl);
-
-      // Add query params
+      // Prepare query params
+      const queryParams: Record<string, string> = {};
       query.filter(q => q.enabled && q.key).forEach(q => {
-        url.searchParams.set(q.key, q.value);
+        queryParams[q.key] = q.value;
       });
 
       // Prepare headers
@@ -296,26 +616,79 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
         requestHeaders[h.key] = h.value;
       });
 
-      const options: RequestInit = {
-        method: formData.method,
-        headers: requestHeaders,
-      };
-
-      if (['POST', 'PUT', 'PATCH'].includes(formData.method) && body) {
-        options.body = body;
-      }
-
-      const res = await fetch(url.toString(), options);
-      const responseData = await res.json();
-
-      setResponse({
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        data: responseData,
+      // Prepare params (path parameters)
+      const pathParams: Record<string, string> = {};
+      params.filter(p => p.enabled && p.key).forEach(p => {
+        pathParams[p.key] = p.value;
       });
 
-      toast.success('Request completed');
+      // Parse body based on request type
+      let parsedBody: any;
+      if (['POST', 'PUT', 'PATCH'].includes(formData.method)) {
+        if (formData.request_type === DataFormats.FORMDATA) {
+          // Convert form data fields to object
+          parsedBody = {};
+          formDataFields.filter(f => f.enabled && f.key).forEach(f => {
+            parsedBody[f.key] = f.value;
+          });
+        } else if (formData.request_type === DataFormats.JSON && body) {
+          try {
+            parsedBody = JSON.parse(body);
+          } catch {
+            parsedBody = body; // Keep as string if not valid JSON
+          }
+        } else if (body) {
+          parsedBody = body; // XML or other text formats
+        }
+      }
+
+      // Call backend proxy
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
+      const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
+
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.auth_token}`,
+          'x-user-id': user?._id || '',
+          'x-workspace-id': '',
+        },
+        body: JSON.stringify({
+          url: fullUrl,
+          method: formData.method,
+          headers: requestHeaders,
+          query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+          params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
+          body: parsedBody,
+        }),
+      });
+
+      const responseData = await res.json();
+
+      // Extract metadata and actual response data
+      const { _meta, data: actualData } = responseData;
+
+      if (res.ok) {
+        setResponse({
+          status: _meta?.status || res.status,
+          statusText: _meta?.statusText || res.statusText,
+          headers: _meta?.headers || {},
+          data: actualData, // The actual API response (can be array or object)
+        });
+        toast.success('Request completed');
+      } else {
+        // Handle error response
+        setResponse({
+          status: _meta?.status || res.status,
+          statusText: _meta?.statusText || res.statusText,
+          headers: _meta?.headers || {},
+          data: actualData, // The actual API error response
+          error: _meta?.error || 'Request failed',
+        });
+        toast.error(_meta?.error || 'Request failed');
+      }
+
       setActiveTab('response'); // Auto-switch to response tab
     } catch (error: any) {
       toast.error(`Request failed: ${error.message}`);
@@ -334,7 +707,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       return;
     }
 
-    // Build IAppAction object with all fields including envs (ICustomEnv[])
+    // Build IAppAction object with all fields including envs (ICustomEnv[]) and metadata
     const actionData = {
       name: formData.name,
       tag: formData.tag,
@@ -345,22 +718,49 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       params: params.length > 0 ? {
         type: 'PARAMS',
         sample: params.reduce((acc, p) => ({ ...acc, [p.key]: p.value }), {}),
-        data: params.map(p => ({ key: p.key, value: p.value, enabled: p.enabled }))
+        data: params.map(p => ({
+          key: p.key,
+          value: p.value,
+          enabled: p.enabled,
+          ...(p.metadata && Object.keys(p.metadata).length > 0 ? { metadata: p.metadata } : {})
+        }))
       } : undefined,
       query: query.length > 0 ? {
         type: 'QUERY',
         sample: query.reduce((acc, q) => ({ ...acc, [q.key]: q.value }), {}),
-        data: query.map(q => ({ key: q.key, value: q.value, enabled: q.enabled }))
+        data: query.map(q => ({
+          key: q.key,
+          value: q.value,
+          enabled: q.enabled,
+          ...(q.metadata && Object.keys(q.metadata).length > 0 ? { metadata: q.metadata } : {})
+        }))
       } : undefined,
       headers: headers.length > 0 ? {
         type: 'HEADERS',
         sample: headers.reduce((acc, h) => ({ ...acc, [h.key]: h.value }), {}),
-        data: headers.map(h => ({ key: h.key, value: h.value, enabled: h.enabled }))
+        data: headers.map(h => ({
+          key: h.key,
+          value: h.value,
+          enabled: h.enabled,
+          ...(h.metadata && Object.keys(h.metadata).length > 0 ? { metadata: h.metadata } : {})
+        }))
       } : undefined,
-      body: body ? {
+      body: body || formDataFields.length > 0 ? {
         type: 'BODY',
-        sample: formData.request_type === 'JSON' ? JSON.parse(body) : body,
-        data: []
+        sample: formData.request_type === DataFormats.JSON
+          ? JSON.parse(body)
+          : formData.request_type === DataFormats.FORMDATA
+          ? formDataFields.reduce((acc, f) => ({ ...acc, [f.key]: f.value }), {})
+          : body,
+        data: formData.request_type === DataFormats.FORMDATA
+          ? formDataFields.map(f => ({
+              key: f.key,
+              value: f.value,
+              enabled: f.enabled,
+              ...(f.metadata && Object.keys(f.metadata).length > 0 ? { metadata: f.metadata } : {})
+            }))
+          : [],
+        ...(formData.request_type === DataFormats.JSON && Object.keys(bodyFieldsMetadata).length > 0 ? { fieldsMetadata: bodyFieldsMetadata } : {})
       } : undefined,
       envs: customEnvs, // ICustomEnv[]
       responses: response ? [{
@@ -378,9 +778,28 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
     console.log('Action data to save:', actionData);
 
-    // TODO: Implement app.actions.update SDK method
-    toast.success('Request saved');
-    updateTab(tabId, { isDirty: false });
+    // Validate ductape is initialized
+    if (!ductape) {
+      toast.error('SDK not initialized. Please check your credentials.');
+      return;
+    }
+
+    try {
+      const result = await ductape.actions.create({
+        app_id: data?.appId || '',
+        ...actionData,
+      });
+
+      if (result.success) {
+        toast.success('Action created successfully');
+        updateTab(tabId, { isDirty: false });
+      } else {
+        toast.error(result.message || 'Failed to create action');
+      }
+    } catch (error: any) {
+      console.error('Error creating action:', error);
+      toast.error(error.message || 'Failed to create action');
+    }
   };
 
   const getMethodColor = (method: string) => {
@@ -640,8 +1059,8 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
       {/* Right Panel - Request/Response */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="border-b border-grey-400 bg-white px-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <div className="border-b border-grey-400 bg-white px-6 flex-shrink-0">
             <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto">
               <TabsTrigger
                 value="query"
@@ -679,8 +1098,8 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-auto">
-            <TabsContent value="query" className="p-6 space-y-4 m-0">
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <TabsContent value="query" className="p-6 space-y-4 m-0 overflow-auto">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <Hash className="h-4 w-4 text-primary" />
@@ -698,39 +1117,42 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   </p>
                 ) : (
                   query.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <input
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
-                        className="w-4 h-4 rounded border-grey-400"
-                      />
-                      <Input
-                        placeholder="Key"
-                        value={item.key}
-                        onChange={(e) => updateKeyValue(index, 'key', e.target.value, setQuery)}
-                        className="flex-1 h-9"
-                      />
-                      <Input
-                        placeholder="Value"
-                        value={item.value}
-                        onChange={(e) => updateKeyValue(index, 'value', e.target.value, setQuery)}
-                        className="flex-1 h-9"
-                      />
-                      <Button
-                        onClick={() => removeKeyValue(index, setQuery)}
-                        variant="ghost"
-                        size="sm"
-                      >
-                        <Trash2 className="h-4 w-4 text-red" />
-                      </Button>
+                    <div key={index} className="p-3 bg-grey-100 rounded border border-grey-400 space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
+                          className="w-4 h-4 rounded border-grey-400"
+                        />
+                        <Input
+                          placeholder="Key"
+                          value={item.key}
+                          onChange={(e) => updateKeyValue(index, 'key', e.target.value, setQuery)}
+                          className="flex-1 h-9"
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={item.value}
+                          onChange={(e) => updateKeyValue(index, 'value', e.target.value, setQuery)}
+                          className="flex-1 h-9"
+                        />
+                        <Button
+                          onClick={() => removeKeyValue(index, setQuery)}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                      {renderMetadataPanel(item, index, 'query', setQuery)}
                     </div>
                   ))
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="params" className="p-6 space-y-4 m-0">
+            <TabsContent value="params" className="p-6 space-y-4 m-0 overflow-auto">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <Hash className="h-4 w-4 text-primary" />
@@ -748,39 +1170,42 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   </p>
                 ) : (
                   params.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <input
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
-                        className="w-4 h-4 rounded border-grey-400"
-                      />
-                      <Input
-                        placeholder="Key"
-                        value={item.key}
-                        onChange={(e) => updateKeyValue(index, 'key', e.target.value, setParams)}
-                        className="flex-1 h-9"
-                      />
-                      <Input
-                        placeholder="Value"
-                        value={item.value}
-                        onChange={(e) => updateKeyValue(index, 'value', e.target.value, setParams)}
-                        className="flex-1 h-9"
-                      />
-                      <Button
-                        onClick={() => removeKeyValue(index, setParams)}
-                        variant="ghost"
-                        size="sm"
-                      >
-                        <Trash2 className="h-4 w-4 text-red" />
-                      </Button>
+                    <div key={index} className="p-3 bg-grey-100 rounded border border-grey-400 space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
+                          className="w-4 h-4 rounded border-grey-400"
+                        />
+                        <Input
+                          placeholder="Key"
+                          value={item.key}
+                          onChange={(e) => updateKeyValue(index, 'key', e.target.value, setParams)}
+                          className="flex-1 h-9"
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={item.value}
+                          onChange={(e) => updateKeyValue(index, 'value', e.target.value, setParams)}
+                          className="flex-1 h-9"
+                        />
+                        <Button
+                          onClick={() => removeKeyValue(index, setParams)}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 text-red" />
+                        </Button>
+                      </div>
+                      {renderMetadataPanel(item, index, 'params', setParams)}
                     </div>
                   ))
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="headers" className="p-6 space-y-4 m-0">
+            <TabsContent value="headers" className="p-6 space-y-4 m-0 overflow-auto">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold text-grey flex items-center gap-2">
                   <FileCode className="h-4 w-4 text-primary" />
@@ -793,68 +1218,168 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               </div>
               <div className="space-y-2">
                 {headers.map((item, index) => (
-                  <div key={index} className="flex gap-2 items-center p-2 bg-grey-100 rounded border border-grey-400">
-                    <input
-                      type="checkbox"
-                      checked={item.enabled}
-                      onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
-                      className="w-4 h-4 rounded border-grey-400"
-                    />
-                    <Input
-                      placeholder="Header"
-                      value={item.key}
-                      onChange={(e) => updateKeyValue(index, 'key', e.target.value, setHeaders)}
-                      className="flex-1 h-9"
-                    />
-                    <Input
-                      placeholder="Value"
-                      value={item.value}
-                      onChange={(e) => updateKeyValue(index, 'value', e.target.value, setHeaders)}
-                      className="flex-1 h-9"
-                    />
-                    <Button
-                      onClick={() => removeKeyValue(index, setHeaders)}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <Trash2 className="h-4 w-4 text-red" />
-                    </Button>
+                  <div key={index} className="p-3 bg-grey-100 rounded border border-grey-400 space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="checkbox"
+                        checked={item.enabled}
+                        onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
+                        className="w-4 h-4 rounded border-grey-400"
+                      />
+                      <Input
+                        placeholder="Header"
+                        value={item.key}
+                        onChange={(e) => updateKeyValue(index, 'key', e.target.value, setHeaders)}
+                        className="flex-1 h-9"
+                      />
+                      <Input
+                        placeholder="Value"
+                        value={item.value}
+                        onChange={(e) => updateKeyValue(index, 'value', e.target.value, setHeaders)}
+                        className="flex-1 h-9"
+                      />
+                      <Button
+                        onClick={() => removeKeyValue(index, setHeaders)}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        <Trash2 className="h-4 w-4 text-red" />
+                      </Button>
+                    </div>
+                    {renderMetadataPanel(item, index, 'headers', setHeaders)}
                   </div>
                 ))}
               </div>
             </TabsContent>
 
             {['POST', 'PUT', 'PATCH'].includes(formData.method) && (
-              <TabsContent value="body" className="p-6 space-y-4 m-0">
+              <TabsContent value="body" className="p-6 space-y-4 m-0 overflow-auto">
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-semibold text-grey flex items-center gap-2">
                     <Code className="h-4 w-4 text-primary" />
                     Request Body
                   </Label>
-                  <Select
-                    value={formData.request_type}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, request_type: value }))}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="JSON">JSON</SelectItem>
-                      <SelectItem value="XML">XML</SelectItem>
-                      <SelectItem value="FORM">Form Data</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    {formData.request_type === DataFormats.JSON && body && (
+                      <Button
+                        onClick={formatJSON}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <Wand2 className="h-4 w-4" />
+                        Format JSON
+                      </Button>
+                    )}
+                    <Select
+                      value={formData.request_type}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, request_type: value as DataFormats }))}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={DataFormats.JSON}>JSON</SelectItem>
+                        <SelectItem value={DataFormats.SOAP}>XML</SelectItem>
+                        <SelectItem value={DataFormats.FORMDATA}>Form Data</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Textarea
-                  placeholder={formData.request_type === 'JSON' ? '{\n  "key": "value"\n}' : 'Request body'}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="font-mono text-sm min-h-[400px] resize-none"
-                />
+
+                {/* JSON/XML Textarea */}
+                {(formData.request_type === DataFormats.JSON || formData.request_type === DataFormats.SOAP) && (
+                  <>
+                    <Textarea
+                      placeholder={formData.request_type === DataFormats.JSON ? '{\n  "key": "value"\n}' : '<xml>\n  <key>value</key>\n</xml>'}
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      className="font-mono text-sm min-h-[300px] resize-none"
+                    />
+
+                    {/* JSON Field Metadata - only show for valid JSON */}
+                    {formData.request_type === DataFormats.JSON && body && (() => {
+                      try {
+                        const parsed = JSON.parse(body);
+                        const fieldPaths = extractJsonPaths(parsed);
+
+                        if (fieldPaths.length > 0) {
+                          return (
+                            <div className="space-y-2 mt-4">
+                              <Label className="text-sm font-semibold text-grey-700">Field Metadata</Label>
+                              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                {fieldPaths.map((path) => (
+                                  <div key={path} className="p-3 bg-grey-100 rounded border border-grey-400">
+                                    <div className="flex items-center justify-between">
+                                      <code className="text-sm font-mono text-grey-800">{path}</code>
+                                    </div>
+                                    {renderBodyFieldMetadata(path)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                      } catch (e) {
+                        // Invalid JSON, don't show field metadata
+                      }
+                      return null;
+                    })()}
+                  </>
+                )}
+
+                {/* Form Data - similar to query/params inputs */}
+                {formData.request_type === DataFormats.FORMDATA && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      {formDataFields.map((item, index) => (
+                        <div key={index} className="p-3 bg-grey-100 rounded border border-grey-400 space-y-2">
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setFormDataFields)}
+                              className="w-4 h-4 rounded border-grey-400"
+                            />
+                            <Input
+                              placeholder="Key"
+                              value={item.key}
+                              onChange={(e) => updateKeyValue(index, 'key', e.target.value, setFormDataFields)}
+                              className="flex-1 h-9"
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={item.value}
+                              onChange={(e) => updateKeyValue(index, 'value', e.target.value, setFormDataFields)}
+                              className="flex-1 h-9"
+                            />
+                            <Button
+                              onClick={() => removeKeyValue(index, setFormDataFields)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Trash2 className="h-4 w-4 text-red" />
+                            </Button>
+                          </div>
+                          {renderMetadataPanel(item, index, 'body', setFormDataFields)}
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={() => addKeyValue(setFormDataFields)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Form Field
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
             )}
 
-            <TabsContent value="response" className="p-6 space-y-4 m-0 h-full">
+            <TabsContent value="response" className="m-0 h-full flex flex-col overflow-hidden">
               {!response ? (
                 <div className="flex items-center justify-center h-full text-grey-600">
                   <div className="text-center">
@@ -863,9 +1388,9 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4 h-full flex flex-col">
+                <div className="h-full flex flex-col overflow-hidden">
                   {response.status && (
-                    <div className="flex items-center gap-2 p-3 bg-grey-100 rounded-lg border border-grey-400">
+                    <div className="flex-shrink-0 flex items-center gap-2 p-3 mx-6 mt-6 bg-grey-100 rounded-lg border border-grey-400">
                       <span className="text-sm font-medium text-grey-600">Status:</span>
                       <span className={cn(
                         'px-3 py-1 rounded text-xs font-bold',
@@ -877,15 +1402,30 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                       </span>
                     </div>
                   )}
-                  <div className="flex-1 flex flex-col min-h-0">
-                    <Label className="text-sm font-medium text-grey-600 mb-2">Response Body</Label>
-                    <div className="flex-1 bg-white rounded-lg border border-grey-400 p-4 overflow-auto font-mono text-sm">
-                      <pre className="text-grey-800" style={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}>
-                        {JSON.stringify(response.data || response, null, 2)}
-                      </pre>
+                  <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4">
+                    <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                      <Label className="text-sm font-medium text-grey-600">Response Body</Label>
+                      <Button
+                        onClick={copyResponseToClipboard}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </Button>
+                    </div>
+                    <div className="flex-1 bg-white rounded-lg border border-grey-400 p-4 overflow-auto font-mono text-sm min-h-0">
+                      <pre
+                        className="text-grey-800"
+                        style={{
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'
+                        }}
+                        dangerouslySetInnerHTML={{
+                          __html: syntaxHighlightJSON(response.data || response)
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -896,7 +1436,11 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
         {/* Save Button */}
         <div className="border-t border-grey-400 bg-white p-4 flex justify-end">
-          <Button onClick={handleSave} className="bg-primary text-white hover:bg-primary/90">
+          <Button
+            onClick={handleSave}
+            className="bg-primary text-white hover:bg-primary/90"
+            disabled={!response || (response.status && (response.status < 200 || response.status >= 300))}
+          >
             <Save className="h-4 w-4 mr-2" />
             Save Request
           </Button>
