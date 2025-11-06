@@ -873,34 +873,34 @@ const ductape = new Ductape(credentials);`;
           // Handle nested objects and arrays
           if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
             const nestedEntries = Object.entries(value).map(([nestedKey, nestedValue]) =>
-              `      ${nestedKey}: ${typeof nestedValue === 'string' ? `'${nestedValue}'` : JSON.stringify(nestedValue)}`
+              `            ${nestedKey}: ${typeof nestedValue === 'string' ? `'${nestedValue}'` : JSON.stringify(nestedValue)}`
             ).join(',\n');
-            return `    ${key}: {\n${nestedEntries}\n    }`;
+            return `          ${key}: {\n${nestedEntries}\n          }`;
           } else if (Array.isArray(value)) {
-            return `    ${key}: ${JSON.stringify(value)}`;
+            return `          ${key}: ${JSON.stringify(value)}`;
           } else {
-            return `    ${key}: ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}`;
+            return `          ${key}: ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}`;
           }
         }).join(',\n');
 
         const cacheConfig = state.componentCache[componentId] ?
-          `,\n    cache: '${state.componentCache[componentId]}'` : '';
+          `,\n        cache: '${state.componentCache[componentId]}'` : '';
 
         const condition = state.eventConditions[componentId];
         const checkExpression = buildCheckExpression(condition);
-        const conditionConfig = condition && condition.type && checkExpression ? `,\n    condition: {\n      type: Conditions.${condition.type.toUpperCase()},\n      check: '${checkExpression}'${condition.iter !== undefined ? `,\n      iter: ${condition.iter}` : ''}${condition.init !== undefined ? `,\n      init: ${condition.init}` : ''}\n    }` : '';
+        const conditionConfig = condition && condition.type && checkExpression ? `,\n        condition: {\n          type: Conditions.${condition.type.toUpperCase()},\n          check: '${checkExpression}'${condition.iter !== undefined ? `,\n          iter: ${condition.iter}` : ''}${condition.init !== undefined ? `,\n          init: ${condition.init}` : ''}\n        }` : '';
 
         const eventTag = component.app ? `${component.app}:${component.tag}` : component.tag;
 
-        return `  {
-    type: FeatureEventTypes.${component.type},
-    event: '${eventTag}',
-    input: {
+        return `      {
+        type: FeatureEventTypes.${component.type},
+        event: '${eventTag}',
+        input: {
 ${inputEntries}
-    },
-    retries: 2,
-    allow_fail: false${cacheConfig}${conditionConfig}
-  }`;
+        },
+        retries: 2,
+        allow_fail: false${cacheConfig}${conditionConfig}
+      }`;
       }).filter(Boolean);
 
       // Auto-detect parent sequences
