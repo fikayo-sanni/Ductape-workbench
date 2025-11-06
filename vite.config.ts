@@ -10,6 +10,8 @@ export default defineConfig({
       buffer: "buffer", // 👈 add this line
       ioredis: path.resolve(__dirname, "./empty-module-file.js"), // 👈 alias for ioredis
       bullmq: path.resolve(__dirname, "./empty-module-file.js"), // 👈 alias for bullmq
+      "ajv/dist/core": path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress ajv
+      "ajv-draft-04": path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress ajv-draft-04
     },
   },
   define: {
@@ -17,7 +19,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["buffer"], // 👈 ensures Vite optimizes it properly
-    exclude: ['bullmq'],
+    exclude: ['bullmq', 'ajv', 'ajv-draft-04'],
   },
   ssr: {
     external: ['bullmq'],
