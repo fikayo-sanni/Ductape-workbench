@@ -3,6 +3,10 @@ set -e
 
 echo "Installing dependencies for Vercel..."
 
+# Clean npm cache to avoid cached problematic dependencies
+echo "Clearing npm cache..."
+npm cache clean --force
+
 # Remove node-expat from package-lock if it exists
 if [ -f "package-lock.json" ]; then
   echo "Cleaning package-lock.json..."
