@@ -346,7 +346,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   className="w-full h-full rounded-lg object-cover"
                 />
               ) : (
-                getInitials(currentApp?.app_name)
+                getInitials(String(currentApp?.app_name))
               )}
             </div>
 
@@ -662,8 +662,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
           setShowCreateConstantModal(open);
           if (!open) setEditingConstant(null);
         }}
-        appTag={currentApp?.tag}
-        appId={currentApp?._id}
+        appTag={String(currentApp?.tag)}
+        appId={String(currentApp?._id)}
         constant={editingConstant}
       />
 

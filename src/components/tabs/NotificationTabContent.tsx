@@ -55,6 +55,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
         
         console.dir(ductape)
         // Fetch all notifications for the product
+        // @ts-ignore
         const notification = await ductape.notifications.fetch(notifier?.tag);
 
         console.log(notification)

@@ -93,6 +93,7 @@ export default function MarketplaceTabContent() {
     }
 
     try {
+      console.log(isLoadingAppDetails);
       setIsLoadingAppDetails(true);
 
       // Fetch full app data using the app's tag

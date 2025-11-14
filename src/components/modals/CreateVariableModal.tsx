@@ -142,7 +142,7 @@ export default function CreateVariableModal({
       // Fetch fresh app data and update the tab
       try {
         const response = await appServices.fetchApp({
-          app_id: appId,
+          app_id: String(appId),
           user_id: user?._id || '',
           public_key: user?.public_key || '',
         });
@@ -193,7 +193,7 @@ export default function CreateVariableModal({
       // Fetch fresh app data and update the tab
       try {
         const response = await appServices.fetchApp({
-          app_id: appId,
+          app_id: String(appId),
           user_id: user?._id || '',
           public_key: user?.public_key || '',
         });

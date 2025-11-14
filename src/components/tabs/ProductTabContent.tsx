@@ -37,7 +37,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
   const [activeFilter, setActiveFilter] = useState<string>(initialActiveSection);
 
   // Check if product data is incomplete (missing integrations, envs, name, etc.)
-  const isProductDataIncomplete = initialProduct && (!initialProduct.integrations || initialProduct.integrations.length === 0 || !initialProduct.name);
+  const isProductDataIncomplete = initialProduct && (!initialProduct.envs || initialProduct.envs.length === 0 || !initialProduct.name);
 
   // Fetch product data if not provided or incomplete (when restored from localStorage)
   const { data: fetchedProductData, isLoading: isFetchingProduct } = useQuery({
@@ -273,7 +273,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                   className="w-full h-full rounded-lg object-cover"
                 />
               ) : (
-                getInitials(product?.name)
+                getInitials(String(product?.name))
               )}
             </div>
 
@@ -693,15 +693,15 @@ export default function ProductTabContent({ product: initialProduct, productId }
       <CreateEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
-        productTag={product?.tag}
-        productId={product?._id}
+        productTag={String(product?.tag)}
+        productId={String(product?._id)}
       />
 
       {/* Update Environment Modal */}
       <UpdateProductEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
-        productTag={product?.tag}
+        productTag={String(product?.tag)}
         productId={product?._id}
         environment={selectedEnvironment}
         onSuccess={() => {

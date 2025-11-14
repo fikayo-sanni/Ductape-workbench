@@ -481,7 +481,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                    selectedType === JobEventTypes.NOTIFICATION ? 'Notification' :
                    selectedType === JobEventTypes.PUBLISH ? 'Message Broker' :
                    selectedType === JobEventTypes.STORAGE ? 'Storage' :
-                   selectedType === 'FEATURE' ? 'Feature' : 'Parent'}
+                   selectedType === JobEventTypes.FEATURE ? 'Feature' : 'Parent'}
                 </Label>
                 <Select
                   value={formData.parent}
@@ -497,7 +497,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                       selectedType === JobEventTypes.NOTIFICATION ? 'Select notification' :
                       selectedType === JobEventTypes.PUBLISH ? 'Select message broker' :
                       selectedType === JobEventTypes.STORAGE ? 'Select storage' :
-                      selectedType === 'FEATURE' ? 'Select feature' : 'Select parent component'
+                      selectedType === JobEventTypes.FEATURE ? 'Select feature' : 'Select parent component'
                     } />
                   </SelectTrigger>
                   <SelectContent>
@@ -514,7 +514,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                    selectedType === JobEventTypes.NOTIFICATION ? 'Select the notification to trigger' :
                    selectedType === JobEventTypes.PUBLISH ? 'Select the message broker' :
                    selectedType === JobEventTypes.STORAGE ? 'Select the storage to monitor' :
-                   selectedType === 'FEATURE' ? 'Select the feature to execute' : 'The parent component for this event'}
+                   selectedType === JobEventTypes.FEATURE ? 'Select the feature to execute' : 'The parent component for this event'}
                 </p>
               </div>
             )}

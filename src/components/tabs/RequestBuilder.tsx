@@ -110,6 +110,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   // Load initial state from localStorage
   const getInitialState = () => {
     try {
+      console.log(updateTab);
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         return JSON.parse(saved);
@@ -214,7 +215,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "")
         .slice(0, 50);
-      setFormData((prev) => ({ ...prev, tag }));
+      setFormData((prev: any) => ({ ...prev, tag }));
     }
   }, [formData.name]);
 
@@ -900,7 +901,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   };
 
   // Helper function to detect response format
-  const detectResponseFormat = (data: any): InputsTypes => {
+  /*const detectResponseFormat = (data: any): InputsTypes => {
     if (!data) return InputsTypes.TEXT;
 
     // Check content type from headers if available
@@ -954,7 +955,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     }
 
     return InputsTypes.TEXT;
-  };
+  };*/
 
   const handleSave = async () => {
     if (!formData.name) {
@@ -1114,7 +1115,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
       console.log("Full action payload:", actionPayload);
 
-      const result = await ductape.actions.create(actionPayload);
+      await ductape.actions.create(actionPayload);
 
       toast.success("Action created successfully");
 
@@ -1229,7 +1230,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               placeholder="Description (optional)"
               value={formData.description}
               onChange={(e) =>
-                setFormData((prev) => ({
+                setFormData((prev: any) => ({
                   ...prev,
                   description: e.target.value,
                 }))
@@ -1317,7 +1318,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               <Select
                 value={formData.method}
                 onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, method: value }))
+                  setFormData((prev: any) => ({ ...prev, method: value }))
                 }
               >
                 <SelectTrigger className="w-28">
@@ -1774,7 +1775,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                     <Select
                       value={formData.request_type}
                       onValueChange={(value) =>
-                        setFormData((prev) => ({
+                        setFormData((prev: any) => ({
                           ...prev,
                           request_type: value as DataFormats,
                         }))
