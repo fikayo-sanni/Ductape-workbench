@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,14 +8,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Loader,
   CheckCircle,
 } from 'lucide-react';
-import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useIntegration } from '@/context/integration-context';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/store/useAuth';
+import productServices from '@/services/productServices';
 import StepOne from './StepOne';
 import StepTwo from './StepTwo';
+import StepThree from './StepThree';
+import StepFour from './StepFour';
 
 interface MarketplaceApp {
   _id: string;
@@ -25,6 +26,7 @@ interface MarketplaceApp {
   domain_name: string;
   description?: string;
   logo?: string;
+  tag?: string;
   versions?: Array<{
     _id: string;
     version: string;
@@ -41,68 +43,88 @@ interface AppIntegrationModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export default function AppIntegrationModal({ 
-  app, 
-  open, 
-  onOpenChange 
+export default function AppIntegrationModal({
+  app,
+  open,
+  onOpenChange
 }: AppIntegrationModalProps) {
-  const { user } = useAuth();
   const { openTab } = useWorkbenchStore();
   const { data: integrationData, resetIntegration } = useIntegration();
-  
-  const [integrationStep, setIntegrationStep] = useState<'step1' | 'step2' | 'importing' | 'success'>('step1');
+  const queryClient = useQueryClient();
+  const { user, currentWorkspaceId } = useAuth();
 
+  const [integrationStep, setIntegrationStep] = useState<number>(1);
+  const [appDetails, setAppDetails] = useState<any>(null);
 
+  const handleStepComplete = () => {
+    // Skip step 3 if app has no variables
+    const latestVersion = appDetails?.versions?.find((v: any) => v.latest);
+    const hasVariables = latestVersion?.variables && latestVersion.variables.length > 0;
 
-  // Integration mutation
-  const { mutate: integrateApp } = useMutation({
-    mutationFn: async () => {
-      if (!app || !integrationData?.productTag || !user?._id || !user?.public_key) {
-        throw new Error('Missing required data for integration');
+    if (integrationStep === 2 && !hasVariables) {
+      // Skip step 3 (variables) and go directly to step 4 (auth)
+      setIntegrationStep(4);
+    } else if (integrationStep < 4) {
+      setIntegrationStep(integrationStep + 1);
+    }
+  };
+
+  const handleStepBack = () => {
+    // Skip step 3 backwards if app has no variables
+    const latestVersion = appDetails?.versions?.find((v: any) => v.latest);
+    const hasVariables = latestVersion?.variables && latestVersion.variables.length > 0;
+
+    if (integrationStep === 4 && !hasVariables) {
+      // Skip step 3 (variables) and go back to step 2 (environments)
+      setIntegrationStep(2);
+    } else if (integrationStep > 1) {
+      setIntegrationStep(integrationStep - 1);
+    }
+  };
+
+  const handleFinish = async () => {
+    setIntegrationStep(5); // success step
+
+    // Invalidate product queries to refresh data
+    await queryClient.invalidateQueries({ queryKey: ['products'] });
+
+    // Open the product tab if we have the product tag
+    if (integrationData?.productTag && user?._id && currentWorkspaceId) {
+      try {
+        // Fetch fresh products data
+        const productsData = await productServices.fetchProducts({
+          workspace_id: currentWorkspaceId,
+          user_id: user._id,
+          public_key: user.public_key || '',
+          status: 'all',
+        });
+
+        // Find the product by tag
+        const product = productsData?.data?.find((p: any) => p.tag === integrationData.productTag);
+
+        if (product) {
+          // Invalidate specific product query
+          await queryClient.invalidateQueries({ queryKey: ['product', product._id] });
+
+          // Open the product tab
+          openTab({
+            id: `product-${product._id}`,
+            type: 'product',
+            title: product.name,
+            itemId: product._id,
+            data: product,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch product:', error);
       }
-
-      // Simulate integration process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      return {
-        success: true,
-        productTag: integrationData.productTag,
-        appId: app._id,
-      };
-    },
-    onSuccess: () => {
-      toast.success('App integrated successfully!');
-      setIntegrationStep('success');
-      
-      // Open the marketplace tab to show success
-      openTab({
-        id: `marketplace-${Date.now()}`,
-        type: 'marketplace',
-        title: 'Marketplace',
-      });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to integrate app');
-      setIntegrationStep('step1');
-    },
-  });
-
-  const handleStepOneComplete = () => {
-    setIntegrationStep('step2');
-  };
-
-  const handleStepTwoComplete = () => {
-    setIntegrationStep('importing');
-    integrateApp();
-  };
-
-  const handleBackToStepOne = () => {
-    setIntegrationStep('step1');
+    }
   };
 
   const handleClose = () => {
     onOpenChange(false);
-    setIntegrationStep('step1');
+    setIntegrationStep(1);
+    setAppDetails(null);
     resetIntegration();
   };
 
@@ -134,8 +156,8 @@ export default function AppIntegrationModal({
               )}
             </div>
             <div>
-              <DialogTitle>Integrate {app.app_name}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="dark:text-white">Integrate {app.app_name}</DialogTitle>
+              <DialogDescription className="dark:text-gray-300">
                 Add this app to your product and start using its features
               </DialogDescription>
             </div>
@@ -143,42 +165,47 @@ export default function AppIntegrationModal({
         </DialogHeader>
 
         <div className="py-6">
-          {integrationStep === 'step1' && (
+          {integrationStep === 1 && (
             <StepOne
-              goToNextStep={handleStepOneComplete}
+              goToNextStep={handleStepComplete}
               app={app}
+              setAppDetails={setAppDetails}
             />
           )}
 
-          {integrationStep === 'step2' && (
+          {integrationStep === 2 && appDetails && (
             <StepTwo
-              goToNextStep={handleStepTwoComplete}
-              goToPreviousStep={handleBackToStepOne}
-              app={app}
+              goToNextStep={handleStepComplete}
+              goToPreviousStep={handleStepBack}
+              app={appDetails}
             />
           )}
 
-          {integrationStep === 'importing' && (
-            <div className="text-center py-12">
-              <Loader className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
-              <h3 className="text-lg font-semibold text-grey mb-2">
-                Integrating App
-              </h3>
-              <p className="text-grey-600">
-                Please wait while we integrate {app.app_name} into your product...
-              </p>
-            </div>
+          {integrationStep === 3 && appDetails && (
+            <StepThree
+              goToNextStep={handleStepComplete}
+              goToPreviousStep={handleStepBack}
+              app={appDetails}
+            />
           )}
 
-          {integrationStep === 'success' && (
+          {integrationStep === 4 && appDetails && (
+            <StepFour
+              goToPreviousStep={handleStepBack}
+              handleFinish={handleFinish}
+              app={appDetails}
+            />
+          )}
+
+          {integrationStep === 5 && (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto rounded-full bg-green/10 flex items-center justify-center mb-4">
                 <CheckCircle className="h-8 w-8 text-green" />
               </div>
-              <h3 className="text-lg font-semibold text-grey mb-2">
+              <h3 className="text-lg font-semibold text-grey dark:text-white mb-2">
                 Integration Successful!
               </h3>
-              <p className="text-grey-600 mb-6">
+              <p className="text-grey-600 dark:text-gray-300 mb-6">
                 {app.app_name} has been successfully integrated into your product.
               </p>
               <Button onClick={handleClose} className="w-full">

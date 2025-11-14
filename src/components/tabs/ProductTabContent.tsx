@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IProduct } from '@/types/product';
 import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,94 +15,73 @@ import appServicesReal from '@/services/appServicesReal';
 import toast from 'react-hot-toast';
 
 interface ProductTabContentProps {
-  product: IProduct;
+  product?: IProduct;
+  productId?: string;
 }
 
-export default function ProductTabContent({ product }: ProductTabContentProps) {
-  const { openTab } = useWorkbenchStore();
+export default function ProductTabContent({ product: initialProduct, productId }: ProductTabContentProps) {
+  const { openTab, updateTab, activeTabId, tabs } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+
+  // Get initialization data from active tab if product is undefined (after refresh)
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const initialActiveSection = (activeTab?.data as any)?.activeSection || 'overview';
+
   const [showAddAppModal, setShowAddAppModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
   const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
   const [selectedEnvironment, setSelectedEnvironment] = useState<any>(null);
   const [loadingAppTag, setLoadingAppTag] = useState<string | null>(null);
 
-  // Content filter state
-  const [activeFilter, setActiveFilter] = useState<string>('overview');
+  // Content filter state - initialize from persisted data
+  const [activeFilter, setActiveFilter] = useState<string>(initialActiveSection);
 
-  // Fetch connected apps
+  // Check if product data is incomplete (missing integrations, envs, name, etc.)
+  const isProductDataIncomplete = initialProduct && (!initialProduct.integrations || initialProduct.integrations.length === 0 || !initialProduct.name);
+
+  // Fetch product data if not provided or incomplete (when restored from localStorage)
+  const { data: fetchedProductData, isLoading: isFetchingProduct } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: async () => {
+      if (!productId || !user?._id || !user?.public_key || !currentWorkspaceId) return null;
+
+      const response = await productServices.fetchProduct({
+        product_id: productId,
+        user_id: user._id,
+        public_key: user.public_key,
+        workspace_id: currentWorkspaceId,
+      });
+      return response.data;
+    },
+    enabled: (!initialProduct || isProductDataIncomplete) && !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
+  });
+
+  // Use fetched data if available (it's more complete), otherwise use initial product
+  const product = fetchedProductData || initialProduct;
+
+  // Fetch connected apps (must be before early return)
   const { data: productAppsRes, status: productAppsStatus } = useQuery({
-    queryKey: ['product-apps', product._id],
+    queryKey: ['product-apps', product?._id],
     queryFn: () =>
       productServices.fetchProductApps({
         user_id: user?._id || '',
         public_key: user?.public_key || '',
         workspace_id: currentWorkspaceId || '',
-        product_id: product._id,
+        product_id: product!._id,
       }),
-    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product._id,
+    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
   });
 
   const connectedApps = productAppsRes?.data || [];
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const handleOpenComponent = (component: any, type: string) => {
-    openTab({
-      id: `${type}-${component._id}-${Date.now()}`,
-      type: type as any,
-      title: component.name || component.tag || `${type}`,
-      itemId: component._id,
-      data: { ...component, componentType: type, productName: product.name, productTag: product.tag, productLogo: product.logo },
-    });
-  };
-
-  const handleAddComponent = (type: string) => {
-    // Show modal for environment creation instead of opening a tab
-    if (type === 'environment') {
-      setShowCreateEnvModal(true);
-      return;
+  // Update tab with fetched data
+  useEffect(() => {
+    if (fetchedProductData && activeTabId && !initialProduct) {
+      updateTab(activeTabId, { data: fetchedProductData });
     }
+  }, [fetchedProductData, activeTabId, initialProduct, updateTab]);
 
-    // Open a new tab for creating other components
-    openTab({
-      id: `new-${type}-${Date.now()}`,
-      type: type as any,
-      title: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-      data: {
-        componentType: type,
-        productName: product.name,
-        productId: product._id,
-        productTag: product.tag,
-        productLogo: product.logo,
-        productEnvs: product.envs || [],
-        workspaceId: currentWorkspaceId,
-        // Additional data for jobs (parent/event selection)
-        productApps: connectedApps || [],
-        productDatabases: product.databases || [],
-        productMessageBroker: product.messageBroker || [],
-        productNotifications: product.notifications || [],
-        productStorage: product.storage || [],
-        productSessions: product.sessions || [],
-        isNew: true
-      },
-      isDirty: true, // Mark as dirty to trigger new component forms
-    });
-  };
-
-  const handleEditEnvironment = (env: any) => {
-    setSelectedEnvironment(env);
-    setShowUpdateEnvModal(true);
-  };
-
-  // Mutation to fetch full app data by tag
+  // Mutation to fetch full app data by tag (MUST be before early return)
   const { mutate: fetchFullApp } = useMutation({
     mutationFn: (params: { tag: string; user_id: string; public_key: string }) =>
       appServicesReal.fetchAppByTag(params),
@@ -124,6 +103,150 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
     },
   });
 
+  // Debug logging
+  useEffect(() => {
+    console.log('ProductTabContent Debug:', {
+      productId,
+      hasInitialProduct: !!initialProduct,
+      hasFetchedProductData: !!fetchedProductData,
+      hasProduct: !!product,
+      productName: product?.name,
+      isFetchingProduct,
+      isProductDataIncomplete,
+      userId: user?._id,
+      publicKey: user?.public_key,
+      currentWorkspaceId,
+    });
+  }, [productId, initialProduct, fetchedProductData, product, isFetchingProduct, isProductDataIncomplete, user, currentWorkspaceId]);
+
+  // Show skeleton loading state while fetching product data or when data is incomplete (after all hooks)
+  // Only show skeleton if we're loading AND don't have product yet, OR if product exists but name is missing
+  if ((isFetchingProduct && !product) || (product && !product.name)) {
+    return (
+      <div className="bg-grey-100">
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
+          {/* Header Skeleton */}
+          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 bg-grey-300 rounded-lg animate-pulse" />
+              <div className="flex-1 space-y-3">
+                <div className="h-8 w-56 bg-grey-300 rounded animate-pulse" />
+                <div className="h-4 w-40 bg-grey-300 rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Navigation Skeleton */}
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 bg-grey-300 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-grey-300 rounded animate-pulse" />
+              <div className="flex gap-2 flex-wrap">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-9 w-32 bg-grey-300 rounded animate-pulse" />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Content Cards Skeleton */}
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-grey-300 rounded animate-pulse" />
+                    <div className="h-6 w-32 bg-grey-300 rounded animate-pulse" />
+                  </div>
+                  <div className="h-9 w-20 bg-grey-300 rounded animate-pulse" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="p-4 rounded-lg border border-grey-400">
+                      <div className="h-5 w-3/4 bg-grey-300 rounded animate-pulse mb-2" />
+                      <div className="h-4 w-1/2 bg-grey-300 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if product couldn't be loaded
+  if (!product && !isFetchingProduct) {
+    return (
+      <div className="flex items-center justify-center h-full bg-grey-100">
+        <div className="text-center">
+          <p className="text-red text-lg mb-2">Failed to load product</p>
+          <p className="text-grey-600">The product data could not be retrieved.</p>
+          {productId && (
+            <p className="text-grey-500 text-sm mt-2">Product ID: {productId}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const getInitials = (name: string) => {
+    return name?.split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleOpenComponent = (component: any, type: string) => {
+    openTab({
+      id: `${type}-${component._id}-${Date.now()}`,
+      type: type as any,
+      title: component.name || component.tag || `${type}`,
+      itemId: component._id,
+      data: { ...component, componentType: type, productName: product?.name, productTag: product?.tag, productLogo: product?.logo },
+    });
+  };
+
+  const handleAddComponent = (type: string) => {
+    // Show modal for environment creation instead of opening a tab
+    if (type === 'environment') {
+      setShowCreateEnvModal(true);
+      return;
+    }
+
+    // Open a new tab for creating other components
+    openTab({
+      id: `new-${type}-${Date.now()}`,
+      type: type as any,
+      title: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+      data: {
+        componentType: type,
+        productName: product?.name,
+        productId: product?._id,
+        productTag: product?.tag,
+        productLogo: product?.logo,
+        productEnvs: product?.envs || [],
+        workspaceId: currentWorkspaceId,
+        // Additional data for jobs (parent/event selection)
+        productApps: connectedApps || [],
+        productDatabases: product?.databases || [],
+        productMessageBroker: product?.messageBroker || [],
+        productNotifications: product?.notifications || [],
+        productStorage: product?.storage || [],
+        productSessions: product?.sessions || [],
+        isNew: true
+      },
+      isDirty: true, // Mark as dirty to trigger new component forms
+    });
+  };
+
+  const handleEditEnvironment = (env: any) => {
+    setSelectedEnvironment(env);
+    setShowUpdateEnvModal(true);
+  };
+
   const handleOpenApp = (app: any) => {
     setLoadingAppTag(app.tag || app.app_tag);
 
@@ -143,32 +266,32 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           <div className="flex items-start gap-4">
             {/* Logo */}
             <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
-              {product.logo ? (
+              {product?.logo ? (
                 <img
-                  src={product.logo}
-                  alt={product.name}
+                  src={product?.logo}
+                  alt={product?.name}
                   className="w-full h-full rounded-lg object-cover"
                 />
               ) : (
-                getInitials(product.name)
+                getInitials(product?.name)
               )}
             </div>
 
             {/* Product Info */}
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-grey">{product.name}</h1>
+                <h1 className="text-2xl font-bold text-grey">{product?.name}</h1>
                 <span className={cn(
                   'px-3 py-1 rounded-full text-xs font-medium',
-                  product.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
+                  product?.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
                 )}>
-                  {product.status}
+                  {product?.status}
                 </span>
               </div>
-              <p className="text-sm text-grey-600 mb-3">{product.tag}</p>
-              {product.description && (
+              <p className="text-sm text-grey-600 mb-3">{product?.tag}</p>
+              {product?.description && (
                 <div className="text-grey-600">
-                  <MarkdownViewer content={product.description} />
+                  <MarkdownViewer content={product?.description} />
                 </div>
               )}
             </div>
@@ -206,7 +329,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Settings2 className="h-4 w-4" />
-                Environments ({product.envs?.length || 0})
+                Environments ({product?.envs?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'databases' ? 'default' : 'outline'}
@@ -215,7 +338,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Database className="h-4 w-4" />
-                Databases ({product.databases?.length || 0})
+                Databases ({product?.databases?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'storage' ? 'default' : 'outline'}
@@ -224,7 +347,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <HardDrive className="h-4 w-4" />
-                Storage ({product.storage?.length || 0})
+                Storage ({product?.storage?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'caches' ? 'default' : 'outline'}
@@ -233,7 +356,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Activity className="h-4 w-4" />
-                Caches ({product.caches?.length || 0})
+                Caches ({product?.caches?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'messageBrokers' ? 'default' : 'outline'}
@@ -242,7 +365,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <MessageSquare className="h-4 w-4" />
-                Message Brokers ({product.messageBroker?.length || 0})
+                Message Brokers ({product?.messageBroker?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'jobs' ? 'default' : 'outline'}
@@ -251,7 +374,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Box className="h-4 w-4" />
-                Jobs ({product.jobs?.length || 0})
+                Jobs ({product?.jobs?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'features' ? 'default' : 'outline'}
@@ -260,7 +383,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Workflow className="h-4 w-4" />
-                Features ({product.features?.length || 0})
+                Features ({product?.features?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'fallbacks' ? 'default' : 'outline'}
@@ -269,7 +392,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Shield className="h-4 w-4" />
-                Fallbacks ({product.fallback?.length || 0})
+                Fallbacks ({product?.fallback?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'quotas' ? 'default' : 'outline'}
@@ -278,7 +401,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Timer className="h-4 w-4" />
-                Quotas ({product.quota?.length || 0})
+                Quotas ({product?.quota?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'healthchecks' ? 'default' : 'outline'}
@@ -287,7 +410,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Heart className="h-4 w-4" />
-                Health Checks ({product.healthchecks?.length || 0})
+                Health Checks ({product?.healthchecks?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'notifications' ? 'default' : 'outline'}
@@ -296,7 +419,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <Bell className="h-4 w-4" />
-                Notifiers ({product.notifications?.length || 0})
+                Notifiers ({product?.notifications?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'sessions' ? 'default' : 'outline'}
@@ -305,7 +428,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                 className="gap-2"
               >
                 <KeyRound className="h-4 w-4" />
-                Sessions ({product.sessions?.length || 0})
+                Sessions ({product?.sessions?.length || 0})
               </Button>
             </div>
           </div>
@@ -324,7 +447,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Settings2 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.envs?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.envs?.length || 0}</p>
                   <p className="text-sm text-grey-600">Environments</p>
                 </div>
               </div>
@@ -356,7 +479,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Database className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.databases?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.databases?.length || 0}</p>
                   <p className="text-sm text-grey-600">Databases</p>
                 </div>
               </div>
@@ -372,7 +495,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <HardDrive className="h-5 w-5 text-purple-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.storage?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.storage?.length || 0}</p>
                   <p className="text-sm text-grey-600">Storage</p>
                 </div>
               </div>
@@ -388,7 +511,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Activity className="h-5 w-5 text-orange-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.caches?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.caches?.length || 0}</p>
                   <p className="text-sm text-grey-600">Caches</p>
                 </div>
               </div>
@@ -404,7 +527,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <MessageSquare className="h-5 w-5 text-cyan-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.messageBroker?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.messageBroker?.length || 0}</p>
                   <p className="text-sm text-grey-600">Message Brokers</p>
                 </div>
               </div>
@@ -420,7 +543,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Box className="h-5 w-5 text-indigo-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.jobs?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.jobs?.length || 0}</p>
                   <p className="text-sm text-grey-600">Jobs</p>
                 </div>
               </div>
@@ -436,7 +559,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Workflow className="h-5 w-5 text-pink-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.features?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.features?.length || 0}</p>
                   <p className="text-sm text-grey-600">Features</p>
                 </div>
               </div>
@@ -449,10 +572,10 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-red" />
+                  <Shield className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.fallback?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.fallback?.length || 0}</p>
                   <p className="text-sm text-grey-600">Fallbacks</p>
                 </div>
               </div>
@@ -468,7 +591,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <Timer className="h-5 w-5 text-orange" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.quota?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.quota?.length || 0}</p>
                   <p className="text-sm text-grey-600">Quotas</p>
                 </div>
               </div>
@@ -481,10 +604,10 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Heart className="h-5 w-5 text-red" />
+                  <Heart className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.healthchecks?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.healthchecks?.length || 0}</p>
                   <p className="text-sm text-grey-600">Health Checks</p>
                 </div>
               </div>
@@ -497,10 +620,10 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Bell className="h-5 w-5 text-red" />
+                  <Bell className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.notifications?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.notifications?.length || 0}</p>
                   <p className="text-sm text-grey-600">Notifiers</p>
                 </div>
               </div>
@@ -516,7 +639,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
                   <KeyRound className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product.sessions?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.sessions?.length || 0}</p>
                   <p className="text-sm text-grey-600">Sessions</p>
                 </div>
               </div>
@@ -570,16 +693,16 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
       <CreateEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
-        productTag={product.tag}
-        productId={product._id}
+        productTag={product?.tag}
+        productId={product?._id}
       />
 
       {/* Update Environment Modal */}
       <UpdateProductEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
-        productTag={product.tag}
-        productId={product._id}
+        productTag={product?.tag}
+        productId={product?._id}
         environment={selectedEnvironment}
         onSuccess={() => {
           setSelectedEnvironment(null);
@@ -702,7 +825,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Environments</h2>
-              <span className="text-sm text-grey-600">({product.envs?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.envs?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -715,9 +838,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             </Button>
           </div>
           
-          {product.envs && product.envs.length > 0 ? (
+          {product?.envs && product?.envs.length > 0 ? (
             <div className="space-y-3">
-              {product.envs.map((env) => (
+              {product?.envs.map((env) => (
                 <div
                   key={env._id}
                   className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
@@ -768,7 +891,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Database className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Databases</h2>
-              <span className="text-sm text-grey-600">({product.databases?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.databases?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -780,9 +903,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.databases && product.databases.length > 0 ? (
+          {product?.databases && product?.databases.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.databases.map((db: any) => (
+              {product?.databases.map((db: any) => (
                 <button
                   key={db._id}
                   onClick={() => handleOpenComponent(db, 'database')}
@@ -822,7 +945,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <HardDrive className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Storage</h2>
-              <span className="text-sm text-grey-600">({product.storage?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.storage?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -834,9 +957,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.storage && product.storage.length > 0 ? (
+          {product?.storage && product?.storage.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.storage.map((storage: any) => (
+              {product?.storage.map((storage: any) => (
                 <button
                   key={storage._id}
                   onClick={() => handleOpenComponent(storage, 'storage')}
@@ -876,7 +999,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Caches</h2>
-              <span className="text-sm text-grey-600">({product.caches?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.caches?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -888,9 +1011,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.caches && product.caches.length > 0 ? (
+          {product?.caches && product?.caches.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.caches.map((cache: any) => (
+              {product?.caches.map((cache: any) => (
                 <button
                   key={cache._id}
                   onClick={() => handleOpenComponent(cache, 'cache')}
@@ -928,7 +1051,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Message Brokers</h2>
-              <span className="text-sm text-grey-600">({product.messageBroker?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.messageBroker?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -940,9 +1063,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.messageBroker && product.messageBroker.length > 0 ? (
+          {product?.messageBroker && product?.messageBroker.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.messageBroker.map((broker: any) => (
+              {product?.messageBroker.map((broker: any) => (
                 <button
                   key={broker._id}
                   onClick={() => handleOpenComponent(broker, 'message-broker')}
@@ -982,7 +1105,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Box className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Jobs</h2>
-              <span className="text-sm text-grey-600">({product.jobs?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.jobs?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -994,9 +1117,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.jobs && product.jobs.length > 0 ? (
+          {product?.jobs && product?.jobs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.jobs.map((job: any) => (
+              {product?.jobs.map((job: any) => (
                 <button
                   key={job._id}
                   onClick={() => handleOpenComponent(job, 'job')}
@@ -1036,7 +1159,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Workflow className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Features</h2>
-              <span className="text-sm text-grey-600">({product.features?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.features?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -1048,9 +1171,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.features && product.features.length > 0 ? (
+          {product?.features && product?.features.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.features.map((feature: any) => (
+              {product?.features.map((feature: any) => (
                 <button
                   key={feature._id}
                   onClick={() => handleOpenComponent(feature, 'feature')}
@@ -1095,7 +1218,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Fallbacks</h2>
-              <span className="text-sm text-grey-600">({product.fallback?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.fallback?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -1107,9 +1230,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.fallback && product.fallback.length > 0 ? (
+          {product?.fallback && product?.fallback.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.fallback.map((fallback: any) => (
+              {product?.fallback.map((fallback: any) => (
                 <button
                   key={fallback._id}
                   onClick={() => handleOpenComponent(fallback, 'fallback')}
@@ -1154,7 +1277,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <div className="flex items-center gap-2">
               <Timer className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Quotas</h2>
-              <span className="text-sm text-grey-600">({product.quota?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.quota?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -1166,9 +1289,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product.quota && product.quota.length > 0 ? (
+          {product?.quota && product?.quota.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.quota.map((quota: any) => (
+              {product?.quota.map((quota: any) => (
                 <button
                   key={quota._id}
                   onClick={() => handleOpenComponent(quota, 'quota')}
@@ -1207,12 +1330,12 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
   }
 
   function renderHealthchecksCard() {
-    const healthchecksCount = product.healthchecks?.length || 0;
+    const healthchecksCount = product?.healthchecks?.length || 0;
     return (
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red" />
+            <Heart className="h-5 w-5" />
             <h2 className="text-lg font-semibold text-grey">Health Checks</h2>
             <span className="text-sm text-grey-600">({healthchecksCount})</span>
           </div>
@@ -1227,16 +1350,16 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           </Button>
         </div>
 
-        {product.healthchecks && product.healthchecks.length > 0 ? (
+        {product?.healthchecks && product?.healthchecks.length > 0 ? (
           <div className="space-y-3">
-            {product.healthchecks.map((healthcheck: any) => (
+            {product?.healthchecks.map((healthcheck: any) => (
               <button
                 key={healthcheck._id}
                 onClick={() => handleOpenComponent(healthcheck, 'healthcheck')}
                 className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Heart className="h-4 w-4 text-red" />
+                  <Heart className="h-4 w-4" />
                   <h3 className="text-sm font-medium text-grey">{healthcheck.name}</h3>
                 </div>
                 <p className="text-xs text-grey-600">{healthcheck.tag}</p>
@@ -1260,12 +1383,12 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
   }
 
   function renderNotificationsCard() {
-    const notificationsCount = product.notifications?.length || 0;
+    const notificationsCount = product?.notifications?.length || 0;
     return (
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-red" />
+            <Bell className="h-5 w-5" />
             <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
             <span className="text-sm text-grey-600">({notificationsCount})</span>
           </div>
@@ -1280,16 +1403,16 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           </Button>
         </div>
 
-        {product.notifications && product.notifications.length > 0 ? (
+        {product?.notifications && product?.notifications.length > 0 ? (
           <div className="space-y-3">
-            {product.notifications.map((notification: any) => (
+            {product?.notifications.map((notification: any) => (
               <button
                 key={notification._id}
                 onClick={() => handleOpenComponent(notification, 'notification')}
                 className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Bell className="h-4 w-4 text-red" />
+                  <Bell className="h-4 w-4" />
                   <h3 className="text-sm font-medium text-grey">{notification.name}</h3>
                 </div>
                 <p className="text-xs text-grey-600">{notification.tag}</p>
@@ -1319,7 +1442,7 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
           <div className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-grey-600" />
             <h2 className="text-lg font-semibold text-grey">Sessions</h2>
-            <span className="text-sm text-grey-600">({product.sessions?.length || 0})</span>
+            <span className="text-sm text-grey-600">({product?.sessions?.length || 0})</span>
           </div>
           <Button
             size="sm"
@@ -1331,9 +1454,9 @@ export default function ProductTabContent({ product }: ProductTabContentProps) {
             <span className="hidden sm:inline">Add</span>
           </Button>
         </div>
-        {product.sessions && product.sessions.length > 0 ? (
+        {product?.sessions && product?.sessions.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product.sessions.map((session: any) => (
+            {product?.sessions.map((session: any) => (
               <button
                 key={session._id}
                 onClick={() => handleOpenComponent(session, 'session')}

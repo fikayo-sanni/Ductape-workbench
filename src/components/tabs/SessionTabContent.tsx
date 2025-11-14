@@ -8,8 +8,20 @@ interface SessionTabContentProps {
 }
 
 export default function SessionTabContent({ session }: SessionTabContentProps) {
+  // Early return if session is not provided
+  if (!session) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100 p-6">
+        <div className="text-center text-grey-600 max-w-md">
+          <p className="text-lg mb-2">Session data not available</p>
+          <p className="text-sm">Unable to load session information</p>
+        </div>
+      </div>
+    );
+  }
+
   // Extract product info for header
-  const product = session?.productName && session?.productTag ? {
+  const product = session.productName && session.productTag ? {
     name: session.productName,
     tag: session.productTag,
     logo: session.productLogo,
@@ -70,27 +82,27 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               <KeyRound className="h-6 w-6 text-blue-500" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-grey mb-2">{session.name}</h1>
+              <h1 className="text-2xl font-bold text-grey mb-2">{session?.name}</h1>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm text-grey-600 flex items-center gap-1">
                   <Tag className="h-3 w-3" />
-                  <span className="font-mono">{session.tag}</span>
+                  <span className="font-mono">{session?.tag}</span>
                 </span>
-                {session.expiry !== undefined && session.period && (
+                {session?.expiry !== undefined && session?.period && (
                   <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {formatDuration(session.expiry, session.period)}
+                    {formatDuration(session?.expiry, session?.period)}
                   </span>
                 )}
-                {session.selector && (
+                {session?.selector && (
                   <span className="px-2 py-1 rounded text-xs font-medium bg-grey-100 text-grey-600">
-                    Selector: {session.selector}
+                    Selector: {session?.selector}
                   </span>
                 )}
               </div>
-              {session.description && (
+              {session?.description && (
                 <div className="text-sm text-grey-600">
-                  <MarkdownViewer content={session.description} />
+                  <MarkdownViewer content={session?.description} />
                 </div>
               )}
             </div>
@@ -106,7 +118,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
             <div>
               <Label className="text-sm font-semibold text-grey">Session Name</Label>
               <Input
-                value={session.name || ''}
+                value={session?.name || ''}
                 readOnly
                 className="mt-2"
               />
@@ -116,7 +128,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
             <div>
               <Label className="text-sm font-semibold text-grey">Tag</Label>
               <Input
-                value={session.tag || ''}
+                value={session?.tag || ''}
                 readOnly
                 className="mt-2 font-mono"
               />
@@ -127,7 +139,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               <div>
                 <Label className="text-sm font-semibold text-grey">Expiry Duration</Label>
                 <Input
-                  value={session.expiry || 0}
+                  value={session?.expiry || 0}
                   readOnly
                   className="mt-2"
                 />
@@ -135,21 +147,21 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               <div>
                 <Label className="text-sm font-semibold text-grey">Time Period</Label>
                 <Input
-                  value={session.period || ''}
+                  value={session?.period || ''}
                   readOnly
                   className="mt-2"
                 />
               </div>
             </div>
             <p className="text-xs text-grey-600">
-              Session will expire after {formatDuration(session.expiry || 0, session.period || 'MINUTES')}
+              Session will expire after {formatDuration(session?.expiry || 0, session?.period || 'MINUTES')}
             </p>
 
             {/* Selector */}
             <div>
               <Label className="text-sm font-semibold text-grey">Selector</Label>
               <Input
-                value={session.selector || ''}
+                value={session?.selector || ''}
                 readOnly
                 className="mt-2"
               />
@@ -165,7 +177,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
                 Schema (JSON)
               </Label>
               <textarea
-                value={formatSchema(session.schema || {})}
+                value={formatSchema(session?.schema || {})}
                 readOnly
                 className="mt-2 w-full min-h-[200px] px-3 py-2 text-sm rounded-md border border-grey-400 bg-white resize-none font-mono"
               />
@@ -175,11 +187,11 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
             </div>
 
             {/* Description */}
-            {session.description && (
+            {session?.description && (
               <div>
                 <Label className="text-sm font-semibold text-grey">Description</Label>
                 <div className="mt-2 p-3 rounded-md border border-grey-400 bg-white">
-                  <MarkdownViewer content={session.description} />
+                  <MarkdownViewer content={session?.description} />
                 </div>
               </div>
             )}
@@ -214,7 +226,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               </span>
               <div>
                 <p className="font-semibold text-grey">Session Expiry</p>
-                <p className="text-xs">Sessions automatically expire after {formatDuration(session.expiry || 0, session.period || 'MINUTES')}, requiring re-authentication</p>
+                <p className="text-xs">Sessions automatically expire after {formatDuration(session?.expiry || 0, session?.period || 'MINUTES')}, requiring re-authentication</p>
               </div>
             </div>
           </div>
@@ -257,7 +269,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-grey mb-2">ℹ️ About Sessions</h3>
           <p className="text-xs text-grey-600">
-            Sessions manage user authentication state with configurable expiry periods. The selector field uniquely identifies sessions, while the schema defines what data is stored in each session. Shorter expiry periods provide better security but may require more frequent re-authentication.
+            Sessions manage user authentication state with configurable expiry periods. The selector field uniquely identifies sessions, while the schema defines what data is stored in each session?. Shorter expiry periods provide better security but may require more frequent re-authentication.
           </p>
         </div>
       </div>

@@ -1,7 +1,4 @@
 import { Button } from "@/components/ui/button";
-import {
-  DialogContent,
-} from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -10,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useIntegration } from '@/context/integration-context';
 import { useQuery } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
+import appServicesReal from '@/services/appServicesReal';
 import { useAuth } from '@/store/useAuth';
 import { Loader, ArrowRight, Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useDuctape } from '@/hooks/useDuctape';
 
 const formSchema = z.object({
   product_tag: z.string().min(1, "Product is required"),
@@ -26,11 +25,14 @@ interface StepProps {
   handleFinish?: () => void;
   app?: any;
   productTag?: string | null;
+  setAppDetails?: (app: any) => void;
 }
 
 export default function StepOne({
   goToNextStep,
   productTag,
+  app,
+  setAppDetails,
 }: StepProps) {
   const { user, currentWorkspaceId } = useAuth();
   const { data: integrationData, setProductTag, setAccessTag, resetIntegration } = useIntegration();
@@ -50,6 +52,15 @@ export default function StepOne({
 
   const products = productsData?.data ?? [];
 
+  const productBuilder = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any;
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,16 +74,51 @@ export default function StepOne({
       return;
     }
 
+    if (!productBuilder) {
+      toast.error('Failed to initialize product builder');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      
-      // For now, we'll simulate the product builder connection
-      // In a real implementation, this would use the Ductape SDK
-      const mockAccessTag = `access_${Date.now()}`;
-      
+
+      // Get app tag from the marketplace app
+      const appTag = app?.domain_name || app?.tag;
+      if (!appTag) {
+        throw new Error('App tag not found');
+      }
+
+      // Fetch full app details including versions
+      const appDetails = await appServicesReal.fetchAppByTag({
+        tag: appTag,
+        user_id: user._id,
+        public_key: user.public_key,
+      });
+
+      if (!appDetails?.data) {
+        throw new Error('Failed to fetch app details');
+      }
+
+      // Initialize product builder
+      await productBuilder.init(values.product_tag);
+      console.log('Setting productTag:', values.product_tag);
       setProductTag(values.product_tag);
-      setAccessTag(mockAccessTag);
-      
+
+      // Connect app to product
+      const { access_tag } = await productBuilder.apps.connect(appTag);
+      console.log('Setting accessTag:', access_tag);
+      setAccessTag(access_tag);
+
+      // Store app details with access_tag for next steps
+      const appWithAccess = {
+        ...appDetails.data,
+        access_tag
+      };
+
+      if (setAppDetails) {
+        setAppDetails(appWithAccess);
+      }
+
       goToNextStep();
     } catch (error) {
       console.error('Failed to connect app:', error);
@@ -95,16 +141,15 @@ export default function StepOne({
       // Auto submit if product tag is provided
       form.handleSubmit(onSubmit)();
     }
-  }, [productTag, form, onSubmit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productTag]);
 
   // Early return if required data is missing or still loading
   if (!user?._id || !user?.public_key || !currentWorkspaceId) {
     return (
-      <DialogContent className="px-7 pb-7 pt-4 max-w-[730px] border-b-4 border-b-primary sm:rounded-none">
-        <div className="flex items-center justify-center p-8">
-          <p className="text-grey-600">Missing required configuration</p>
-        </div>
-      </DialogContent>
+      <div className="flex items-center justify-center p-8">
+        <p className="text-grey-600">Missing required configuration</p>
+      </div>
     );
   }
 

@@ -28,7 +28,7 @@ import { DataFormats } from '@ductape/sdk/dist/types';
 interface UpdateAppEnvironmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  appTag: string;
+  appTag?: string;
   environment: any;
   onSuccess?: () => void;
 }

@@ -102,7 +102,7 @@ export default function AppCard({ app, onClick, onIntegrate, viewMode }: AppCard
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                {formatDate(app.created_at)}
+                {formatDate(app.updated_at)}
               </div>
             </div>
           </div>

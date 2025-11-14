@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Mail, Webhook, FileText, Plus, Box, Activity, Loader2, CheckCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { Bell, Mail, Webhook, FileText, Plus, Box, Activity, Loader2, CheckCircle, Eye, EyeOff, Copy, Check, MessageSquare } from 'lucide-react';
 import { IProductNotifier } from '@/types/notifier';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -45,12 +45,27 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
 
   // Fetch notification from SDK
   const { data: notificationData, isLoading } = useQuery({
-    queryKey: ['notification', productTag, notifier?.tag, selectedEnv],
+    queryKey: ['notification', productTag, notifier?.tag],
     queryFn: async () => {
       if (!ductape || !productTag || !notifier?.tag) return null;
-      const productBuilder = ductape as any;
-      await productBuilder.init(productTag);
-      return await productBuilder.notifications?.fetch(notifier.tag);
+      try {
+        // Initialize product context
+        await ductape.init(productTag);
+
+        
+        console.dir(ductape)
+        // Fetch all notifications for the product
+        const notification = await ductape.notifications.fetch(notifier?.tag);
+
+        console.log(notification)
+        // Find the specific notification by tag
+        //const notification = notifications?.find((n: any) => n.tag === notifier.tag);
+
+        return notification || null;
+      } catch (error) {
+        console.error('Error fetching notification:', error);
+        return null;
+      }
     },
     enabled: !!ductape && !!productTag && !!notifier?.tag,
   });
@@ -58,6 +73,16 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
   // Get the notification configuration for the selected environment
   const notificationConfig = notificationData?.envs?.find((env: any) => env.slug === selectedEnv);
   const displayNotifier = notificationData || notifier;
+
+  // Debug logging
+  console.log('NotificationTabContent Debug:', {
+    notifier,
+    notificationData,
+    selectedEnv,
+    notificationConfig,
+    displayNotifier,
+    envs: notificationData?.envs,
+  });
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -392,7 +417,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                     <Badge variant="outline" className="ml-auto">Active</Badge>
                   </div>
                   <div className="space-y-3">
-                    {typeof notificationConfig.emails === 'object' && notificationConfig.emails.auth ? (
+                    {typeof notificationConfig.emails === 'object' ? (
                       <>
                         <div>
                           <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Host</Label>
@@ -410,7 +435,15 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                             className="bg-white text-grey font-mono"
                           />
                         </div>
-                        
+                        <div>
+                          <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Sender Email</Label>
+                          <Input
+                            value={notificationConfig.emails.sender_email || ''}
+                            disabled
+                            className="bg-white text-grey font-mono"
+                          />
+                        </div>
+
                         <div className="flex items-center justify-between border border-grey-300 rounded-lg p-3 bg-grey-50">
                           <div>
                             <Label className="text-xs font-semibold text-grey uppercase tracking-wide block">TLS</Label>
@@ -430,40 +463,114 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                           </div>
                         </div>
 
-                        <div className="border-t border-grey-300 pt-3">
-                          <h3 className="text-sm font-semibold text-grey mb-3">Authentication</h3>
-                          <div className="space-y-3">
-                            <div>
-                              <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">User</Label>
-                              <Input
-                                value={notificationConfig.emails.auth.user || ''}
-                                disabled
-                                className="bg-white text-grey font-mono"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Password</Label>
-                              <div className="flex items-center gap-2">
+                        {notificationConfig.emails.auth && (
+                          <div className="border-t border-grey-300 pt-3">
+                            <h3 className="text-sm font-semibold text-grey mb-3">Authentication</h3>
+                            <div className="space-y-3">
+                              <div>
+                                <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">User</Label>
                                 <Input
-                                  type={showCredentials['email-pass'] ? 'text' : 'password'}
-                                  value={notificationConfig.emails.auth.pass ? '••••••••••••••••' : ''}
+                                  value={notificationConfig.emails.auth.user || ''}
                                   disabled
-                                  className="bg-white text-grey font-mono pr-10"
+                                  className="bg-white text-grey font-mono"
                                 />
-                                <button
-                                  onClick={() => toggleShowCredential('email-pass')}
-                                  className="text-grey-600 hover:text-grey"
-                                >
-                                  {showCredentials['email-pass'] ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </button>
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Password</Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type={showCredentials['email-pass'] ? 'text' : 'password'}
+                                    value={notificationConfig.emails.auth.pass ? '••••••••••••••••' : ''}
+                                    disabled
+                                    className="bg-white text-grey font-mono pr-10"
+                                  />
+                                  <button
+                                    onClick={() => toggleShowCredential('email-pass')}
+                                    className="text-grey-600 hover:text-grey"
+                                  >
+                                    {showCredentials['email-pass'] ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* SMS */}
+              {notificationConfig.sms && (
+                <div className="border border-grey-300 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                      <MessageSquare className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="font-medium text-grey">SMS</span>
+                    <Badge variant="outline" className="ml-auto">Active</Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {typeof notificationConfig.sms === 'object' ? (
+                      <>
+                        {notificationConfig.sms.provider && (
+                          <div>
+                            <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Provider</Label>
+                            <Input
+                              value={notificationConfig.sms.provider.charAt(0).toUpperCase() + notificationConfig.sms.provider.slice(1)}
+                              disabled
+                              className="bg-white text-grey font-mono"
+                            />
+                          </div>
+                        )}
+                        {notificationConfig.sms.accountSid && (
+                          <div>
+                            <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Account SID / Auth ID</Label>
+                            <Input
+                              value={notificationConfig.sms.accountSid}
+                              disabled
+                              className="bg-white text-grey font-mono"
+                            />
+                          </div>
+                        )}
+                        {notificationConfig.sms.authToken && (
+                          <div>
+                            <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Auth Token</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type={showCredentials['sms-token'] ? 'text' : 'password'}
+                                value={notificationConfig.sms.authToken ? '••••••••••••••••' : ''}
+                                disabled
+                                className="bg-white text-grey font-mono pr-10"
+                              />
+                              <button
+                                onClick={() => toggleShowCredential('sms-token')}
+                                className="text-grey-600 hover:text-grey"
+                              >
+                                {showCredentials['sms-token'] ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {notificationConfig.sms.sender && (
+                          <div>
+                            <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Sender Phone Number</Label>
+                            <Input
+                              value={notificationConfig.sms.sender}
+                              disabled
+                              className="bg-white text-grey font-mono"
+                            />
+                          </div>
+                        )}
                       </>
                     ) : null}
                   </div>
@@ -503,27 +610,40 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                             />
                           </div>
                         )}
-                        {notificationConfig.callbacks.headers && Object.keys(notificationConfig.callbacks.headers).length > 0 && (
+                        {notificationConfig.callbacks.headers && typeof notificationConfig.callbacks.headers === 'object' && Object.keys(notificationConfig.callbacks.headers).length > 0 && (
                           <div>
                             <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-2 block">Headers</Label>
                             <div className="bg-grey-50 border border-grey-300 rounded-lg p-3 space-y-2">
-                              {Object.entries(notificationConfig.callbacks.headers).map(([key, value]) => (
-                                <div key={key} className="flex items-center gap-2 text-sm">
-                                  <span className="font-medium text-grey w-24">{key}:</span>
-                                  <span className="text-grey-600 font-mono flex-1">{String(value)}</span>
+                              {Object.entries(notificationConfig.callbacks.headers).map(([key, value], idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <span className="font-medium text-grey w-32">{key}:</span>
+                                  <span className="text-grey-600 font-mono flex-1">{value as string}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
-                        {notificationConfig.callbacks.query && Object.keys(notificationConfig.callbacks.query).length > 0 && (
+                        {notificationConfig.callbacks.query && typeof notificationConfig.callbacks.query === 'object' && Object.keys(notificationConfig.callbacks.query).length > 0 && (
                           <div>
                             <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-2 block">Query Parameters</Label>
                             <div className="bg-grey-50 border border-grey-300 rounded-lg p-3 space-y-2">
-                              {Object.entries(notificationConfig.callbacks.query).map(([key, value]) => (
-                                <div key={key} className="flex items-center gap-2 text-sm">
-                                  <span className="font-medium text-grey w-24">{key}:</span>
-                                  <span className="text-grey-600 font-mono flex-1">{String(value)}</span>
+                              {Object.entries(notificationConfig.callbacks.query).map(([key, value], idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <span className="font-medium text-grey w-32">{key}:</span>
+                                  <span className="text-grey-600 font-mono flex-1">{value as string}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {notificationConfig.callbacks.params && typeof notificationConfig.callbacks.params === 'object' && Object.keys(notificationConfig.callbacks.params).length > 0 && (
+                          <div>
+                            <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-2 block">Path Parameters</Label>
+                            <div className="bg-grey-50 border border-grey-300 rounded-lg p-3 space-y-2">
+                              {Object.entries(notificationConfig.callbacks.params).map(([key, value], idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <span className="font-medium text-grey w-32">{key}:</span>
+                                  <span className="text-grey-600 font-mono flex-1">{value as string}</span>
                                 </div>
                               ))}
                             </div>

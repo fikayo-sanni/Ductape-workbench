@@ -112,7 +112,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       // Map to product environments
       return product.envs.map((env: any) => ({
         env_name: env.env_name || env.name,
-        slug: env.slug.length === 3 ? env.slug : env.slug.substring(0, 3).toUpperCase(),
+        slug: env.slug.length === 3 ? env.slug : env.slug.substring(0, 3),
         description: env.description || '',
         base_url: '',
         whitelist: false,
@@ -121,12 +121,27 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
         productEnvSlug: env.slug
       }));
     }
-    // Default environments if no product context
-    return [
-      { env_name: 'Development', slug: 'DEV', description: 'Development environment', base_url: '', whitelist: false, active: true, productEnvId: null, productEnvSlug: null },
-      { env_name: 'Staging', slug: 'STG', description: 'Staging environment', base_url: '', whitelist: false, active: false, productEnvId: null, productEnvSlug: null },
-      { env_name: 'Production', slug: 'PRO', description: 'Production environment', base_url: '', whitelist: false, active: true, productEnvId: null, productEnvSlug: null },
-    ];
+
+    // Use workspace default environments if no product context
+    const currentWorkspace = user?.workspaces?.find(
+      (ws: any) => ws.workspace_id === currentWorkspaceId || ws._id === currentWorkspaceId
+    );
+
+    if (currentWorkspace?.defaultEnvs && currentWorkspace.defaultEnvs.length > 0) {
+      return currentWorkspace.defaultEnvs.map((env: any, idx: number) => ({
+        env_name: env.env_name,
+        slug: env.slug,
+        description: env.description || '',
+        base_url: '',
+        whitelist: false,
+        active: idx === 0, // First environment active by default
+        productEnvId: null,
+        productEnvSlug: null
+      }));
+    }
+
+    // Fallback to empty array if no environments found
+    return [];
   });
 
   const handleSave = async () => {
@@ -205,7 +220,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       }
 
       // Update environment base URLs for each active environment using SDK
-      if (ductape) {
+      /* if (ductape) {
         for (const env of activeEnvs) {
           if (env.base_url) {
             try {
@@ -220,7 +235,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
             }
           }
         }
-      }
+      }*/
 
       // If we have a product context, connect the app to the product using SDK
       if (product && ductape) {
@@ -377,7 +392,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                     className="w-full h-full rounded-lg object-cover"
                   />
                 ) : (
-                  product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                  product.name?.split(' ').map((word: string) => word[0]).join('').slice(0, 2)
                 )}
               </div>
               <div className="flex-1">
@@ -431,8 +446,8 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                   ...formData,
                   app_name: name,
                   // Auto-populate description if it's empty or was previously auto-generated
-                  description: !formData.description || formData.description.endsWith(' feature')
-                    ? `${name} feature`
+                  description: !formData.description || formData.description.endsWith(' apis')
+                    ? `${name} apis`
                     : formData.description
                 });
               }}
@@ -531,7 +546,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                     <Input
                       placeholder="Slug (3 chars)"
                       value={env.slug}
-                      onChange={(e) => updateEnvironment(index, 'slug', e.target.value.toUpperCase().substring(0, 3))}
+                      onChange={(e) => updateEnvironment(index, 'slug', e.target.value.substring(0, 3))}
                       className="w-20"
                       maxLength={3}
                     />

@@ -1,15 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Box, Save, CheckCircle } from 'lucide-react';
+import { Box, Save, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { JobEventTypes } from '@ductape/sdk/dist/types';
+import productServices from '@/services/productServices';
+import appServices from '@/services/appServices';
 
 interface NewJobTabContentProps {
   tabId: string;
@@ -21,26 +23,43 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Extract product context from data
-  const product = data?.productId ? {
-    _id: data.productId,
-    name: data.productName,
-    tag: data.productTag,
-    logo: data.productLogo,
-    envs: data.productEnvs || [],
-    workspace_id: data.workspaceId || currentWorkspaceId,
-    // Additional product components for job parent selection
-    apps: data.productApps || [],
-    databases: data.productDatabases || [],
-    messageBroker: data.productMessageBroker || [],
-    notifications: data.productNotifications || [],
-    storage: data.productStorage || [],
-    jobs: data.productJobs || [],
-    quota: data.productQuota || [],
-    fallback: data.productFallback || [],
-    caches: data.productCaches || [],
-    features: data.productFeatures || [],
-  } : null;
+  // Get productId from data
+  const productId = data?.productId;
+
+  // Fetch complete product data
+  const { data: fetchedProductData, isLoading: isFetchingProduct } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: async () => {
+      if (!productId || !user?._id || !user?.public_key || !currentWorkspaceId) return null;
+
+      const response = await productServices.fetchProduct({
+        product_id: productId,
+        user_id: user._id,
+        public_key: user.public_key,
+        workspace_id: currentWorkspaceId,
+      });
+      return response.data;
+    },
+    enabled: !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
+  });
+
+  // Fetch connected apps with full data
+  const { data: productAppsRes, isLoading: isFetchingApps } = useQuery({
+    queryKey: ['product-apps', productId],
+    queryFn: () =>
+      productServices.fetchProductApps({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        workspace_id: currentWorkspaceId || '',
+        product_id: productId || '',
+      }),
+    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!productId,
+  });
+
+  const connectedApps = productAppsRes?.data || [];
+
+  // Use fetched product data
+  const product = fetchedProductData || null;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -54,6 +73,24 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
 
   const [selectedType, setSelectedType] = useState<JobEventTypes | ''>('');
   const [selectedParent, setSelectedParent] = useState<string | ''>('');
+
+  // Fetch selected app's full details when an app is selected
+  const selectedAppData = connectedApps?.find((app: any) =>
+    (app.access_tag || app.tag || app.app_tag) === selectedParent
+  );
+  const selectedAppId = selectedAppData?._id || selectedAppData?.app_id;
+
+  const { data: selectedAppDetails, isLoading: isFetchingSelectedApp } = useQuery({
+    queryKey: ['app', selectedAppId],
+    queryFn: () => appServices.fetchApp({
+      app_id: selectedAppId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!selectedAppId && !!user?._id && !!user?.public_key && selectedType === JobEventTypes.ACTION,
+  });
+
+  const selectedApp = selectedAppDetails?.data || null;
 
   // Initialize Ductape SDK
   const ductape = useDuctape({
@@ -78,9 +115,9 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     if (!product) return [];
 
     if (selectedType === JobEventTypes.ACTION) {
-      return product.apps?.map((app: any) => ({
-        label: app.access_tag || app.tag,
-        value: app.access_tag || app.tag,
+      return connectedApps?.map((app: any) => ({
+        label: app.app_name || app.access_tag || app.tag,
+        value: app.access_tag || app.tag || app.app_tag,
       })) || [];
     }
 
@@ -112,19 +149,45 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
       })) || [];
     }
 
+    if (selectedType === 'FEATURE' as JobEventTypes) {
+      return product.features?.map((feature: any) => ({
+        label: feature.name || feature.tag,
+        value: feature.tag,
+      })) || [];
+    }
+
     return [];
-  }, [selectedType, product]);
+  }, [selectedType, product, connectedApps]);
 
   // Get event options based on selected parent
   const eventOptions = useMemo(() => {
-    if (!product || !selectedParent) return [];
+    if (!product || !selectedParent) {
+      console.log('eventOptions early return:', { product: !!product, selectedParent });
+      return [];
+    }
 
     if (selectedType === JobEventTypes.ACTION) {
-      // For actions, return the app's actions
-      return product.apps?.map((app: any) => ({
-        label: app.access_tag || app.tag,
-        value: app.access_tag || app.tag,
+      // Use the fetched app data which has full details
+      if (!selectedApp) {
+        console.log('Waiting for app data to load...');
+        return [];
+      }
+
+      console.log('ACTION eventOptions:', {
+        selectedParent,
+        selectedApp: selectedApp?.app_name,
+        versions: selectedApp?.versions?.length,
+      });
+
+      // Get actions from the latest version of the selected app
+      const latestVersion = selectedApp?.versions?.find((v: any) => v.latest) || selectedApp?.versions?.[0];
+      const actions = latestVersion?.actions?.map((action: any) => ({
+        label: action.name || action.tag,
+        value: action.tag,
       })) || [];
+
+      console.log('Found actions:', actions.length, actions);
+      return actions;
     }
 
     if (selectedType === JobEventTypes.DATABASE_ACTION) {
@@ -151,8 +214,73 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
       })) || [];
     }
 
+    if (selectedType === 'FEATURE' as JobEventTypes) {
+      // For features, the parent IS the event - return the selected feature
+      const selectedFeature = product.features?.find((feature: any) => feature.tag === selectedParent);
+      if (selectedFeature) {
+        return [{
+          label: selectedFeature.name || selectedFeature.tag,
+          value: selectedFeature.tag,
+        }];
+      }
+      return [];
+    }
+
     return [];
-  }, [selectedType, selectedParent, product]);
+  }, [selectedType, selectedParent, product, connectedApps, selectedApp]);
+
+  // Filter available event types based on what data exists
+  const availableEventTypes = useMemo(() => {
+    if (!product) return [];
+
+    const types: JobEventTypes[] = [];
+
+    // ACTION - check if there are connected apps
+    if (connectedApps && connectedApps.length > 0) {
+      types.push(JobEventTypes.ACTION);
+    }
+
+    // DATABASE_ACTION - check if there are databases
+    if (product.databases && product.databases.length > 0) {
+      types.push(JobEventTypes.DATABASE_ACTION);
+    }
+
+    // NOTIFICATION - check if there are notifications
+    if (product.notifications && product.notifications.length > 0) {
+      types.push(JobEventTypes.NOTIFICATION);
+    }
+
+    // PUBLISH - check if there are message brokers
+    if (product.messageBroker && product.messageBroker.length > 0) {
+      types.push(JobEventTypes.PUBLISH);
+    }
+
+    // STORAGE - check if there are storage components
+    if (product.storage && product.storage.length > 0) {
+      types.push(JobEventTypes.STORAGE);
+    }
+
+    // FEATURE - check if there are features
+    if (product.features && product.features.length > 0) {
+      types.push('FEATURE' as JobEventTypes);
+    }
+
+    return types;
+  }, [product, connectedApps]);
+
+  // Debug logging - placed after useMemo definitions
+  console.log('NewJobTabContent State:', {
+    selectedType,
+    selectedParent,
+    formData,
+    connectedAppsCount: connectedApps?.length,
+    parentOptionsCount: parentOptions?.length,
+    eventOptionsCount: eventOptions?.length,
+    isFetchingSelectedApp,
+    selectedAppName: selectedApp?.app_name,
+    selectedAppVersions: selectedApp?.versions?.length,
+    availableEventTypesCount: availableEventTypes.length,
+  });
 
   const { mutateAsync: createJob, isPending: isCreating } = useMutation({
     mutationFn: async (values: typeof formData) => {
@@ -204,6 +332,20 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
 
     await createJob(formData);
   };
+
+  // Show loading state while fetching data
+  if (isFetchingProduct || isFetchingApps) {
+    return (
+      <div className="h-full overflow-auto bg-grey-100 p-6">
+        <div className="max-w-3xl mx-auto flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-grey-600">Loading product data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
@@ -311,20 +453,35 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                   <SelectValue placeholder="Select event type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(JobEventTypes).map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type.replace(/_/g, ' ')}
-                    </SelectItem>
-                  ))}
+                  {availableEventTypes.length > 0 ? (
+                    availableEventTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type.replace(/_/g, ' ').toUpperCase()}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-3 text-sm text-grey-600 text-center">
+                      No event types available. Add apps, databases, features, or other components to this product first.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-grey-600 mt-1">The type of event this job will execute</p>
+              <p className="text-xs text-grey-600 mt-1">
+                {availableEventTypes.length > 0
+                  ? 'The type of event this job will execute'
+                  : 'Add components to this product to enable job creation'}
+              </p>
             </div>
 
             {selectedType && parentOptions.length > 0 && (
               <div>
                 <Label htmlFor="parent" className="required">
-                  Parent
+                  {selectedType === JobEventTypes.ACTION ? 'App' :
+                   selectedType === JobEventTypes.DATABASE_ACTION ? 'Database' :
+                   selectedType === JobEventTypes.NOTIFICATION ? 'Notification' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Message Broker' :
+                   selectedType === JobEventTypes.STORAGE ? 'Storage' :
+                   selectedType === 'FEATURE' ? 'Feature' : 'Parent'}
                 </Label>
                 <Select
                   value={formData.parent}
@@ -334,7 +491,14 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                   }}
                 >
                   <SelectTrigger id="parent" className="mt-2">
-                    <SelectValue placeholder="Select parent component" />
+                    <SelectValue placeholder={
+                      selectedType === JobEventTypes.ACTION ? 'Select app' :
+                      selectedType === JobEventTypes.DATABASE_ACTION ? 'Select database' :
+                      selectedType === JobEventTypes.NOTIFICATION ? 'Select notification' :
+                      selectedType === JobEventTypes.PUBLISH ? 'Select message broker' :
+                      selectedType === JobEventTypes.STORAGE ? 'Select storage' :
+                      selectedType === 'FEATURE' ? 'Select feature' : 'Select parent component'
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {parentOptions.map((option: any) => (
@@ -344,21 +508,55 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-grey-600 mt-1">The parent component for this event</p>
+                <p className="text-xs text-grey-600 mt-1">
+                  {selectedType === JobEventTypes.ACTION ? 'Select the app containing the action' :
+                   selectedType === JobEventTypes.DATABASE_ACTION ? 'Select the database to monitor' :
+                   selectedType === JobEventTypes.NOTIFICATION ? 'Select the notification to trigger' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Select the message broker' :
+                   selectedType === JobEventTypes.STORAGE ? 'Select the storage to monitor' :
+                   selectedType === 'FEATURE' ? 'Select the feature to execute' : 'The parent component for this event'}
+                </p>
               </div>
             )}
 
-            {selectedParent && eventOptions.length > 0 && (
+            {selectedParent && (isFetchingSelectedApp ? (
               <div>
                 <Label htmlFor="event" className="required">
-                  Event
+                  {selectedType === JobEventTypes.ACTION ? 'Action' :
+                   selectedType === JobEventTypes.DATABASE_ACTION ? 'Database Action' :
+                   selectedType === JobEventTypes.NOTIFICATION ? 'Message' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Topic' :
+                   selectedType === JobEventTypes.STORAGE ? 'Storage Action' : 'Event'}
+                </Label>
+                <div className="mt-2 flex items-center gap-2 p-3 rounded-md border border-grey-400 bg-grey-50">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm text-grey-600">
+                    {selectedType === JobEventTypes.ACTION ? 'Loading actions...' :
+                     'Loading options...'}
+                  </span>
+                </div>
+              </div>
+            ) : eventOptions.length > 0 && (
+              <div>
+                <Label htmlFor="event" className="required">
+                  {selectedType === JobEventTypes.ACTION ? 'Action' :
+                   selectedType === JobEventTypes.DATABASE_ACTION ? 'Database Action' :
+                   selectedType === JobEventTypes.NOTIFICATION ? 'Message' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Topic' :
+                   selectedType === JobEventTypes.STORAGE ? 'Storage Action' : 'Event'}
                 </Label>
                 <Select
                   value={formData.event}
                   onValueChange={(value) => setFormData({ ...formData, event: value })}
                 >
                   <SelectTrigger id="event" className="mt-2">
-                    <SelectValue placeholder="Select event" />
+                    <SelectValue placeholder={
+                      selectedType === JobEventTypes.ACTION ? 'Select action' :
+                      selectedType === JobEventTypes.DATABASE_ACTION ? 'Select database action' :
+                      selectedType === JobEventTypes.NOTIFICATION ? 'Select message' :
+                      selectedType === JobEventTypes.PUBLISH ? 'Select topic' :
+                      selectedType === JobEventTypes.STORAGE ? 'Select storage action' : 'Select event'
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {eventOptions.map((option: any) => (
@@ -368,9 +566,15 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-grey-600 mt-1">The specific event to execute</p>
+                <p className="text-xs text-grey-600 mt-1">
+                  {selectedType === JobEventTypes.ACTION ? 'The specific action to execute' :
+                   selectedType === JobEventTypes.DATABASE_ACTION ? 'The database action to monitor' :
+                   selectedType === JobEventTypes.NOTIFICATION ? 'The message template to send' :
+                   selectedType === JobEventTypes.PUBLISH ? 'The topic to publish to' :
+                   selectedType === JobEventTypes.STORAGE ? 'The storage action to execute' : 'The specific event to execute'}
+                </p>
               </div>
-            )}
+            ))}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

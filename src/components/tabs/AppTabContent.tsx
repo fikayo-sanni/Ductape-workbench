@@ -25,14 +25,21 @@ import { useQuery } from '@tanstack/react-query';
 import appServices from '@/services/appServices';
 
 interface AppTabContentProps {
-  app: IApp;
+  app?: IApp;
+  appId?: string;
 }
 
-export default function AppTabContent({ app }: AppTabContentProps) {
-  const { openTab } = useWorkbenchStore();
+export default function AppTabContent({ app, appId }: AppTabContentProps) {
+  const { openTab, tabs, activeTabId } = useWorkbenchStore();
   const { currentWorkspaceId, user } = useAuth();
+
+  // Get itemId and initialization data from active tab if app is undefined (after refresh)
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const effectiveAppId = app?._id || appId || activeTab?.itemId;
+  const initialActiveSection = (activeTab?.data as any)?.activeSection || 'overview';
+
   const [selectedVersionTag, setSelectedVersionTag] = useState<string>(
-    app.versions?.find(v => v.latest)?.tag || app.versions?.[0]?.tag || ''
+    app?.versions?.find(v => v.latest)?.tag || app?.versions?.[0]?.tag || ''
   );
   const [editingEnv, setEditingEnv] = useState<any | null>(null);
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
@@ -48,112 +55,67 @@ export default function AppTabContent({ app }: AppTabContentProps) {
   const [actionsSearch, setActionsSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
-  // Content filter state
-  const [activeFilter, setActiveFilter] = useState<string>('overview');
+  // Content filter state - initialize from persisted data
+  const [activeFilter, setActiveFilter] = useState<string>(initialActiveSection);
 
   // Determine if app is internal or third-party
-  const isInternalApp = app.workspace_id === currentWorkspaceId;
+  const isInternalApp = app?.workspace_id === currentWorkspaceId;
 
-  // Fetch app details if it's a marketplace app
-  const { data: appDetails } = useQuery({
-    queryKey: ['app', app._id, app.tag],
+  // Check if app data is incomplete (missing versions, actions, app_name, etc.)
+  const isAppDataIncomplete = app && (!app.versions || app.versions.length === 0 || !app.app_name);
+
+  // Fetch app details if app data is missing or incomplete
+  const { data: appDetails, isLoading, error } = useQuery({
+    queryKey: ['app', effectiveAppId],
     queryFn: () => appServices.fetchApp({
-      app_id: app._id,
+      app_id: effectiveAppId || '',
       user_id: user?._id || '',
       public_key: user?.public_key || '',
     }),
-    enabled: !isInternalApp && !!app._id,
+    enabled: !!effectiveAppId && !!user?._id && !!user?.public_key && (!app || isAppDataIncomplete),
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Use fetched app details if available, otherwise use the passed app
   const currentApp = appDetails?.data || app;
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  // Debug logging
+  useEffect(() => {
+    console.log('AppTabContent Debug:', {
+      effectiveAppId,
+      hasApp: !!app,
+      hasAppDetails: !!appDetails?.data,
+      hasCurrentApp: !!currentApp,
+      isLoading,
+      error,
+      userId: user?._id,
+      publicKey: user?.public_key,
+    });
+  }, [effectiveAppId, app, appDetails, currentApp, isLoading, error, user]);
 
-  const selectedVersion = currentApp.versions?.find(v => v.tag === selectedVersionTag) ||
-    (currentApp.versions && currentApp.versions.length > 0 ?
-      (currentApp.versions.find(v => v.latest) || currentApp.versions[0]) :
+  // Update tab with fetched data
+  useEffect(() => {
+    if (appDetails?.data && activeTabId && !app) {
+      const { updateTab } = useWorkbenchStore.getState();
+      updateTab(activeTabId, { data: appDetails.data });
+    }
+  }, [appDetails, activeTabId, app]);
+
+  // ALL HOOKS AND COMPUTED VALUES MUST BE BEFORE EARLY RETURNS!
+
+  // Calculate selected version
+  const selectedVersion = currentApp?.versions?.find(v => v.tag === selectedVersionTag) ||
+    (currentApp?.versions && currentApp?.versions.length > 0 ?
+      (currentApp?.versions.find(v => v.latest) || currentApp?.versions[0]) :
       null);
 
-  const actionsCount = selectedVersion?.actions?.length || currentApp.actions_count || 0;
-  const envsCount = selectedVersion?.envs?.length || currentApp.envs_count || 0;
+  const actionsCount = selectedVersion?.actions?.length || currentApp?.actions_count || 0;
+  const envsCount = selectedVersion?.envs?.length || currentApp?.envs_count || 0;
   const authsCount = selectedVersion?.auths?.length || 0;
   const variablesCount = selectedVersion?.variables?.length || 0;
   const constantsCount = selectedVersion?.constants?.length|| 0;
-  const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any).webhooks_count || 0;
-
-  // Auto-select latest version when app data changes
-  useEffect(() => {
-    if (currentApp.versions && currentApp.versions.length > 0) {
-      // Find the latest version
-      const latestVersion = currentApp.versions.find(v => v.latest) || currentApp.versions[0];
-      if (latestVersion && latestVersion.tag !== selectedVersionTag) {
-        setSelectedVersionTag(latestVersion.tag);
-      }
-    }
-  }, [currentApp.versions, selectedVersionTag]);
-
-  // Show AppCreatedModal for internal apps with no actions
-  useEffect(() => {
-    const hasActions = (selectedVersion?.actions && selectedVersion.actions.length > 0) ||
-      (currentApp.actions_count && currentApp.actions_count > 0);
-
-    if (isInternalApp && selectedVersion && !hasActions) {
-      setShowAppCreatedModal(true);
-    }
-  }, [isInternalApp, selectedVersion, currentApp.actions_count]);
-
-  const handleOpenAuth = (auth: any) => {
-    openTab({
-      id: `auth-${auth._id}-${Date.now()}`,
-      type: 'feature',
-      title: auth.name,
-      itemId: auth._id,
-      data: { ...auth, componentType: 'auth', appName: currentApp.app_name, version: selectedVersionTag },
-    });
-  };
-
-  const handleOpenVariable = (variable: any, constant: boolean = false) => {
-    if (constant) {
-      setEditingConstant(variable);
-      setShowCreateConstantModal(true);
-    } else {
-      setEditingVariable(variable);
-      setShowCreateVariableModal(true);
-    }
-  };
-
-  const handleOpenAction = (action: any) => {
-    openTab({
-      id: `action-${action.tag}-${Date.now()}`,
-      type: 'request',
-      title: action.name || action.tag,
-      itemId: action.tag,
-      data: {
-        ...action,
-        componentType: 'action',
-        appName: currentApp.app_name,
-        appTag: currentApp.tag,
-        version: selectedVersionTag,
-        envs: selectedVersion?.envs || [],
-        variables: selectedVersion?.variables || [],
-        constants: selectedVersion?.constants || [],
-        auths: selectedVersion?.auths || [],
-      },
-    });
-  };
-
-  const handleIntegrateApp = () => {
-    setShowIntegrationModal(true);
-  };
-
+  const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any)?.webhooks_count || 0;
 
   // Build folder tree structure
   const folderTree = useMemo(() => {
@@ -218,6 +180,157 @@ export default function AppTabContent({ app }: AppTabContentProps) {
     return found?.folder.name || 'All Actions';
   }, [selectedFolderId, flattenedFolders]);
 
+  // Auto-select latest version when app data changes
+  useEffect(() => {
+    if (currentApp?.versions && currentApp?.versions.length > 0) {
+      // Find the latest version
+      const latestVersion = currentApp?.versions.find(v => v.latest) || currentApp?.versions[0];
+      if (latestVersion && latestVersion.tag !== selectedVersionTag) {
+        setSelectedVersionTag(latestVersion.tag);
+      }
+    }
+  }, [currentApp?.versions, selectedVersionTag]);
+
+  // Show AppCreatedModal for internal apps with no actions
+  useEffect(() => {
+    const hasActions = (selectedVersion?.actions && selectedVersion.actions.length > 0) ||
+      (currentApp?.actions_count && currentApp?.actions_count > 0);
+
+    if (isInternalApp && selectedVersion && !hasActions) {
+      setShowAppCreatedModal(true);
+    }
+  }, [isInternalApp, selectedVersion, currentApp?.actions_count]);
+
+  // NOW WE CAN HAVE EARLY RETURNS - ALL HOOKS HAVE BEEN CALLED!
+
+  // Show skeleton loading state while fetching or when data is incomplete
+  if ((isLoading && !currentApp) || (currentApp && !currentApp.app_name)) {
+    return (
+      <div className="bg-grey-100 p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Header Skeleton */}
+          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 bg-grey-300 rounded-lg animate-pulse" />
+              <div className="flex-1 space-y-3">
+                <div className="h-8 w-48 bg-grey-300 rounded animate-pulse" />
+                <div className="h-4 w-32 bg-grey-300 rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Grid Skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-grey-300 rounded-lg animate-pulse" />
+                  <div className="space-y-2">
+                    <div className="h-6 w-12 bg-grey-300 rounded animate-pulse" />
+                    <div className="h-4 w-16 bg-grey-300 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Content Cards Skeleton */}
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-grey-300 rounded animate-pulse" />
+                    <div className="h-6 w-32 bg-grey-300 rounded animate-pulse" />
+                  </div>
+                  <div className="h-9 w-20 bg-grey-300 rounded animate-pulse" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="p-3 rounded-lg border border-grey-400">
+                      <div className="h-5 w-3/4 bg-grey-300 rounded animate-pulse mb-2" />
+                      <div className="h-4 w-1/2 bg-grey-300 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if app couldn't be loaded
+  if (!currentApp && !isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-grey-100">
+        <div className="text-center">
+          <p className="text-red text-lg mb-2">Failed to load app</p>
+          <p className="text-grey-600">
+            {error ? `Error: ${error instanceof Error ? error.message : 'Unknown error'}` : 'The app data could not be retrieved.'}
+          </p>
+          {effectiveAppId && (
+            <p className="text-grey-500 text-sm mt-2">App ID: {effectiveAppId}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Helper functions (not hooks, can be after early returns)
+  const getInitials = (name: string) => {
+    return name?.split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleOpenAuth = (auth: any) => {
+    openTab({
+      id: `auth-${auth._id}-${Date.now()}`,
+      type: 'feature',
+      title: auth.name,
+      itemId: auth._id,
+      data: { ...auth, componentType: 'auth', appName: currentApp?.app_name, version: selectedVersionTag },
+    });
+  };
+
+  const handleOpenVariable = (variable: any, constant: boolean = false) => {
+    if (constant) {
+      setEditingConstant(variable);
+      setShowCreateConstantModal(true);
+    } else {
+      setEditingVariable(variable);
+      setShowCreateVariableModal(true);
+    }
+  };
+
+  const handleOpenAction = (action: any) => {
+    openTab({
+      id: `action-${action.tag}-${Date.now()}`,
+      type: 'request',
+      title: action.name || action.tag,
+      itemId: action.tag,
+      data: {
+        ...action,
+        componentType: 'action',
+        appName: currentApp?.app_name,
+        appTag: currentApp?.tag,
+        version: selectedVersionTag,
+        envs: selectedVersion?.envs || [],
+        variables: selectedVersion?.variables || [],
+        constants: selectedVersion?.constants || [],
+        auths: selectedVersion?.auths || [],
+      },
+    });
+  };
+
+  const handleIntegrateApp = () => {
+    setShowIntegrationModal(true);
+  };
+
   return (
     <div className="bg-grey-100 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -226,27 +339,27 @@ export default function AppTabContent({ app }: AppTabContentProps) {
           <div className="flex items-start gap-4">
             {/* Logo */}
             <div className="w-16 h-16 rounded-lg bg-green/10 flex items-center justify-center text-green text-xl font-semibold flex-shrink-0">
-              {currentApp.logo ? (
+              {currentApp?.logo ? (
                 <img
-                  src={currentApp.logo}
-                  alt={currentApp.app_name}
+                  src={currentApp?.logo}
+                  alt={currentApp?.app_name}
                   className="w-full h-full rounded-lg object-cover"
                 />
               ) : (
-                getInitials(currentApp.app_name)
+                getInitials(currentApp?.app_name)
               )}
             </div>
 
             {/* App Info */}
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-grey">{currentApp.app_name}</h1>
-                {currentApp.status && (
+                <h1 className="text-2xl font-bold text-grey">{currentApp?.app_name}</h1>
+                {currentApp?.status && (
                   <span className={cn(
                     'px-3 py-1 rounded-full text-xs font-medium',
-                    currentApp.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
+                    currentApp?.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
                   )}>
-                    {currentApp.status}
+                    {currentApp?.status}
                   </span>
                 )}
                 {/* App Type Badge */}
@@ -268,21 +381,21 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                     </>
                   )}
                 </span>
-                {currentApp.access_tag && (
+                {currentApp?.access_tag && (
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
-                    {currentApp.access_tag}
+                    {currentApp?.access_tag}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
-              {currentApp.description && (
+              <p className="text-sm text-grey-600 mb-3">{currentApp?.tag}</p>
+              {currentApp?.description && (
                 <div className="text-grey-600 mb-4">
-                  <MarkdownViewer content={currentApp.description} />
+                  <MarkdownViewer content={currentApp?.description} />
                 </div>
               )}
 
               {/* Version Selector */}
-              {currentApp.versions && currentApp.versions.length > 0 && (
+              {currentApp?.versions && currentApp?.versions.length > 0 && (
                 <div className="flex items-center gap-3 mt-4">
                   <label className="text-sm font-medium text-grey-600">Version:</label>
                   <Select value={selectedVersionTag} onValueChange={setSelectedVersionTag}>
@@ -290,7 +403,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                       <SelectValue placeholder="Select version" />
                     </SelectTrigger>
                     <SelectContent>
-                      {currentApp.versions.map((version) => (
+                      {currentApp?.versions.map((version) => (
                         <SelectItem key={version.tag} value={version.tag}>
                           {version.tag} {version.latest && '(Latest)'}
                         </SelectItem>
@@ -301,17 +414,19 @@ export default function AppTabContent({ app }: AppTabContentProps) {
               )}
 
               {/* Integration Actions */}
-              <div className="flex items-center gap-3 mt-4">
-                <Button
-                  onClick={handleIntegrateApp}
-                  className="gap-2"
-                  size="sm"
-                  variant="outline"
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Integrate
-                </Button>
-              </div>
+              {selectedVersion?.active && (
+                <div className="flex items-center gap-3 mt-4">
+                  <Button
+                    onClick={handleIntegrateApp}
+                    className="gap-2"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Integrate
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -498,12 +613,20 @@ export default function AppTabContent({ app }: AppTabContentProps) {
         {activeFilter === 'variables' && renderVariablesCard()}
       </div>
 
+      {showAppCreatedModal && (
+        <AppCreatedModal
+          app={currentApp}
+          open={showAppCreatedModal}
+          onOpenChange={setShowAppCreatedModal}
+        />
+      )}
+
       {/* Create Environment Modal */}
       <CreateAppEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
-        appTag={currentApp.tag}
-        appId={currentApp._id}
+        appTag={currentApp?.tag}
+        appId={currentApp?._id}
       />
 
       {/* Update Environment Modal */}
@@ -513,7 +636,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
           setShowUpdateEnvModal(open);
           if (!open) setEditingEnv(null);
         }}
-        appTag={currentApp.tag}
+        appTag={currentApp?.tag}
         environment={editingEnv}
         onSuccess={() => {
           setEditingEnv(null);
@@ -527,8 +650,8 @@ export default function AppTabContent({ app }: AppTabContentProps) {
           setShowCreateVariableModal(open);
           if (!open) setEditingVariable(null);
         }}
-        appTag={currentApp.tag}
-        appId={currentApp._id}
+        appTag={currentApp?.tag}
+        appId={currentApp?._id}
         variable={editingVariable}
       />
 
@@ -539,10 +662,31 @@ export default function AppTabContent({ app }: AppTabContentProps) {
           setShowCreateConstantModal(open);
           if (!open) setEditingConstant(null);
         }}
-        appTag={currentApp.tag}
-        appId={currentApp._id}
+        appTag={currentApp?.tag}
+        appId={currentApp?._id}
         constant={editingConstant}
       />
+
+      {/* Integration Modal */}
+      {showIntegrationModal && currentApp && (
+        <IntegrationProvider>
+          <AppIntegrationModal
+            app={{
+              _id: currentApp._id,
+              app_name: currentApp.app_name,
+              domain_name: currentApp.tag,
+              description: currentApp.description,
+              logo: currentApp.logo,
+              tag: currentApp.tag,
+              versions: currentApp.versions || [],
+              created_at: currentApp.created_at || new Date().toISOString(),
+              updated_at: currentApp.updated_at || new Date().toISOString(),
+            } as any}
+            open={showIntegrationModal}
+            onOpenChange={setShowIntegrationModal}
+          />
+        </IntegrationProvider>
+      )}
     </div>
   );
 
@@ -664,7 +808,7 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                     type: 'webhook',
                     title: webhook.name || webhook.tag,
                     itemId: webhook._id,
-                    data: { ...webhook, appName: currentApp.app_name, version: selectedVersionTag },
+                    data: { ...webhook, appName: currentApp?.app_name, version: selectedVersionTag },
                   });
                 }}
                 className="w-full flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
@@ -714,10 +858,10 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                     app: currentApp, 
                     product: null,
                     actions: selectedVersion?.actions || [],
-                    appId: currentApp._id,
-                    appTag: currentApp.tag,
-                    appName: currentApp.app_name,
-                    workspaceId: currentApp.workspace_id,
+                    appId: currentApp?._id,
+                    appTag: currentApp?.tag,
+                    appName: currentApp?.app_name,
+                    workspaceId: currentApp?.workspace_id,
                   },
                   isDirty: true,
                 });
@@ -784,9 +928,9 @@ export default function AppTabContent({ app }: AppTabContentProps) {
                     data: {
                       isNew: true,
                       app: currentApp,
-                      appId: currentApp._id,
-                      appTag: currentApp.tag,
-                      appName: currentApp.app_name,
+                      appId: currentApp?._id,
+                      appTag: currentApp?.tag,
+                      appName: currentApp?.app_name,
                       version: selectedVersionTag,
                       envs: selectedVersion?.envs || [],
                       variables: selectedVersion?.variables || [],
@@ -1034,645 +1178,4 @@ export default function AppTabContent({ app }: AppTabContentProps) {
       </div>
     );
   }
-
-  // Remove the old content sections and replace with the new structure
-  return (
-    <div className="bg-grey-100 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* App Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            {/* Logo */}
-            <div className="w-16 h-16 rounded-lg bg-green/10 flex items-center justify-center text-green text-xl font-semibold flex-shrink-0">
-              {currentApp.logo ? (
-                <img
-                  src={currentApp.logo}
-                  alt={currentApp.app_name}
-                  className="w-full h-full rounded-lg object-cover"
-                />
-              ) : (
-                getInitials(currentApp.app_name)
-              )}
-            </div>
-
-            {/* App Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-grey">{currentApp.app_name}</h1>
-                {currentApp.status && (
-                  <span className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium',
-                    currentApp.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                  )}>
-                    {currentApp.status}
-                  </span>
-                )}
-                {/* App Type Badge */}
-                <span className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
-                  isInternalApp
-                    ? 'bg-blue-500/10 text-blue-600'
-                    : 'bg-orange-500/10 text-orange-600'
-                )}>
-                  {isInternalApp ? (
-                    <>
-                      <Building2 className="h-3 w-3" />
-                      Internal
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="h-3 w-3" />
-                      Third-party
-                    </>
-                  )}
-                </span>
-                {currentApp.access_tag && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
-                    {currentApp.access_tag}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
-              {currentApp.description && (
-                <div className="text-grey-600 mb-4">
-                  <MarkdownViewer content={currentApp.description} />
-                </div>
-              )}
-
-              {/* Version Selector */}
-              {currentApp.versions && currentApp.versions.length > 0 && (
-                <div className="flex items-center gap-3 mt-4">
-                  <label className="text-sm font-medium text-grey-600">Version:</label>
-                  <Select value={selectedVersionTag} onValueChange={setSelectedVersionTag}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Select version" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currentApp.versions.map((version) => (
-                        <SelectItem key={version.tag} value={version.tag}>
-                          {version.tag} {version.latest && '(Latest)'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Integration Actions */}
-              <div className="flex items-center gap-3 mt-4">
-                <Button
-                  onClick={handleIntegrateApp}
-                  className="gap-2"
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4" />
-                  Integrate App
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Filter Navigation */}
-        <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-grey-600" />
-            <span className="text-sm font-medium text-grey-600">Quick Access:</span>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={activeFilter === 'overview' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('overview')}
-                className="gap-2"
-              >
-                <Grid3x3 className="h-4 w-4" />
-                Overview
-              </Button>
-              <Button
-                variant={activeFilter === 'actions' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('actions')}
-                className="gap-2"
-              >
-                <Zap className="h-4 w-4" />
-                Actions ({actionsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'environments' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('environments')}
-                className="gap-2"
-              >
-                <Settings2 className="h-4 w-4" />
-                Environments ({envsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'webhooks' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('webhooks')}
-                className="gap-2"
-              >
-                <Webhook className="h-4 w-4" />
-                Webhooks ({webhooksCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'auths' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('auths')}
-                className="gap-2"
-              >
-                <Key className="h-4 w-4" />
-                Auth ({authsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'variables' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('variables')}
-                className="gap-2"
-              >
-                <FileCode className="h-4 w-4" />
-                Variables ({variablesCount + constantsCount})
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* App Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <button
-            onClick={() => setActiveFilter('actions')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'actions' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{actionsCount}</p>
-                <p className="text-sm text-grey-600">Actions</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('environments')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'environments' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <Settings2 className="h-5 w-5 text-green" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{envsCount}</p>
-                <p className="text-sm text-grey-600">Environments</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('webhooks')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'webhooks' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <Webhook className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{webhooksCount}</p>
-                <p className="text-sm text-grey-600">Webhooks</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('auths')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'auths' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
-                <Key className="h-5 w-5 text-yellow" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{authsCount}</p>
-                <p className="text-sm text-grey-600">Auths</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('variables')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'variables' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <FileCode className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{variablesCount + constantsCount}</p>
-                <p className="text-sm text-grey-600">Variables</p>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Content Sections with Filtering */}
-        {activeFilter === 'overview' && (
-          <div className="space-y-6">
-            {/* Show all sections in overview mode */}
-            {renderEnvironmentsCard()}
-            {renderWebhooksCard()}
-            {renderAuthsCard()}
-            {renderActionsCard()}
-            {renderVariablesCard()}
-          </div>
-        )}
-
-        {activeFilter === 'environments' && renderEnvironmentsCard()}
-        {activeFilter === 'webhooks' && renderWebhooksCard()}
-        {activeFilter === 'auths' && renderAuthsCard()}
-        {activeFilter === 'actions' && renderActionsCard()}
-        {activeFilter === 'variables' && renderVariablesCard()}
-      </div>
-    </div>
-  );
-
-  // Integration Modal
-  if (showIntegrationModal) {
-    const marketplaceApp = {
-      _id: currentApp._id,
-      app_name: currentApp.app_name,
-      domain_name: currentApp.domains?.[0] || currentApp.app_name.toLowerCase().replace(/\s+/g, '-'),
-      description: currentApp.description,
-      logo: currentApp.logo,
-      versions: (currentApp.versions || []).map((v: any) => ({
-        _id: v._id || v.tag,
-        version: v.tag,
-        latest: v.latest || false,
-        created_at: v.created_at || new Date().toISOString(),
-      })),
-      created_at: currentApp.created_at || new Date().toISOString(),
-      updated_at: currentApp.updated_at || new Date().toISOString(),
-  };
-
-  // Integration Modal
-  if (showIntegrationModal) {
-    const marketplaceApp = {
-      _id: currentApp._id,
-      app_name: currentApp.app_name,
-      domain_name: currentApp.domains?.[0] || currentApp.app_name.toLowerCase().replace(/\s+/g, '-'),
-      description: currentApp.description,
-      logo: currentApp.logo,
-      versions: (currentApp.versions || []).map((v: any) => ({
-        _id: v._id || v.tag,
-        version: v.tag,
-        latest: v.latest || false,
-        created_at: v.created_at || new Date().toISOString(),
-      })),
-      created_at: currentApp.created_at || new Date().toISOString(),
-      updated_at: currentApp.updated_at || new Date().toISOString(),
-    };
-
-    return (
-      <IntegrationProvider>
-        <AppIntegrationModal
-          app={marketplaceApp as any}
-          open={showIntegrationModal}
-          onOpenChange={setShowIntegrationModal}
-        />
-      </IntegrationProvider>
-    );
-  }
-
-  // AppCreatedModal for internal apps with no actions
-  if (showAppCreatedModal) {
-    return (
-      <AppCreatedModal
-        app={currentApp}
-        open={showAppCreatedModal}
-        onOpenChange={setShowAppCreatedModal}
-      />
-    );
-  }
-
-  return (
-      <IntegrationProvider>
-        <AppIntegrationModal
-          app={marketplaceApp as any}
-          open={showIntegrationModal}
-          onOpenChange={setShowIntegrationModal}
-        />
-      </IntegrationProvider>
-    );
-  }
-
-  // AppCreatedModal for internal apps with no actions
-  if (showAppCreatedModal) {
-    return (
-      <AppCreatedModal
-        app={currentApp}
-        open={showAppCreatedModal}
-        onOpenChange={setShowAppCreatedModal}
-      />
-    );
-  }
-
-  // Render the main content
-  return (
-    <>
-      <div className="bg-grey-100 p-6">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* App Header */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              {/* Logo */}
-              <div className="w-16 h-16 rounded-lg bg-green/10 flex items-center justify-center text-green text-xl font-semibold flex-shrink-0">
-                {currentApp.logo ? (
-                  <img
-                    src={currentApp.logo}
-                    alt={currentApp.app_name}
-                    className="w-full h-full rounded-lg object-cover"
-                  />
-                ) : (
-                  getInitials(currentApp.app_name)
-                )}
-              </div>
-
-              {/* App Info */}
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <h1 className="text-2xl font-bold text-grey">{currentApp.app_name}</h1>
-                  {currentApp.status && (
-                    <span className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium',
-                      currentApp.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                    )}>
-                      {currentApp.status}
-                    </span>
-                  )}
-                  {/* App Type Badge */}
-                  <span className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
-                    isInternalApp
-                      ? 'bg-blue-500/10 text-blue-600'
-                      : 'bg-orange-500/10 text-orange-600'
-                  )}>
-                    {isInternalApp ? (
-                      <>
-                        <Building2 className="h-3 w-3" />
-                        Internal
-                      </>
-                    ) : (
-                      <>
-                        <ExternalLink className="h-3 w-3" />
-                        Third-party
-                      </>
-                    )}
-                  </span>
-                  {currentApp.access_tag && (
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
-                      {currentApp.access_tag}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-grey-600 mb-3">{currentApp.tag}</p>
-                {currentApp.description && (
-                  <p className="text-grey-600 mb-4">{currentApp.description}</p>
-                )}
-
-                {/* Version Selector */}
-                {currentApp.versions && currentApp.versions.length > 0 && (
-                  <div className="flex items-center gap-3 mt-4">
-                    <label className="text-sm font-medium text-grey-600">Version:</label>
-                    <Select value={selectedVersionTag} onValueChange={setSelectedVersionTag}>
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Select version" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currentApp.versions.map((version) => (
-                          <SelectItem key={version.tag} value={version.tag}>
-                            {version.tag} {version.latest && '(Latest)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Integration Actions */}
-                <div className="flex items-center gap-3 mt-4">
-                  <Button
-                    onClick={handleIntegrateApp}
-                    className="gap-2"
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    Integrate
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Content Filter Navigation */}
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Filter className="h-4 w-4 text-grey-600" />
-              <span className="text-sm font-medium text-grey-600">Quick Access:</span>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={activeFilter === 'overview' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('overview')}
-                  className="gap-2"
-                >
-                  <Grid3x3 className="h-4 w-4" />
-                  Overview
-                </Button>
-                <Button
-                  variant={activeFilter === 'actions' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('actions')}
-                  className="gap-2"
-                >
-                  <Zap className="h-4 w-4" />
-                  Actions ({actionsCount})
-                </Button>
-                <Button
-                  variant={activeFilter === 'environments' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('environments')}
-                  className="gap-2"
-                >
-                  <Settings2 className="h-4 w-4" />
-                  Environments ({envsCount})
-                </Button>
-                <Button
-                  variant={activeFilter === 'webhooks' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('webhooks')}
-                  className="gap-2"
-                >
-                  <Webhook className="h-4 w-4" />
-                  Webhooks ({webhooksCount})
-                </Button>
-                <Button
-                  variant={activeFilter === 'auths' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('auths')}
-                  className="gap-2"
-                >
-                  <Key className="h-4 w-4" />
-                  Auth ({authsCount})
-                </Button>
-                <Button
-                  variant={activeFilter === 'variables' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveFilter('variables')}
-                  className="gap-2"
-                >
-                  <FileCode className="h-4 w-4" />
-                  Variables ({variablesCount + constantsCount})
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* App Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <button
-              onClick={() => setActiveFilter('actions')}
-              className={cn(
-                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-                activeFilter === 'actions' ? 'border-primary bg-primary/5' : 'border-grey-400'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{actionsCount}</p>
-                  <p className="text-sm text-grey-600">Actions</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveFilter('environments')}
-              className={cn(
-                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-                activeFilter === 'environments' ? 'border-primary bg-primary/5' : 'border-grey-400'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                  <Settings2 className="h-5 w-5 text-green" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{envsCount}</p>
-                  <p className="text-sm text-grey-600">Environments</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveFilter('webhooks')}
-              className={cn(
-                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-                activeFilter === 'webhooks' ? 'border-primary bg-primary/5' : 'border-grey-400'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Webhook className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{webhooksCount}</p>
-                  <p className="text-sm text-grey-600">Webhooks</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveFilter('auths')}
-              className={cn(
-                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-                activeFilter === 'auths' ? 'border-primary bg-primary/5' : 'border-grey-400'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
-                  <Key className="h-5 w-5 text-yellow" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{authsCount}</p>
-                  <p className="text-sm text-grey-600">Auths</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveFilter('variables')}
-              className={cn(
-                "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-                activeFilter === 'variables' ? 'border-primary bg-primary/5' : 'border-grey-400'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <FileCode className="h-5 w-5 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{variablesCount + constantsCount}</p>
-                  <p className="text-sm text-grey-600">Variables</p>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Content Sections with Filtering */}
-          {activeFilter === 'overview' && (
-            <div className="space-y-6">
-              {/* Show all sections in overview mode */}
-              {renderEnvironmentsCard()}
-              {renderWebhooksCard()}
-              {renderAuthsCard()}
-              {renderActionsCard()}
-              {renderVariablesCard()}
-            </div>
-          )}
-
-          {activeFilter === 'environments' && renderEnvironmentsCard()}
-          {activeFilter === 'webhooks' && renderWebhooksCard()}
-          {activeFilter === 'auths' && renderAuthsCard()}
-          {activeFilter === 'actions' && renderActionsCard()}
-          {activeFilter === 'variables' && renderVariablesCard()}
-        </div>
-      </div>
-
-      {/* Create Environment Modal */}
-      <CreateAppEnvironmentModal
-        open={showCreateEnvModal}
-        onOpenChange={setShowCreateEnvModal}
-        appTag={currentApp.tag}
-        appId={currentApp._id}
-      />
-    </>
-  );
 }

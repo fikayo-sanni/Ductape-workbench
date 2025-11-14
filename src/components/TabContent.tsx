@@ -23,7 +23,6 @@ import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewSessionTabContent from './tabs/NewSessionTabContent';
 import SessionTabContent from './tabs/SessionTabContent';
 import SettingsTabContent from './tabs/SettingsTabContent';
-import NewRequestTabContent from './tabs/NewRequestTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
 import NewMessageTabContent from './tabs/NewMessageTabContent';
@@ -42,6 +41,7 @@ import StorageComponentContent from './tabs/StorageComponentContent';
 import CacheComponentContent from './tabs/CacheComponentContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import JobTabContent from './tabs/JobTabContent';
+import NewJobTabContent from './tabs/NewJobTabContent';
 import GenericComponentContent from './tabs/GenericComponentContent';
 
 function FeatureTabContent({ tab }: { tab: Tab }) {
@@ -147,14 +147,9 @@ export default function TabContent() {
   const renderTabContent = () => {
     switch (activeTab.type) {
       case 'request':
-        // Check if this is a new request creation tab with app context
-        if (activeTab.data?.isNew && activeTab.data?.appId) {
-          return <RequestBuilder tabId={activeTab.id} data={activeTab.data} />;
-        }
-
-        // Legacy: Check if this is a new request creation tab
+        // Check if this is a new request creation tab (with or without full data after refresh)
         if (activeTab.isDirty && !activeTab.itemId) {
-          return <NewRequestTabContent tabId={activeTab.id} data={activeTab.data} />;
+          return <RequestBuilder tabId={activeTab.id} data={activeTab.data} />;
         }
 
         // Check if this is an action request (from app actions)
@@ -182,14 +177,14 @@ export default function TabContent() {
         if (activeTab.isDirty && !activeTab.itemId && !activeTab.data?._id) {
           return <NewAppTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <AppTabContent app={activeTab.data} />;
+        return <AppTabContent app={activeTab.data} appId={activeTab.itemId} />;
 
       case 'product':
         // Check if this is a new product creation tab
         if (activeTab.isDirty && !activeTab.itemId && !activeTab.data?._id) {
           return <NewProductTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <ProductTabContent product={activeTab.data} />;
+        return <ProductTabContent product={activeTab.data} productId={activeTab.itemId} />;
 
       case 'auth':
         // Check if this is a new auth creation tab
@@ -293,7 +288,7 @@ export default function TabContent() {
       case 'job':
         // Check if this is a new job creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
-          return <NewFeatureTabContent tabId={activeTab.id} type={activeTab.type} data={activeTab.data} />;
+          return <NewJobTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <JobTabContent job={activeTab.data} />;
 
@@ -303,20 +298,6 @@ export default function TabContent() {
           return <NewSessionTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <SessionTabContent session={activeTab.data} />;
-
-      case 'healthcheck':
-        // Check if this is a new healthcheck creation tab
-        if (activeTab.isDirty && activeTab.data?.isNew) {
-          return <NewHealthcheckTabContent data={activeTab.data} />;
-        }
-        return <FeatureTabContent tab={activeTab} />;
-
-      case 'notification':
-        // Check if this is a new notification creation tab
-        if (activeTab.isDirty && activeTab.data?.isNew) {
-          return <NewNotificationTabContent tabId={activeTab.id} data={activeTab.data} />;
-        }
-        return <NotificationTabContent data={activeTab.data} />;
 
       case 'marketplace':
         return <MarketplaceTabContent />;

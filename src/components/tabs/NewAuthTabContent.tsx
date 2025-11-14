@@ -56,7 +56,7 @@ interface AuthBuilderState {
 }
 
 export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProps) {
-  const { closeTab, openTab } = useWorkbenchStore();
+  const { closeTab, openTab, tabs } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -203,13 +203,11 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
     },
     onSuccess: async () => {
       closeTab(tabId);
-      
+
       // Invalidate app queries to refresh data
       const appIdToInvalidate = data?.appId || data?.app?._id;
       queryClient.invalidateQueries({ queryKey: ['app', appIdToInvalidate] });
       queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
-      
-      toast.success('Authorization created successfully');
 
       // Fetch fresh app data and reopen app tab
       const appTag = data?.appTag || data?.app?.tag;
@@ -221,8 +219,14 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
             public_key: user?.public_key || '',
           });
           const refreshedApp = appResponse.data;
-          
-          // Open or update the app tab with fresh data
+
+          // Close existing app tab if it exists, then reopen with fresh data
+          const existingAppTab = tabs.find(t => t.type === 'app' && t.itemId === refreshedApp._id);
+          if (existingAppTab) {
+            closeTab(existingAppTab.id);
+          }
+
+          // Reopen with fresh data
           openTab({
             id: `app-${refreshedApp._id}`,
             type: 'app',
@@ -230,17 +234,11 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
             itemId: refreshedApp._id,
             data: refreshedApp,
           });
+
+          toast.success('Authorization created successfully');
         } catch (error) {
           console.error('Failed to refresh app data:', error);
-          // Still try to open app tab with existing data if fetch fails
-          if (appIdToInvalidate) {
-            openTab({
-              id: `app-${appIdToInvalidate}`,
-              type: 'app',
-              title: data?.appName || 'App',
-              itemId: appIdToInvalidate,
-            });
-          }
+          toast.error('Failed to refresh app data');
         }
       }
     },
@@ -261,13 +259,11 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
     },
     onSuccess: async () => {
       closeTab(tabId);
-      
+
       // Invalidate app queries to refresh data
       const appIdToInvalidate = data?.appId || data?.app?._id;
       queryClient.invalidateQueries({ queryKey: ['app', appIdToInvalidate] });
       queryClient.invalidateQueries({ queryKey: ['app-details-for-auth'] });
-      
-      toast.success('Authorization created successfully');
 
       // Fetch fresh app data and reopen app tab
       const appTag = data?.appTag || data?.app?.tag;
@@ -279,8 +275,14 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
             public_key: user?.public_key || '',
           });
           const refreshedApp = appResponse.data;
-          
-          // Open or update the app tab with fresh data
+
+          // Close existing app tab if it exists, then reopen with fresh data
+          const existingAppTab = tabs.find(t => t.type === 'app' && t.itemId === refreshedApp._id);
+          if (existingAppTab) {
+            closeTab(existingAppTab.id);
+          }
+
+          // Reopen with fresh data
           openTab({
             id: `app-${refreshedApp._id}`,
             type: 'app',
@@ -288,17 +290,11 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
             itemId: refreshedApp._id,
             data: refreshedApp,
           });
+
+          toast.success('Authorization created successfully');
         } catch (error) {
           console.error('Failed to refresh app data:', error);
-          // Still try to open app tab with existing data if fetch fails
-          if (appIdToInvalidate) {
-            openTab({
-              id: `app-${appIdToInvalidate}`,
-              type: 'app',
-              title: data?.appName || 'App',
-              itemId: appIdToInvalidate,
-            });
-          }
+          toast.error('Failed to refresh app data');
         }
       }
     },

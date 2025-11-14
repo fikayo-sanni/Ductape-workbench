@@ -7,6 +7,7 @@ import {
   EndpointResponse,
 } from '@/types';
 import { Tab } from '@/types/tab';
+import { deleteTabState, cleanupOldTabStates } from '@/lib/tab-state-manager';
 
 interface WorkbenchState {
   // Workspaces
@@ -207,9 +208,19 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         return { activeTabId: existingTab.id };
       }
 
-      // Create new tab
+      // Find the index of the currently active tab
+      const activeTabIndex = state.tabs.findIndex((t) => t.id === state.activeTabId);
+
+      // Insert new tab after the current tab (or at the end if no active tab)
+      const newTabs = [...state.tabs];
+      if (activeTabIndex >= 0) {
+        newTabs.splice(activeTabIndex + 1, 0, tab);
+      } else {
+        newTabs.push(tab);
+      }
+
       return {
-        tabs: [...state.tabs, tab],
+        tabs: newTabs,
         activeTabId: tab.id,
       };
     }),
@@ -218,6 +229,9 @@ export const useWorkbenchStore = create<WorkbenchState>()(
     set((state) => {
       const newTabs = state.tabs.filter((t) => t.id !== tabId);
       let newActiveTabId = state.activeTabId;
+
+      // Delete tab state from localStorage
+      deleteTabState(tabId);
 
       // If closing the active tab, switch to another tab
       if (state.activeTabId === tabId) {
@@ -382,10 +396,33 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         activeView: state.activeView,
         currentWorkspaceId: state.currentWorkspaceId,
         currentProjectId: state.currentProjectId,
-        tabs: state.tabs,
+        // Only persist tab metadata, not the full data to avoid quota issues
+        tabs: state.tabs.map(tab => ({
+          id: tab.id,
+          type: tab.type,
+          title: tab.title,
+          itemId: tab.itemId,
+          isDirty: tab.isDirty,
+          // Include small initialization data (appId, productId, activeSection, etc.) but exclude large objects
+          data: tab.data ? {
+            appId: (tab.data as any).appId,
+            productId: (tab.data as any).productId,
+            integrationId: (tab.data as any).integrationId,
+            activeSection: (tab.data as any).activeSection,
+            isNew: (tab.data as any).isNew,
+            componentType: (tab.data as any).componentType,
+            productName: (tab.data as any).productName,
+            productTag: (tab.data as any).productTag,
+            productLogo: (tab.data as any).productLogo,
+            // Exclude large fields like full app object, versions, actions, webhooks, etc.
+          } : undefined,
+        })),
         activeTabId: state.activeTabId,
         chatbotSidebarOpen: state.chatbotSidebarOpen,
       }),
     }
   )
 );
+
+// Clean up old tab states on app initialization
+cleanupOldTabStates();

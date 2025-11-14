@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -20,6 +21,8 @@ import {
   Loader,
 } from 'lucide-react';
 import marketplaceServices from '@/services/marketplaceServices';
+import appServicesReal from '@/services/appServicesReal';
+import { toast } from 'react-hot-toast';
 import AppCard from '@/components/marketplace/AppCard';
 import MarketplaceSidebar from '@/components/marketplace/MarketplaceSidebar';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
@@ -27,6 +30,7 @@ import { IntegrationProvider } from '@/context/integration-context';
 
 export default function MarketplaceTabContent() {
   const { openTab } = useWorkbenchStore();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -34,6 +38,7 @@ export default function MarketplaceTabContent() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [integrationModalOpen, setIntegrationModalOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [isLoadingAppDetails, setIsLoadingAppDetails] = useState(false);
 
   // Fetch domains
   const { data: domainsRes, status: domainsStatus } = useQuery({
@@ -80,15 +85,42 @@ export default function MarketplaceTabContent() {
     }
   });
 
-  const handleAppClick = (app: any) => {
-    // Open app details in a new tab
-    openTab({
-      id: `marketplace-app-${app._id}-${Date.now()}`,
-      type: 'app',
-      title: app.app_name,
-      itemId: app._id,
-      data: { ...app, isMarketplaceApp: true },
-    });
+  const handleAppClick = async (app: any) => {
+    // Fetch full app details before opening tab
+    if (!user?._id || !user?.public_key) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    try {
+      setIsLoadingAppDetails(true);
+
+      // Fetch full app data using the app's tag
+      const appTag = app.domain_name || app.tag;
+      const appDetailsResponse = await appServicesReal.fetchAppByTag({
+        tag: appTag,
+        user_id: user._id,
+        public_key: user.public_key,
+      });
+
+      if (appDetailsResponse?.data) {
+        // Open app details in a new tab with full data
+        openTab({
+          id: `marketplace-app-${app._id}-${Date.now()}`,
+          type: 'app',
+          title: app.app_name,
+          itemId: app._id,
+          data: { ...appDetailsResponse.data, isMarketplaceApp: true },
+        });
+      } else {
+        toast.error('Failed to load app details');
+      }
+    } catch (error) {
+      console.error('Error fetching app details:', error);
+      toast.error('Failed to load app details');
+    } finally {
+      setIsLoadingAppDetails(false);
+    }
   };
 
   const handleIntegrateApp = (app: any) => {

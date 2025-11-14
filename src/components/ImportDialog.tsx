@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { Label } from './ui/label';
 import {
   Dialog,
   DialogContent,
@@ -8,20 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Upload, FileText, Link2 } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (data: { type: 'postman' | 'openapi'; source: 'file' | 'url'; content: string }) => void;
+  onImport: (data: { type: 'postman' | 'openapi'; source: 'file'; content: string }) => void;
+  isLoading?: boolean;
 }
 
-export default function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
+export default function ImportDialog({ open, onOpenChange, onImport, isLoading = false }: ImportDialogProps) {
   const [importType, setImportType] = useState<'postman' | 'openapi'>('postman');
-  const [importSource, setImportSource] = useState<'file' | 'url'>('file');
-  const [url, setUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -52,150 +50,143 @@ export default function ImportDialog({ open, onOpenChange, onImport }: ImportDia
   };
 
   const handleImport = async () => {
-    if (importSource === 'url' && url) {
-      onImport({ type: importType, source: 'url', content: url });
-    } else if (importSource === 'file' && file) {
+    if (file) {
       const content = await file.text();
       onImport({ type: importType, source: 'file', content });
     }
 
     // Reset
-    setUrl('');
     setFile(null);
     onOpenChange(false);
   };
 
-  const canImport = (importSource === 'url' && url) || (importSource === 'file' && file);
+  const canImport = file !== null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={isLoading ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Import to App</DialogTitle>
           <DialogDescription>
-            Import Postman collections or OpenAPI specifications to create an app
+            Import Postman collections to create an app with actions, environments, and variables
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={importType} onValueChange={(v) => setImportType(v as 'postman' | 'openapi')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="postman">Postman</TabsTrigger>
-            <TabsTrigger value="openapi">OpenAPI</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="postman" className="space-y-4 mt-4">
-            <p className="text-sm text-grey-600">
-              Import a Postman collection (v2.0 or v2.1) to automatically create an app with
-              actions, environments, and variables.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="openapi" className="space-y-4 mt-4">
-            <p className="text-sm text-grey-600">
-              Import an OpenAPI specification (v3.0 or v3.1) to automatically create an app with
-              endpoints and schemas.
-            </p>
-          </TabsContent>
-        </Tabs>
-
-        {/* Import Source */}
-        <div className="space-y-4 mt-4">
-          <div className="flex gap-2">
-            <Button
-              variant={importSource === 'file' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setImportSource('file')}
-              className="flex-1"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload File
-            </Button>
-            <Button
-              variant={importSource === 'url' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setImportSource('url')}
-              className="flex-1"
-            >
-              <Link2 className="h-4 w-4 mr-2" />
-              From URL
-            </Button>
-          </div>
-
-          {importSource === 'file' ? (
-            <div
+        {/* Import Type Selection */}
+        <div className="space-y-3 mt-4">
+          <Label className="text-sm font-semibold text-grey">Select Import Type</Label>
+          <div className="space-y-2">
+            <label
               className={cn(
-                'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
-                isDragging ? 'border-primary bg-blue-400' : 'border-grey-400',
-                file && 'border-green bg-green/5'
+                'flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors',
+                importType === 'postman' ? 'border-primary bg-primary/5' : 'border-grey-300 hover:border-grey-400'
               )}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
             >
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-grey-600" />
-                </div>
-
-                {file ? (
-                  <>
-                    <p className="text-sm font-medium text-grey">{file.name}</p>
-                    <p className="text-xs text-grey-600">
-                      {(file.size / 1024).toFixed(2)} KB
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFile(null)}
-                      className="mt-2"
-                    >
-                      Remove
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-grey-600">
-                      Drag and drop your JSON file here
-                    </p>
-                    <p className="text-xs text-grey-600">or</p>
-                    <label htmlFor="file-upload">
-                      <Button variant="outline" size="sm" asChild>
-                        <span>Browse Files</span>
-                      </Button>
-                    </label>
-                    <input
-                      id="file-upload"
-                      type="file"
-                      accept=".json"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-grey">URL</label>
-              <Input
-                placeholder="https://api.example.com/openapi.json"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
+              <input
+                type="radio"
+                name="importType"
+                value="postman"
+                checked={importType === 'postman'}
+                onChange={(e) => setImportType(e.target.value as 'postman' | 'openapi')}
+                className="w-4 h-4 text-primary"
               />
-              <p className="text-xs text-grey-600">
-                Paste the URL to your {importType === 'postman' ? 'Postman collection' : 'OpenAPI spec'}
-              </p>
+              <div className="flex-1">
+                <div className="font-semibold text-grey">Postman Collection</div>
+                <div className="text-sm text-grey-600">
+                  Import Postman v2.0 or v2.1 collections
+                </div>
+              </div>
+            </label>
+
+            <label
+              className={cn(
+                'flex items-center gap-3 p-4 border rounded-lg transition-colors opacity-50 cursor-not-allowed',
+                'border-grey-300'
+              )}
+            >
+              <input
+                type="radio"
+                name="importType"
+                value="openapi"
+                disabled
+                className="w-4 h-4 text-primary"
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-grey">OpenAPI Specification</div>
+                <div className="text-sm text-grey-600">
+                  Coming soon - OpenAPI v3.0 or v3.1
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* File Upload */}
+        <div className="space-y-3 mt-4">
+          <Label className="text-sm font-semibold text-grey">Upload File</Label>
+          <div
+            className={cn(
+              'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
+              isDragging ? 'border-primary bg-blue-400' : 'border-grey-400',
+              file && 'border-green bg-green/5'
+            )}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-grey-600" />
+              </div>
+
+              {file ? (
+                <>
+                  <p className="text-sm font-medium text-grey">{file.name}</p>
+                  <p className="text-xs text-grey-600">
+                    {(file.size / 1024).toFixed(2)} KB
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFile(null)}
+                    className="mt-2"
+                  >
+                    Remove
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-grey-600">
+                    Drag and drop your JSON file here
+                  </p>
+                  <p className="text-xs text-grey-600">or</p>
+                  <label htmlFor="file-upload">
+                    <Button variant="outline" size="sm" asChild>
+                      <span>Browse Files</span>
+                    </Button>
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleImport} disabled={!canImport}>
-            Import
+          {!isLoading && (
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+          )}
+          <Button onClick={handleImport} disabled={!canImport || isLoading}>
+            {isLoading ? 'Importing...' : 'Import'}
           </Button>
         </div>
       </DialogContent>

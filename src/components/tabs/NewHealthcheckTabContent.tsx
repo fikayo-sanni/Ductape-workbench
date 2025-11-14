@@ -456,6 +456,8 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="app">App</SelectItem>
+                    <SelectItem value="database">Database</SelectItem>
+                     <SelectItem value="database">Message Broker</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-grey-600 mt-1">

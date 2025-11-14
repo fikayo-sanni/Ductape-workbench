@@ -61,6 +61,17 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
     );
   }
 
+  if (!displayData) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600">Database not found</p>
+        </div>
+      </div>
+    );
+  }
+
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);

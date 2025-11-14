@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ConditionalModal from '@/components/modals/ConditionalModal';
-import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save } from 'lucide-react';
+import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save, BookOpen, X, List } from 'lucide-react';
 import { DataTypes, FeatureEventTypes } from '@ductape/sdk/dist/types';
 import { IFeatureInput } from '@ductape/sdk/dist/types';
 import toast from 'react-hot-toast';
@@ -225,6 +226,12 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   const [editingComponent, setEditingComponent] = useState<string | null>(null);
   const [editingComponentName, setEditingComponentName] = useState<string>('');
   const [selectedAppId, setSelectedAppId] = useState<string>('');
+
+  // Documentation sidebar state
+  const [showDocsSidebar, setShowDocsSidebar] = useState<boolean>(false);
+  const [selectedActionForDocs, setSelectedActionForDocs] = useState<any>(null);
+  const [showBodyDataTable, setShowBodyDataTable] = useState<boolean>(false);
+  const [showResponseDataTables, setShowResponseDataTables] = useState<Record<number, boolean>>({});
 
   // Update form values when sourceVariable changes
   useEffect(() => {
@@ -1148,7 +1155,7 @@ console.log('Feature result:', result);`;
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-6 relative">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
@@ -1568,6 +1575,20 @@ console.log('Feature result:', result);`;
                         )}
                       </div>
                       <div className="flex space-x-2">
+                        {component.action && (
+                          <Button
+                            onClick={() => {
+                              setSelectedActionForDocs(component.action);
+                              setShowDocsSidebar(true);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                          >
+                            <BookOpen className="w-3 h-3 mr-1" />
+                            Docs
+                          </Button>
+                        )}
                         <Select
                           value={state.componentCache[component.id] || 'no-cache'}
                           onValueChange={(value) => setState({
@@ -1778,14 +1799,30 @@ console.log('Feature result:', result);`;
                                     {component.tag}
                                   </span>
                                 </div>
-                                <Button
-                                  onClick={() => removeComponent(componentId)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
+                                <div className="flex space-x-2">
+                                  {component.action && (
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedActionForDocs(component.action);
+                                        setShowDocsSidebar(true);
+                                      }}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs"
+                                    >
+                                      <BookOpen className="w-3 h-3 mr-1" />
+                                      Docs
+                                    </Button>
+                                  )}
+                                  <Button
+                                    onClick={() => removeComponent(componentId)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
                               {/* Condition Configuration */}
                               <div className="mt-2 pt-2 border-t border-grey-300 ml-4">
@@ -2084,10 +2121,26 @@ console.log('Feature result:', result);`;
                         return (
                           <div key={componentId} className="mb-4 p-3 bg-grey-50 rounded-lg">
                             <div className="flex items-center justify-between mb-3">
-                              <h5 className="text-grey font-medium">{component.name}</h5>
-                              <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
-                                {component.tag}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <h5 className="text-grey font-medium">{component.name}</h5>
+                                <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
+                                  {component.tag}
+                                </span>
+                              </div>
+                              {component.action && (
+                                <Button
+                                  onClick={() => {
+                                    setSelectedActionForDocs(component.action);
+                                    setShowDocsSidebar(true);
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  <BookOpen className="w-3 h-3 mr-1" />
+                                  Docs
+                                </Button>
+                              )}
                             </div>
 
                             {/* Event Input Mapping Form */}
@@ -2641,6 +2694,331 @@ console.log('Feature result:', result);`;
           </ul>
         </div>
       </div>
+
+      {/* Action Documentation Sidebar */}
+      {showDocsSidebar && selectedActionForDocs && (
+        <div className="fixed top-0 right-0 h-full w-[500px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
+              <BookOpen className="w-5 h-5" />
+              Action Documentation
+            </h3>
+            <Button
+              onClick={() => {
+                setShowDocsSidebar(false);
+                setSelectedActionForDocs(null);
+              }}
+              variant="ghost"
+              size="sm"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Action Name & Tag */}
+            <div>
+              <h4 className="text-xl font-bold text-grey mb-2">{selectedActionForDocs.name}</h4>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded font-mono">
+                  {selectedActionForDocs.tag}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                  selectedActionForDocs.method === 'GET' ? 'bg-green/10 text-green' :
+                  selectedActionForDocs.method === 'POST' ? 'bg-blue/10 text-blue' :
+                  selectedActionForDocs.method === 'PUT' ? 'bg-orange/10 text-orange' :
+                  selectedActionForDocs.method === 'DELETE' ? 'bg-red/10 text-red' :
+                  'bg-grey-200 text-grey'
+                }`}>
+                  {selectedActionForDocs.method}
+                </span>
+              </div>
+              {selectedActionForDocs.description && (
+                <p className="text-sm text-grey-600 mt-2">{selectedActionForDocs.description}</p>
+              )}
+            </div>
+
+            {/* Resource/Endpoint */}
+            {selectedActionForDocs.resource && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Endpoint</Label>
+                <code className="text-sm bg-grey-100 px-3 py-2 rounded border border-grey-300 block font-mono">
+                  {selectedActionForDocs.resource}
+                </code>
+              </div>
+            )}
+
+            {/* Request Type */}
+            {selectedActionForDocs.request_type && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Request Type</Label>
+                <span className="text-sm bg-grey-100 px-3 py-1.5 rounded border border-grey-300 inline-block">
+                  {selectedActionForDocs.request_type}
+                </span>
+              </div>
+            )}
+
+            {/* Path Parameters */}
+            {selectedActionForDocs.params?.data && selectedActionForDocs.params.data.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Path Parameters</Label>
+                <div className="space-y-2">
+                  {selectedActionForDocs.params.data.map((param: any, index: number) => (
+                    <div key={index} className="p-3 bg-grey-50 rounded border border-grey-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <code className="text-sm font-mono font-semibold text-primary">{param.key}</code>
+                        {param.metadata?.required && (
+                          <span className="text-xs bg-red/10 text-red px-2 py-0.5 rounded">Required</span>
+                        )}
+                      </div>
+                      {param.metadata?.type && (
+                        <p className="text-xs text-grey-600">Type: <span className="font-mono">{param.metadata.type}</span></p>
+                      )}
+                      {param.value && (
+                        <p className="text-xs text-grey-600 mt-1">Example: <code className="font-mono bg-white px-1">{param.value}</code></p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Query Parameters */}
+            {selectedActionForDocs.query?.data && selectedActionForDocs.query.data.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Query Parameters</Label>
+                <div className="space-y-2">
+                  {selectedActionForDocs.query.data.map((param: any, index: number) => (
+                    <div key={index} className="p-3 bg-grey-50 rounded border border-grey-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <code className="text-sm font-mono font-semibold text-primary">{param.key}</code>
+                        {param.metadata?.required && (
+                          <span className="text-xs bg-red/10 text-red px-2 py-0.5 rounded">Required</span>
+                        )}
+                      </div>
+                      {param.metadata?.type && (
+                        <p className="text-xs text-grey-600">Type: <span className="font-mono">{param.metadata.type}</span></p>
+                      )}
+                      {param.value && (
+                        <p className="text-xs text-grey-600 mt-1">Example: <code className="font-mono bg-white px-1">{param.value}</code></p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Headers */}
+            {selectedActionForDocs.headers?.data && selectedActionForDocs.headers.data.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Headers</Label>
+                <div className="space-y-2">
+                  {selectedActionForDocs.headers.data.map((header: any, index: number) => (
+                    <div key={index} className="p-3 bg-grey-50 rounded border border-grey-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <code className="text-sm font-mono font-semibold text-primary">{header.key}</code>
+                      </div>
+                      {header.value && (
+                        <p className="text-xs text-grey-600">Value: <code className="font-mono bg-white px-1">{header.value}</code></p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Request Body */}
+            {selectedActionForDocs.body?.sample && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-semibold text-grey-700">Request Body</Label>
+                  {selectedActionForDocs.body?.data && selectedActionForDocs.body.data.length > 0 && (
+                    <Button
+                      onClick={() => setShowBodyDataTable(!showBodyDataTable)}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <List className="w-3 h-3 mr-1" />
+                      {showBodyDataTable ? 'Show Sample' : 'Show Data'}
+                    </Button>
+                  )}
+                </div>
+                {!showBodyDataTable ? (
+                  <div className="bg-grey-50 rounded border border-grey-300 p-3">
+                    <pre className="text-xs font-mono overflow-x-auto">
+                      {(() => {
+                        try {
+                          const sample = selectedActionForDocs.body.sample;
+                          // If sample is a string, try to parse it as JSON
+                          if (typeof sample === 'string') {
+                            try {
+                              const parsed = JSON.parse(sample);
+                              return JSON.stringify(parsed, null, 2);
+                            } catch {
+                              // Not valid JSON, return as-is
+                              return sample;
+                            }
+                          }
+                          // If it's already an object, stringify it
+                          return JSON.stringify(sample, null, 2);
+                        } catch {
+                          return selectedActionForDocs.body.sample;
+                        }
+                      })()}
+                    </pre>
+                  </div>
+                ) : (
+                  <div className="border border-grey-300 rounded overflow-hidden">
+                    <Table className="text-xs">
+                      <TableHeader className="bg-grey-100">
+                        <TableRow>
+                          <TableHead className="text-xs font-semibold text-grey">Key</TableHead>
+                          <TableHead className="text-xs font-semibold text-grey">Type</TableHead>
+                          <TableHead className="text-xs font-semibold text-grey">Description</TableHead>
+                          <TableHead className="text-xs font-semibold text-grey">Length</TableHead>
+                          <TableHead className="text-xs font-semibold text-grey">Required</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedActionForDocs.body.data.map((row: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-grey font-mono">{row.key}</TableCell>
+                            <TableCell className="text-grey">
+                              <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
+                                {row.type || row.metadata?.type || 'string'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-grey text-xs">{row.description || '--'}</TableCell>
+                            <TableCell className="text-grey text-xs">
+                              {row.minLength || row.metadata?.minLength ? `min: ${row.minLength || row.metadata?.minLength}` : ''}
+                              {row.maxLength || row.metadata?.maxLength ? ` max: ${row.maxLength || row.metadata?.maxLength}` : ''}
+                              {!row.minLength && !row.metadata?.minLength && !row.maxLength && !row.metadata?.maxLength ? '--' : ''}
+                            </TableCell>
+                            <TableCell className="text-grey">
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                (row.required || row.metadata?.required) ? 'bg-orange/10 text-orange' : 'bg-grey-200 text-grey'
+                              }`}>
+                                {((row.required || row.metadata?.required) ? 'true' : 'false')}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Response(s) */}
+            {selectedActionForDocs.responses && selectedActionForDocs.responses.filter((r: any) => r.success === true).length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Responses</Label>
+                <div className="space-y-3">
+                  {selectedActionForDocs.responses.filter((r: any) => r.success === true).map((response: any, index: number) => (
+                    <div key={index} className="border border-grey-300 rounded-lg overflow-hidden">
+                      <div className="bg-grey-100 px-3 py-2 border-b border-grey-300 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-grey">{response.name || `Response ${index + 1}`}</span>
+                          <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                            response.success ? 'bg-green/10 text-green' : 'bg-red/10 text-red'
+                          }`}>
+                            {response.status_code}
+                          </span>
+                          {response.success ? (
+                            <span className="text-xs text-green font-medium">Success</span>
+                          ) : (
+                            <span className="text-xs text-red font-medium">Error</span>
+                          )}
+                        </div>
+                        {response.body?.data && response.body.data.length > 0 && (
+                          <Button
+                            onClick={() => setShowResponseDataTables(prev => ({
+                              ...prev,
+                              [index]: !prev[index]
+                            }))}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                          >
+                            <List className="w-3 h-3 mr-1" />
+                            {showResponseDataTables[index] ? 'Show Sample' : 'Show Data'}
+                          </Button>
+                        )}
+                      </div>
+                      {!showResponseDataTables[index] ? (
+                        <div className="p-3 bg-grey-50">
+                          <pre className="text-xs font-mono overflow-x-auto">
+                            {(() => {
+                              try {
+                                const sample = response.body?.sample || response.body;
+                                // If sample is a string, try to parse it as JSON
+                                if (typeof sample === 'string') {
+                                  try {
+                                    const parsed = JSON.parse(sample);
+                                    return JSON.stringify(parsed, null, 2);
+                                  } catch {
+                                    // Not valid JSON, return as-is
+                                    return sample;
+                                  }
+                                }
+                                // If it's already an object, stringify it
+                                return JSON.stringify(sample, null, 2);
+                              } catch {
+                                return response.body?.sample || response.body;
+                              }
+                            })()}
+                          </pre>
+                        </div>
+                      ) : (
+                        <div className="p-3">
+                          <Table className="text-xs">
+                            <TableHeader className="bg-grey-100">
+                              <TableRow>
+                                <TableHead className="text-xs font-semibold text-grey">Key</TableHead>
+                                <TableHead className="text-xs font-semibold text-grey">Type</TableHead>
+                                <TableHead className="text-xs font-semibold text-grey">Description</TableHead>
+                                <TableHead className="text-xs font-semibold text-grey">Length</TableHead>
+                                <TableHead className="text-xs font-semibold text-grey">Required</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {response.body.data.map((row: any, idx: number) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="text-grey font-mono">{row.key}</TableCell>
+                                  <TableCell className="text-grey">
+                                    <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
+                                      {row.type || row.metadata?.type || 'string'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-grey text-xs">{row.description || '--'}</TableCell>
+                                  <TableCell className="text-grey text-xs">
+                                    {row.minLength || row.metadata?.minLength ? `min: ${row.minLength || row.metadata?.minLength}` : ''}
+                                    {row.maxLength || row.metadata?.maxLength ? ` max: ${row.maxLength || row.metadata?.maxLength}` : ''}
+                                    {!row.minLength && !row.metadata?.minLength && !row.maxLength && !row.metadata?.maxLength ? '--' : ''}
+                                  </TableCell>
+                                  <TableCell className="text-grey">
+                                    <span className={`px-2 py-0.5 rounded text-xs ${
+                                      (row.required || row.metadata?.required) ? 'bg-orange/10 text-orange' : 'bg-grey-200 text-grey'
+                                    }`}>
+                                      {((row.required || row.metadata?.required) ? 'true' : 'false')}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Conditional Modal */}
       {editingComponentId && (

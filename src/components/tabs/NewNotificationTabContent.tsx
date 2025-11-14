@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,9 +41,9 @@ interface EnvConfig {
   callbacks?: {
     url?: string;
     method?: string;
-    headers?: Array<{ key: string; value: string }>;
-    query?: Array<{ key: string; value: string }>;
-    params?: Array<{ key: string; value: string }>;
+    headers?: Record<string, string>;
+    query?: Record<string, string>;
+    params?: Record<string, string>;
     body?: string;
   };
 }
@@ -148,64 +148,25 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       if (!product?.tag) throw new Error('Product tag not found');
 
       await ductape.init(product.tag);
-
-      const envs = envConfigs.map(config => ({
-        slug: config.slug,
-        ...(selectedNotifiers.find(n => n.id === 'push')?.selected && config.push_notifications && {
-          push_notifications: config.push_notifications,
-        }),
-        ...(selectedNotifiers.find(n => n.id === 'email')?.selected && config.emails && {
-          emails: config.emails,
-        }),
-        ...(selectedNotifiers.find(n => n.id === 'sms')?.selected && config.sms && {
-          sms: config.sms,
-        }),
-        ...(selectedNotifiers.find(n => n.id === 'callback')?.selected && config.callbacks && {
-          callbacks: {
-            url: config.callbacks.url,
-            method: config.callbacks.method,
-            headers: config.callbacks.headers?.length ? {
-              ...config.callbacks.headers.reduce((acc, item) => {
-                if (item.key && item.value) acc[item.key] = item.value;
-                return acc;
-              }, {} as Record<string, string>)
-            } : undefined,
-            query: config.callbacks.query?.length ? {
-              ...config.callbacks.query.reduce((acc, item) => {
-                if (item.key && item.value) acc[item.key] = item.value;
-                return acc;
-              }, {} as Record<string, string>)
-            } : undefined,
-            params: config.callbacks.params?.length ? {
-              ...config.callbacks.params.reduce((acc, item) => {
-                if (item.key && item.value) acc[item.key] = item.value;
-                return acc;
-              }, {} as Record<string, string>)
-            } : undefined,
-            body: config.callbacks.body,
-          },
-        }),
-      }));
-
       const payload = {
         name: formData.name,
         tag: formData.tag,
         description: formData.description,
-        envs,
+        envs: envConfigs,
       };
 
       const notification = await ductape.notifications.create(payload);
       return notification;
     },
-    onSuccess: (notification) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications', product?._id] });
       closeTab(tabId || '');
       openTab({
-        id: `notification-${notification._id}-${Date.now()}`,
-        type: 'notifier',
-        title: notification.name,
-        itemId: notification._id,
-        data: { ...notification, componentType: 'notifier', productName: product?.name },
+        id: `product-${product?._id}`,
+        type: 'product',
+        title: product?.name || 'Product',
+        itemId: product?._id,
+        data: product,
       });
       toast.success('Notifier created successfully');
     },
@@ -214,7 +175,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = async() => {
     if (!formData.name.trim()) {
       toast.error('Please enter a name');
       return;
@@ -229,7 +190,37 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       return;
     }
 
-    createNotification();
+    // Debug: Show the complete notification object before sending
+    const envs = envConfigs.map(config => ({
+      slug: config.slug,
+      ...(selectedNotifiers.find(n => n.id === 'push')?.selected && config.push_notifications && {
+        push_notifications: config.push_notifications,
+      }),
+      ...(selectedNotifiers.find(n => n.id === 'email')?.selected && config.emails && {
+        emails: config.emails,
+      }),
+      ...(selectedNotifiers.find(n => n.id === 'sms')?.selected && config.sms && {
+        sms: config.sms,
+      }),
+      ...(selectedNotifiers.find(n => n.id === 'callback')?.selected && config.callbacks && {
+        callbacks: config.callbacks,
+      }),
+    }));
+
+    const payload = {
+      name: formData.name,
+      tag: formData.tag,
+      description: formData.description,
+      envs,
+    };
+
+    // alert(JSON.stringify(payload));
+    
+    // console.log('Complete notification payload:', JSON.stringify(payload, null, 2));
+
+    // return;
+    console.log('Complete notification payload:', JSON.stringify(payload, null, 2));
+    await createNotification();
   };
 
   const isStep1Complete = formData.name.trim() !== '' && formData.tag.trim() !== '';
@@ -458,7 +449,7 @@ function EnvironmentConfigCard({
       </div>
 
       {previousConfigs && previousConfigs.length > 0 && (
-        <div className="flex items-center gap-2 pb-2 border-b border-grey-300">
+        <>{/* <div className="flex items-center gap-2 pb-2 border-b border-grey-300">
           <span className="text-sm text-grey-600">Quick copy:</span>
           <div className="flex gap-2 flex-wrap">
             {previousConfigs.map((prevConfig, idx) => (
@@ -477,11 +468,11 @@ function EnvironmentConfigCard({
               </Button>
             ))}
           </div>
-        </div>
+        </div> */}</>
       )}
 
       {/* Channels - Progressive Disclosure */}
-      <Accordion type="multiple" className="w-full">
+      <Accordion type="multiple" defaultValue={['push', 'email', 'sms', 'callback']} className="w-full">
         {selectedNotifiers.find(n => n.id === 'push')?.selected && (
           <AccordionItem value="push" className="border-b border-grey-300 last:border-b-0">
             <AccordionTrigger className="py-3 hover:no-underline">
@@ -579,8 +570,45 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
     client_x509_cert_url: '',
   });
   const [databaseUrl, setDatabaseUrl] = useState('');
+  const isSyncingRef = useRef(false);
+
+  // Initialize from envConfig.push_notifications when it changes (for Quick Copy)
+  useEffect(() => {
+    if (envConfig.push_notifications) {
+      const pushNotif = envConfig.push_notifications as any;
+      if (pushNotif.type === Notifiers.FIREBASE && pushNotif.credentials) {
+        isSyncingRef.current = true;
+        setNotificationType('firebase');
+        setCredentials({
+          type: pushNotif.credentials.type || 'service_account',
+          project_id: pushNotif.credentials.project_id || '',
+          private_key_id: pushNotif.credentials.private_key_id || '',
+          private_key: pushNotif.credentials.private_key || '',
+          client_email: pushNotif.credentials.client_email || '',
+          client_id: pushNotif.credentials.client_id || '',
+          auth_uri: pushNotif.credentials.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: pushNotif.credentials.token_uri || 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: pushNotif.credentials.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: pushNotif.credentials.client_x509_cert_url || '',
+        });
+        setDatabaseUrl(pushNotif.databaseUrl || '');
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 100);
+      } else if (pushNotif.type === Notifiers.EXPO) {
+        isSyncingRef.current = true;
+        setNotificationType('expo');
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 100);
+      }
+    }
+  }, [envConfig.push_notifications]);
 
   useEffect(() => {
+    // Don't sync if we're currently initializing from parent
+    if (isSyncingRef.current) return;
+
     if (notificationType === 'firebase') {
       onConfigChange({
         ...envConfig,
@@ -598,7 +626,8 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
         },
       });
     }
-  }, [notificationType, credentials, databaseUrl, envConfig, onConfigChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationType, credentials, databaseUrl]);
 
   return (
     <div className="space-y-4">
@@ -786,13 +815,52 @@ function EmailConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onCo
     auth_pass: '',
     secure: false,
   });
+  const isSyncingRef = useRef(false);
+
+  // Initialize from envConfig.emails when it changes (for Quick Copy)
+  useEffect(() => {
+    if (envConfig.emails) {
+      const emails = envConfig.emails as any;
+      isSyncingRef.current = true;
+      setEmailConfig({
+        host: emails.host || '',
+        port: emails.port || '',
+        sender_email: emails.sender_email || '',
+        auth_user: emails.auth?.user || emails.auth_user || '',
+        auth_pass: emails.auth?.pass || emails.auth_pass || '',
+        secure: emails.secure || false,
+      });
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 100);
+    }
+  }, [envConfig.emails]);
 
   useEffect(() => {
+    // Don't sync if we're currently initializing from parent
+    if (isSyncingRef.current) return;
+
+    // Build the email config with nested auth object
+    const emailsData = {
+      host: emailConfig.host,
+      port: emailConfig.port,
+      sender_email: emailConfig.sender_email,
+      auth: {
+        user: emailConfig.auth_user,
+        pass: emailConfig.auth_pass,
+      },
+      secure: emailConfig.secure,
+    };
+
+    // Debug: Show constructed object
+    console.log('Email config being sent:', emailsData);
+
     onConfigChange({
       ...envConfig,
-      emails: emailConfig,
+      emails: emailsData,
     });
-  }, [emailConfig, envConfig, onConfigChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailConfig]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -856,20 +924,109 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
     provider: '',
     accountSid: '',
     authToken: '',
+    apiKey: '',
+    apiSecret: '',
     sender: '',
   });
   const [showAuthToken, setShowAuthToken] = useState(false);
+  const [showApiSecret, setShowApiSecret] = useState(false);
+  const isSyncingRef = useRef(false);
+
+  // Initialize from envConfig.sms when it changes (for Quick Copy)
+  useEffect(() => {
+    if (envConfig.sms) {
+      isSyncingRef.current = true;
+      setSmsConfig({
+        provider: (envConfig.sms as any).provider || '',
+        accountSid: (envConfig.sms as any).accountSid || '',
+        authToken: (envConfig.sms as any).authToken || '',
+        apiKey: (envConfig.sms as any).apiKey || '',
+        apiSecret: (envConfig.sms as any).apiSecret || '',
+        sender: (envConfig.sms as any).sender || '',
+      });
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 100);
+    }
+  }, [envConfig.sms]);
 
   useEffect(() => {
+    // Don't sync if we're currently initializing from parent
+    if (isSyncingRef.current) return;
+
+    // Build the SMS config with standardized format
+    const smsData = {
+      provider: smsConfig.provider,
+      accountSid: smsConfig.accountSid,
+      authToken: smsConfig.authToken,
+      sender: smsConfig.sender,
+    };
+
+    // Debug: Show constructed object
+    console.log('SMS config being sent:', smsData);
+
     onConfigChange({
       ...envConfig,
-      sms: smsConfig,
+      sms: smsData,
     });
-  }, [smsConfig, envConfig, onConfigChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smsConfig]);
+
+  // Get provider-specific field labels and visibility
+  const getFieldConfig = () => {
+    switch (smsConfig.provider) {
+      case 'twilio':
+        return {
+          field1Label: 'Account SID',
+          field1Placeholder: 'ACxxxxxxxxxx',
+          field1Key: 'accountSid' as const,
+          field2Label: 'Auth Token',
+          field2Placeholder: 'Your Twilio auth token',
+          field2Key: 'authToken' as const,
+          showApiKey: false,
+          showApiSecret: false,
+        };
+      case 'nexmo':
+        return {
+          field1Label: 'API Key',
+          field1Placeholder: 'Your Nexmo API key',
+          field1Key: 'apiKey' as const,
+          field2Label: 'API Secret',
+          field2Placeholder: 'Your Nexmo API secret',
+          field2Key: 'apiSecret' as const,
+          showApiKey: true,
+          showApiSecret: true,
+        };
+      case 'plivo':
+        return {
+          field1Label: 'Auth ID',
+          field1Placeholder: 'Your Plivo auth ID',
+          field1Key: 'accountSid' as const,
+          field2Label: 'API Key',
+          field2Placeholder: 'Your Plivo API key',
+          field2Key: 'apiKey' as const,
+          showApiKey: true,
+          showApiSecret: false,
+        };
+      default:
+        return {
+          field1Label: 'Account SID / Auth ID',
+          field1Placeholder: '',
+          field1Key: 'accountSid' as const,
+          field2Label: 'Auth Token / API Key',
+          field2Placeholder: '',
+          field2Key: 'authToken' as const,
+          showApiKey: false,
+          showApiSecret: false,
+        };
+    }
+  };
+
+  const fieldConfig = getFieldConfig();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
+      <div className="col-span-2">
         <Label>SMS Provider</Label>
         <Select value={smsConfig.provider} onValueChange={(v) => setSmsConfig({ ...smsConfig, provider: v })}>
           <SelectTrigger className="mt-1">
@@ -882,47 +1039,57 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
           </SelectContent>
         </Select>
       </div>
-      <div>
-        <Label>Account SID</Label>
-        <Input
-          value={smsConfig.accountSid}
-          onChange={(e) => setSmsConfig({ ...smsConfig, accountSid: e.target.value })}
-          className="mt-1"
-          placeholder="ACxxxxxxxxxx"
-        />
-      </div>
-      <div>
-        <Label>Auth Token</Label>
-        <div className="relative mt-1">
-          <Input
-            type={showAuthToken ? 'text' : 'password'}
-            value={smsConfig.authToken}
-            onChange={(e) => setSmsConfig({ ...smsConfig, authToken: e.target.value })}
-            className="pr-10"
-          />
-          <button
-            type="button"
-            onClick={() => setShowAuthToken(prev => !prev)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
-            aria-label={showAuthToken ? 'Hide auth token' : 'Show auth token'}
-          >
-            {showAuthToken ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      </div>
-      <div>
-        <Label>Sender Number</Label>
-        <Input
-          value={smsConfig.sender}
-          onChange={(e) => setSmsConfig({ ...smsConfig, sender: e.target.value })}
-          className="mt-1"
-          placeholder="+1415xxxxxxx"
-        />
-      </div>
+
+      {smsConfig.provider && (
+        <>
+          <div>
+            <Label>{fieldConfig.field1Label}</Label>
+            <Input
+              value={smsConfig[fieldConfig.field1Key]}
+              onChange={(e) => setSmsConfig({ ...smsConfig, [fieldConfig.field1Key]: e.target.value })}
+              className="mt-1"
+              placeholder={fieldConfig.field1Placeholder}
+            />
+          </div>
+
+          <div>
+            <Label>{fieldConfig.field2Label}</Label>
+            <div className="relative mt-1">
+              <Input
+                type={(fieldConfig.field2Key === 'authToken' && showAuthToken) || (fieldConfig.field2Key === 'apiSecret' && showApiSecret) || fieldConfig.field2Key === 'apiKey' ? 'text' : 'password'}
+                value={smsConfig[fieldConfig.field2Key]}
+                onChange={(e) => setSmsConfig({ ...smsConfig, [fieldConfig.field2Key]: e.target.value })}
+                className="pr-10"
+                placeholder={fieldConfig.field2Placeholder}
+              />
+              {(fieldConfig.field2Key === 'authToken' || fieldConfig.field2Key === 'apiSecret') && (
+                <button
+                  type="button"
+                  onClick={() => fieldConfig.field2Key === 'authToken' ? setShowAuthToken(prev => !prev) : setShowApiSecret(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+                  aria-label={(fieldConfig.field2Key === 'authToken' && showAuthToken) || (fieldConfig.field2Key === 'apiSecret' && showApiSecret) ? 'Hide' : 'Show'}
+                >
+                  {((fieldConfig.field2Key === 'authToken' && showAuthToken) || (fieldConfig.field2Key === 'apiSecret' && showApiSecret)) ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="col-span-2">
+            <Label>Sender Phone Number</Label>
+            <Input
+              value={smsConfig.sender}
+              onChange={(e) => setSmsConfig({ ...smsConfig, sender: e.target.value })}
+              className="mt-1"
+              placeholder="+1415xxxxxxx"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -931,40 +1098,108 @@ function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; o
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('POST');
   const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>([]);
+  const lastSyncedCallbacksRef = useRef<any>(null);
+
+  // Initialize from envConfig.callbacks when it changes (for Quick Copy)
+  useEffect(() => {
+    // Only initialize if callbacks actually changed (not from our own sync)
+    if (envConfig.callbacks && envConfig.callbacks !== lastSyncedCallbacksRef.current) {
+      const callbacks = envConfig.callbacks;
+      setUrl(callbacks.url || '');
+      setMethod(callbacks.method || 'POST');
+
+      // Reconstruct requestFields from callbacks
+      const fields: Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }> = [];
+
+      // Add headers (now an object)
+      if (callbacks.headers) {
+        Object.entries(callbacks.headers).forEach(([key, value], idx) => {
+          fields.push({
+            id: `header_${Date.now()}_${idx}`,
+            key,
+            value,
+            addTo: 'headers',
+          });
+        });
+      }
+
+      // Add query params (now an object)
+      if (callbacks.query) {
+        Object.entries(callbacks.query).forEach(([key, value], idx) => {
+          fields.push({
+            id: `query_${Date.now()}_${idx}`,
+            key,
+            value,
+            addTo: 'query',
+          });
+        });
+      }
+
+      // Add params (now an object)
+      if (callbacks.params) {
+        Object.entries(callbacks.params).forEach(([key, value], idx) => {
+          fields.push({
+            id: `param_${Date.now()}_${idx}`,
+            key,
+            value,
+            addTo: 'params',
+          });
+        });
+      }
+
+      // Add body
+      if (callbacks.body) {
+        fields.push({
+          id: `body_${Date.now()}`,
+          key: 'body',
+          value: callbacks.body,
+          addTo: 'body',
+        });
+      }
+
+      setRequestFields(fields);
+    }
+  }, [envConfig.callbacks]);
 
   useEffect(() => {
-    // Build headers, query, params, and body arrays to match the interface
-    const headers: Array<{ key: string; value: string }> = [];
-    const query: Array<{ key: string; value: string }> = [];
-    const params: Array<{ key: string; value: string }> = [];
+    // Build headers, query, params, and body as objects
+    const headers: Record<string, string> = {};
+    const query: Record<string, string> = {};
+    const params: Record<string, string> = {};
     let body = '';
 
     requestFields.forEach(item => {
       if (item.key && item.value) {
         if (item.addTo === 'headers') {
-          headers.push({ key: item.key, value: item.value });
+          headers[item.key] = item.value;
         } else if (item.addTo === 'query') {
-          query.push({ key: item.key, value: item.value });
+          query[item.key] = item.value;
         } else if (item.addTo === 'params') {
-          params.push({ key: item.key, value: item.value });
+          params[item.key] = item.value;
         } else if (item.addTo === 'body') {
           body = item.value;
         }
       }
     });
 
+    const newCallbacks = {
+      url,
+      method,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
+      query: Object.keys(query).length > 0 ? query : undefined,
+      params: Object.keys(params).length > 0 ? params : undefined,
+      body: body || undefined,
+    };
+
+    // Store reference to what we're syncing
+    lastSyncedCallbacksRef.current = newCallbacks;
+
     onConfigChange({
       ...envConfig,
-      callbacks: { 
-        url, 
-        method, 
-        headers: headers.length > 0 ? headers : undefined,
-        query: query.length > 0 ? query : undefined,
-        params: params.length > 0 ? params : undefined,
-        body: body || undefined,
-      },
+      callbacks: newCallbacks,
     });
-  }, [url, method, requestFields, envConfig, onConfigChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, method, requestFields]);
 
   const handleAddField = () => {
     const newField = { 
@@ -1086,6 +1321,80 @@ function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; o
       <p className="text-xs text-grey-600 mt-2">
         Configure how the callback request should be constructed with fields that can be added to headers, query parameters, path parameters, or the request body.
       </p>
+
+      {/* Request Preview */}
+      {url && (
+        <div className="mt-4 p-4 bg-grey-100 rounded-lg border border-grey-300">
+          <h4 className="text-sm font-semibold text-grey mb-3">Request Preview</h4>
+          <div className="space-y-3 text-sm font-mono">
+            {/* Method and URL */}
+            <div>
+              <span className="text-blue-600 font-bold">{method}</span>{' '}
+              <span className="text-grey">{url}</span>
+            </div>
+
+            {/* Headers */}
+            {requestFields.some(f => f.addTo === 'headers' && f.key && f.value) && (
+              <div>
+                <div className="text-xs text-grey-600 font-sans mb-1">Headers:</div>
+                <div className="pl-4 space-y-1">
+                  {requestFields
+                    .filter(f => f.addTo === 'headers' && f.key && f.value)
+                    .map(f => (
+                      <div key={f.id} className="text-grey-700">
+                        <span className="text-purple-600">{f.key}:</span> {f.value}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Query Parameters */}
+            {requestFields.some(f => f.addTo === 'query' && f.key && f.value) && (
+              <div>
+                <div className="text-xs text-grey-600 font-sans mb-1">Query Params:</div>
+                <div className="pl-4 space-y-1">
+                  {requestFields
+                    .filter(f => f.addTo === 'query' && f.key && f.value)
+                    .map(f => (
+                      <div key={f.id} className="text-grey-700">
+                        <span className="text-green-600">{f.key}:</span> {f.value}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Path Parameters */}
+            {requestFields.some(f => f.addTo === 'params' && f.key && f.value) && (
+              <div>
+                <div className="text-xs text-grey-600 font-sans mb-1">Path Params:</div>
+                <div className="pl-4 space-y-1">
+                  {requestFields
+                    .filter(f => f.addTo === 'params' && f.key && f.value)
+                    .map(f => (
+                      <div key={f.id} className="text-grey-700">
+                        <span className="text-orange-600">{f.key}:</span> {f.value}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Body */}
+            {requestFields.some(f => f.addTo === 'body' && f.value) && (
+              <div>
+                <div className="text-xs text-grey-600 font-sans mb-1">Body:</div>
+                <div className="pl-4 bg-white p-2 rounded border border-grey-300">
+                  <pre className="text-grey-700 whitespace-pre-wrap break-all">
+                    {requestFields.find(f => f.addTo === 'body')?.value}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
