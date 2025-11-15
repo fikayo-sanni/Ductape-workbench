@@ -480,8 +480,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                    selectedType === JobEventTypes.DATABASE_ACTION ? 'Database' :
                    selectedType === JobEventTypes.NOTIFICATION ? 'Notification' :
                    selectedType === JobEventTypes.PUBLISH ? 'Message Broker' :
-                   selectedType === JobEventTypes.STORAGE ? 'Storage' :
-                   selectedType === JobEventTypes.FEATURE ? 'Feature' : 'Parent'}
+                   selectedType === JobEventTypes.STORAGE ? 'Storage' : 'Parent'}
                 </Label>
                 <Select
                   value={formData.parent}
@@ -496,8 +495,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                       selectedType === JobEventTypes.DATABASE_ACTION ? 'Select database' :
                       selectedType === JobEventTypes.NOTIFICATION ? 'Select notification' :
                       selectedType === JobEventTypes.PUBLISH ? 'Select message broker' :
-                      selectedType === JobEventTypes.STORAGE ? 'Select storage' :
-                      selectedType === JobEventTypes.FEATURE ? 'Select feature' : 'Select parent component'
+                      selectedType === JobEventTypes.STORAGE ? 'Select storage' : 'Select parent component'
                     } />
                   </SelectTrigger>
                   <SelectContent>
@@ -513,8 +511,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                    selectedType === JobEventTypes.DATABASE_ACTION ? 'Select the database to monitor' :
                    selectedType === JobEventTypes.NOTIFICATION ? 'Select the notification to trigger' :
                    selectedType === JobEventTypes.PUBLISH ? 'Select the message broker' :
-                   selectedType === JobEventTypes.STORAGE ? 'Select the storage to monitor' :
-                   selectedType === JobEventTypes.FEATURE ? 'Select the feature to execute' : 'The parent component for this event'}
+                   selectedType === JobEventTypes.STORAGE ? 'Select the storage to monitor' : 'The parent component for this event'}
                 </p>
               </div>
             )}
