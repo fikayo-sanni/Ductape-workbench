@@ -34,8 +34,8 @@ interface WorkbenchState {
   chatbotSidebarOpen: boolean;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
-  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace';
-  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'marketplace' | 'chatbot' | null;
+  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
+  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | null;
 
   // Logs Filter State
   logsFilters: {
@@ -79,6 +79,7 @@ interface WorkbenchState {
   openDashboardTab: () => void;
   openTokensTab: () => void;
   openTeamsTab: () => void;
+  openPartnershipTab: () => void;
   openMarketplaceTab: () => void;
 
   // Actions - UI
@@ -198,13 +199,23 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   // Tab Actions
   openTab: (tab) =>
     set((state) => {
-      // Check if tab already exists (by itemId and type, or just by id if new tab)
+      // Check if tab already exists by:
+      // 1. Static ID (for singleton tabs like 'partnership-search')
+      // 2. itemId and type (for content tabs with data)
       const existingTab = state.tabs.find(
-        (t) => t.itemId === tab.itemId && t.type === tab.type && tab.itemId
+        (t) => (tab.id && t.id === tab.id) || (t.itemId === tab.itemId && t.type === tab.type && tab.itemId)
       );
 
       if (existingTab) {
         // Tab already exists, just switch to it
+        // If it's a partnership tab, also switch sidebar to partnership view
+        if (existingTab.type === 'partnership' && existingTab.itemId) {
+          return {
+            activeTabId: existingTab.id,
+            activeView: 'partnership',
+            activeIconSidebar: 'partnership',
+          };
+        }
         return { activeTabId: existingTab.id };
       }
 
@@ -217,6 +228,16 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         newTabs.splice(activeTabIndex + 1, 0, tab);
       } else {
         newTabs.push(tab);
+      }
+
+      // If opening a partnership detail tab, also switch sidebar to partnership view
+      if (tab.type === 'partnership' && tab.itemId) {
+        return {
+          tabs: newTabs,
+          activeTabId: tab.id,
+          activeView: 'partnership',
+          activeIconSidebar: 'partnership',
+        };
       }
 
       return {
@@ -251,7 +272,22 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       };
     }),
 
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) =>
+    set((state) => {
+      // Find the tab being activated
+      const tab = state.tabs.find((t) => t.id === tabId);
+
+      // If it's a partnership detail tab, also switch sidebar to partnership view
+      if (tab && tab.type === 'partnership' && tab.itemId) {
+        return {
+          activeTabId: tabId,
+          activeView: 'partnership',
+          activeIconSidebar: 'partnership',
+        };
+      }
+
+      return { activeTabId: tabId };
+    }),
 
   updateTab: (tabId, updates) =>
     set((state) => ({
@@ -318,7 +354,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       const newTokensTab: Tab = {
         id: `tokens-${Date.now()}`,
         type: 'tokens',
-        title: 'API Tokens',
+        title: 'Tokens',
       };
 
       return {
@@ -347,6 +383,29 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       return {
         tabs: [...state.tabs, newTeamsTab],
         activeTabId: newTeamsTab.id,
+      };
+    }),
+
+  openPartnershipTab: () =>
+    set((state) => {
+      // Check if partnership tab already exists
+      const existingPartnershipTab = state.tabs.find((t) => t.type === 'partnership');
+
+      if (existingPartnershipTab) {
+        // Tab already exists, just switch to it
+        return { activeTabId: existingPartnershipTab.id };
+      }
+
+      // Create new partnership tab
+      const newPartnershipTab: Tab = {
+        id: `partnership-${Date.now()}`,
+        type: 'partnership',
+        title: 'Partnership',
+      };
+
+      return {
+        tabs: [...state.tabs, newPartnershipTab],
+        activeTabId: newPartnershipTab.id,
       };
     }),
 

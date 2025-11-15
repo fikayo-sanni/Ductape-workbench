@@ -99,6 +99,25 @@ const updateApp = async <T extends Record<string, any>>(data: {
   return response.data;
 };
 
+const fetchAppComponents = async (data: {
+  app_id: string;
+  component_type: string;
+  user_id: string;
+  public_key: string;
+  version?: string;
+}): Promise<{ data: any[] }> => {
+  const { app_id, component_type, user_id, public_key, version } = data;
+  const params: any = { user_id, public_key };
+  if (version) {
+    params.version = version;
+  }
+  const response = await apiClient.get<{ data: any[] }>(
+    `/apps/v1/components/${app_id}/${component_type}`,
+    { params }
+  );
+  return response.data;
+};
+
 const appServices = {
   fetchApps,
   fetchApp,
@@ -106,6 +125,7 @@ const appServices = {
   fetchWorkspaceApps,
   createApp,
   updateApp,
+  fetchAppComponents,
 };
 
 export default appServices;

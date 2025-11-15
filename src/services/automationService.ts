@@ -382,6 +382,16 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
+      partnership: {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
+      brief: {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
       settings: {
         canInspectForms: false,
         canFillForms: false,
@@ -719,6 +729,8 @@ export class AutomationService {
       tokens: 'Tokens',
       teams: 'Teams',
       marketplace: 'Marketplace',
+      partnership: 'Partnership',
+      brief: 'Brief',
       settings: 'Settings',
     };
     return titles[tabType] || tabType;

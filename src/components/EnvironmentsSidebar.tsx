@@ -241,7 +241,7 @@ export default function EnvironmentsSidebar() {
                 <Trash2 className="h-5 w-5 text-red" />
               </div>
               <div>
-                <DialogTitle>Delete Environment</DialogTitle>
+                <DialogTitle className='text-grey'>Delete Environment</DialogTitle>
                 <DialogDescription>
                   This action cannot be undone
                 </DialogDescription>

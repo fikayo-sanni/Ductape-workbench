@@ -171,7 +171,7 @@ export default function CreateWorkspaceEnvironmentModal({
               <Settings2 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>{editingEnv ? 'Edit Environment' : 'Create Environment'}</DialogTitle>
+              <DialogTitle className='text-grey'>{editingEnv ? 'Edit Environment' : 'Create Environment'}</DialogTitle>
               <DialogDescription>
                 {editingEnv ? 'Update workspace environment' : 'Add a new workspace environment'}
               </DialogDescription>

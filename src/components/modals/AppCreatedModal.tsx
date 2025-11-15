@@ -202,7 +202,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                   <CheckCircle className="h-6 w-6 text-green" />
                 </div>
                 <div>
-                  <DialogTitle>App Created Successfully!</DialogTitle>
+                  <DialogTitle className='text-grey'>App Created Successfully!</DialogTitle>
                   <DialogDescription>
                     Your app "{app?.app_name || app?.name}" has been created and is now open. What would you like to do next?
                   </DialogDescription>
@@ -268,7 +268,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                   </Button>
                 )}
                 <div>
-                  <DialogTitle>Import to App</DialogTitle>
+                  <DialogTitle className='text-grey'>Import to App</DialogTitle>
                   <DialogDescription>
                     Import Postman collections to create an app with actions, environments, and variables
                   </DialogDescription>

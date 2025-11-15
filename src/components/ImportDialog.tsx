@@ -66,7 +66,7 @@ export default function ImportDialog({ open, onOpenChange, onImport, isLoading =
     <Dialog open={open} onOpenChange={isLoading ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Import to App</DialogTitle>
+          <DialogTitle className='text-grey'>Import to App</DialogTitle>
           <DialogDescription>
             Import Postman collections to create an app with actions, environments, and variables
           </DialogDescription>

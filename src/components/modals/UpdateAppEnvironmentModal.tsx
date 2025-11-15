@@ -160,7 +160,7 @@ export default function UpdateAppEnvironmentModal({
               <Settings2 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>Update Environment</DialogTitle>
+              <DialogTitle className='text-grey'>Update Environment</DialogTitle>
               <DialogDescription>
                 Modify environment settings for this app
               </DialogDescription>

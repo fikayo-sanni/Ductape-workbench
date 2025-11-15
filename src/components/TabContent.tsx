@@ -8,6 +8,9 @@ import Logs from './Logs';
 import Dashboard from './Dashboard';
 import TokensTabContent from './tabs/TokensTabContent';
 import TeamsTabContent from './tabs/TeamsTabContent';
+import PartnershipTabContent from './tabs/PartnershipTabContent';
+import PartnershipDetailTabContent from './tabs/PartnershipDetailTabContent';
+import BriefTabContent from './tabs/BriefTabContent';
 import MarketplaceTabContent from './tabs/MarketplaceTabContent';
 import ActionViewTabContent from './tabs/ActionViewTabContent';
 import AuthTabContent from './tabs/AuthTabContent';
@@ -205,6 +208,17 @@ export default function TabContent() {
 
       case 'teams':
         return <TeamsTabContent />;
+
+      case 'partnership':
+        // Check if this is a specific partnership detail view (has data) or the management view (no data)
+        if (activeTab.data && activeTab.itemId) {
+          return <PartnershipDetailTabContent tab={activeTab as typeof activeTab & { data: NonNullable<typeof activeTab.data> }} />;
+        }
+        return <PartnershipTabContent />;
+
+      case 'brief':
+        // Product brief view/edit/create
+        return <BriefTabContent tab={activeTab as typeof activeTab & { data: NonNullable<typeof activeTab.data> }} />;
 
       case 'storage':
         // Check if this is a new storage creation tab

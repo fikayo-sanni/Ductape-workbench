@@ -116,7 +116,7 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
               <Plus className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>Add App to Product</DialogTitle>
+              <DialogTitle className='text-grey'>Add App to Product</DialogTitle>
               <DialogDescription>
                 Choose how you'd like to add an app to this product
               </DialogDescription>

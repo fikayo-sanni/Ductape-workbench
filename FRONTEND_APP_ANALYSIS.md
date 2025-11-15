@@ -150,7 +150,7 @@ const [open, setOpen] = useState(false);
   </DialogTrigger>
   <DialogContent>
     <DialogHeader>
-      <DialogTitle>Title</DialogTitle>
+      <DialogTitle className='text-grey'>Title</DialogTitle>
     </DialogHeader>
     {/* Content */}
   </DialogContent>

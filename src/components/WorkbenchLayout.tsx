@@ -9,6 +9,7 @@ import WorkbenchHeader from './WorkbenchHeader';
 import ProductsSidebar from './ProductsSidebar';
 import AppsSidebar from './AppsSidebar';
 import EnvironmentsSidebar from './EnvironmentsSidebar';
+import PartnershipsSidebar from './PartnershipsSidebar';
 import Dashboard from './Dashboard';
 import TabBar from './TabBar';
 import TabContent from './TabContent';
@@ -113,6 +114,7 @@ function WorkbenchContent() {
                     { id: 'products', label: 'Products' },
                     { id: 'apps', label: 'Apps' },
                     { id: 'environments', label: 'Envs' },
+                    { id: 'partnership', label: 'Partners' },
                     { id: 'dashboard', label: 'Dashboard' },
                   ].map((view) => (
                     <button
@@ -139,6 +141,7 @@ function WorkbenchContent() {
               {activeView === 'products' && <ProductsSidebar />}
               {activeView === 'apps' && <AppsSidebar />}
               {activeView === 'environments' && <EnvironmentsSidebar />}
+              {activeView === 'partnership' && <PartnershipsSidebar />}
             </div>
           )}
 

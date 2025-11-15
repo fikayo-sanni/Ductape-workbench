@@ -65,7 +65,7 @@ export default function AppSelectionModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className='text-grey'>{title}</DialogTitle>
           {description && (
             <p className="text-sm text-grey-600 mt-1">{description}</p>
           )}

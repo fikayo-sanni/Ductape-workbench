@@ -187,7 +187,7 @@ export default function CreateAppEnvironmentModal({
               <Settings2 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>Create Environment</DialogTitle>
+              <DialogTitle className='text-grey'>Create Environment</DialogTitle>
               <DialogDescription>
                 Add a new environment to organize deployment stages
               </DialogDescription>

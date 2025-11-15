@@ -16,6 +16,7 @@ import { Send, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, Boo
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
+import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
 
 interface ActionViewTabContentProps {
   action: any;
@@ -176,50 +177,95 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   // Initialize params, query, headers from action data
   useEffect(() => {
     if (action) {
-      // Initialize params
+      // Initialize params (only simple types, arrays/objects are handled via reconstruction)
       if (action.params?.data) {
+        const simpleParams = action.params.data.filter((param: any) => {
+          const fieldType = param.type?.toLowerCase() || '';
+          return fieldType !== 'array' &&
+                 !fieldType.startsWith('array') &&
+                 fieldType !== 'object' &&
+                 fieldType !== 'json';
+        });
+
         setParams(
-          action.params.data.map((param: any) => ({
+          simpleParams.map((param: any) => ({
             key: param.key || '',
-            value: param.default || '',
+            value: param.default || param.defaultValue || '',
             description: param.description || '',
             enabled: true,
           }))
         );
       }
 
-      // Initialize query
+      // Initialize query (only simple types, arrays/objects are handled via reconstruction)
       if (action.query?.data) {
+        const simpleQuery = action.query.data.filter((param: any) => {
+          const fieldType = param.type?.toLowerCase() || '';
+          return fieldType !== 'array' &&
+                 !fieldType.startsWith('array') &&
+                 fieldType !== 'object' &&
+                 fieldType !== 'json';
+        });
+
         setQuery(
-          action.query.data.map((param: any) => ({
+          simpleQuery.map((param: any) => ({
             key: param.key || '',
-            value: param.default || '',
+            value: param.default || param.defaultValue || '',
             description: param.description || '',
             enabled: true,
           }))
         );
       }
 
-      // Initialize headers
+      // Initialize headers (only simple types, arrays/objects are handled via reconstruction)
       if (action.headers?.data) {
+        const simpleHeaders = action.headers.data.filter((header: any) => {
+          const fieldType = header.type?.toLowerCase() || '';
+          return fieldType !== 'array' &&
+                 !fieldType.startsWith('array') &&
+                 fieldType !== 'object' &&
+                 fieldType !== 'json';
+        });
+
         setHeaders([
           { key: 'Content-Type', value: 'application/json', enabled: true },
-          ...action.headers.data.map((header: any) => ({
+          ...simpleHeaders.map((header: any) => ({
             key: header.key || '',
-            value: header.default || '',
+            value: header.default || header.defaultValue || '',
             description: header.description || '',
             enabled: true,
           }))
         ]);
       }
 
-      // Initialize body
-      if (action.body?.data) {
-        const bodyData = action.body.data.reduce((acc: any, field: any) => {
-          acc[field.key] = field.default || '';
-          return acc;
-        }, {});
-        setBody(JSON.stringify(bodyData, null, 2));
+      // Initialize body with reconstruction from sample data
+      if (action.body) {
+        let bodyContent: any = {};
+
+        // Try to use the parsed data structure first (IParsedSample array)
+        if (action.body.data && Array.isArray(action.body.data) && action.body.data.length > 0) {
+          // Reconstruct the full body structure using sample data
+          // The reconstruction function will use sampleValue from IParsedSample
+          // and handle nested objects/arrays properly
+          bodyContent = reconstructPayloadFromSample(
+            action.body.data,
+            {} // Empty user inputs - let it use sample values
+          );
+        }
+        // Fallback to using the raw sample if data is not available
+        else if (action.body.sample) {
+          try {
+            // If sample is a string, parse it
+            bodyContent = typeof action.body.sample === 'string'
+              ? JSON.parse(action.body.sample)
+              : action.body.sample;
+          } catch (e) {
+            // If parsing fails, use as-is or empty object
+            bodyContent = action.body.sample || {};
+          }
+        }
+
+        setBody(JSON.stringify(bodyContent, null, 2));
       }
     }
   }, [action]);
@@ -363,39 +409,59 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
 
     setIsLoadingRequest(true);
     try {
-      // Prepare query params
-      const queryParams: Record<string, string> = {};
+      // Collect simple user inputs from UI
+      const userQueryParams: Record<string, string> = {};
       query
         .filter((q) => q.enabled && q.key)
         .forEach((q) => {
-          queryParams[q.key] = q.value;
+          userQueryParams[q.key] = q.value;
         });
 
-      // Prepare headers
-      const requestHeaders: Record<string, string> = {};
+      const userHeaders: Record<string, string> = {};
       headers
         .filter((h) => h.enabled && h.key)
         .forEach((h) => {
-          requestHeaders[h.key] = h.value;
+          userHeaders[h.key] = h.value;
         });
 
-      // Prepare params (path parameters)
-      const pathParams: Record<string, string> = {};
+      const userPathParams: Record<string, string> = {};
       params
         .filter((p) => p.enabled && p.key)
         .forEach((p) => {
-          pathParams[p.key] = p.value;
+          userPathParams[p.key] = p.value;
         });
 
-      // Parse body based on request type
-      let parsedBody: any;
+      // Parse body
+      let userBodyData: any = {};
       if (['POST', 'PUT', 'PATCH'].includes(formData.method) && body) {
         try {
-          parsedBody = JSON.parse(body);
+          userBodyData = JSON.parse(body);
         } catch {
-          parsedBody = body; // Keep as string if not valid JSON
+          userBodyData = body; // Keep as string if not valid JSON
         }
       }
+
+      // Reconstruct the full payload using sample data from action
+      // This merges simple user inputs with complex structures (arrays/objects) from samples
+      const reconstructed = reconstructActionPayload(
+        {
+          params: action?.params,
+          body: action?.body,
+          query: action?.query,
+          headers: action?.headers,
+        },
+        {
+          params: userPathParams,
+          body: userBodyData,
+          query: userQueryParams,
+          headers: userHeaders,
+        }
+      );
+
+      const queryParams = reconstructed.query || userQueryParams;
+      const requestHeaders = reconstructed.headers || userHeaders;
+      const pathParams = reconstructed.params || userPathParams;
+      const parsedBody = reconstructed.body || userBodyData;
 
       // Call backend proxy
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
@@ -1061,7 +1127,7 @@ console.log(response.data);`;
                   placeholder='{\n  "key": "value"\n}'
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  className="font-mono text-sm min-h-[200px]"
+                  className="font-mono text-sm min-h-[600px]"
                 />
               </TabsContent>
             )}

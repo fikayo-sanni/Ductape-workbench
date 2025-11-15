@@ -12,11 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Heart, Loader2, CheckCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
+import appServices from '@/services/appServices';
+import { reconstructActionPayload } from '@/utils/payloadReconstruction';
 
 interface NewHealthcheckTabContentProps {
   data?: any;
@@ -45,11 +48,16 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     description: '',
     interval: '60', // Default: 60 seconds
     retries: 1,
-    type: 'app', // Only App for now
+    type: 'app', // Default type
     selectedApp: '',
+    selectedDatabase: '',
+    selectedMessageBroker: '',
+    selectedFeature: '',
   });
   const [selectedAction, setSelectedAction] = useState('');
-  const [actionInputs, setActionInputs] = useState<any>({});
+  const [actionInputsByEnv, setActionInputsByEnv] = useState<Record<string, any>>({});
+  const [actionSearchTerm, setActionSearchTerm] = useState('');
+  const [selectedEnv, setSelectedEnv] = useState<string>(''); // Track which env is being configured
 
   // Fetch connected apps
   const { data: productAppsRes } = useQuery({
@@ -64,7 +72,24 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
   });
 
+  // Fetch full product details for databases, message_brokers, features
+  const { data: productDetailsRes } = useQuery({
+    queryKey: ['product-details', product?._id],
+    queryFn: () =>
+      productServices.fetchProduct({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        workspace_id: currentWorkspaceId || '',
+        product_id: product?._id || '',
+      }),
+    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
+  });
+
   const connectedApps = productAppsRes?.data || [];
+  const productDetails = productDetailsRes?.data;
+  const databases = productDetails?.databases || [];
+  const messageBrokers = productDetails?.messageBroker || [];
+  const features = productDetails?.features || [];
 
   // Initialize Ductape SDK for product
   const ductape = useDuctape({
@@ -75,34 +100,40 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     type: 'product',
   }) as any;
 
-  // Fetch app details when app is selected
-  /*const selectedAppData = useMemo(() => {
+  // Get the selected app details from connected apps
+  const selectedAppData = useMemo(() => {
     return connectedApps.find((app: any) => app.tag === formData.selectedApp);
-  }, [formData.selectedApp, connectedApps]);*/
-
-  // Initialize SDK for the selected app
-  const appDuctape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'app',
-  }) as any;
+  }, [formData.selectedApp, connectedApps]);
 
   // Fetch app actions when app is selected
-  const { data: appActions } = useQuery({
-    queryKey: ['app-actions', formData.selectedApp],
-    queryFn: async () => {
-      if (!formData.selectedApp || !appDuctape) return null;
-      await appDuctape.init(formData.selectedApp);
-      const apps = await appDuctape.apps.fetch();
-      const app = apps.find((a: any) => a.tag === formData.selectedApp);
-      return app?.versions?.[0]?.actions || [];
+  const { data: appActionsRes } = useQuery({
+    queryKey: ['app-actions', selectedAppData?.app_id],
+    queryFn: () => {
+      if (!selectedAppData?.app_id) {
+        throw new Error('App ID is required');
+      }
+      return appServices.fetchAppComponents({
+        app_id: selectedAppData.app_id,
+        component_type: 'action',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      });
     },
-    enabled: !!formData.selectedApp && !!appDuctape,
+    enabled: !!selectedAppData?.app_id && !!user?._id && !!user?.public_key,
   });
 
-  const actions = appActions || [];
+  const actions = appActionsRes?.data || [];
+
+  // Filter actions based on search term
+  const filteredActions = useMemo(() => {
+    if (!actionSearchTerm.trim()) return actions;
+    const searchLower = actionSearchTerm.toLowerCase();
+    return actions.filter((action: any) =>
+      (action.name?.toLowerCase().includes(searchLower)) ||
+      (action.tag?.toLowerCase().includes(searchLower)) ||
+      (action.method?.toLowerCase().includes(searchLower))
+    );
+  }, [actions, actionSearchTerm]);
 
   // Auto-generate tag from name
   useEffect(() => {
@@ -137,57 +168,117 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     return actions.find((action: any) => action.tag === selectedAction);
   }, [selectedAction, actions]);
 
-  // When an action is selected, extract its input fields
+  // Reset search term when app changes
   useEffect(() => {
-    if (selectedActionData) {
-      const inputs: any = {};
-      
-      // Extract fields from params, body, query, headers
-      ['params', 'body', 'query', 'headers'].forEach((type) => {
-        if (selectedActionData[type] && Array.isArray(selectedActionData[type])) {
-          inputs[type] = {};
-          selectedActionData[type].forEach((field: any) => {
-            if (field.key) {
-              inputs[type][field.key] = '';
-            }
+    setActionSearchTerm('');
+  }, [formData.selectedApp]);
+
+  // When an action is selected, extract its input fields for all environments
+  useEffect(() => {
+    if (selectedActionData && product?.envs) {
+      const inputsByEnv: Record<string, any> = {};
+
+      // Initialize inputs for each environment
+      product.envs.forEach((env: any) => {
+        const inputs: any = {};
+
+        // Extract fields from params, body, query, headers
+        // Handle both direct array and { data: [] } structure
+        ['params', 'body', 'query', 'headers'].forEach((type) => {
+          const fieldData = selectedActionData[type];
+          const allFields = Array.isArray(fieldData) ? fieldData : fieldData?.data || [];
+
+          // Filter out array and object type fields
+          const fields = allFields.filter((field: any) => {
+            const fieldType = field.type?.toLowerCase() || '';
+            return fieldType !== 'array' &&
+                   !fieldType.startsWith('array') &&
+                   fieldType !== 'object';
           });
-        }
+
+          if (fields.length > 0) {
+            inputs[type] = {};
+            fields.forEach((field: any) => {
+              if (field.key) {
+                inputs[type][field.key] = field.default || '';
+              }
+            });
+          }
+        });
+
+        inputsByEnv[env.slug] = inputs;
       });
 
-      setActionInputs(inputs);
+      setActionInputsByEnv(inputsByEnv);
+
+      // Set first environment as selected by default
+      if (product.envs.length > 0 && !selectedEnv) {
+        setSelectedEnv(product.envs[0].slug);
+      }
     }
-  }, [selectedActionData]);
+  }, [selectedActionData, product?.envs]);
 
   const { mutateAsync: createHealthcheck, isPending: isCreating } = useMutation({
     mutationFn: async () => {
       if (!ductape) throw new Error('Product not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
-      if (!formData.selectedApp) throw new Error('Please select a connected app');
-      if (!selectedAction) throw new Error('Please select an action');
 
       await ductape.init(product.tag);
 
-      // Build the inputs object from actionInputs
-      const inputs: any = {};
-      Object.keys(actionInputs).forEach(type => {
-        if (Object.keys(actionInputs[type]).length > 0) {
-          inputs[type] = actionInputs[type];
-        }
-      });
-
-      const payload = {
+      const basePayload = {
         name: formData.name,
         tag: formData.tag,
         description: formData.description,
-        app: formData.selectedApp,
-        event: selectedAction,
         interval: parseInt(formData.interval) * 1000, // Convert seconds to milliseconds
         retries: formData.retries,
-        envs: product.envs.map((env: any) => ({
-          slug: env.slug,
-          inputs,
-        })),
+        type: formData.type,
       };
+
+      let payload: any = { ...basePayload };
+
+      // Build type-specific payload
+      if (formData.type === 'app') {
+        if (!formData.selectedApp) throw new Error('Please select a connected app');
+        if (!selectedAction) throw new Error('Please select an action');
+
+        // Build envs array with per-environment inputs
+        const envs = product.envs.map((env: any) => {
+          const envInputs = actionInputsByEnv[env.slug] || {};
+
+          // Reconstruct the full payload using sample data from selectedActionData
+          // This merges simple user inputs with complex structures (arrays/objects) from samples
+          const reconstructedInputs = reconstructActionPayload(
+            {
+              params: selectedActionData?.params,
+              body: selectedActionData?.body,
+              query: selectedActionData?.query,
+              headers: selectedActionData?.headers,
+            },
+            envInputs
+          );
+
+          return {
+            slug: env.slug,
+            inputs: reconstructedInputs,
+          };
+        });
+
+        payload = {
+          ...basePayload,
+          app: formData.selectedApp,
+          event: selectedAction,
+          envs,
+        };
+      } else if (formData.type === 'database') {
+        if (!formData.selectedDatabase) throw new Error('Please select a database');
+        payload.database = formData.selectedDatabase;
+      } else if (formData.type === 'message_broker') {
+        if (!formData.selectedMessageBroker) throw new Error('Please select a message broker');
+        payload.message_broker = formData.selectedMessageBroker;
+      } else if (formData.type === 'feature') {
+        if (!formData.selectedFeature) throw new Error('Please select a feature');
+        payload.feature = formData.selectedFeature;
+      }
 
       const healthcheck = await ductape.apps.health.create(payload);
       return healthcheck;
@@ -222,21 +313,58 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       toast.error('Please enter a valid interval (minimum 1 second)');
       return;
     }
-    if (!formData.selectedApp) {
-      toast.error('Please select a connected app');
-      return;
+
+    // Type-specific validation
+    if (formData.type === 'app') {
+      if (!formData.selectedApp) {
+        toast.error('Please select a connected app');
+        return;
+      }
+      if (!selectedAction) {
+        toast.error('Please select an action');
+        return;
+      }
+    } else if (formData.type === 'database') {
+      if (!formData.selectedDatabase) {
+        toast.error('Please select a database');
+        return;
+      }
+    } else if (formData.type === 'message_broker') {
+      if (!formData.selectedMessageBroker) {
+        toast.error('Please select a message broker');
+        return;
+      }
+    } else if (formData.type === 'feature') {
+      if (!formData.selectedFeature) {
+        toast.error('Please select a feature');
+        return;
+      }
     }
-    if (!selectedAction) {
-      toast.error('Please select an action');
-      return;
-    }
-    
+
     createHealthcheck();
   };
 
-  const isFormComplete = formData.name.trim() !== '' && formData.tag.trim() !== '' && 
-                         formData.interval && parseInt(formData.interval) >= 1 &&
-                         formData.selectedApp !== '' && selectedAction !== '';
+  const isFormComplete = useMemo(() => {
+    const baseComplete = formData.name.trim() !== '' &&
+                        formData.tag.trim() !== '' &&
+                        formData.interval &&
+                        parseInt(formData.interval) >= 1;
+
+    if (!baseComplete) return false;
+
+    // Check type-specific requirements
+    if (formData.type === 'app') {
+      return formData.selectedApp !== '' && selectedAction !== '';
+    } else if (formData.type === 'database') {
+      return formData.selectedDatabase !== '';
+    } else if (formData.type === 'message_broker') {
+      return formData.selectedMessageBroker !== '';
+    } else if (formData.type === 'feature') {
+      return formData.selectedFeature !== '';
+    }
+
+    return false;
+  }, [formData, selectedAction]);
 
   return (
     <div className="bg-grey-100 p-6">
@@ -456,8 +584,9 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="app">App</SelectItem>
-                    <SelectItem value="database">Database</SelectItem>
-                     <SelectItem value="database">Message Broker</SelectItem>
+                     <SelectItem value="database">Database</SelectItem>
+                     <SelectItem value="message_broker">Message Broker</SelectItem>
+                     <SelectItem value="feature">Feature</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-grey-600 mt-1">
@@ -467,42 +596,45 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
             </div>
           </div>
 
-          {/* App Selection Section */}
+          {/* Resource Selection Section */}
           <div className="border-t border-grey-400 pt-6">
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle className="h-5 w-5 text-green" />
-              <h2 className="text-lg font-semibold text-grey">2. App and Action Selection</h2>
+              <h2 className="text-lg font-semibold text-grey">2. Resource Selection</h2>
             </div>
 
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="app" className="required">
-                  Connected App
-                </Label>
-                <Select
-                  value={formData.selectedApp}
-                  onValueChange={(value) => {
-                    setFormData({ ...formData, selectedApp: value });
-                    setSelectedAction(''); // Reset action when app changes
-                  }}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Select a connected app" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {connectedApps.map((app: any) => (
-                      <SelectItem key={app._id} value={app.tag}>
-                        {app.app_name} ({app.tag})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-grey-600 mt-1">
-                  Select the app to monitor with this health check
-                </p>
-              </div>
+              {/* App Selection (for type: app) */}
+              {formData.type === 'app' && (
+                <>
+                  <div>
+                    <Label htmlFor="app" className="required">
+                      Connected App
+                    </Label>
+                    <Select
+                      value={formData.selectedApp}
+                      onValueChange={(value) => {
+                        setFormData({ ...formData, selectedApp: value });
+                        setSelectedAction(''); // Reset action when app changes
+                      }}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Select a connected app" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connectedApps.map((app: any) => (
+                          <SelectItem key={app.app_id} value={app.tag}>
+                            {app.app_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-grey-600 mt-1">
+                      Select the app to monitor with this health check
+                    </p>
+                  </div>
 
-              {formData.selectedApp && (
+                  {formData.selectedApp && (
                 <div>
                   <Label htmlFor="action" className="required">
                     Action
@@ -515,11 +647,33 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                       <SelectValue placeholder="Select an action" />
                     </SelectTrigger>
                     <SelectContent>
-                      {actions.map((action: any) => (
-                        <SelectItem key={action.tag} value={action.tag}>
-                          {action.name || action.tag} ({action.method})
-                        </SelectItem>
-                      ))}
+                      <div className="px-2 pb-2 pt-1 sticky top-0 bg-white border-b">
+                        <Input
+                          placeholder="Search actions..."
+                          value={actionSearchTerm}
+                          onChange={(e) => setActionSearchTerm(e.target.value)}
+                          className="h-8"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {filteredActions.length > 0 ? (
+                          filteredActions.map((action: any) => (
+                            <SelectItem key={action.tag} value={action.tag}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{action.name || action.tag}</span>
+                                {action.method && (
+                                  <span className="text-xs text-grey-600 uppercase">({action.method})</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-6 text-center text-sm text-grey-600">
+                            No actions found
+                          </div>
+                        )}
+                      </div>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-grey-600 mt-1">
@@ -529,49 +683,237 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
               )}
 
               {selectedAction && selectedActionData && (
-                <div className="space-y-4 border-t border-grey-400 pt-4">
-                  <Label className="text-sm font-semibold text-grey mb-3 block">
-                    3. Action Input Fields
-                  </Label>
-                  
-                  {/* Render fields from params, body, query, headers */}
-                  {['params', 'body', 'query', 'headers'].map((type) => {
-                    const fields = selectedActionData[type] || [];
-                    if (!fields.length) return null;
+                <div className="space-y-6 border-t border-grey-400 pt-6 mt-6">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green" />
+                    <h3 className="text-base font-semibold text-grey">3. Configure Action Inputs</h3>
+                  </div>
 
-                    return (
-                      <div key={type} className="space-y-3">
-                        <Label className="text-xs font-medium text-grey-600 uppercase">
-                          {type}
-                        </Label>
-                        {fields.map((field: any, idx: number) => (
-                          <div key={idx}>
-                            <Label htmlFor={`${type}-${field.key}`}>
-                              {field.key} {field.required && <span className="text-red">*</span>}
-                            </Label>
-                            <Input
-                              id={`${type}-${field.key}`}
-                              placeholder={field.description || `Enter ${field.key}`}
-                              value={actionInputs[type]?.[field.key] || ''}
-                              onChange={(e) => {
-                                setActionInputs((prev: any) => ({
-                                  ...prev,
-                                  [type]: {
-                                    ...prev[type],
-                                    [field.key]: e.target.value,
-                                  },
-                                }));
-                              }}
-                              className="mt-1"
-                            />
-                            {field.description && (
-                              <p className="text-xs text-grey-600 mt-1">{field.description}</p>
-                            )}
-                          </div>
-                        ))}
+                  {/* Show action details */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-grey mb-1">
+                          {selectedActionData.name || selectedActionData.tag}
+                        </h4>
+                        {selectedActionData.description && (
+                          <p className="text-xs text-grey-600">{selectedActionData.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          {selectedActionData.method && (
+                            <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded font-medium">
+                              {selectedActionData.method}
+                            </span>
+                          )}
+                          {selectedActionData.resource && (
+                            <code className="text-xs bg-grey-100 px-2 py-0.5 rounded text-grey-600">
+                              {selectedActionData.resource}
+                            </code>
+                          )}
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
+
+                  {/* Environment Tabs */}
+                  {product?.envs && product.envs.length > 0 && (
+                    <div className="bg-grey-50 border border-grey-400 rounded-lg p-4">
+                      <p className="text-xs text-grey-600 mb-3">
+                        Configure inputs for each environment. Different environments can have different values.
+                      </p>
+                      <Tabs value={selectedEnv} onValueChange={setSelectedEnv}>
+                        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${product.envs.length}, 1fr)` }}>
+                          {product.envs.map((env: any) => (
+                            <TabsTrigger key={env.slug} value={env.slug}>
+                              {env.env_name || env.slug}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+
+                        {product.envs.map((env: any) => (
+                          <TabsContent key={env.slug} value={env.slug} className="mt-4 space-y-4">
+                            {/* Render fields from params, query, headers, body for this environment */}
+                            {['params', 'query', 'headers', 'body'].map((type) => {
+                              const fieldData = selectedActionData[type];
+                              const allFields = Array.isArray(fieldData) ? fieldData : fieldData?.data || [];
+
+                              // Filter out array and object type fields
+                              const fields = allFields.filter((field: any) => {
+                                const fieldType = field.type?.toLowerCase() || '';
+                                return fieldType !== 'array' &&
+                                       !fieldType.startsWith('array') &&
+                                       fieldType !== 'object';
+                              });
+
+                              if (!fields.length) return null;
+
+                              return (
+                                <div key={type} className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+                                  <div className="bg-grey-100 px-4 py-3 border-b border-grey-400">
+                                    <Label className="text-sm font-semibold text-grey uppercase">
+                                      {type === 'params' ? 'Path Parameters' :
+                                       type === 'query' ? 'Query Parameters' :
+                                       type === 'headers' ? 'Headers' :
+                                       'Request Body'}
+                                    </Label>
+                                  </div>
+                                  <div className="p-4 space-y-4">
+                                    {fields.map((field: any, idx: number) => (
+                                      <div key={idx} className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`${env.slug}-${type}-${field.key}`} className="text-sm font-medium text-grey">
+                                            {field.key}
+                                            {field.required && <span className="text-red ml-1">*</span>}
+                                          </Label>
+                                          {field.type && (
+                                            <span className="text-xs px-2 py-0.5 bg-blue/10 text-blue rounded">
+                                              {field.type}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <Input
+                                          id={`${env.slug}-${type}-${field.key}`}
+                                          placeholder={field.default || field.description || `Enter ${field.key}`}
+                                          value={actionInputsByEnv[env.slug]?.[type]?.[field.key] || ''}
+                                          onChange={(e) => {
+                                            setActionInputsByEnv((prev: any) => ({
+                                              ...prev,
+                                              [env.slug]: {
+                                                ...prev[env.slug],
+                                                [type]: {
+                                                  ...prev[env.slug]?.[type],
+                                                  [field.key]: e.target.value,
+                                                },
+                                              },
+                                            }));
+                                          }}
+                                          className="h-9"
+                                        />
+
+                                        {field.description && (
+                                          <p className="text-xs text-grey-600">{field.description}</p>
+                                        )}
+                                        
+                                          <p className="text-xs text-grey-500">
+                                            {`Min: ${field.minLength}`}
+                                            {' • '}
+                                            {`Max: ${field.maxLength}`}
+                                          </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* Show note if no inputs required */}
+                            {!['params', 'query', 'headers', 'body'].some(type => {
+                              const fieldData = selectedActionData[type];
+                              const allFields = Array.isArray(fieldData) ? fieldData : fieldData?.data || [];
+
+                              // Filter out array and object type fields
+                              const fields = allFields.filter((field: any) => {
+                                const fieldType = field.type?.toLowerCase() || '';
+                                return fieldType !== 'array' &&
+                                       !fieldType.startsWith('array') &&
+                                       fieldType !== 'object';
+                              });
+
+                              return fields.length > 0;
+                            }) && (
+                              <div className="text-center py-6 bg-grey-100 rounded-lg border border-grey-400">
+                                <p className="text-sm text-grey-600">This action doesn't require any simple input parameters (arrays and objects not supported)</p>
+                              </div>
+                            )}
+                          </TabsContent>
+                        ))}
+                      </Tabs>
+                    </div>
+                  )}
+                </div>
+              )}
+                </>
+              )}
+
+              {/* Database Selection (for type: database) */}
+              {formData.type === 'database' && (
+                <div>
+                  <Label htmlFor="database" className="required">
+                    Database
+                  </Label>
+                  <Select
+                    value={formData.selectedDatabase}
+                    onValueChange={(value) => setFormData({ ...formData, selectedDatabase: value })}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select a database" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {databases.map((db: any) => (
+                        <SelectItem key={db._id || db.tag} value={db.tag}>
+                          {db.name || db.tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-600 mt-1">
+                    Select the database to monitor with this health check
+                  </p>
+                </div>
+              )}
+
+              {/* Message Broker Selection (for type: message_broker) */}
+              {formData.type === 'message_broker' && (
+                <div>
+                  <Label htmlFor="messageBroker" className="required">
+                    Message Broker
+                  </Label>
+                  <Select
+                    value={formData.selectedMessageBroker}
+                    onValueChange={(value) => setFormData({ ...formData, selectedMessageBroker: value })}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select a message broker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {messageBrokers.map((broker: any) => (
+                        <SelectItem key={broker._id || broker.tag} value={broker.tag}>
+                          {broker.name || broker.tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-600 mt-1">
+                    Select the message broker to monitor with this health check
+                  </p>
+                </div>
+              )}
+
+              {/* Feature Selection (for type: feature) */}
+              {formData.type === 'feature' && (
+                <div>
+                  <Label htmlFor="feature" className="required">
+                    Feature
+                  </Label>
+                  <Select
+                    value={formData.selectedFeature}
+                    onValueChange={(value) => setFormData({ ...formData, selectedFeature: value })}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select a feature" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {features.map((feature: any) => (
+                        <SelectItem key={feature._id || feature.tag} value={feature.tag}>
+                          {feature.name || feature.tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-600 mt-1">
+                    Select the feature to monitor with this health check
+                  </p>
                 </div>
               )}
             </div>

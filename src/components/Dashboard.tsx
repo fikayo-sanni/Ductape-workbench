@@ -15,25 +15,80 @@ import {
   Inbox,
   HardDrive,
   MessageSquare,
+  Filter,
+  X as CloseIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import workspaceServices from '@/services/workspaceServices';
+import appServices from '@/services/appServices';
+import productServices from '@/services/productServices';
 import { useEffect, useState } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const { currentWorkspaceId, user } = useAuth();
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Fetch dashboard data
+  // Filter state
+  const [selectedAppId, setSelectedAppId] = useState<string>('all');
+  const [selectedProductId, setSelectedProductId] = useState<string>('all');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('7d');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Time range options
+  const timeRanges = [
+    { value: '24h', label: 'Last 24 Hours' },
+    { value: '7d', label: 'Last 7 Days' },
+    { value: '30d', label: 'Last 30 Days' },
+    { value: '90d', label: 'Last 90 Days' },
+    { value: '1y', label: 'Last Year' },
+  ];
+
+  // Fetch apps for filter dropdown
+  const { data: appsData } = useQuery({
+    queryKey: ['workspace-apps', currentWorkspaceId],
+    queryFn: () =>
+      appServices.fetchWorkspaceApps({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      }),
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  // Fetch products for filter dropdown
+  const { data: productsData } = useQuery({
+    queryKey: ['workspace-products', currentWorkspaceId],
+    queryFn: () =>
+      productServices.fetchProducts({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        status: 'all',
+      }),
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  // Fetch dashboard data with filters
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ['dashboard', currentWorkspaceId],
+    queryKey: ['dashboard', currentWorkspaceId, selectedAppId, selectedProductId, selectedTimeRange],
     queryFn: () =>
       workspaceServices.fetchDashboardData({
         workspace_id: currentWorkspaceId || '',
         user_id: user?._id || '',
         public_key: user?.public_key || '',
+        app_id: selectedAppId !== 'all' ? selectedAppId : undefined,
+        product_id: selectedProductId !== 'all' ? selectedProductId : undefined,
+        time_range: selectedTimeRange,
       }),
     enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
     refetchInterval: 30000, // Refetch every 30 seconds
@@ -45,6 +100,16 @@ export default function Dashboard() {
       setLastUpdated(new Date());
     }
   }, [dashboardData]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedAppId('all');
+    setSelectedProductId('all');
+    setSelectedTimeRange('7d');
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = selectedAppId !== 'all' || selectedProductId !== 'all' || selectedTimeRange !== '7d';
 
   // Map backend data to component props
   const stats = [
@@ -141,14 +206,147 @@ export default function Dashboard() {
               Monitor your products, apps, and infrastructure in real-time
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-grey-600">
-            <Clock className="h-4 w-4" />
-            <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={showFilters ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 bg-primary text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                  {[selectedAppId !== 'all', selectedProductId !== 'all', selectedTimeRange !== '7d'].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+            <div className="flex items-center gap-2 text-sm text-grey-600">
+              <Clock className="h-4 w-4" />
+              <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+            </div>
           </div>
         </div>
 
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-grey flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Dashboard Data
+              </h3>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="gap-2 text-grey-600 hover:text-grey"
+                >
+                  <CloseIcon className="h-4 w-4" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* App Filter */}
+              <div>
+                <label className="text-sm font-medium text-grey-600 mb-2 block">
+                  Internal App
+                </label>
+                <Select value={selectedAppId} onValueChange={setSelectedAppId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Apps" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Apps</SelectItem>
+                    {appsData?.data?.map((app: any) => (
+                      <SelectItem key={app._id} value={app._id}>
+                        {app.app_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Product Filter */}
+              <div>
+                <label className="text-sm font-medium text-grey-600 mb-2 block">
+                  Product
+                </label>
+                <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Products" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Products</SelectItem>
+                    {productsData?.data?.map((product: any) => (
+                      <SelectItem key={product._id} value={product._id}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Time Range Filter */}
+              <div>
+                <label className="text-sm font-medium text-grey-600 mb-2 block">
+                  Time Range
+                </label>
+                <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeRanges.map((range) => (
+                      <SelectItem key={range.value} value={range.value}>
+                        {range.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="mt-4 pt-4 border-t border-grey-400">
+                <p className="text-xs text-grey-600 mb-2">Active Filters:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAppId !== 'all' && (
+                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                      <span>App: {appsData?.data?.find((a: any) => a._id === selectedAppId)?.app_name}</span>
+                      <button onClick={() => setSelectedAppId('all')} className="hover:bg-primary/20 rounded p-0.5">
+                        <CloseIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {selectedProductId !== 'all' && (
+                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                      <span>Product: {productsData?.data?.find((p: any) => p._id === selectedProductId)?.name}</span>
+                      <button onClick={() => setSelectedProductId('all')} className="hover:bg-primary/20 rounded p-0.5">
+                        <CloseIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {selectedTimeRange !== '7d' && (
+                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                      <span>{timeRanges.find(r => r.value === selectedTimeRange)?.label}</span>
+                      <button onClick={() => setSelectedTimeRange('7d')} className="hover:bg-primary/20 rounded p-0.5">
+                        <CloseIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
             const TrendIcon = stat.trend === 'up' ? TrendingUp : TrendingDown;

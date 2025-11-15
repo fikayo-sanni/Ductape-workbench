@@ -265,7 +265,7 @@ export default function CreateConstantModal({
               <FileCode className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>{constant ? 'Update Constant' : 'Create Constant'}</DialogTitle>
+              <DialogTitle className='text-grey'>{constant ? 'Update Constant' : 'Create Constant'}</DialogTitle>
               <DialogDescription>
                 {constant ? 'Update the constant configuration' : 'Add a new constant to store fixed configuration values'}
               </DialogDescription>

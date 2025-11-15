@@ -249,7 +249,7 @@ export default function CreateVariableModal({
               <FileCode className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>{variable ? 'Update Variable' : 'Create Variable'}</DialogTitle>
+              <DialogTitle className='text-grey'>{variable ? 'Update Variable' : 'Create Variable'}</DialogTitle>
               <DialogDescription>
                 {variable ? 'Update the variable configuration' : 'Add a new variable to store dynamic configuration values'}
               </DialogDescription>

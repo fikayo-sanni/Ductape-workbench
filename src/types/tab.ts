@@ -21,6 +21,8 @@ export type TabType =
   | 'dashboard'
   | 'tokens'
   | 'teams'
+  | 'partnership'
+  | 'brief'
   | 'marketplace'
   | 'notifier'
   | 'settings';

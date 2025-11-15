@@ -99,7 +99,7 @@ export default function CreateWorkspaceModal({
               <Building2 className="h-5 w-5 text-blue" />
             </div>
             <div>
-              <DialogTitle>Create New Workspace</DialogTitle>
+              <DialogTitle className='text-grey'>Create New Workspace</DialogTitle>
               <DialogDescription>
                 Set up a new workspace for your projects
               </DialogDescription>

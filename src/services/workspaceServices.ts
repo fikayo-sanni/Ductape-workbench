@@ -203,12 +203,22 @@ const fetchDashboardData = async (data: {
   workspace_id: string;
   user_id: string;
   public_key: string;
+  app_id?: string;
+  product_id?: string;
+  time_range?: string;
 }): Promise<any> => {
-  const {workspace_id, user_id, public_key} = data;
+  const {workspace_id, user_id, public_key, app_id, product_id, time_range} = data;
   try {
+    const params: any = {public_key, user_id};
+
+    // Add optional filters if provided
+    if (app_id) params.app_id = app_id;
+    if (product_id) params.product_id = product_id;
+    if (time_range) params.time_range = time_range;
+
     const response = await apiClient.get<any>(
       `/workspaces/v1/dashboard/${workspace_id}`,
-      {params: {public_key, user_id}},
+      {params},
     );
     return response.data;
   } catch (error: unknown) {

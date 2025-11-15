@@ -1,8 +1,9 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store, MessageCircle } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store, MessageCircle, Handshake } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { getDummyWorkspacePartnerships } from '@/data/partnerships.dummy';
 
-type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace';
+type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
 
 interface IconSidebarProps {
   activeView: SidebarView;
@@ -11,6 +12,19 @@ interface IconSidebarProps {
 
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
   const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
+
+  // Calculate unread messages count
+  const currentWorkspaceId = 'ws_001';
+  const { data: partnershipsData } = getDummyWorkspacePartnerships(currentWorkspaceId);
+  const allPartnerships = [
+    ...partnershipsData.myClients,
+    ...partnershipsData.myServiceProviders,
+  ];
+
+  const unreadCount = allPartnerships.reduce((count, partnership) => {
+    const unreadMessages = partnership.messages.filter(msg => !msg.read).length;
+    return count + unreadMessages;
+  }, 0);
 
   const menuItems: Array<{
     id: SidebarView;
@@ -42,6 +56,11 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
       icon: Store,
       label: 'Marketplace',
     },
+    {
+      id: 'partnership',
+      icon: Handshake,
+      label: 'Partnerships',
+    },
   ];
 
   return (
@@ -72,7 +91,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
                   toggleSidebar();
                 }
               } else {
-                // Products, Apps, Environments - open sidebar if collapsed
+                // Products, Apps, Environments, Partnership - open sidebar if collapsed
                 if (sidebarCollapsed) {
                   toggleSidebar();
                 }
@@ -88,6 +107,13 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
             aria-label={item.label}
           >
             <Icon className="h-5 w-5" />
+
+            {/* Unread Badge for Partnerships */}
+            {item.id === 'partnership' && unreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </div>
+            )}
 
             {/* Tooltip on hover */}
             <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
@@ -148,7 +174,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
 
         {/* Tooltip on hover */}
         <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-          API Tokens
+          Tokens
         </div>
       </button>
 

@@ -99,7 +99,7 @@ export default function InternalAppSelectionModal({
               <Grid3x3 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>Select Internal App</DialogTitle>
+              <DialogTitle className='text-grey'>Select Internal App</DialogTitle>
               <DialogDescription>
                 Choose an existing app from your workspace or create a new one
               </DialogDescription>
