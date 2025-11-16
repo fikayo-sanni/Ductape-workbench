@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface OnboardingStep {
   name: string;
@@ -25,6 +26,7 @@ interface OnboardingStep {
 
 interface BriefTabContentProps {
   tab: {
+    id: string;
     data: (IProductBrief & { isNew?: boolean; isEdit?: boolean }) | { isNew: true };
   };
 }
@@ -35,15 +37,23 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
   const isNew = !brief;
   const isViewOnly = !isNew && !isEdit;
 
-  const [formData, setFormData] = useState({
-    product_id: brief?.product_id || '',
-    title: brief?.title || '',
-    description: brief?.description || '',
-    product_details: brief?.product_details || '',
-    usage_instructions: brief?.usage_instructions || '',
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tab.id, null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      product_id: brief?.product_id || '',
+      title: brief?.title || '',
+      description: brief?.description || '',
+      product_details: brief?.product_details || '',
+      usage_instructions: brief?.usage_instructions || '',
+    }
+  );
 
   const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>(() => {
+    if (savedTabState?.onboardingSteps) {
+      return savedTabState.onboardingSteps;
+    }
     if (brief?.onboarding_steps) {
       try {
         return JSON.parse(brief.onboarding_steps);
@@ -55,6 +65,15 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // Persist tab state automatically
+  useTabState(
+    tab.id,
+    'brief',
+    formData.title || 'New Product Brief',
+    {},
+    { formData, onboardingSteps }
+  );
 
   const addOnboardingStep = () => {
     setOnboardingSteps([...onboardingSteps, { name: '', description: '', message_template: '' }]);

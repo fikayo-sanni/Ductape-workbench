@@ -214,7 +214,7 @@ export default function TabContent() {
         if (activeTab.data && activeTab.itemId) {
           return <PartnershipDetailTabContent tab={activeTab as typeof activeTab & { data: NonNullable<typeof activeTab.data> }} />;
         }
-        return <PartnershipTabContent />;
+        return <PartnershipTabContent tabId={activeTab.id} />;
 
       case 'brief':
         // Product brief view/edit/create

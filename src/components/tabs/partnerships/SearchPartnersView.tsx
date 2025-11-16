@@ -6,8 +6,12 @@ import { getDummyPublishedBriefs } from '@/data/partnerships.dummy';
 import { IProductBrief } from '@/types/partnership';
 import ProductBriefDetailDialog from './ProductBriefDetailDialog';
 
-export default function SearchPartnersView() {
-  const [searchQuery, setSearchQuery] = useState('');
+interface SearchPartnersViewProps {
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+}
+
+export default function SearchPartnersView({ searchQuery, setSearchQuery }: SearchPartnersViewProps) {
   const [selectedBrief, setSelectedBrief] = useState<IProductBrief | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
