@@ -18,6 +18,7 @@ import { useAuth } from '@/store/useAuth';
 import workspaceServices from '@/services/workspaceServices';
 import appServices from '@/services/appServices';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 // Dynamic import for SDK to avoid build issues
 
 interface NewAppTabContentProps {
@@ -33,7 +34,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
   const [createdApp, setCreatedApp] = useState<any>(null);
   const [isConnectingToProduct, setIsConnectingToProduct] = useState(false);
   const [workspaceName, setWorkspaceName] = useState<string>('workspace');
-  
+
   // Extract product context from data
   const product = data?.productId ? {
     _id: data.productId,
@@ -43,14 +44,19 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     envs: data.productEnvs || []
   } : null;
 
-  const [formData, setFormData] = useState({
-    app_name: '',
-    tag: '',
-    description: '',
-    status: 'active' as 'active' | 'inactive',
-    logo: '',
-    version: '1.0.0',
-  });
+  // Restore saved state once
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      app_name: '',
+      tag: '',
+      description: '',
+      status: 'active' as 'active' | 'inactive',
+      logo: '',
+      version: '1.0.0',
+    }
+  );
 
   // File upload mutation
   const { mutate: uploadLogo, status: uploadingLogo } = useMutation({
@@ -70,7 +76,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
         try {
           const file = variables.file;
           await workspaceServices.uploadFileToUrl({ url, file });
-          setFormData(prev => ({ ...prev, logo: key }));
+          setFormData((prev: typeof formData) => ({ ...prev, logo: key }));
           toast.success('Logo uploaded successfully', { id: 'logoUpload' });
         } catch (error) {
           console.error('Error uploading file:', error);
@@ -108,6 +114,11 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
 
   // Environment configurations with product mapping
   const [environments, setEnvironments] = useState(() => {
+    // Try to restore saved state first
+    if (savedTabState?.environments) {
+      return savedTabState.environments;
+    }
+
     if (product && product.envs && product.envs.length > 0) {
       // Map to product environments
       return product.envs.map((env: any) => ({
@@ -143,6 +154,18 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     // Fallback to empty array if no environments found
     return [];
   });
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-app',
+    formData.app_name || 'New App',
+    {},
+    {
+      formData,
+      environments,
+    }
+  );
 
   const handleSave = async () => {
     if (!formData.app_name.trim()) {

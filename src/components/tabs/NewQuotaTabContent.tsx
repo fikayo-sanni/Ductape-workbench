@@ -21,6 +21,7 @@ import { useDuctape } from '@/hooks/useDuctape';
 import { FeatureEventTypes } from '@ductape/sdk/dist/types';
 import { IFeatureInput } from '@ductape/sdk/dist/types';
 import appServicesReal from '@/services/appServicesReal';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewQuotaTabContentProps {
   tabId: string;
@@ -98,16 +99,28 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     notifications: data.productNotifications || [],
   } : null;
 
-  const [state, setState] = useState<QuotaBuilderState>(INITIAL_STATE);
-  const [editingInputKey, setEditingInputKey] = useState<string | null>(null);
-  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
-  const [selectedComponentType, setSelectedComponentType] = useState<string>('');
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [state, setState] = useState<QuotaBuilderState>(savedTabState?.state || INITIAL_STATE);
+  const [editingInputKey, setEditingInputKey] = useState<string | null>(savedTabState?.editingInputKey || null);
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(savedTabState?.editingOptionId || null);
+  const [selectedComponentType, setSelectedComponentType] = useState<string>(savedTabState?.selectedComponentType || '');
 
   // For action/database selection
-  const [selectedApp, setSelectedApp] = useState<any>(null);
-  const [selectedDatabase, setSelectedDatabase] = useState<any>(null);
-  const [actionSearchTerm, setActionSearchTerm] = useState('');
-  const [databaseActionType, setDatabaseActionType] = useState<string>('');
+  const [selectedApp, setSelectedApp] = useState<any>(savedTabState?.selectedApp || null);
+  const [selectedDatabase, setSelectedDatabase] = useState<any>(savedTabState?.selectedDatabase || null);
+  const [actionSearchTerm, setActionSearchTerm] = useState(savedTabState?.actionSearchTerm || '');
+  const [databaseActionType, setDatabaseActionType] = useState<string>(savedTabState?.databaseActionType || '');
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-quota',
+    state.name || 'New Quota',
+    {},
+    { state, editingInputKey, editingOptionId, selectedComponentType, selectedApp, selectedDatabase, actionSearchTerm, databaseActionType }
+  );
 
   // Initialize Ductape SDK
   const ductape = useDuctape({

@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { TokenPeriods } from '@ductape/sdk/dist/types';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewSessionTabContentProps {
   tabId: string;
@@ -42,15 +43,29 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
     type: 'product'
   }) as any;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    description: '',
-    selector: '',
-    schema: '{}',
-    expiry: '1',
-    period: TokenPeriods.MINUTES,
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      description: '',
+      selector: '',
+      schema: '{}',
+      expiry: '1',
+      period: TokenPeriods.MINUTES,
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-session',
+    formData.name || 'New Session',
+    {},
+    { formData }
+  );
 
   // Create session mutation
   const { mutateAsync: createSession, isPending: isCreating } = useMutation({

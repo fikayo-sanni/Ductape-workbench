@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
-import { Key, Plus, Copy, Eye, EyeOff, Trash2, AlertCircle } from "lucide-react";
+import {
+  Key,
+  Plus,
+  Copy,
+  Eye,
+  EyeOff,
+  Trash2,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
 import tokensServices from "@/services/tokensServices";
+import { MarkdownEditor } from "../ui/markdown-editor";
 
 interface Token {
   name: string;
@@ -60,29 +68,33 @@ export default function TokensTabContent() {
   // Workspace Credentials State
   const [workspaceCredentials, setWorkspaceCredentials] = useState([
     {
-      key: 'workspace_id',
-      name: 'Workspace ID',
-      description: 'Unique identifier for your Ductape workspace',
-      value: '**************************************',
+      key: "workspace_id",
+      name: "Workspace ID",
+      description: "Unique identifier for your Ductape workspace",
+      value: "**************************************",
     },
     {
-      key: 'user_id',
-      name: 'User ID',
-      description: 'Unique identifier for your user account within your Ductape workspace',
-      value: '**************************************',
+      key: "user_id",
+      name: "User ID",
+      description:
+        "Unique identifier for your user account within your Ductape workspace",
+      value: "**************************************",
     },
     {
-      key: 'private_key',
-      name: 'Private Key',
-      description: 'Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.',
-      value: '**************************************',
+      key: "private_key",
+      name: "Private Key",
+      description:
+        "Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.",
+      value: "**************************************",
     },
   ]);
   const [showOtpDialog, setShowOtpDialog] = useState(false);
-  const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
+  const [otpValues, setOtpValues] = useState(["", "", "", "", "", ""]);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
-  const [visibleCredentials, setVisibleCredentials] = useState<{ [key: number]: boolean }>({});
+  const [visibleCredentials, setVisibleCredentials] = useState<{
+    [key: number]: boolean;
+  }>({});
   const [secondsLeft, setSecondsLeft] = useState(60);
 
   // Get current workspace data
@@ -267,8 +279,8 @@ export default function TokensTabContent() {
     try {
       // Call API to send OTP
       await tokensServices.getTwoFA({
-        user_id: user?._id ?? '',
-        public_key: user?.public_key ?? '',
+        user_id: user?._id ?? "",
+        public_key: user?.public_key ?? "",
       });
       toast.success("OTP sent to your email");
       setOtpSent(true);
@@ -290,29 +302,31 @@ export default function TokensTabContent() {
     try {
       // Call API to verify OTP and get actual credentials
       const response = await tokensServices.postTwoFA({
-        user_id: user?._id ?? '',
-        public_key: user?.public_key ?? '',
+        user_id: user?._id ?? "",
+        public_key: user?.public_key ?? "",
         token: otp,
       });
 
       if (response.status && response.data) {
         setWorkspaceCredentials([
           {
-            key: 'workspace_id',
-            name: 'Workspace ID',
-            description: 'Unique identifier for your Ductape workspace',
+            key: "workspace_id",
+            name: "Workspace ID",
+            description: "Unique identifier for your Ductape workspace",
             value: response.data.workspace_id,
           },
           {
-            key: 'user_id',
-            name: 'User ID',
-            description: 'Unique identifier for your user account within your Ductape workspace',
+            key: "user_id",
+            name: "User ID",
+            description:
+              "Unique identifier for your user account within your Ductape workspace",
             value: response.data.user_id,
           },
           {
-            key: 'private_key',
-            name: 'Private Key',
-            description: 'Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.',
+            key: "private_key",
+            name: "Private Key",
+            description:
+              "Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.",
             value: response.data.private_key,
           },
         ]);
@@ -320,7 +334,7 @@ export default function TokensTabContent() {
         setVisibleCredentials({ 0: true, 1: true, 2: true });
         setOtpVerified(true);
         setShowOtpDialog(false);
-        setOtpValues(['', '', '', '', '', '']);
+        setOtpValues(["", "", "", "", "", ""]);
         toast.success("OTP verified successfully");
       } else {
         toast.error("Invalid OTP entered");
@@ -333,7 +347,7 @@ export default function TokensTabContent() {
 
   const handleOtpChange = (index: number, value: string) => {
     const newOtpValues = [...otpValues];
-    newOtpValues[index] = value.replace(/\D/, '');
+    newOtpValues[index] = value.replace(/\D/, "");
     setOtpValues(newOtpValues);
 
     // Auto-focus next input
@@ -344,15 +358,17 @@ export default function TokensTabContent() {
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
+    if (e.key === "Backspace" && !otpValues[index] && index > 0) {
       const prevInput = document.getElementById(`otp-${index - 1}`);
       prevInput?.focus();
     }
   };
 
   const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
 
@@ -374,7 +390,9 @@ export default function TokensTabContent() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <Key className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold text-grey">Tokens & Credentials</h1>
+                <h1 className="text-2xl font-bold text-grey">
+                  Tokens & Credentials
+                </h1>
               </div>
               <p className="text-grey-600">
                 Manage workspace credentials and tokens for secure access
@@ -423,7 +441,9 @@ export default function TokensTabContent() {
                         {credential.name}
                       </h3>
                       <button
-                        onClick={() => copyCredentialToClipboard(credential.value)}
+                        onClick={() =>
+                          copyCredentialToClipboard(credential.value)
+                        }
                         className={cn(
                           "transition-colors",
                           visibleCredentials[index]
@@ -451,7 +471,10 @@ export default function TokensTabContent() {
                   <button
                     onClick={() => {
                       // Check if all 3 credentials are visible
-                      const allVisible = visibleCredentials[0] && visibleCredentials[1] && visibleCredentials[2];
+                      const allVisible =
+                        visibleCredentials[0] &&
+                        visibleCredentials[1] &&
+                        visibleCredentials[2];
 
                       if (allVisible) {
                         // Hide all
@@ -467,9 +490,17 @@ export default function TokensTabContent() {
                       }
                     }}
                     className="text-grey-600 hover:text-grey transition-colors flex items-center gap-1.5 text-xs"
-                    title={(visibleCredentials[0] && visibleCredentials[1] && visibleCredentials[2]) ? "Hide All" : "Show All"}
+                    title={
+                      visibleCredentials[0] &&
+                      visibleCredentials[1] &&
+                      visibleCredentials[2]
+                        ? "Hide All"
+                        : "Show All"
+                    }
                   >
-                    {(visibleCredentials[0] && visibleCredentials[1] && visibleCredentials[2]) ? (
+                    {visibleCredentials[0] &&
+                    visibleCredentials[1] &&
+                    visibleCredentials[2] ? (
                       <>
                         <EyeOff className="h-3.5 w-3.5" />
                         <span>Hide All</span>
@@ -510,7 +541,9 @@ export default function TokensTabContent() {
                     <Key className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{tokens.length}</p>
+                    <p className="text-2xl font-bold text-grey">
+                      {tokens.length}
+                    </p>
                     <p className="text-sm text-grey-600">Total</p>
                   </div>
                 </div>
@@ -533,7 +566,9 @@ export default function TokensTabContent() {
 
             {/* Tokens List */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-4">API Tokens</h2>
+              <h2 className="text-lg font-semibold text-grey mb-4">
+                API Tokens
+              </h2>
               {loading ? (
                 <div className="text-center py-8 text-grey-600">
                   Loading tokens...
@@ -543,7 +578,9 @@ export default function TokensTabContent() {
                   <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-4">
                     <Key className="h-8 w-8 text-grey-400" />
                   </div>
-                  <p className="text-grey-600 font-medium mb-1">No tokens yet</p>
+                  <p className="text-grey-600 font-medium mb-1">
+                    No tokens yet
+                  </p>
                   <p className="text-sm text-grey-500">
                     Create your first token to get started
                   </p>
@@ -581,7 +618,9 @@ export default function TokensTabContent() {
                           )}
 
                           <div className="flex items-center gap-4 text-xs text-grey-600 flex-wrap">
-                            <span>Scope: {token.scope.join(", ") || "None"}</span>
+                            <span>
+                              Scope: {token.scope.join(", ") || "None"}
+                            </span>
                             {token.envs.length > 0 && (
                               <>
                                 <span>•</span>
@@ -604,7 +643,9 @@ export default function TokensTabContent() {
                                 <span>•</span>
                                 <span>
                                   Last used:{" "}
-                                  {new Date(token.last_used).toLocaleDateString()}
+                                  {new Date(
+                                    token.last_used
+                                  ).toLocaleDateString()}
                                 </span>
                               </>
                             )}
@@ -645,7 +686,7 @@ export default function TokensTabContent() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className='text-grey'>Create New Token</DialogTitle>
+            <DialogTitle className="text-grey">Create New Token</DialogTitle>
             <DialogDescription>
               Create a new API token for accessing your workspace resources
             </DialogDescription>
@@ -678,9 +719,10 @@ export default function TokensTabContent() {
                   setNewToken({
                     ...newToken,
                     name: value,
-                    description: shouldUpdateDescription && value
-                      ? `Token for ${value}`
-                      : newToken.description
+                    description:
+                      shouldUpdateDescription && value
+                        ? `Token for ${value}`
+                        : newToken.description,
                   });
                 }}
               />
@@ -690,15 +732,13 @@ export default function TokensTabContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="token-description">Description</Label>
-              <Textarea
-                id="token-description"
-                placeholder="Optional description for this token"
+              <MarkdownEditor
                 value={newToken.description}
                 onChange={(e) =>
-                  setNewToken({ ...newToken, description: e.target.value })
+                  setNewToken({ ...newToken, description: e })
                 }
-                rows={2}
+                placeholder="Optional description for this token"
+                label="Description *"
               />
             </div>
 
@@ -826,7 +866,9 @@ export default function TokensTabContent() {
       <Dialog open={showNewTokenDialog} onOpenChange={setShowNewTokenDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className='text-grey'>Token Created Successfully!</DialogTitle>
+            <DialogTitle className="text-grey">
+              Token Created Successfully!
+            </DialogTitle>
             <DialogDescription>
               Make sure to copy your token now. You won't be able to see it
               again!

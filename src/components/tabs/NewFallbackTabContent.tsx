@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { FeatureEventTypes, DataTypes } from '@ductape/sdk/dist/types';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewFallbackTabContentProps {
   tabId: string;
@@ -79,15 +80,29 @@ export default function NewFallbackTabContent({ tabId, data }: NewFallbackTabCon
     features: data.productFeatures || [],
   } : null;
 
-  const [state, setState] = useState<FallbackBuilderState>({
-    name: '',
-    description: '',
-    tag: '',
-    fallbackInputs: {},
-    selectedComponents: [],
-    componentInputs: {},
-    componentOutputs: {},
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [state, setState] = useState<FallbackBuilderState>(
+    savedTabState?.state || {
+      name: '',
+      description: '',
+      tag: '',
+      fallbackInputs: {},
+      selectedComponents: [],
+      componentInputs: {},
+      componentOutputs: {},
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-fallback',
+    state.name || 'New Fallback',
+    {},
+    { state }
+  );
 
 
   // Progressive disclosure steps

@@ -21,6 +21,7 @@ import { useAuth } from '@/store/useAuth';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Notifiers } from '@ductape/sdk/dist/types/enums';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewNotificationTabContentProps {
   data?: any;
@@ -63,20 +64,36 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
     workspace_id: data.workspaceId || currentWorkspaceId,
   } : null;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    description: '',
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId || '', null as any);
 
-  const [selectedNotifiers, setSelectedNotifiers] = useState<NotifierType[]>([
-    { id: 'push', label: 'Push Notifications', selected: false },
-    { id: 'email', label: 'Email', selected: false },
-    { id: 'sms', label: 'SMS', selected: false },
-    { id: 'callback', label: 'Callbacks', selected: false },
-  ]);
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      description: '',
+    }
+  );
 
-  const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
+  const [selectedNotifiers, setSelectedNotifiers] = useState<NotifierType[]>(
+    savedTabState?.selectedNotifiers || [
+      { id: 'push', label: 'Push Notifications', selected: false },
+      { id: 'email', label: 'Email', selected: false },
+      { id: 'sms', label: 'SMS', selected: false },
+      { id: 'callback', label: 'Callbacks', selected: false },
+    ]
+  );
+
+  const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>(savedTabState?.envConfigs || []);
+
+  // Persist tab state automatically
+  useTabState(
+    tabId || '',
+    'new-notification',
+    formData.name || 'New Notification',
+    {},
+    { formData, selectedNotifiers, envConfigs }
+  );
 
   // Initialize environment configurations
   useEffect(() => {
@@ -119,7 +136,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
-      setFormData(prev => ({ ...prev, tag: sanitized }));
+      setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
     }
   }, [formData.name]);
 
@@ -133,7 +150,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    setFormData(prev => ({ ...prev, tag: sanitized }));
+    setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
   };
 
   const handleNotifierToggle = (id: string) => {

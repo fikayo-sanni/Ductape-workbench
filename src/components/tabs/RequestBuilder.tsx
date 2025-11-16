@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/useAuth";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useDuctape } from "@/hooks/useDuctape";
+import { useTabState, getInitialTabState } from "@/hooks/useTabState";
+import { deleteTabState } from "@/lib/tab-state-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,27 +103,11 @@ const syntaxHighlightJSON = (jsonString: string) => {
 
 export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   const { user, currentWorkspaceId } = useAuth();
-  const { updateTab, tabs } = useWorkbenchStore();
+  const { tabs } = useWorkbenchStore();
   const queryClient = useQueryClient();
 
-  // localStorage key for this tab's request builder state
-  const STORAGE_KEY = `request-builder-${data?.appId || data?.productId || tabId}`;
-
-  // Load initial state from localStorage
-  const getInitialState = () => {
-    try {
-      console.log(updateTab);
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('Error loading saved state:', error);
-    }
-    return null;
-  };
-
-  const savedState = getInitialState();
+  // Restore saved state using centralized tab state manager
+  const savedState = getInitialTabState(tabId, null as any);
 
   // Initialize Ductape SDK
   const ductape = useDuctape({
@@ -337,8 +323,13 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   }, [baseUrl]);
 
   // Save state to localStorage whenever relevant state changes
-  useEffect(() => {
-    const stateToSave = {
+  // Persist tab state automatically using centralized tab state manager
+  useTabState(
+    tabId,
+    'request-builder',
+    formData.name || 'New Request',
+    {},
+    {
       formData,
       fullUrl,
       baseUrl,
@@ -351,28 +342,8 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       response,
       activeTab,
       customEnvs,
-    };
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-    } catch (error) {
-      console.error('Error saving state to localStorage:', error);
     }
-  }, [
-    formData,
-    fullUrl,
-    baseUrl,
-    resource,
-    params,
-    query,
-    headers,
-    body,
-    formDataFields,
-    response,
-    activeTab,
-    customEnvs,
-    STORAGE_KEY,
-  ]);
+  );
 
   const handleNameChange = (value: string) => {
     // Auto-generate description only if description is empty or was auto-generated
@@ -1120,11 +1091,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       toast.success("Action created successfully");
 
       // Clear saved state from localStorage after successful save
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (error) {
-        console.error('Error clearing saved state:', error);
-      }
+      deleteTabState(tabId);
 
       // Close current tab
       const { closeTab, openTab } = useWorkbenchStore.getState();

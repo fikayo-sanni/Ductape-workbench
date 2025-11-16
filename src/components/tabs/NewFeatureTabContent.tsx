@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import appServicesReal from '@/services/appServicesReal';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewFeatureTabContentProps {
   tabId: string;
@@ -168,7 +169,21 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     caches: data.productCaches || [],
   } : null;
 
-  const [state, setState] = useState<FeatureBuilderState>(INITIAL_STATE);
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [state, setState] = useState<FeatureBuilderState>(
+    savedTabState?.state || INITIAL_STATE
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-feature',
+    state.featureName || 'New Feature',
+    {},
+    { state }
+  );
 
   // Helper function to build check expression from condition properties
   const buildCheckExpression = (cond: FeatureBuilderState['eventConditions'][string] | undefined) => {

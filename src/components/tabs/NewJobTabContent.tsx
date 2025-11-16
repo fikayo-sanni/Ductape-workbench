@@ -12,6 +12,7 @@ import { useDuctape } from '@/hooks/useDuctape';
 import { JobEventTypes } from '@ductape/sdk/dist/types';
 import productServices from '@/services/productServices';
 import appServices from '@/services/appServices';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewJobTabContentProps {
   tabId: string;
@@ -61,18 +62,36 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
   // Use fetched product data
   const product = fetchedProductData || null;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    event_type: '',
-    parent: '',
-    event: '',
-    executions: 0,
-    intervals: 0,
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
 
-  const [selectedType, setSelectedType] = useState<JobEventTypes | ''>('');
-  const [selectedParent, setSelectedParent] = useState<string | ''>('');
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      event_type: '',
+      parent: '',
+      event: '',
+      executions: 0,
+      intervals: 0,
+    }
+  );
+
+  const [selectedType, setSelectedType] = useState<JobEventTypes | ''>(
+    savedTabState?.selectedType || ''
+  );
+  const [selectedParent, setSelectedParent] = useState<string | ''>(
+    savedTabState?.selectedParent || ''
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-job',
+    formData.name || 'New Job',
+    {},
+    { formData, selectedType, selectedParent }
+  );
 
   // Fetch selected app's full details when an app is selected
   const selectedAppData = connectedApps?.find((app: any) =>
@@ -106,7 +125,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     // Auto-generate tag
     if (value && product?.tag) {
       const sanitizedValue = value.replace(/[^a-zA-Z0-9-_]/g, '_').toLowerCase();
-      setFormData(prev => ({ ...prev, name: value, tag: sanitizedValue }));
+      setFormData((prev: typeof formData) => ({ ...prev, name: value, tag: sanitizedValue }));
     }
   };
 

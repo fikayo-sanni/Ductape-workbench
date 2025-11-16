@@ -24,7 +24,7 @@ export default function ChatbotSidebar({ isOpen, onClose }: ChatbotSidebarProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! I'm your AI assistant for Ductape.\n\nThe chatbot feature is currently under construction. We're working hard to bring you an intelligent assistant that can help you build integrations, understand your workspace data, and answer questions about your products, apps, and environments.\n\nStay tuned for updates! 🚀",
+      content: "Hi! I'm Jean, your AI assistant for Ductape.\n\nThe chatbot feature is currently under construction. We're working hard to bring you an intelligent assistant that can help you build integrations, understand your workspace data, and answer questions about your products, apps, and environments.\n\nStay tuned for updates! 🚀",
       timestamp: new Date(),
     },
   ]);

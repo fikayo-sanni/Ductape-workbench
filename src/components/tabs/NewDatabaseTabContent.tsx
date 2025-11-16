@@ -11,6 +11,7 @@ import { useAuth } from '@/store/useAuth';
 import productServicesReal from '@/services/productServicesReal';
 import productServices from '@/services/productServices';
 import { useDuctape } from '@/hooks/useDuctape';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewDatabaseTabContentProps {
   tabId: string;
@@ -47,15 +48,33 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
     type: 'product'
   }) as any;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    type: 'postgresql',
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
 
-  const [envConnections, setEnvConnections] = useState<EnvConnection[]>([]);
-  const [showEnvs, setShowEnvs] = useState(false);
-  const [showPasswords, setShowPasswords] = useState<Record<number, boolean>>({});
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      type: 'postgresql',
+    }
+  );
+
+  const [envConnections, setEnvConnections] = useState<EnvConnection[]>(
+    savedTabState?.envConnections || []
+  );
+  const [showEnvs, setShowEnvs] = useState(savedTabState?.showEnvs || false);
+  const [showPasswords, setShowPasswords] = useState<Record<number, boolean>>(
+    savedTabState?.showPasswords || {}
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-database',
+    formData.name || 'New Database',
+    {},
+    { formData, envConnections, showEnvs, showPasswords }
+  );
 
   // Fetch product data if productId is provided but productEnvs is not
   const { data: productsData, isLoading: loadingProducts } = useQuery({

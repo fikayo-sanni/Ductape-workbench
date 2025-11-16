@@ -26,6 +26,7 @@ import { useDuctape } from '@/hooks/useDuctape';
 import { AuthTypes } from '@ductape/sdk/dist/types';
 import appServices from '@/services/appServices';
 import appServicesReal from '@/services/appServicesReal';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewAuthTabContentProps {
   tabId: string;
@@ -60,16 +61,30 @@ export default function NewAuthTabContent({ tabId, data }: NewAuthTabContentProp
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  const [state, setState] = useState<AuthBuilderState>({
-    authorizationType: 'credential_access',
-    name: '',
-    description: '',
-    tag: '',
-    action: '',
-    expiry: 1,
-    period: 'hours',
-    tokenFields: [{ id: `field_${Date.now()}`, key: '', sampleValue: '', addTo: 'headers' }],
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [state, setState] = useState<AuthBuilderState>(
+    savedTabState?.state || {
+      authorizationType: 'credential_access',
+      name: '',
+      description: '',
+      tag: '',
+      action: '',
+      expiry: 1,
+      period: 'hours',
+      tokenFields: [{ id: `field_${Date.now()}`, key: '', sampleValue: '', addTo: 'headers' }],
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-auth',
+    state.name || 'New Auth',
+    {},
+    { state }
+  );
 
   // Progressive disclosure - show sections as user progresses
   const showStep2 = state.name.trim().length > 0 && state.tag.trim().length > 0;

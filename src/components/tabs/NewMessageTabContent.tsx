@@ -16,6 +16,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { toast } from 'react-hot-toast';
 import { FileText, Loader2, Plus, Trash2, Info } from 'lucide-react';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewMessageTabContentProps {
   tabId: string;
@@ -47,20 +48,34 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
     callback: notification?.envs?.some((env: any) => env.callbacks),
   };
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    description: '',
-    pushTitle: '',
-    pushBody: '',
-    pushData: '',
-    emailSubject: '',
-    emailTemplate: '',
-    sms: '',
-    callbackUrl: '',
-    callbackMethod: 'POST',
-    callbackFields: [] as CallbackField[],
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      description: '',
+      pushTitle: '',
+      pushBody: '',
+      pushData: '',
+      emailSubject: '',
+      emailTemplate: '',
+      sms: '',
+      callbackUrl: '',
+      callbackMethod: 'POST',
+      callbackFields: [] as CallbackField[],
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-message',
+    formData.name || 'New Message',
+    {},
+    { formData }
+  );
 
   // Auto-generate tag from name
   const handleAutoGenerateTag = () => {
@@ -73,7 +88,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    setFormData(prev => ({ ...prev, tag: sanitized }));
+    setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
   };
 
   useEffect(() => {
@@ -83,7 +98,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
-      setFormData(prev => ({ ...prev, tag: sanitized }));
+      setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
     }
   }, [formData.name]);
 
@@ -94,25 +109,25 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
       value: '',
       addTo: 'headers',
     };
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       callbackFields: [...prev.callbackFields, newField],
     }));
   };
 
   const handleUpdateCallbackField = (id: string, updates: Partial<CallbackField>) => {
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
-      callbackFields: prev.callbackFields.map(field =>
+      callbackFields: prev.callbackFields.map((field: CallbackField) =>
         field.id === id ? { ...field, ...updates } : field
       ),
     }));
   };
 
   const handleRemoveCallbackField = (id: string) => {
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
-      callbackFields: prev.callbackFields.filter(field => field.id !== id),
+      callbackFields: prev.callbackFields.filter((field: CallbackField) => field.id !== id),
     }));
   };
 
@@ -161,7 +176,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
         const query: Record<string, string> = {};
         const bodyFields: Record<string, string> = {};
 
-        formData.callbackFields.forEach(field => {
+        formData.callbackFields.forEach((field: CallbackField) => {
           if (field.key && field.value) {
             switch (field.addTo) {
               case 'headers':
@@ -483,7 +498,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                       </Button>
                     </div>
                     <div className="space-y-2">
-                      {formData.callbackFields.map((field) => (
+                      {formData.callbackFields.map((field: CallbackField) => (
                         <div key={field.id} className="flex gap-2 items-end p-3 bg-grey-50 rounded-lg border border-grey-300">
                           <div className="flex-1">
                             <Label className="text-xs text-grey-600">Key</Label>

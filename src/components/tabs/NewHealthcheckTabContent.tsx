@@ -20,6 +20,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
 import appServices from '@/services/appServices';
 import { reconstructActionPayload } from '@/utils/payloadReconstruction';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewHealthcheckTabContentProps {
   data?: any;
@@ -42,22 +43,38 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     apps: data.productApps || [],
   } : null;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    description: '',
-    interval: '60', // Default: 60 seconds
-    retries: 1,
-    type: 'app', // Default type
-    selectedApp: '',
-    selectedDatabase: '',
-    selectedMessageBroker: '',
-    selectedFeature: '',
-  });
-  const [selectedAction, setSelectedAction] = useState('');
-  const [actionInputsByEnv, setActionInputsByEnv] = useState<Record<string, any>>({});
-  const [actionSearchTerm, setActionSearchTerm] = useState('');
-  const [selectedEnv, setSelectedEnv] = useState<string>(''); // Track which env is being configured
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId || '', null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      description: '',
+      interval: '60', // Default: 60 seconds
+      retries: 1,
+      type: 'app', // Default type
+      selectedApp: '',
+      selectedDatabase: '',
+      selectedMessageBroker: '',
+      selectedFeature: '',
+    }
+  );
+  const [selectedAction, setSelectedAction] = useState(savedTabState?.selectedAction || '');
+  const [actionInputsByEnv, setActionInputsByEnv] = useState<Record<string, any>>(
+    savedTabState?.actionInputsByEnv || {}
+  );
+  const [actionSearchTerm, setActionSearchTerm] = useState(savedTabState?.actionSearchTerm || '');
+  const [selectedEnv, setSelectedEnv] = useState<string>(savedTabState?.selectedEnv || ''); // Track which env is being configured
+
+  // Persist tab state automatically
+  useTabState(
+    tabId || '',
+    'new-healthcheck',
+    formData.name || 'New Health Check',
+    {},
+    { formData, selectedAction, actionInputsByEnv, actionSearchTerm, selectedEnv }
+  );
 
   // Fetch connected apps
   const { data: productAppsRes } = useQuery({
@@ -143,7 +160,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
-      setFormData(prev => ({ ...prev, tag: sanitized }));
+      setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
     }
   }, [formData.name]);
 
@@ -157,11 +174,11 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    setFormData(prev => ({ ...prev, tag: sanitized }));
+    setFormData((prev: typeof formData) => ({ ...prev, tag: sanitized }));
   };
 
   const handleIntervalPreset = (seconds: number) => {
-    setFormData(prev => ({ ...prev, interval: seconds.toString() }));
+    setFormData((prev: typeof formData) => ({ ...prev, interval: seconds.toString() }));
   };
 
   const selectedActionData = useMemo(() => {

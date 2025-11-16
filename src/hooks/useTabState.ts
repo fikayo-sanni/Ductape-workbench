@@ -29,6 +29,7 @@ export function useTabState<TData = any, TFormState = any>(
    * Save current state to localStorage
    */
   const saveState = useCallback(() => {
+    console.log(`[useTabState] Saving state for tab ${tabId} (${type}):`, formState);
     saveTabState(
       tabId,
       type,
@@ -125,4 +126,34 @@ export function useTabState<TData = any, TFormState = any>(
      */
     handleScroll,
   };
+}
+
+/**
+ * Helper function to get initial tab state, merging saved state with defaults
+ * Use this in useState initialization to restore previous form data
+ *
+ * Example:
+ * const [formData, setFormData] = useState(() =>
+ *   getInitialTabState(tabId, { name: '', description: '' })
+ * );
+ *
+ * @param tabId - The unique ID of the tab
+ * @param defaultState - The default state to use if no saved state exists
+ * @returns The merged state (saved state takes precedence over defaults)
+ */
+export function getInitialTabState<T = any>(tabId: string, defaultState: T): T {
+  const savedState = getTabState(tabId);
+
+  if (savedState?.formState) {
+    console.log(`[useTabState] Restoring saved state for tab ${tabId}:`, savedState.formState);
+    // If defaultState is null, return the formState directly
+    // Otherwise merge (for backward compatibility)
+    if (defaultState === null || defaultState === undefined) {
+      return savedState.formState as T;
+    }
+    return { ...defaultState, ...savedState.formState };
+  }
+
+  console.log(`[useTabState] No saved state found for tab ${tabId}, using defaults`);
+  return defaultState;
 }

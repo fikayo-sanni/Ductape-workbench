@@ -9,6 +9,7 @@ import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewCacheTabContentProps {
   tabId: string;
@@ -39,11 +40,25 @@ export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentPr
     type: 'product'
   }) as any;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    expiry: '3600000', // Default: 1 hour in milliseconds
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
+
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      expiry: '3600000', // Default: 1 hour in milliseconds
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-cache',
+    formData.name || 'New Cache',
+    {},
+    { formData }
+  );
 
   // Create cache mutation
   const { mutateAsync: createCache, isPending: isCreating } = useMutation({

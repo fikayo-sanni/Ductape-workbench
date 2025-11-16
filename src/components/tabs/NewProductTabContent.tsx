@@ -14,6 +14,7 @@ import {
 import { Package, Save, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewProductTabContentProps {
   tabId: string;
@@ -24,14 +25,29 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
   const { closeTab, openTab } = useWorkbenchStore();
   const { currentWorkspaceId } = useAuth();
 
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-    description: '',
-    status: 'active' as 'active' | 'inactive',
-    logo: '',
-  });
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+      description: '',
+      status: 'active' as 'active' | 'inactive',
+      logo: '',
+    }
+  );
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-product',
+    formData.name || 'New Product',
+    {},
+    {
+      formData,
+    }
+  );
 
   const handleSave = async () => {
     if (!formData.name.trim()) {

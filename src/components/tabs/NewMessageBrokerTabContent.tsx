@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { MessageBrokerTypes } from '@ductape/sdk/dist/types';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 interface NewMessageBrokerTabContentProps {
   tabId: string;
@@ -80,13 +81,27 @@ export default function NewMessageBrokerTabContent({ tabId, data }: NewMessageBr
     workspace_id: data.workspaceId || currentWorkspaceId
   } : null;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    tag: '',
-  });
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
 
-  const [showEnvs, setShowEnvs] = useState(false);
-  const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
+  const [formData, setFormData] = useState(
+    savedTabState?.formData || {
+      name: '',
+      tag: '',
+    }
+  );
+
+  const [showEnvs, setShowEnvs] = useState(savedTabState?.showEnvs || false);
+  const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>(savedTabState?.envConfigs || []);
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'new-message-broker',
+    formData.name || 'New Message Broker',
+    {},
+    { formData, showEnvs, envConfigs }
+  );
 
   // Initialize Ductape SDK
   const ductape = useDuctape({
@@ -156,7 +171,7 @@ export default function NewMessageBrokerTabContent({ tabId, data }: NewMessageBr
     // Auto-generate tag
     if (value && product?.tag) {
       const sanitizedValue = value.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-      setFormData(prev => ({ ...prev, name: value, tag: `${sanitizedValue}` }));
+      setFormData((prev: typeof formData) => ({ ...prev, name: value, tag: `${sanitizedValue}` }));
     }
   };
 
