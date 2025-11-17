@@ -17,7 +17,9 @@ import AuthTabContent from './tabs/AuthTabContent';
 import NewAuthTabContent from './tabs/NewAuthTabContent';
 import EnvironmentTabContent from './tabs/EnvironmentTabContent';
 import StorageTabContent from './tabs/StorageTabContent';
+import StorageExplorerTab from './tabs/StorageExplorerTab';
 import DatabaseTabContent from './tabs/DatabaseTabContent';
+import DatabaseExplorerTab from './tabs/DatabaseExplorerTab';
 import CacheTabContent from './tabs/CacheTabContent';
 import WebhookTabContent from './tabs/WebhookTabContent';
 import NewWebhookTabContent from './tabs/NewWebhookTabContent';
@@ -221,6 +223,10 @@ export default function TabContent() {
         return <BriefTabContent tab={activeTab as typeof activeTab & { data: NonNullable<typeof activeTab.data> }} />;
 
       case 'storage':
+        // Check if this is a storage explorer tab
+        if (activeTab.data?.isExplorer) {
+          return <StorageExplorerTab storage={activeTab.data.storage} />;
+        }
         // Check if this is a new storage creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewStorageTabContent tabId={activeTab.id} data={activeTab.data} />;
@@ -235,6 +241,10 @@ export default function TabContent() {
         return <CacheTabContent cache={activeTab.data} />;
 
       case 'database':
+        // Check if this is a database explorer tab
+        if (activeTab.data?.isExplorer) {
+          return <DatabaseExplorerTab database={activeTab.data.database} />;
+        }
         // Check if this is a new database creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
           return <NewDatabaseTabContent tabId={activeTab.id} data={activeTab.data} />;

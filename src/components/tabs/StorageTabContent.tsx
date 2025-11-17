@@ -1,4 +1,4 @@
-import { HardDrive, Cloud, Server, Copy, Check, Eye, EyeOff, Edit2, Loader2, Save, X, Upload, CheckCircle } from 'lucide-react';
+import { HardDrive, Cloud, Server, Copy, Check, Eye, EyeOff, Edit2, Loader2, Save, X, Upload, CheckCircle, FolderOpen, Code } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StorageProviders } from '@ductape/sdk/dist/types';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface StorageTabContentProps {
   storage: any;
@@ -20,12 +22,14 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     tag: '',
   });
   const [envConfigs, setEnvConfigs] = useState<any[]>([]);
   const { user, currentWorkspaceId } = useAuth();
+  const { openTab } = useWorkbenchStore();
   const queryClient = useQueryClient();
   const productTag = storage?.productTag;
   
@@ -305,6 +309,161 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
     }
   };
 
+  const handleViewFiles = () => {
+    // Use the first available environment
+    const firstEnv = displayData.envs?.[0];
+    if (!firstEnv) {
+      toast.error('No environment configured');
+      return;
+    }
+
+    openTab({
+      id: `storage-explorer-${displayData.tag}-${firstEnv.slug}`,
+      type: 'storage',
+      title: `${displayData.name} - Files`,
+      itemId: `${displayData.tag}-${firstEnv.slug}`,
+      data: {
+        storage: {
+          name: displayData.name,
+          tag: displayData.tag,
+          type: firstEnv.type,
+          env: firstEnv,
+        },
+        isExplorer: true,
+      },
+    });
+  };
+
+  const handleViewCode = () => {
+    setShowCodeSidebar(true);
+  };
+
+  // Generate SDK code examples for storage
+  const generateCodeSections = (language: string, env?: string) => {
+    const storageTag = displayData.tag || 'your-storage-tag';
+    const productTagValue = productTag || 'your-product-tag';
+    const envSlug = env || displayData.envs?.[0]?.slug || 'production';
+
+    switch (language) {
+      case 'javascript':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+          },
+          {
+            title: 'Read File',
+            code: `const filePath = 'path/to/file.txt';
+const input = await ductape.processor.storage.readFile(filePath);`
+          },
+          {
+            title: 'Write File',
+            code: `const uploadData = {
+  env: '${envSlug}',
+  product_tag: '${productTagValue}',
+  event: '${storageTag}',
+  input,
+  retries: 3,
+};
+
+const result = await ductape.processor.storage.run(uploadData);
+console.log('File uploaded:', result.url);`
+          }
+        ];
+
+      case 'typescript':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `import { Ductape } from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+          },
+          {
+            title: 'Read File',
+            code: `const filePath: string = 'path/to/file.txt';
+const input = await ductape.processor.storage.readFile(filePath);`
+          },
+          {
+            title: 'Write File',
+            code: `const uploadData = {
+  env: '${envSlug}',
+  product_tag: '${productTagValue}',
+  event: '${storageTag}',
+  input,
+  retries: 3,
+};
+
+const {url} = await ductape.processor.storage.run(uploadData);
+console.log('File uploaded:', url);`
+          }
+        ];
+
+      case 'python':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `from ductape import Ductape
+
+ductape = Ductape(
+    workspace_id='your-workspace-id',
+    user_id='your-user-id',
+    token='your-auth-token',
+    public_key='your-public-key',
+    type='product'
+)
+
+# Initialize product
+ductape.init('${productTagValue}')`
+          },
+          {
+            title: 'Read File',
+            code: `file_path = 'path/to/file.txt'
+input = ductape.processor.storage.read_file(file_path)`
+          },
+          {
+            title: 'Write File',
+            code: `upload_data = {
+    'env': '${envSlug}',
+    'product_tag': '${productTagValue}',
+    'event': '${storageTag}',
+    'input': input,
+    'retries': 3,
+}
+
+result = ductape.processor.storage.run(upload_data)
+print(f'File uploaded: {result.url}')`
+          }
+        ];
+
+      default:
+        return [
+          {
+            title: 'Example',
+            code: '// Select a language to see code examples'
+          }
+        ];
+    }
+  };
+
   // Extract product info for header
   const product = storage?.productName && storage?.productTag ? {
     name: storage.productName,
@@ -314,6 +473,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
   } : null;
 
   return (
+    <>
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
@@ -424,14 +584,32 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
                 </Button>
               </div>
             ) : (
-              <Button
-                onClick={handleUpdateStorage}
-                className="gap-2"
-                variant="outline"
-              >
-                <Edit2 className="h-4 w-4" />
-                Update Storage
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleViewCode}
+                  className="gap-2"
+                  variant="outline"
+                >
+                  <Code className="h-4 w-4" />
+                  Code
+                </Button>
+                <Button
+                  onClick={handleViewFiles}
+                  className="gap-2"
+                  variant="default"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  View Files
+                </Button>
+                <Button
+                  onClick={handleUpdateStorage}
+                  className="gap-2"
+                  variant="outline"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  Update Storage
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -461,27 +639,32 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
                   {getProviderIcon(providerType)}
                   Environment: {env.slug || envConfig?.slug}
                 </h2>
-                {isEditing ? (
-                  <Select
-                    value={providerType.toLowerCase() || ''}
-                    onValueChange={(value) => updateEnvConfig(index, 'type', value)}
-                    disabled={isUpdating}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="aws">AWS</SelectItem>
-                      <SelectItem value="azure">Azure</SelectItem>
-                      <SelectItem value="gcp">GCP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className={cn('px-3 py-1 rounded text-xs font-medium', getProviderColor(providerType))}>
-                    {(providerType || 'Unknown').toUpperCase()}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <Select
+                      value={providerType.toLowerCase() || ''}
+                      onValueChange={(value) => updateEnvConfig(index, 'type', value)}
+                      disabled={isUpdating}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="aws">AWS</SelectItem>
+                        <SelectItem value="azure">Azure</SelectItem>
+                        <SelectItem value="gcp">GCP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className={cn('px-3 py-1 rounded text-xs font-medium', getProviderColor(providerType))}>
+                      {(providerType || 'Unknown').toUpperCase()}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* Credentials Section */}
+              <>
 
               {/* AWS S3 Configuration */}
               {isAWS && (
@@ -918,6 +1101,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
                   </div>
                 </div>
               )}
+              </>
             </div>
           );
         })}
@@ -942,5 +1126,18 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
         </div>
       </div>
     </div>
+
+    {/* Code Sidebar */}
+    {showCodeSidebar && (
+      <CodeSidebar
+        title={displayData.name || 'Storage'}
+        subtitle={`Product: ${product?.name || productTag || 'Unknown'}`}
+        tag={displayData.tag}
+        onClose={() => setShowCodeSidebar(false)}
+        generateCodeSections={generateCodeSections}
+        environments={displayData.envs || []}
+      />
+    )}
+    </>
   );
 }

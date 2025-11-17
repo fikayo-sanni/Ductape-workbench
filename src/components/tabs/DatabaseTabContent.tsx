@@ -1,4 +1,4 @@
-import { Database, Server, Link, Copy, Check, Eye, EyeOff, Table, GitBranch, Zap, Loader2, CheckCircle } from 'lucide-react';
+import { Database, Server, Link, Copy, Check, Eye, EyeOff, Table as TableIcon, GitBranch, Zap, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 interface DatabaseTabContentProps {
   database: any;
@@ -16,8 +17,9 @@ interface DatabaseTabContentProps {
 export default function DatabaseTabContent({ database }: DatabaseTabContentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConnections, setShowConnections] = useState<Record<number, boolean>>({});
-  
+
   const { user, currentWorkspaceId } = useAuth();
+  const { openTab } = useWorkbenchStore();
   const productTag = database?.productTag;
   
   // Initialize SDK
@@ -84,6 +86,24 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
       ...prev,
       [index]: !prev[index]
     }));
+  };
+
+  const handleViewDatabase = (env: any) => {
+    openTab({
+      id: `db-explorer-${displayData.tag}-${env.slug}`,
+      type: 'database',
+      title: `${displayData.name} (${env.slug})`,
+      itemId: `${displayData.tag}-${env.slug}`,
+      data: {
+        database: {
+          name: displayData.name,
+          tag: displayData.tag,
+          type: displayData.type,
+          env: env,
+        },
+        isExplorer: true,
+      },
+    });
   };
 
   const getDatabaseTypeColor = (type: string) => {
@@ -174,6 +194,15 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
                     <Server className="h-5 w-5 text-primary" />
                     <h3 className="text-base font-semibold text-grey">{env.slug}</h3>
                   </div>
+                  <Button
+                    onClick={() => handleViewDatabase(env)}
+                    className="gap-2"
+                    size="sm"
+                  >
+                    <TableIcon className="h-4 w-4" />
+                    View Database
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
                 </div>
 
                 {env.description && (
@@ -238,7 +267,7 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         {displayData.tables && displayData.tables.length > 0 && (
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
-              <Table className="h-5 w-5 text-blue" />
+              <TableIcon className="h-5 w-5 text-blue" />
               <h2 className="text-lg font-semibold text-grey">Tables</h2>
             </div>
             <div className="space-y-2">
@@ -249,7 +278,7 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Table className="h-4 w-4 text-blue" />
+                      <TableIcon className="h-4 w-4 text-blue" />
                       <p className="text-sm font-medium text-grey">{table.name || table.tag}</p>
                     </div>
                   </div>

@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface ActionViewTabContentProps {
   action: any;
@@ -125,7 +126,8 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
 
   // Code sidebar state
   const [showCodeSidebar, setShowCodeSidebar] = useState<boolean>(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
+  const [showDefaultValuesForm, setShowDefaultValuesForm] = useState<boolean>(false);
+  const [defaultValues, setDefaultValues] = useState<Array<{ variable: string; valueSource: string; value: string }>>([]);
 
   // Use app data passed from parent component
   const app = {
@@ -546,32 +548,66 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
     }
   };
 
-  // Generate SDK code examples
-  const generateCodeExample = (language: string) => {
+  // Default values management functions
+  const addDefaultValue = () => {
+    setDefaultValues(prev => [...prev, { variable: '', valueSource: '', value: '' }]);
+  };
+
+  const handleSetDefaultValues = () => {
+    setShowDefaultValuesForm(prev => {
+      const newValue = !prev;
+      if (newValue && defaultValues.length === 0) {
+        addDefaultValue();
+      }
+      return newValue;
+    });
+  };
+
+  const removeDefaultValue = (index: number) => {
+    setDefaultValues(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateDefaultValue = (index: number, field: 'variable' | 'valueSource' | 'value', value: string) => {
+    setDefaultValues(prev => prev.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const getValueForSource = (sourceType: string, selectedValue: string) => {
+    switch (sourceType) {
+      case 'default':
+        return '$Default';
+      case 'input':
+        return selectedValue;
+      default:
+        return selectedValue;
+    }
+  };
+
+  // Get available variables from params, query, headers, body
+  const availableVariables = [
+    ...params.filter(p => p.key).map(p => ({ label: p.key, value: p.key, type: 'param' })),
+    ...query.filter(q => q.key).map(q => ({ label: q.key, value: q.key, type: 'query' })),
+    ...headers.filter(h => h.key).map(h => ({ label: h.key, value: h.key, type: 'header' })),
+  ];
+
+  const availableValueSources = [
+    { label: 'Default', value: 'default' },
+    { label: 'Input', value: 'input' }
+  ];
+
+  // Generate SDK code sections for CodeSidebar component
+  const generateCodeSections = (language: string, env?: string) => {
     const appTag = action.appTag || 'your-app-tag';
     const actionTag = formData.tag || action.tag || 'action-tag';
-    const activeEnv = customEnvs.find(e => e.active);
-    const envSlug = activeEnv?.slug || 'production';
+    const envSlug = env || customEnvs.find(e => e.active)?.slug || 'production';
 
-    // Build parameters object
-    const paramsObj: any = {};
-    params.filter(p => p.enabled && p.key).forEach(p => {
-      paramsObj[p.key] = p.value || `{{${p.key}}}`;
-    });
+    // Prepare enabled params, query, headers for code examples
+    const enabledParams = params.filter(p => p.enabled && p.key);
+    const enabledQuery = query.filter(q => q.enabled && q.key);
+    const enabledHeaders = headers.filter(h => h.enabled && h.key);
 
-    // Build query object
-    const queryObj: any = {};
-    query.filter(q => q.enabled && q.key).forEach(q => {
-      queryObj[q.key] = q.value || `{{${q.key}}}`;
-    });
-
-    // Build headers object
-    const headersObj: any = {};
-    headers.filter(h => h.enabled && h.key).forEach(h => {
-      headersObj[h.key] = h.value || `{{${h.key}}}`;
-    });
-
-    // Build body object
+    // Parse body if available
     let bodyObj: any = null;
     if (['POST', 'PUT', 'PATCH'].includes(formData.method) && body) {
       try {
@@ -581,86 +617,152 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       }
     }
 
+    // Helper function to get value with default override
+    const getParamValue = (key: string, value: string) => {
+      const defaultValue = defaultValues.find(dv => dv.variable === key);
+      if (defaultValue && defaultValue.valueSource) {
+        const formattedValue = getValueForSource(defaultValue.valueSource, defaultValue.value);
+        return formattedValue;
+      }
+      return value || `{{${key}}}`;
+    };
+
     switch (language) {
       case 'javascript':
-        return `// Initialize Ductape SDK
+        return [
+          {
+            title: 'Init Ductape',
+            code: `const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'app'
+});
+
+// Initialize app
+await ductape.init('${appTag}');`
+          },
+          {
+            title: 'Input',
+            code: `const payload = {
+  env: '${envSlug}',
+  app: '${appTag}',
+  event: '${actionTag}',
+  input: {${enabledParams.length > 0 ? `
+    params: {
+${enabledParams.map(p => `      ${p.key}: '${getParamValue(p.key, p.value)}'`).join(',\n')}
+    },` : ''}${enabledQuery.length > 0 ? `
+    query: {
+${enabledQuery.map(q => `      ${q.key}: '${getParamValue(q.key, q.value)}'`).join(',\n')}
+    },` : ''}${enabledHeaders.length > 0 ? `
+    headers: {
+${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
+    },` : ''}${bodyObj ? `
+    body: ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 2).split('\n').map((line, i) => i === 0 ? line : `    ${line}`).join('\n')},` : ''}
+  },
+  retries: 3
+};`
+          },
+          {
+            title: 'Execute',
+            code: `const result = await ductape.apps.run(payload);
+console.log('Action result:', result);`
+          }
+        ];
+
+      case 'typescript':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `import Ductape from '@ductape/sdk';
+
 const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
   token: 'your-auth-token',
   public_key: 'your-public-key',
-  type: 'product'
+  type: 'app'
 });
 
-// Initialize product
-await ductape.init('your-product-tag');
-
-// Call action
-const response = await ductape.apps.run({
-  app_tag: '${appTag}',
-  action_tag: '${actionTag}',
-  env: '${envSlug}',${Object.keys(paramsObj).length > 0 ? `\n  params: ${JSON.stringify(paramsObj, null, 2).split('\n').join('\n  ')},` : ''}${Object.keys(queryObj).length > 0 ? `\n  query: ${JSON.stringify(queryObj, null, 2).split('\n').join('\n  ')},` : ''}${Object.keys(headersObj).length > 0 ? `\n  headers: ${JSON.stringify(headersObj, null, 2).split('\n').join('\n  ')},` : ''}${bodyObj ? `\n  body: ${JSON.stringify(bodyObj, null, 2).split('\n').join('\n  ')}` : ''}
-});
-
-console.log(response.data);`;
+// Initialize app
+await ductape.init('${appTag}');`
+          },
+          {
+            title: 'Input',
+            code: `const payload = {
+  env: '${envSlug}',
+  app: '${appTag}',
+  event: '${actionTag}',
+  input: {${enabledParams.length > 0 ? `
+    params: {
+${enabledParams.map(p => `      ${p.key}: '${getParamValue(p.key, p.value)}'`).join(',\n')}
+    },` : ''}${enabledQuery.length > 0 ? `
+    query: {
+${enabledQuery.map(q => `      ${q.key}: '${getParamValue(q.key, q.value)}'`).join(',\n')}
+    },` : ''}${enabledHeaders.length > 0 ? `
+    headers: {
+${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
+    },` : ''}${bodyObj ? `
+    body: ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 2).split('\n').map((line, i) => i === 0 ? line : `    ${line}`).join('\n')},` : ''}
+  },
+  retries: 3
+};`
+          },
+          {
+            title: 'Execute',
+            code: `const result = await ductape.apps.run(payload);
+console.log('Action result:', result);`
+          }
+        ];
 
       case 'python':
-        return `# Initialize Ductape SDK
-from ductape import Ductape
+        return [
+          {
+            title: 'Init Ductape',
+            code: `from ductape import Ductape
 
 ductape = Ductape(
     workspace_id='your-workspace-id',
     user_id='your-user-id',
     token='your-auth-token',
     public_key='your-public-key',
-    type='product'
+    type='app'
 )
 
-# Initialize product
-ductape.init('your-product-tag')
-
-# Call action
-response = ductape.apps.run(
-    app_tag='${appTag}',
-    action_tag='${actionTag}',
-    env='${envSlug}',${Object.keys(paramsObj).length > 0 ? `\n    params=${JSON.stringify(paramsObj, null, 4).replace(/"/g, "'")}` : ''}${Object.keys(queryObj).length > 0 ? `\n    query=${JSON.stringify(queryObj, null, 4).replace(/"/g, "'")}` : ''}${Object.keys(headersObj).length > 0 ? `\n    headers=${JSON.stringify(headersObj, null, 4).replace(/"/g, "'")}` : ''}${bodyObj ? `\n    body=${JSON.stringify(bodyObj, null, 4).replace(/"/g, "'")}` : ''}
-)
-
-print(response.data)`;
-
-      case 'curl':
-        const curlHeaders = Object.entries(headersObj).map(([k, v]) => `-H "${k}: ${v}"`).join(' \\\n  ');
-        const curlUrl = `${baseUrl || 'https://api.ductape.app'}${resource}${Object.keys(queryObj).length > 0 ? '?' + new URLSearchParams(queryObj).toString() : ''}`;
-        return `# Direct API call using curl
-curl -X ${formData.method} "${curlUrl}" \\
-  -H "Authorization: Bearer YOUR_AUTH_TOKEN" \\${curlHeaders ? '\n  ' + curlHeaders : ''}${bodyObj ? `\n  -d '${JSON.stringify(bodyObj)}'` : ''}`;
-
-      case 'typescript':
-        return `// Initialize Ductape SDK (TypeScript)
-import { Ductape } from '@ductape/sdk';
-
-const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-// Initialize product
-await ductape.init('your-product-tag');
-
-// Call action
-const response = await ductape.apps.run({
-  app_tag: '${appTag}',
-  action_tag: '${actionTag}',
-  env: '${envSlug}',${Object.keys(paramsObj).length > 0 ? `\n  params: ${JSON.stringify(paramsObj, null, 2).split('\n').join('\n  ')},` : ''}${Object.keys(queryObj).length > 0 ? `\n  query: ${JSON.stringify(queryObj, null, 2).split('\n').join('\n  ')},` : ''}${Object.keys(headersObj).length > 0 ? `\n  headers: ${JSON.stringify(headersObj, null, 2).split('\n').join('\n  ')},` : ''}${bodyObj ? `\n  body: ${JSON.stringify(bodyObj, null, 2).split('\n').join('\n  ')}` : ''}
-});
-
-console.log(response.data);`;
+# Initialize app
+ductape.init('${appTag}')`
+          },
+          {
+            title: 'Input',
+            code: `payload_data = {
+    'env': '${envSlug}',
+    'app': '${appTag}',
+    'event': '${actionTag}',
+    'input': {${enabledParams.length > 0 ? `
+        'params': {
+${enabledParams.map(p => `            '${p.key}': '${getParamValue(p.key, p.value)}'`).join(',\n')}
+        },` : ''}${enabledQuery.length > 0 ? `
+        'query': {
+${enabledQuery.map(q => `            '${q.key}': '${getParamValue(q.key, q.value)}'`).join(',\n')}
+        },` : ''}${enabledHeaders.length > 0 ? `
+        'headers': {
+${enabledHeaders.map(h => `            '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
+        },` : ''}${bodyObj ? `
+        'body': ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 4).replace(/"/g, "'").split('\n').map((line, i) => i === 0 ? line : `        ${line}`).join('\n')},` : ''}
+    },
+    'retries': 3
+}`
+          },
+          {
+            title: 'Execute',
+            code: `result = ductape.apps.run(payload_data)
+print('Action result:', result)`
+          }
+        ];
 
       default:
-        return '// Select a language to see code examples';
+        return [];
     }
   };
 
@@ -1594,108 +1696,120 @@ console.log(response.data);`;
 
       {/* Code Sidebar */}
       {showCodeSidebar && (
-        <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
-              <Code className="w-5 h-5" />
-              Code Examples
-            </h3>
-            <Button
-              onClick={() => setShowCodeSidebar(false)}
-              variant="ghost"
-              size="sm"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="p-4 space-y-6">
-            {/* Action Details */}
-            <div>
-              <h4 className="text-lg font-bold text-grey mb-2">{formData.name || action.tag}</h4>
-              {formData.tag && (
-                <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded font-mono">
-                  {formData.tag}
-                </span>
-              )}
-              {app?.app_name && (
-                <p className="text-sm text-grey-600 mt-2">
-                  App: <span className="font-medium">{app.app_name}</span>
-                </p>
-              )}
-            </div>
-
-            {/* Language Selector */}
-            <div>
-              <Label className="text-sm font-semibold text-grey-700 mb-2 block">Language</Label>
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="javascript">JavaScript</SelectItem>
-                  <SelectItem value="typescript">TypeScript</SelectItem>
-                  <SelectItem value="python">Python</SelectItem>
-                  <SelectItem value="curl">cURL</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Code Example */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-semibold text-grey-700">Example Code</Label>
-                <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generateCodeExample(selectedLanguage));
-                    toast.success('Code copied to clipboard');
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
+        <CodeSidebar
+          title={formData.name || action.tag || 'Action'}
+          subtitle={`App: ${app?.app_name || 'Unknown'}`}
+          tag={formData.tag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateCodeSections}
+          environments={customEnvs.map(env => ({
+            slug: env.slug,
+            env_name: environments.find((e: any) => e.slug === env.slug)?.env_name || env.slug
+          }))}
+          onSectionAction={(sectionTitle) => {
+            if (sectionTitle === 'Input') {
+              return (
+                <button
+                  onClick={handleSetDefaultValues}
+                  className={`px-3 py-1.5 text-xs rounded transition-colors h-7 ${
+                    showDefaultValuesForm
+                      ? 'bg-white border border-red text-red hover:bg-red/10'
+                      : 'bg-primary hover:bg-primary/90 text-white'
+                  }`}
                 >
-                  <Code className="h-4 w-4" />
-                  Copy
-                </Button>
-              </div>
-              <pre className="bg-grey-50 p-4 rounded-lg border border-grey-300 text-sm overflow-x-auto font-mono">
-                <code>{generateCodeExample(selectedLanguage)}</code>
-              </pre>
-            </div>
+                  {showDefaultValuesForm ? 'X' : 'Set Values'}
+                </button>
+              );
+            }
+            return null;
+          }}
+          sectionFooter={(sectionTitle) => {
+            if (sectionTitle === 'Input' && showDefaultValuesForm) {
+              return (
+                <div className="mb-3 p-3 border border-grey-300 rounded bg-grey-50">
+                  <h4 className="text-sm font-medium mb-3">Default Values</h4>
+                  {defaultValues.map((defaultValue, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2 items-end">
+                      <div className="flex-1">
+                        <Label className="text-xs">Variable</Label>
+                        <Select
+                          value={defaultValue.variable}
+                          onValueChange={(value) => updateDefaultValue(idx, 'variable', value)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select variable" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableVariables.map(variable => (
+                              <SelectItem key={variable.value} value={variable.value}>
+                                {variable.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-            {/* Installation Instructions */}
-            {(selectedLanguage === 'javascript' || selectedLanguage === 'typescript') && (
-              <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Installation</Label>
-                <pre className="bg-grey-50 p-4 rounded-lg border border-grey-300 text-sm font-mono">
-                  <code>npm install @ductape/sdk</code>
-                </pre>
-              </div>
-            )}
+                      <div className="flex-1">
+                        <Label className="text-xs">Value Source</Label>
+                        <Select
+                          value={defaultValue.valueSource}
+                          onValueChange={(value) => updateDefaultValue(idx, 'valueSource', value)}
+                          disabled={!defaultValue.variable}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select source" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableValueSources.map(source => (
+                              <SelectItem key={source.value} value={source.value}>
+                                {source.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-            {selectedLanguage === 'python' && (
-              <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Installation</Label>
-                <pre className="bg-grey-50 p-4 rounded-lg border border-grey-300 text-sm font-mono">
-                  <code>pip install ductape</code>
-                </pre>
-              </div>
-            )}
+                      <div className="flex-1">
+                        <Label className="text-xs">Value</Label>
+                        {defaultValue.valueSource === 'default' ? (
+                          <Input
+                            value="$Default"
+                            disabled
+                            className="h-8 bg-grey-100"
+                          />
+                        ) : (
+                          <Input
+                            value={defaultValue.value}
+                            onChange={(e) => updateDefaultValue(idx, 'value', e.target.value)}
+                            placeholder="Enter value"
+                            className="h-8"
+                            disabled={!defaultValue.valueSource}
+                          />
+                        )}
+                      </div>
 
-            {/* Usage Notes */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h5 className="text-sm font-semibold text-blue-900 mb-2">Usage Notes</h5>
-              <ul className="text-xs text-blue-800 space-y-1">
-                <li>• Replace placeholder values with your actual credentials</li>
-                <li>• Ensure you have the required permissions to access this action</li>
-                <li>• The response data will be available in the <code className="bg-blue-100 px-1 rounded">response.data</code> property</li>
-                {selectedLanguage === 'curl' && (
-                  <li>• For production use, consider using the SDK instead of direct API calls</li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
+                      <button
+                        type="button"
+                        onClick={() => removeDefaultValue(idx)}
+                        className="h-8 px-2 bg-red hover:bg-red/80 text-white text-xs rounded transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addDefaultValue}
+                    className="mt-2 px-3 py-1 bg-grey hover:bg-grey/80 text-white text-xs rounded transition-colors"
+                  >
+                    Add Default Value
+                  </button>
+                </div>
+              );
+            }
+            return null;
+          }}
+        />
       )}
     </div>
   );
