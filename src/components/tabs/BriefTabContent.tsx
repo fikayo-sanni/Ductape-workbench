@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownEditor, MarkdownViewer } from '@/components/ui/markdown-editor';
 import { Plus, X, Save, FileText, Edit } from 'lucide-react';
-import { IProductBrief, BriefStatus } from '@/types/partnership';
+import { IProductBrief, BriefStatus, IOnboardingStep } from '@/types/partnership';
 import { dummyProducts } from '@/data/partnerships.dummy';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -17,12 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
-
-interface OnboardingStep {
-  name: string;
-  description: string;
-  message_template: string;
-}
 
 interface BriefTabContentProps {
   tab: {
@@ -50,16 +44,12 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
     }
   );
 
-  const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>(() => {
+  const [onboardingSteps, setOnboardingSteps] = useState<IOnboardingStep[]>(() => {
     if (savedTabState?.onboardingSteps) {
       return savedTabState.onboardingSteps;
     }
-    if (brief?.onboarding_steps) {
-      try {
-        return JSON.parse(brief.onboarding_steps);
-      } catch (e) {
-        return [{ name: '', description: '', message_template: '' }];
-      }
+    if (brief?.onboarding_steps && brief.onboarding_steps.length > 0) {
+      return brief.onboarding_steps;
     }
     return [{ name: '', description: '', message_template: '' }];
   });
@@ -85,7 +75,7 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
     }
   };
 
-  const updateOnboardingStep = (index: number, field: keyof OnboardingStep, value: string) => {
+  const updateOnboardingStep = (index: number, field: keyof IOnboardingStep, value: string) => {
     const newSteps = [...onboardingSteps];
     newSteps[index][field] = value;
     setOnboardingSteps(newSteps);

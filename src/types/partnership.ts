@@ -17,6 +17,13 @@ export enum SenderType {
   CLIENT = 'client'
 }
 
+// Onboarding Step Types
+export interface IOnboardingStep {
+  name: string;
+  description: string;
+  message_template: string;
+}
+
 // Sales Funnel Types
 export interface ISalesFunnelStep {
   name: string;
@@ -43,7 +50,7 @@ export interface IProductBrief {
   description: string;
   product_details: string; // What the product does
   usage_instructions: string; // How to use the product
-  onboarding_steps: string; // Steps to onboard
+  onboarding_steps: IOnboardingStep[];
   status: BriefStatus;
   created_at: Date;
   updated_at: Date;
@@ -189,7 +196,7 @@ export interface ICreateProductBriefPayload {
   description: string;
   product_details: string;
   usage_instructions?: string;
-  onboarding_steps?: string;
+  onboarding_steps?: IOnboardingStep[];
 }
 
 export interface IUpdateProductBriefPayload {
@@ -200,7 +207,7 @@ export interface IUpdateProductBriefPayload {
   description?: string;
   product_details?: string;
   usage_instructions?: string;
-  onboarding_steps?: string;
+  onboarding_steps?: IOnboardingStep[];
 }
 
 export interface ICreateSalesFunnelPayload {

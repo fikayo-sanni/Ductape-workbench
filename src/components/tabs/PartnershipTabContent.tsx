@@ -2,29 +2,12 @@ import { useState } from 'react';
 import { Handshake, Search } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SearchPartnersView from './partnerships/SearchPartnersView';
-import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 type PartnershipView = 'search' | 'briefs' | 'providers' | 'clients';
 
-interface PartnershipTabContentProps {
-  tabId?: string;
-}
-
-export default function PartnershipTabContent({ tabId = 'partnership-default' }: PartnershipTabContentProps) {
-  // Restore saved state
-  const savedTabState = getInitialTabState(tabId, null as any);
-
-  const [activeView, setActiveView] = useState<PartnershipView>(savedTabState?.activeView || 'search');
-  const [searchQuery, setSearchQuery] = useState<string>(savedTabState?.searchQuery || '');
-
-  // Persist tab state automatically
-  useTabState(
-    tabId,
-    'partnership',
-    'Partnerships',
-    {},
-    { activeView, searchQuery }
-  );
+export default function PartnershipTabContent() {
+  const [activeView, setActiveView] = useState<PartnershipView>('search');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   return (
     <div className="h-full overflow-auto bg-grey-100">

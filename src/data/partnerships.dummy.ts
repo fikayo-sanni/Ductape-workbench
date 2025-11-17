@@ -112,7 +112,13 @@ export const dummyProductBriefs: IProductBrief[] = [
     description: "A comprehensive API gateway solution designed for enterprise-scale applications. Manage, secure, and scale your APIs with ease.",
     product_details: "API Gateway Pro provides advanced routing, rate limiting, authentication, and monitoring capabilities. It supports REST, GraphQL, and WebSocket protocols with built-in caching and load balancing.",
     usage_instructions: "1. Create an API endpoint\n2. Configure authentication methods\n3. Set up rate limiting rules\n4. Deploy to production\n5. Monitor via dashboard",
-    onboarding_steps: "1. Sign up and verify email\n2. Create your first workspace\n3. Configure API credentials\n4. Review documentation\n5. Start integrating endpoints",
+    onboarding_steps: [
+      { name: "Sign up and verify email", description: "Create your account and verify your email address to get started", message_template: "Welcome! Please verify your email to activate your account." },
+      { name: "Create your first workspace", description: "Set up a workspace to organize your API projects", message_template: "Let's create your workspace. What would you like to call it?" },
+      { name: "Configure API credentials", description: "Generate API keys and configure authentication settings", message_template: "It's time to set up your API credentials for secure access." },
+      { name: "Review documentation", description: "Go through our comprehensive documentation and tutorials", message_template: "Check out our docs to learn all about API Gateway Pro's features." },
+      { name: "Start integrating endpoints", description: "Begin integrating your first API endpoints", message_template: "You're all set! Ready to integrate your first endpoint?" }
+    ],
     status: BriefStatus.PUBLISHED,
     created_at: new Date("2024-01-15"),
     updated_at: new Date("2024-02-20"),
@@ -128,7 +134,13 @@ export const dummyProductBriefs: IProductBrief[] = [
     description: "Keep your databases in perfect sync across multiple regions with our real-time synchronization engine.",
     product_details: "RealTime Sync monitors database changes and propagates them instantly across all configured targets. Supports PostgreSQL, MySQL, MongoDB, and more with conflict resolution.",
     usage_instructions: "1. Connect source database\n2. Configure target databases\n3. Set sync rules and filters\n4. Enable real-time replication\n5. Monitor sync status",
-    onboarding_steps: "1. Request demo access\n2. Provide database schemas\n3. Configure sync pipelines\n4. Test with sample data\n5. Go live with monitoring",
+    onboarding_steps: [
+      { name: "Request demo access", description: "Request access to our demo environment to test the platform", message_template: "Welcome to RealTime Sync! Let's get you set up with demo access." },
+      { name: "Provide database schemas", description: "Share your database schema details so we can configure the sync", message_template: "Please provide your database schema information for optimal configuration." },
+      { name: "Configure sync pipelines", description: "Set up your first synchronization pipeline", message_template: "Time to configure your sync pipeline. Which databases would you like to connect?" },
+      { name: "Test with sample data", description: "Run a test sync with sample data to verify everything works", message_template: "Let's run a test sync to make sure everything is working perfectly." },
+      { name: "Go live with monitoring", description: "Enable real-time sync and set up monitoring dashboards", message_template: "You're ready to go live! We'll set up monitoring so you can track everything." }
+    ],
     status: BriefStatus.PUBLISHED,
     created_at: new Date("2024-02-01"),
     updated_at: new Date("2024-02-25"),
@@ -144,7 +156,13 @@ export const dummyProductBriefs: IProductBrief[] = [
     description: "Store, manage, and deliver your files securely with our encrypted cloud storage platform backed by global CDN.",
     product_details: "SecureCloud offers end-to-end encryption, version control, and lightning-fast delivery through our global CDN network. Perfect for media assets, documents, and backups.",
     usage_instructions: "1. Create storage buckets\n2. Upload files via API or dashboard\n3. Configure access permissions\n4. Enable CDN delivery\n5. Monitor usage and costs",
-    onboarding_steps: "1. Create account\n2. Set up billing\n3. Create first bucket\n4. Generate API keys\n5. Integrate with your application",
+    onboarding_steps: [
+      { name: "Create account", description: "Sign up for SecureCloud and choose your plan", message_template: "Welcome to SecureCloud! Let's create your account and get started." },
+      { name: "Set up billing", description: "Configure your billing details and payment method", message_template: "Please add your billing information to activate your account." },
+      { name: "Create first bucket", description: "Create your first storage bucket for your files", message_template: "Time to create your first storage bucket. What would you like to name it?" },
+      { name: "Generate API keys", description: "Generate secure API keys for programmatic access", message_template: "Let's generate your API keys for secure access to your storage." },
+      { name: "Integrate with your application", description: "Use our SDKs to integrate SecureCloud into your application", message_template: "You're all set! Ready to integrate SecureCloud into your app?" }
+    ],
     status: BriefStatus.DRAFT,
     created_at: new Date("2024-03-01"),
     updated_at: new Date("2024-03-10"),
@@ -526,6 +544,38 @@ export const getDummyWorkspacePartnerships = (
       },
     },
   };
+};
+
+export const getPartnershipById = (
+  partnershipId: string,
+  currentWorkspaceId: string
+): (IPartnership & { relationship_type: 'client' | 'service_provider' }) | null => {
+  console.log('[getPartnershipById] Looking for partnership:', partnershipId);
+  console.log('[getPartnershipById] Current workspace:', currentWorkspaceId);
+  console.log('[getPartnershipById] All partnerships:', dummyPartnerships.map(p => p._id));
+
+  const partnership = dummyPartnerships.find(p => p._id === partnershipId);
+
+  if (!partnership) {
+    console.log('[getPartnershipById] Partnership not found!');
+    return null;
+  }
+
+  console.log('[getPartnershipById] Found partnership:', partnership);
+  console.log('[getPartnershipById] Partnership has messages:', partnership.messages?.length);
+
+  // Determine relationship type based on current workspace
+  const relationship_type: 'client' | 'service_provider' = partnership.client_id === currentWorkspaceId ? 'service_provider' : 'client';
+
+  const result = {
+    ...partnership,
+    relationship_type,
+  } as IPartnership & { relationship_type: 'client' | 'service_provider' };
+
+  console.log('[getPartnershipById] Returning partnership with relationship_type:', relationship_type);
+  console.log('[getPartnershipById] Result has messages:', result.messages?.length);
+
+  return result;
 };
 
 export const getDummyWorkspaceBriefs = (

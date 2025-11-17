@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getDummyPublishedBriefs } from '@/data/partnerships.dummy';
+import { useAuth } from '@/store/useAuth';
+import partnershipServices from '@/services/partnershipServices';
 import { IProductBrief } from '@/types/partnership';
 import ProductBriefDetailDialog from './ProductBriefDetailDialog';
 
@@ -12,12 +14,24 @@ interface SearchPartnersViewProps {
 }
 
 export default function SearchPartnersView({ searchQuery, setSearchQuery }: SearchPartnersViewProps) {
+  const { user } = useAuth();
   const [selectedBrief, setSelectedBrief] = useState<IProductBrief | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
-  // Get published briefs with search
-  const { data } = getDummyPublishedBriefs(1, 20, searchQuery);
-  const briefs = data.briefs;
+  // Fetch published briefs with search
+  const { data: briefsResponse } = useQuery({
+    queryKey: ['published-briefs', searchQuery],
+    queryFn: () => partnershipServices.fetchPublishedBriefs({
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+      search: searchQuery,
+      page: 1,
+      limit: 20,
+    }),
+    enabled: !!user,
+  });
+
+  const briefs = briefsResponse?.data?.briefs || [];
 
   const handleViewBrief = (brief: IProductBrief) => {
     setSelectedBrief(brief);

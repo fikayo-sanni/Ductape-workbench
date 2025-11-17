@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,8 @@ import {
 import { IPartnership, PartnershipStatus } from '@/types/partnership';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import partnershipServices from '@/services/partnershipServices';
+import { useAuth } from '@/store/useAuth';
 import {
   Select,
   SelectContent,
@@ -125,12 +128,29 @@ const getDummyIssues = (): Issue[] => [
 
 interface PartnershipDetailTabContentProps {
   tab: {
-    data: IPartnership & { relationship_type: 'client' | 'service_provider' };
+    id: string;
+    itemId?: string;
+    data?: IPartnership & { relationship_type: 'client' | 'service_provider' };
   };
 }
 
 export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTabContentProps) {
-  const partnership = tab.data;
+  const { user } = useAuth();
+
+  // Fetch partnership data from API
+  const { data: partnershipResponse, isLoading } = useQuery({
+    queryKey: ['partnership', tab.itemId],
+    queryFn: () => partnershipServices.fetchPartnershipById({
+      partnership_id: tab.itemId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!tab.itemId && !!user,
+    initialData: tab.data ? { data: tab.data } : undefined,
+  });
+
+  const partnership = partnershipResponse?.data;
+
   const [newMessage, setNewMessage] = useState('');
   const [deliverableKey, setDeliverableKey] = useState('');
   const [deliverableValue, setDeliverableValue] = useState('');
@@ -157,9 +177,16 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
   const [verifiedDeliverables, setVerifiedDeliverables] = useState<Set<number>>(new Set());
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
-  // Debug logging
-  console.log('Partnership data:', partnership);
-  console.log('Partnership messages:', partnership?.messages);
+  // Show loading state if partnership data is not available yet
+  if (isLoading || !partnership) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center text-grey-600">
+          <p className="text-lg mb-2">Loading partnership details...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Auto-focus on message input when component mounts or partnership changes
   useEffect(() => {
@@ -933,29 +960,19 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
               )}
 
               {/* Onboarding Steps */}
-              {partnership.productBrief.onboarding_steps && (() => {
-                try {
-                  const steps = JSON.parse(partnership.productBrief.onboarding_steps);
-                  if (steps.length > 0 && steps[0].name) {
-                    return (
-                      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                        <h3 className="font-semibold text-grey mb-4">Onboarding Steps</h3>
-                        <div className="space-y-3">
-                          {steps.map((step: any, index: number) => (
-                            <div key={index} className="p-4 bg-grey-100 rounded-lg">
-                              <h4 className="font-semibold text-grey mb-2">Step {index + 1}: {step.name}</h4>
-                              <p className="text-sm text-grey-600">{step.description}</p>
-                            </div>
-                          ))}
-                        </div>
+              {partnership.productBrief.onboarding_steps && partnership.productBrief.onboarding_steps.length > 0 && (
+                <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                  <h3 className="font-semibold text-grey mb-4">Onboarding Steps</h3>
+                  <div className="space-y-3">
+                    {partnership.productBrief.onboarding_steps.map((step, index) => (
+                      <div key={index} className="p-4 bg-grey-100 rounded-lg">
+                        <h4 className="font-semibold text-grey mb-2">Step {index + 1}: {step.name}</h4>
+                        <p className="text-sm text-grey-600">{step.description}</p>
                       </div>
-                    );
-                  }
-                } catch (e) {
-                  return null;
-                }
-                return null;
-              })()}
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

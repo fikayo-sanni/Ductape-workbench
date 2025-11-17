@@ -19,15 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, X } from 'lucide-react';
-import { IProductBrief } from '@/types/partnership';
+import { IProductBrief, IOnboardingStep } from '@/types/partnership';
 import { dummyProducts } from '@/data/partnerships.dummy';
 import toast from 'react-hot-toast';
-
-interface OnboardingStep {
-  name: string;
-  description: string;
-  message_template: string;
-}
 
 interface CreateEditBriefDialogProps {
   brief: IProductBrief | null;
@@ -47,7 +41,7 @@ export default function CreateEditBriefDialog({
     product_details: '',
     usage_instructions: '',
   });
-  const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[]>([
+  const [onboardingSteps, setOnboardingSteps] = useState<IOnboardingStep[]>([
     { name: '', description: '', message_template: '' }
   ]);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,15 +56,11 @@ export default function CreateEditBriefDialog({
         usage_instructions: brief.usage_instructions || '',
       });
 
-      // Parse onboarding_steps if it's a JSON string, otherwise initialize with default
-      try {
-        const steps = brief.onboarding_steps
-          ? JSON.parse(brief.onboarding_steps)
-          : [{ name: '', description: '', message_template: '' }];
-        setOnboardingSteps(steps);
-      } catch (e) {
-        setOnboardingSteps([{ name: '', description: '', message_template: '' }]);
-      }
+      // Use onboarding_steps directly as it's now an array
+      const steps = brief.onboarding_steps && brief.onboarding_steps.length > 0
+        ? brief.onboarding_steps
+        : [{ name: '', description: '', message_template: '' }];
+      setOnboardingSteps(steps);
     } else {
       setFormData({
         product_id: '',
@@ -93,7 +83,7 @@ export default function CreateEditBriefDialog({
     }
   };
 
-  const updateOnboardingStep = (index: number, field: keyof OnboardingStep, value: string) => {
+  const updateOnboardingStep = (index: number, field: keyof IOnboardingStep, value: string) => {
     const newSteps = [...onboardingSteps];
     newSteps[index][field] = value;
     setOnboardingSteps(newSteps);
@@ -126,7 +116,7 @@ export default function CreateEditBriefDialog({
     // TODO: Send brief data to API
     // const briefData = {
     //   ...formData,
-    //   onboarding_steps: JSON.stringify(onboardingSteps),
+    //   onboarding_steps: onboardingSteps,
     // };
 
     // Simulate API call

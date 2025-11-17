@@ -145,10 +145,21 @@ export default function ProductBriefDetailDialog({
               )}
 
               {/* Onboarding Steps */}
-              {brief.onboarding_steps && (
+              {brief.onboarding_steps && brief.onboarding_steps.length > 0 && (
                 <div>
                   <h3 className="font-semibold text-grey mb-3">Onboarding Steps</h3>
-                  <p className="text-grey-600 whitespace-pre-wrap">{brief.onboarding_steps}</p>
+                  <div className="space-y-3">
+                    {brief.onboarding_steps.map((step, index) => (
+                      <div key={index} className="p-4 bg-grey-100 rounded-lg">
+                        <h4 className="font-semibold text-grey mb-2">
+                          Step {index + 1}: {step.name}
+                        </h4>
+                        <p className="text-sm text-grey-600 whitespace-pre-wrap">
+                          {step.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

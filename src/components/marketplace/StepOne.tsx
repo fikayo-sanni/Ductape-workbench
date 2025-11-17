@@ -157,7 +157,7 @@ export default function StepOne({
     <div className="space-y-6">
       <div className="text-center">
         <div className="w-16 h-16 mx-auto rounded-full bg-blue/10 flex items-center justify-center mb-4">
-          <Package className="h-8 w-8 text-blue" />
+          <Package className="h-8 w-8 text-blue dark:text-blue-500" />
         </div>
         <h2 className="text-xl font-bold text-grey mb-2">Select Product</h2>
         <p className="text-grey-600">

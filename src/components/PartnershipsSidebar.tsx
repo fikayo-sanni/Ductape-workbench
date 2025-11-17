@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Search, TrendingUp, MessageSquare, Plus, FileText, Eye, Edit, Trash2, UserPlus, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getDummyWorkspacePartnerships, getDummyWorkspaceBriefs } from '@/data/partnerships.dummy';
+import partnershipServices from '@/services/partnershipServices';
 import { IPartnership, IProductBrief, PartnershipStatus, BriefStatus } from '@/types/partnership';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -29,21 +31,40 @@ type PartnershipViewMode = 'all' | 'clients' | 'providers';
 
 export default function PartnershipsSidebar() {
   const { openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
   const [mainView, setMainView] = useState<MainView>('partnerships');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string | null>(null);
   const [selectedBriefId, setSelectedBriefId] = useState<string | null>(null);
   const [partnershipViewMode, setPartnershipViewMode] = useState<PartnershipViewMode>('all');
 
-  // Mock workspace ID - in real app, get from auth context
-  const currentWorkspaceId = 'ws_001';
+  // Fetch partnerships for current workspace
+  const { data: partnershipsResponse } = useQuery({
+    queryKey: ['workspace-partnerships', currentWorkspaceId],
+    queryFn: () => partnershipServices.fetchWorkspacePartnerships({
+      workspace_id: currentWorkspaceId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!currentWorkspaceId && !!user,
+  });
 
-  // Get partnerships where current workspace is either client or service provider
-  const { data: partnershipsData } = getDummyWorkspacePartnerships(currentWorkspaceId);
+  const partnershipsData = partnershipsResponse?.data || { myClients: [], myServiceProviders: [] };
   const { myClients, myServiceProviders } = partnershipsData;
 
-  // Get briefs for current workspace
-  const briefs = getDummyWorkspaceBriefs(currentWorkspaceId);
+  // Fetch briefs for current workspace
+  const { data: briefsResponse } = useQuery({
+    queryKey: ['workspace-briefs', currentWorkspaceId],
+    queryFn: () => partnershipServices.fetchWorkspaceBriefs({
+      workspace_id: currentWorkspaceId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+      status: BriefStatus.ALL,
+    }),
+    enabled: !!currentWorkspaceId && !!user,
+  });
+
+  const briefs = briefsResponse?.data || [];
 
   // Combine and enrich partnerships with role information
   const allPartnerships = [

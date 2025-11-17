@@ -210,11 +210,11 @@ export default function TabContent() {
         return <TeamsTabContent />;
 
       case 'partnership':
-        // Check if this is a specific partnership detail view (has data) or the management view (no data)
-        if (activeTab.data && activeTab.itemId) {
-          return <PartnershipDetailTabContent tab={activeTab as typeof activeTab & { data: NonNullable<typeof activeTab.data> }} />;
+        // Check if this is a specific partnership detail view (has itemId) or the management view (no itemId)
+        if (activeTab.itemId) {
+          return <PartnershipDetailTabContent tab={activeTab} />;
         }
-        return <PartnershipTabContent tabId={activeTab.id} />;
+        return <PartnershipTabContent />;
 
       case 'brief':
         // Product brief view/edit/create

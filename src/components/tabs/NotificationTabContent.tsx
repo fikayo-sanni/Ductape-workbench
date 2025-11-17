@@ -340,7 +340,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                       <Bell className="h-4 w-4 text-purple-500" />
                     </div>
                     <span className="font-medium text-grey">Push Notifications (Firebase)</span>
-                    <Badge variant="outline" className="ml-auto">Active</Badge>
+                    <Badge variant="outline" className="ml-auto text-grey">Active</Badge>
                   </div>
                   <div className="space-y-3">
                     {typeof notificationConfig.push_notifications === 'object' && notificationConfig.push_notifications.credentials ? (
@@ -415,7 +415,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                       <Mail className="h-4 w-4 text-blue-500" />
                     </div>
                     <span className="font-medium text-grey">Email (SMTP)</span>
-                    <Badge variant="outline" className="ml-auto">Active</Badge>
+                    <Badge variant="outline" className="ml-auto text-grey">Active</Badge>
                   </div>
                   <div className="space-y-3">
                     {typeof notificationConfig.emails === 'object' ? (
@@ -514,7 +514,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                       <MessageSquare className="h-4 w-4 text-green-500" />
                     </div>
                     <span className="font-medium text-grey">SMS</span>
-                    <Badge variant="outline" className="ml-auto">Active</Badge>
+                    <Badge variant="outline" className="ml-auto text-grey">Active</Badge>
                   </div>
                   <div className="space-y-3">
                     {typeof notificationConfig.sms === 'object' ? (
@@ -586,7 +586,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                       <Webhook className="h-4 w-4 text-orange-500" />
                     </div>
                     <span className="font-medium text-grey">Callbacks (Webhook)</span>
-                    <Badge variant="outline" className="ml-auto">Active</Badge>
+                    <Badge variant="outline" className="ml-auto text-grey">Active</Badge>
                   </div>
                   <div className="space-y-3">
                     {typeof notificationConfig.callbacks === 'object' ? (
