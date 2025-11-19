@@ -1246,7 +1246,7 @@ ${inputMessage}
             <h2 className="text-lg font-semibold text-grey">Topics & Queues</h2>
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               onClick={() => {
                 openTab({
                   id: `new-topic-${Date.now()}`,
@@ -1304,7 +1304,7 @@ ${inputMessage}
                       className="flex items-center gap-1.5 text-grey hover:text-primary"
                     >
                       <Code className="h-3.5 w-3.5" />
-                      <span className="text-xs">View Code</span>
+                      <span className="text-xs">Code</span>
                     </Button>
                   </div>
                   {topic.description && (
