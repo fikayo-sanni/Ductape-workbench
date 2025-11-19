@@ -632,16 +632,13 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
         return [
           {
             title: 'Init Ductape',
-            code: `const ductape = new Ductape({
+            code: `const Ductape = require("@ductape/sdk")
+
+const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'app'
-});
-
-// Initialize app
-await ductape.init('${appTag}');`
+  private_key: 'your-private-key'
+});`
           },
           {
             title: 'Input',
@@ -675,18 +672,13 @@ console.log('Action result:', result);`
         return [
           {
             title: 'Init Ductape',
-            code: `import Ductape from '@ductape/sdk';
+            code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'app'
-});
-
-// Initialize app
-await ductape.init('${appTag}');`
+  private_key: 'your-private-key'
+});`
           },
           {
             title: 'Input',
@@ -725,13 +717,8 @@ console.log('Action result:', result);`
 ductape = Ductape(
     workspace_id='your-workspace-id',
     user_id='your-user-id',
-    token='your-auth-token',
-    public_key='your-public-key',
-    type='app'
-)
-
-# Initialize app
-ductape.init('${appTag}')`
+    private_key='your-private-key'
+)`
           },
           {
             title: 'Input',
@@ -758,6 +745,321 @@ ${enabledHeaders.map(h => `            '${h.key}': '${getParamValue(h.key, h.val
             title: 'Execute',
             code: `result = ductape.apps.run(payload_data)
 print('Action result:', result)`
+          }
+        ];
+
+      case 'java':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `import com.ductape.sdk.Ductape;
+import com.ductape.sdk.models.*;
+
+Ductape ductape = new Ductape.Builder()
+    .workspaceId("your-workspace-id")
+    .userId("your-user-id")
+    .privateKey("your-private-key")
+    .build();`
+          },
+          {
+            title: 'Input',
+            code: `Map<String, Object> input = new HashMap<>();
+${enabledParams.length > 0 ? `
+Map<String, Object> params = new HashMap<>();
+${enabledParams.map(p => `params.put("${p.key}", "${getParamValue(p.key, p.value)}");`).join('\n')}
+input.put("params", params);
+` : ''}${enabledQuery.length > 0 ? `
+Map<String, Object> query = new HashMap<>();
+${enabledQuery.map(q => `query.put("${q.key}", "${getParamValue(q.key, q.value)}");`).join('\n')}
+input.put("query", query);
+` : ''}${enabledHeaders.length > 0 ? `
+Map<String, Object> headers = new HashMap<>();
+${enabledHeaders.map(h => `headers.put("${h.key}", "${getParamValue(h.key, h.value)}");`).join('\n')}
+input.put("headers", headers);
+` : ''}${bodyObj ? `
+input.put("body", ${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)});
+` : ''}
+ActionRequest request = new ActionRequest.Builder()
+    .env("${envSlug}")
+    .app("${appTag}")
+    .event("${actionTag}")
+    .input(input)
+    .retries(3)
+    .build();`
+          },
+          {
+            title: 'Execute',
+            code: `ActionResponse result = ductape.apps().run(request);
+System.out.println("Action result: " + result);`
+          }
+        ];
+
+      case 'ruby':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `require 'ductape'
+
+ductape = Ductape::Client.new(
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+)`
+          },
+          {
+            title: 'Input',
+            code: `payload = {
+  env: '${envSlug}',
+  app: '${appTag}',
+  event: '${actionTag}',
+  input: {${enabledParams.length > 0 ? `
+    params: {
+${enabledParams.map(p => `      ${p.key}: '${getParamValue(p.key, p.value)}'`).join(',\n')}
+    },` : ''}${enabledQuery.length > 0 ? `
+    query: {
+${enabledQuery.map(q => `      ${q.key}: '${getParamValue(q.key, q.value)}'`).join(',\n')}
+    },` : ''}${enabledHeaders.length > 0 ? `
+    headers: {
+${enabledHeaders.map(h => `      ${h.key}: '${getParamValue(h.key, h.value)}'`).join(',\n')}
+    },` : ''}${bodyObj ? `
+    body: ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 4).split('\n').map((line, i) => i === 0 ? line : `    ${line}`).join('\n')},` : ''}
+  },
+  retries: 3
+}`
+          },
+          {
+            title: 'Execute',
+            code: `result = ductape.apps.run(payload)
+puts "Action result: #{result}"`
+          }
+        ];
+
+      case 'php':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `<?php
+require_once 'vendor/autoload.php';
+
+use Ductape\\Client;
+
+$ductape = new Client([
+    'workspace_id' => 'your-workspace-id',
+    'user_id' => 'your-user-id',
+    'private_key' => 'your-private-key'
+]);`
+          },
+          {
+            title: 'Input',
+            code: `$payload = [
+    'env' => '${envSlug}',
+    'app' => '${appTag}',
+    'event' => '${actionTag}',
+    'input' => [${enabledParams.length > 0 ? `
+        'params' => [
+${enabledParams.map(p => `            '${p.key}' => '${getParamValue(p.key, p.value)}'`).join(',\n')}
+        ],` : ''}${enabledQuery.length > 0 ? `
+        'query' => [
+${enabledQuery.map(q => `            '${q.key}' => '${getParamValue(q.key, q.value)}'`).join(',\n')}
+        ],` : ''}${enabledHeaders.length > 0 ? `
+        'headers' => [
+${enabledHeaders.map(h => `            '${h.key}' => '${getParamValue(h.key, h.value)}'`).join(',\n')}
+        ],` : ''}${bodyObj ? `
+        'body' => ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 4).split('\n').map((line, i) => i === 0 ? line : `        ${line}`).join('\n')},` : ''}
+    ],
+    'retries' => 3
+];`
+          },
+          {
+            title: 'Execute',
+            code: `$result = $ductape->apps->run($payload);
+echo "Action result: " . json_encode($result);`
+          }
+        ];
+
+      case 'kotlin':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `import com.ductape.sdk.Ductape
+import com.ductape.sdk.models.*
+
+val ductape = Ductape(
+    workspaceId = "your-workspace-id",
+    userId = "your-user-id",
+    privateKey = "your-private-key"
+)`
+          },
+          {
+            title: 'Input',
+            code: `val input = buildMap {
+${enabledParams.length > 0 ? `    put("params", mapOf(
+${enabledParams.map(p => `        "${p.key}" to "${getParamValue(p.key, p.value)}"`).join(',\n')}
+    ))
+` : ''}${enabledQuery.length > 0 ? `    put("query", mapOf(
+${enabledQuery.map(q => `        "${q.key}" to "${getParamValue(q.key, q.value)}"`).join(',\n')}
+    ))
+` : ''}${enabledHeaders.length > 0 ? `    put("headers", mapOf(
+${enabledHeaders.map(h => `        "${h.key}" to "${getParamValue(h.key, h.value)}"`).join(',\n')}
+    ))
+` : ''}${bodyObj ? `    put("body", ${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)})
+` : ''}}
+
+val request = ActionRequest(
+    env = "${envSlug}",
+    app = "${appTag}",
+    event = "${actionTag}",
+    input = input,
+    retries = 3
+)`
+          },
+          {
+            title: 'Execute',
+            code: `val result = ductape.apps.run(request)
+println("Action result: $result")`
+          }
+        ];
+
+      case 'go':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `package main
+
+import (
+    "github.com/ductape/ductape-go"
+)
+
+client := ductape.NewClient(&ductape.Config{
+    WorkspaceID: "your-workspace-id",
+    UserID:      "your-user-id",
+    PrivateKey:  "your-private-key",
+})`
+          },
+          {
+            title: 'Input',
+            code: `input := map[string]interface{}{${enabledParams.length > 0 ? `
+    "params": map[string]interface{}{
+${enabledParams.map(p => `        "${p.key}": "${getParamValue(p.key, p.value)}",`).join('\n')}
+    },` : ''}${enabledQuery.length > 0 ? `
+    "query": map[string]interface{}{
+${enabledQuery.map(q => `        "${q.key}": "${getParamValue(q.key, q.value)}",`).join('\n')}
+    },` : ''}${enabledHeaders.length > 0 ? `
+    "headers": map[string]interface{}{
+${enabledHeaders.map(h => `        "${h.key}": "${getParamValue(h.key, h.value)}",`).join('\n')}
+    },` : ''}${bodyObj ? `
+    "body": ${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)},` : ''}
+}
+
+request := &ductape.ActionRequest{
+    Env:     "${envSlug}",
+    App:     "${appTag}",
+    Event:   "${actionTag}",
+    Input:   input,
+    Retries: 3,
+}`
+          },
+          {
+            title: 'Execute',
+            code: `result, err := client.Apps.Run(request)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Action result: %v\\n", result)`
+          }
+        ];
+
+      case 'csharp':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `using Ductape.Sdk;
+
+var ductape = new DuctapeClient(new DuctapeConfig
+{
+    WorkspaceId = "your-workspace-id",
+    UserId = "your-user-id",
+    PrivateKey = "your-private-key"
+});`
+          },
+          {
+            title: 'Input',
+            code: `var input = new Dictionary<string, object>
+{${enabledParams.length > 0 ? `
+    ["params"] = new Dictionary<string, object>
+    {
+${enabledParams.map(p => `        ["${p.key}"] = "${getParamValue(p.key, p.value)}",`).join('\n')}
+    },` : ''}${enabledQuery.length > 0 ? `
+    ["query"] = new Dictionary<string, object>
+    {
+${enabledQuery.map(q => `        ["${q.key}"] = "${getParamValue(q.key, q.value)}",`).join('\n')}
+    },` : ''}${enabledHeaders.length > 0 ? `
+    ["headers"] = new Dictionary<string, object>
+    {
+${enabledHeaders.map(h => `        ["${h.key}"] = "${getParamValue(h.key, h.value)}",`).join('\n')}
+    },` : ''}${bodyObj ? `
+    ["body"] = ${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)},` : ''}
+};
+
+var request = new ActionRequest
+{
+    Env = "${envSlug}",
+    App = "${appTag}",
+    Event = "${actionTag}",
+    Input = input,
+    Retries = 3
+};`
+          },
+          {
+            title: 'Execute',
+            code: `var result = await ductape.Apps.RunAsync(request);
+Console.WriteLine($"Action result: {result}");`
+          }
+        ];
+
+      case 'rust':
+        return [
+          {
+            title: 'Init Ductape',
+            code: `use ductape_sdk::Ductape;
+use std::collections::HashMap;
+
+let ductape = Ductape::new(
+    "your-workspace-id",
+    "your-user-id",
+    "your-private-key"
+)?;`
+          },
+          {
+            title: 'Input',
+            code: `let mut input: HashMap<String, serde_json::Value> = HashMap::new();
+${enabledParams.length > 0 ? `
+let mut params: HashMap<String, serde_json::Value> = HashMap::new();
+${enabledParams.map(p => `params.insert("${p.key}".to_string(), serde_json::json!("${getParamValue(p.key, p.value)}"));`).join('\n')}
+input.insert("params".to_string(), serde_json::json!(params));
+` : ''}${enabledQuery.length > 0 ? `
+let mut query: HashMap<String, serde_json::Value> = HashMap::new();
+${enabledQuery.map(q => `query.insert("${q.key}".to_string(), serde_json::json!("${getParamValue(q.key, q.value)}"));`).join('\n')}
+input.insert("query".to_string(), serde_json::json!(query));
+` : ''}${enabledHeaders.length > 0 ? `
+let mut headers: HashMap<String, serde_json::Value> = HashMap::new();
+${enabledHeaders.map(h => `headers.insert("${h.key}".to_string(), serde_json::json!("${getParamValue(h.key, h.value)}"));`).join('\n')}
+input.insert("headers".to_string(), serde_json::json!(headers));
+` : ''}${bodyObj ? `
+input.insert("body".to_string(), serde_json::json!(${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)}));
+` : ''}
+let request = ActionRequest {
+    env: "${envSlug}".to_string(),
+    app: "${appTag}".to_string(),
+    event: "${actionTag}".to_string(),
+    input,
+    retries: 3,
+};`
+          },
+          {
+            title: 'Execute',
+            code: `let result = ductape.apps.run(&request)?;
+println!("Action result: {:?}", result);`
           }
         ];
 

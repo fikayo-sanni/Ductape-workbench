@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -33,17 +34,21 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
   const productLogo = data?.productLogo;
   const messageBrokerTag = messageBroker?.tag;
 
-  // Get environments and check if any are SQS
+  // Get environments and filter for SQS only
   const environments = messageBroker?.envs || [];
-  const hasSqsEnvironment = environments.some((env: any) =>
-    env.type?.toLowerCase() === 'sqs' || env.provider?.toLowerCase() === 'sqs'
+  const sqsEnvironments = environments.filter((env: any) =>
+    env.type?.toLowerCase() === 'sqs' ||
+    env.type?.toLowerCase() === 'aws_sqs' ||
+    env.provider?.toLowerCase() === 'sqs' ||
+    env.provider?.toLowerCase() === 'aws_sqs'
   );
+  const hasSqsEnvironment = sqsEnvironments.length > 0;
 
   // Restore saved state
   const savedTabState = getInitialTabState(tabId, null as any);
 
-  // Initialize queueUrl array based on environments
-  const initialQueueUrls: QueueUrlEntry[] = environments.map((env: any) => ({
+  // Initialize queueUrl array based on SQS environments only
+  const initialQueueUrls: QueueUrlEntry[] = sqsEnvironments.map((env: any) => ({
     env_slug: env.slug,
     url: '',
   }));
@@ -55,6 +60,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
       description: '',
       queueUrl: initialQueueUrls,
       sample: '{}',
+      idempotency: false,
     }
   );
 
@@ -89,7 +95,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
     user_id: user?._id || '',
     token: user?.auth_token || '',
     public_key: user?.public_key || '',
-    type: 'app',
+    type: 'product',
   });
 
   const { mutateAsync: createTopic, isPending: isCreating } = useMutation({
@@ -106,7 +112,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
         throw new Error('Invalid JSON in sample field');
       }
 
-      // Validate queueUrl if SQS
+      // Validate queueUrl for all SQS environments
       const queueUrlArray = formData.queueUrl
         .filter((entry: QueueUrlEntry) => entry.url.trim() !== '')
         .map((entry: QueueUrlEntry) => ({
@@ -114,23 +120,25 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
           url: entry.url,
         }));
 
-      if (hasSqsEnvironment && queueUrlArray.length === 0) {
-        throw new Error('Queue URLs are required for SQS message brokers');
+      if (hasSqsEnvironment && queueUrlArray.length !== sqsEnvironments.length) {
+        throw new Error(`Queue URLs are required for all ${sqsEnvironments.length} SQS environment(s)`);
       }
 
       // Build the payload
       const payload = {
         name: formData.name,
-        messageBrokerTag: messageBrokerTag,
         tag: `${messageBrokerTag}:${formData.tag}`,
         description: formData.description,
-        ...(queueUrlArray.length > 0 && { queueUrl: queueUrlArray }),
+        idempotent: formData.idempotency,
+        ...(queueUrlArray.length > 0 && { queueUrls: queueUrlArray }),
         sample: parsedSample,
       };
 
       // Initialize the app and create the topic
       await (ductape as any).init(productTag);
-      const topic = await (ductape as any).app.messageBroker.topics.create(payload);
+
+      alert(JSON.stringify(payload))
+      const topic = await (ductape as any).messageBrokers.topics.create(payload);
       return topic;
     },
     onSuccess: () => {
@@ -336,14 +344,31 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
             <p className="text-xs text-grey-600 mt-1">Detailed description of this topic's purpose</p>
           </div>
 
-          {/* Queue URLs (conditional for SQS) */}
+          {/* Idempotency Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-lg border border-grey-300 bg-grey-50">
+            <div className="flex-1">
+              <Label htmlFor="idempotency" className="text-sm font-medium text-grey">
+                Enable Idempotency
+              </Label>
+              <p className="text-xs text-grey-600 mt-1">
+                Ensures duplicate messages with the same ID are processed only once
+              </p>
+            </div>
+            <Switch
+              id="idempotency"
+              checked={formData.idempotency}
+              onCheckedChange={(checked) => setFormData({ ...formData, idempotency: checked })}
+            />
+          </div>
+
+          {/* Queue URLs (conditional for SQS environments) */}
           {hasSqsEnvironment && (
             <div>
-              <Label className="required">Queue URLs</Label>
+              <Label className="required">Queue URLs (AWS SQS)</Label>
               <div className="mt-2 space-y-3">
                 {formData.queueUrl.map((entry: QueueUrlEntry) => (
                   <div key={entry.env_slug} className="space-y-1">
-                    <Label htmlFor={`url-${entry.env_slug}`} className="text-sm text-grey-600">
+                    <Label htmlFor={`url-${entry.env_slug}`} className="text-sm text-grey-600 required">
                       {entry.env_slug.toUpperCase()} Environment
                     </Label>
                     <Input
@@ -356,7 +381,9 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-grey-600 mt-1">SQS queue URLs for each environment</p>
+              <p className="text-xs text-grey-600 mt-1">
+                Required queue URLs for AWS SQS environments. Each SQS environment must have a queue URL.
+              </p>
             </div>
           )}
 
@@ -364,7 +391,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label htmlFor="sample" className="required">
-                Sample (JSON)
+                Sample Schema (JSON)
               </Label>
               {formData.sample && formData.sample.trim() !== '{}' && formData.sample.trim() !== '' && (
                 <div className="flex items-center gap-1.5">
@@ -384,7 +411,14 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
             </div>
             <Textarea
               id="sample"
-              placeholder='{"userId": "{{userId}}", "createdAt": "{{createdAt}}"}'
+              placeholder={`{
+  "userId": "{{userId}}",
+  "details": {
+    "firstName": "{{firstName}}",
+    "lastName": "{{lastName}}",
+    "email": "{{email}}"
+  }
+}`}
               value={formData.sample}
               onChange={(e) => setFormData({ ...formData, sample: e.target.value })}
               className={`mt-2 min-h-40 font-mono text-sm ${

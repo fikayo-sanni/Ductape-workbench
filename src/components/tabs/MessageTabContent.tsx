@@ -158,16 +158,13 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
       const sections = [
         {
           title: 'Init Ductape',
-          code: `const ductape = new Ductape({
+          code: `const Ductape = require("@ductape/sdk")
+
+const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-// Initialize product
-await ductape.init('${productTagValue}');`
+  private_key: 'your-private-key'
+});`
         }
       ];
 
@@ -276,18 +273,13 @@ await ductape.processor.notification.send({
       const sections = [
         {
           title: 'Init Ductape',
-          code: `import { Ductape } from '@ductape/sdk';
+          code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-// Initialize product
-await ductape.init('${productTagValue}');`
+  private_key: 'your-private-key'
+});`
         }
       ];
 
@@ -399,13 +391,8 @@ await ductape.processor.notification.send({
 ductape = Ductape(
     workspace_id='your-workspace-id',
     user_id='your-user-id',
-    token='your-auth-token',
-    public_key='your-public-key',
-    type='product'
-)
-
-# Initialize product
-ductape.init('${productTagValue}')`
+    private_key='your-private-key'
+)`
         }
       ];
 
@@ -505,6 +492,672 @@ ductape.processor.notification.send({
     'input': input_data,
     'retries': 3
 })`
+      });
+
+      return sections;
+    } else if (language === 'java') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape;
+import com.ductape.sdk.models.*;
+import java.util.*;
+
+Ductape ductape = new Ductape.Builder()
+    .workspaceId("your-workspace-id")
+    .userId("your-user-id")
+    .privateKey("your-private-key")
+    .build();`
+        }
+      ];
+
+      // Add channel-specific input sections
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `Map<String, Object> pushNotification = new HashMap<>();
+pushNotification.put("device_token", "{{deviceToken}}");
+${Object.entries(pushData).map(([key, value]) => `pushNotification.put("${key}", ${JSON.stringify(value)});`).join('\n')}`
+            : `Map<String, Object> pushNotification = new HashMap<>();
+pushNotification.put("device_token", "{{deviceToken}}");
+pushNotification.put("title", Map.of("en", "Your title here"));
+pushNotification.put("body", Map.of("en", "Your message here"));
+pushNotification.put("data", Map.of("action", "open_screen"));`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `Map<String, Object> email = new HashMap<>();
+email.put("to", Arrays.asList("user@example.com"));
+email.put("subject", Map.of("en", "Email subject"));
+email.put("template", Map.of("en", "<p>Email content</p>"));`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `Map<String, Object> callback = new HashMap<>();
+callback.put("query", Map.of("userId", "{{userId}}"));
+callback.put("headers", Map.of("Authorization", "Bearer token"));
+callback.put("body", Map.of("event", "notification_sent"));`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `Map<String, Object> sms = new HashMap<>();
+sms.put("recipients", Arrays.asList("+1234567890"));
+Map<String, Object> smsBody = new HashMap<>();
+smsBody.put("firstname", "{{firstName}}");
+smsBody.put("lastname", "{{lastName}}");
+sms.put("body", smsBody);`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`input.put("slug", "${messageTag}");`);
+      if (hasPushNotification) inputParts.push('input.put("push_notification", pushNotification);');
+      if (hasEmail) inputParts.push('input.put("email", email);');
+      if (hasCallback) inputParts.push('input.put("callback", callback);');
+      if (hasSms) inputParts.push('input.put("sms", sms);');
+
+      sections.push({
+        title: 'Execute',
+        code: `Map<String, Object> input = new HashMap<>();
+${inputParts.join('\n')}
+
+NotificationRequest request = new NotificationRequest.Builder()
+    .env("${envSlug}")
+    .product("${productTagValue}")
+    .event("${fullTag}")
+    .input(input)
+    .retries(3)
+    .build();
+
+ductape.processor().notification().send(request);`
+      });
+
+      return sections;
+    } else if (language === 'ruby') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `require 'ductape'
+
+ductape = Ductape::Client.new(
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+)`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `push_notification = {
+  device_token: '{{deviceToken}}',
+${Object.entries(pushData).map(([key, value]) => `  ${key}: ${JSON.stringify(value)}`).join(',\n')}
+}`
+            : `push_notification = {
+  device_token: '{{deviceToken}}',
+  title: { en: 'Your title here' },
+  body: { en: 'Your message here' },
+  data: { action: 'open_screen' }
+}`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `email = {
+  to: ['user@example.com'],
+  subject: { en: 'Email subject' },
+  template: { en: '<p>Email content</p>' }
+}`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `callback = {
+  query: { userId: '{{userId}}' },
+  headers: { Authorization: 'Bearer token' },
+  body: { event: 'notification_sent' }
+}`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `sms = {
+  recipients: ['+1234567890'],
+  body: {
+    firstname: '{{firstName}}',
+    lastname: '{{lastName}}'
+  }
+}`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`  slug: '${messageTag}'`);
+      if (hasPushNotification) inputParts.push('  push_notification: push_notification');
+      if (hasEmail) inputParts.push('  email: email');
+      if (hasCallback) inputParts.push('  callback: callback');
+      if (hasSms) inputParts.push('  sms: sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `input_data = {
+${inputParts.join(',\n')}
+}
+
+ductape.processor.notification.send(
+  env: '${envSlug}',
+  product: '${productTagValue}',
+  event: '${fullTag}',
+  input: input_data,
+  retries: 3
+)`
+      });
+
+      return sections;
+    } else if (language === 'php') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `<?php
+require_once 'vendor/autoload.php';
+
+use Ductape\\Client;
+
+$ductape = new Client([
+    'workspace_id' => 'your-workspace-id',
+    'user_id' => 'your-user-id',
+    'private_key' => 'your-private-key'
+]);`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `$pushNotification = [
+    'device_token' => '{{deviceToken}}',
+${Object.entries(pushData).map(([key, value]) => `    '${key}' => ${JSON.stringify(value)}`).join(',\n')}
+];`
+            : `$pushNotification = [
+    'device_token' => '{{deviceToken}}',
+    'title' => ['en' => 'Your title here'],
+    'body' => ['en' => 'Your message here'],
+    'data' => ['action' => 'open_screen']
+];`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `$email = [
+    'to' => ['user@example.com'],
+    'subject' => ['en' => 'Email subject'],
+    'template' => ['en' => '<p>Email content</p>']
+];`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `$callback = [
+    'query' => ['userId' => '{{userId}}'],
+    'headers' => ['Authorization' => 'Bearer token'],
+    'body' => ['event' => 'notification_sent']
+];`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `$sms = [
+    'recipients' => ['+1234567890'],
+    'body' => [
+        'firstname' => '{{firstName}}',
+        'lastname' => '{{lastName}}'
+    ]
+];`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`    'slug' => '${messageTag}'`);
+      if (hasPushNotification) inputParts.push("    'push_notification' => $pushNotification");
+      if (hasEmail) inputParts.push("    'email' => $email");
+      if (hasCallback) inputParts.push("    'callback' => $callback");
+      if (hasSms) inputParts.push("    'sms' => $sms");
+
+      sections.push({
+        title: 'Execute',
+        code: `$inputData = [
+${inputParts.join(',\n')}
+];
+
+$ductape->processor->notification->send([
+    'env' => '${envSlug}',
+    'product' => '${productTagValue}',
+    'event' => '${fullTag}',
+    'input' => $inputData,
+    'retries' => 3
+]);`
+      });
+
+      return sections;
+    } else if (language === 'kotlin') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape
+import com.ductape.sdk.models.*
+
+val ductape = Ductape(
+    workspaceId = "your-workspace-id",
+    userId = "your-user-id",
+    privateKey = "your-private-key"
+)`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `val pushNotification = mapOf(
+    "device_token" to "{{deviceToken}}",
+${Object.entries(pushData).map(([key, value]) => `    "${key}" to ${JSON.stringify(value)}`).join(',\n')}
+)`
+            : `val pushNotification = mapOf(
+    "device_token" to "{{deviceToken}}",
+    "title" to mapOf("en" to "Your title here"),
+    "body" to mapOf("en" to "Your message here"),
+    "data" to mapOf("action" to "open_screen")
+)`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `val email = mapOf(
+    "to" to listOf("user@example.com"),
+    "subject" to mapOf("en" to "Email subject"),
+    "template" to mapOf("en" to "<p>Email content</p>")
+)`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `val callback = mapOf(
+    "query" to mapOf("userId" to "{{userId}}"),
+    "headers" to mapOf("Authorization" to "Bearer token"),
+    "body" to mapOf("event" to "notification_sent")
+)`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `val sms = mapOf(
+    "recipients" to listOf("+1234567890"),
+    "body" to mapOf(
+        "firstname" to "{{firstName}}",
+        "lastname" to "{{lastName}}"
+    )
+)`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`    "slug" to "${messageTag}"`);
+      if (hasPushNotification) inputParts.push('    "push_notification" to pushNotification');
+      if (hasEmail) inputParts.push('    "email" to email');
+      if (hasCallback) inputParts.push('    "callback" to callback');
+      if (hasSms) inputParts.push('    "sms" to sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `val inputData = mapOf(
+${inputParts.join(',\n')}
+)
+
+ductape.processor.notification.send(
+    NotificationRequest(
+        env = "${envSlug}",
+        product = "${productTagValue}",
+        event = "${fullTag}",
+        input = inputData,
+        retries = 3
+    )
+)`
+      });
+
+      return sections;
+    } else if (language === 'go') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `package main
+
+import (
+    "github.com/ductape/ductape-go"
+)
+
+client := ductape.NewClient(&ductape.Config{
+    WorkspaceID: "your-workspace-id",
+    UserID:      "your-user-id",
+    PrivateKey:  "your-private-key",
+})`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `pushNotification := map[string]interface{}{
+    "device_token": "{{deviceToken}}",
+${Object.entries(pushData).map(([key, value]) => `    "${key}": ${JSON.stringify(value)},`).join('\n')}
+}`
+            : `pushNotification := map[string]interface{}{
+    "device_token": "{{deviceToken}}",
+    "title": map[string]string{"en": "Your title here"},
+    "body": map[string]string{"en": "Your message here"},
+    "data": map[string]string{"action": "open_screen"},
+}`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `email := map[string]interface{}{
+    "to": []string{"user@example.com"},
+    "subject": map[string]string{"en": "Email subject"},
+    "template": map[string]string{"en": "<p>Email content</p>"},
+}`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `callback := map[string]interface{}{
+    "query": map[string]string{"userId": "{{userId}}"},
+    "headers": map[string]string{"Authorization": "Bearer token"},
+    "body": map[string]string{"event": "notification_sent"},
+}`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `sms := map[string]interface{}{
+    "recipients": []string{"+1234567890"},
+    "body": map[string]string{
+        "firstname": "{{firstName}}",
+        "lastname": "{{lastName}}",
+    },
+}`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`    "slug": "${messageTag}",`);
+      if (hasPushNotification) inputParts.push('    "push_notification": pushNotification,');
+      if (hasEmail) inputParts.push('    "email": email,');
+      if (hasCallback) inputParts.push('    "callback": callback,');
+      if (hasSms) inputParts.push('    "sms": sms,');
+
+      sections.push({
+        title: 'Execute',
+        code: `inputData := map[string]interface{}{
+${inputParts.join('\n')}
+}
+
+request := &ductape.NotificationRequest{
+    Env:     "${envSlug}",
+    Product: "${productTagValue}",
+    Event:   "${fullTag}",
+    Input:   inputData,
+    Retries: 3,
+}
+
+err := client.Processor.Notification.Send(request)
+if err != nil {
+    log.Fatal(err)
+}`
+      });
+
+      return sections;
+    } else if (language === 'csharp') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `using Ductape.Sdk;
+
+var ductape = new DuctapeClient(new DuctapeConfig
+{
+    WorkspaceId = "your-workspace-id",
+    UserId = "your-user-id",
+    PrivateKey = "your-private-key"
+});`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `var pushNotification = new Dictionary<string, object>
+{
+    ["device_token"] = "{{deviceToken}}",
+${Object.entries(pushData).map(([key, value]) => `    ["${key}"] = ${JSON.stringify(value)},`).join('\n')}
+};`
+            : `var pushNotification = new Dictionary<string, object>
+{
+    ["device_token"] = "{{deviceToken}}",
+    ["title"] = new Dictionary<string, string> { ["en"] = "Your title here" },
+    ["body"] = new Dictionary<string, string> { ["en"] = "Your message here" },
+    ["data"] = new Dictionary<string, string> { ["action"] = "open_screen" }
+};`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `var email = new Dictionary<string, object>
+{
+    ["to"] = new[] { "user@example.com" },
+    ["subject"] = new Dictionary<string, string> { ["en"] = "Email subject" },
+    ["template"] = new Dictionary<string, string> { ["en"] = "<p>Email content</p>" }
+};`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `var callback = new Dictionary<string, object>
+{
+    ["query"] = new Dictionary<string, string> { ["userId"] = "{{userId}}" },
+    ["headers"] = new Dictionary<string, string> { ["Authorization"] = "Bearer token" },
+    ["body"] = new Dictionary<string, string> { ["event"] = "notification_sent" }
+};`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `var sms = new Dictionary<string, object>
+{
+    ["recipients"] = new[] { "+1234567890" },
+    ["body"] = new Dictionary<string, string>
+    {
+        ["firstname"] = "{{firstName}}",
+        ["lastname"] = "{{lastName}}"
+    }
+};`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`    ["slug"] = "${messageTag}"`);
+      if (hasPushNotification) inputParts.push('    ["push_notification"] = pushNotification');
+      if (hasEmail) inputParts.push('    ["email"] = email');
+      if (hasCallback) inputParts.push('    ["callback"] = callback');
+      if (hasSms) inputParts.push('    ["sms"] = sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `var inputData = new Dictionary<string, object>
+{
+${inputParts.join(',\n')}
+};
+
+var request = new NotificationRequest
+{
+    Env = "${envSlug}",
+    Product = "${productTagValue}",
+    Event = "${fullTag}",
+    Input = inputData,
+    Retries = 3
+};
+
+await ductape.Processor.Notification.SendAsync(request);`
+      });
+
+      return sections;
+    } else if (language === 'rust') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `use ductape_sdk::Ductape;
+use std::collections::HashMap;
+
+let ductape = Ductape::new(
+    "your-workspace-id",
+    "your-user-id",
+    "your-private-key"
+)?;`
+        }
+      ];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: hasPushData
+            ? `let mut push_notification: HashMap<String, serde_json::Value> = HashMap::new();
+push_notification.insert("device_token".to_string(), serde_json::json!("{{deviceToken}}"));
+${Object.entries(pushData).map(([key, value]) => `push_notification.insert("${key}".to_string(), serde_json::json!(${JSON.stringify(value)}));`).join('\n')}`
+            : `let mut push_notification: HashMap<String, serde_json::Value> = HashMap::new();
+push_notification.insert("device_token".to_string(), serde_json::json!("{{deviceToken}}"));
+push_notification.insert("title".to_string(), serde_json::json!({"en": "Your title here"}));
+push_notification.insert("body".to_string(), serde_json::json!({"en": "Your message here"}));
+push_notification.insert("data".to_string(), serde_json::json!({"action": "open_screen"}));`
+        });
+      }
+
+      if (hasEmail) {
+        sections.push({
+          title: 'Input - Email',
+          code: `let mut email: HashMap<String, serde_json::Value> = HashMap::new();
+email.insert("to".to_string(), serde_json::json!(vec!["user@example.com"]));
+email.insert("subject".to_string(), serde_json::json!({"en": "Email subject"}));
+email.insert("template".to_string(), serde_json::json!({"en": "<p>Email content</p>"}));`
+        });
+      }
+
+      if (hasCallback) {
+        sections.push({
+          title: 'Input - Callback',
+          code: `let mut callback: HashMap<String, serde_json::Value> = HashMap::new();
+callback.insert("query".to_string(), serde_json::json!({"userId": "{{userId}}"}));
+callback.insert("headers".to_string(), serde_json::json!({"Authorization": "Bearer token"}));
+callback.insert("body".to_string(), serde_json::json!({"event": "notification_sent"}));`
+        });
+      }
+
+      if (hasSms) {
+        sections.push({
+          title: 'Input - SMS',
+          code: `let mut sms: HashMap<String, serde_json::Value> = HashMap::new();
+sms.insert("recipients".to_string(), serde_json::json!(vec!["+1234567890"]));
+let mut sms_body: HashMap<String, serde_json::Value> = HashMap::new();
+sms_body.insert("firstname".to_string(), serde_json::json!("{{firstName}}"));
+sms_body.insert("lastname".to_string(), serde_json::json!("{{lastName}}"));
+sms.insert("body".to_string(), serde_json::json!(sms_body));`
+        });
+      }
+
+      const inputParts = [];
+      inputParts.push(`input.insert("slug".to_string(), serde_json::json!("${messageTag}"));`);
+      if (hasPushNotification) inputParts.push('input.insert("push_notification".to_string(), serde_json::json!(push_notification));');
+      if (hasEmail) inputParts.push('input.insert("email".to_string(), serde_json::json!(email));');
+      if (hasCallback) inputParts.push('input.insert("callback".to_string(), serde_json::json!(callback));');
+      if (hasSms) inputParts.push('input.insert("sms".to_string(), serde_json::json!(sms));');
+
+      sections.push({
+        title: 'Execute',
+        code: `let mut input: HashMap<String, serde_json::Value> = HashMap::new();
+${inputParts.join('\n')}
+
+let request = NotificationRequest {
+    env: "${envSlug}".to_string(),
+    product: "${productTagValue}".to_string(),
+    event: "${fullTag}".to_string(),
+    input,
+    retries: 3,
+};
+
+ductape.processor.notification.send(&request)?;`
       });
 
       return sections;

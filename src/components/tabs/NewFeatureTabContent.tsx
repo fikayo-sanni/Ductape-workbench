@@ -162,7 +162,7 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     databases: data.productDatabases || [],
     storage: data.productStorage || [],
     notifications: data.productNotifications || [],
-    messageBroker: data.productMessageBroker || [],
+    messageBrokers: data.productMessageBrokers || [],
     jobs: data.productJobs || [],
     quota: data.productQuota || [],
     fallback: data.productFallback || [],
@@ -391,7 +391,7 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     }
 
     // Add message brokers
-    product?.messageBroker?.forEach((broker: any) => {
+    product?.messageBrokers?.forEach((broker: any) => {
       if (broker.messages?.length > 0) {
         if (!components['Message Brokers']) components['Message Brokers'] = {};
         components['Message Brokers'][broker.name || broker.tag] = broker.messages.map((message: any) => ({
@@ -534,7 +534,7 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     let component;
 
     if (newComponent.type === 'Notifications' || newComponent.type === 'Applications' ||
-      newComponent.type === 'Databases' || newComponent.type === 'Storage') {
+      newComponent.type === 'Databases' || newComponent.type === 'Storage' || newComponent.type === 'Message Brokers') {
       component = getChildOptions().find((c: any) => c.id === newComponent.childId);
     } else {
       const categoryComponents = availableComponents[newComponent.type];
@@ -603,6 +603,10 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
 
     if (newComponent.type === 'Databases') {
       return product?.databases?.filter((db: any) => db.actions && db.actions.length > 0).map((db: any) => db.name || db.tag) || [];
+    }
+
+    if (newComponent.type === 'Message Brokers') {
+      return product?.messageBrokers?.filter((broker: any) => broker.messages && broker.messages.length > 0).map((broker: any) => broker.name || broker.tag) || [];
     }
 
     const categoryComponents = availableComponents[newComponent.type];
@@ -692,6 +696,19 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
         }];
       }
       return [];
+    }
+
+    if (newComponent.type === 'Message Brokers') {
+      const broker = product?.messageBrokers?.find((broker: any) =>
+        (broker.name || broker.tag) === newComponent.parentId
+      );
+      return broker?.messages?.map((message: any) => ({
+        id: `broker-${broker._id}-${message._id}`,
+        type: FeatureEventTypes.PUBLISH,
+        tag: `${broker.tag}:${message.tag}`,
+        name: message.name,
+        category: 'Message Brokers'
+      })) || [];
     }
 
     const categoryComponents = availableComponents[newComponent.type];
@@ -1451,7 +1468,7 @@ console.log('Feature result:', result);`;
                                 <SelectItem key={component.id} value={component.id}>
                                   <div className="flex flex-col">
                                     <span className="font-medium">{component.name}</span>
-                                    {component.tag && component.tag !== component.name && (
+                                    {newComponent.type !== 'Notifications' && component.tag && component.tag !== component.name && (
                                       <span className="text-xs text-grey-500">{component.tag}</span>
                                     )}
                                   </div>

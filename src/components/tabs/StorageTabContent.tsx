@@ -349,16 +349,13 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
         return [
           {
             title: 'Init Ductape',
-            code: `const ductape = new Ductape({
+            code: `const Ductape = require("@ductape/sdk")
+
+const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-// Initialize product
-await ductape.init('${productTagValue}');`
+  private_key: 'your-private-key'
+});`
           },
           {
             title: 'Read File',
@@ -384,18 +381,13 @@ console.log('File uploaded:', result.url);`
         return [
           {
             title: 'Init Ductape',
-            code: `import { Ductape } from '@ductape/sdk';
+            code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-// Initialize product
-await ductape.init('${productTagValue}');`
+  private_key: 'your-private-key'
+});`
           },
           {
             title: 'Read File',
@@ -426,13 +418,8 @@ console.log('File uploaded:', url);`
 ductape = Ductape(
     workspace_id='your-workspace-id',
     user_id='your-user-id',
-    token='your-auth-token',
-    public_key='your-public-key',
-    type='product'
-)
-
-# Initialize product
-ductape.init('${productTagValue}')`
+    private_key='your-private-key'
+)`
           },
           {
             title: 'Read File',

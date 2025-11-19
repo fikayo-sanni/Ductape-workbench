@@ -34,7 +34,7 @@ export default function CodeSidebar({
   onSectionAction,
   sectionFooter,
 }: CodeSidebarProps) {
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('typescript');
   const [selectedEnv, setSelectedEnv] = useState<string>(
     environments[0]?.slug || 'prd'
   );
@@ -104,9 +104,16 @@ export default function CodeSidebar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="javascript">JavaScript</SelectItem>
               <SelectItem value="typescript">TypeScript</SelectItem>
-              <SelectItem value="python">Python</SelectItem>
+              <SelectItem value="javascript">JavaScript</SelectItem>
+              <SelectItem value="python" disabled>Python</SelectItem>
+              <SelectItem value="java" disabled>Java / Spring Boot</SelectItem>
+              <SelectItem value="ruby" disabled>Ruby on Rails</SelectItem>
+              <SelectItem value="php" disabled>PHP</SelectItem>
+              <SelectItem value="kotlin" disabled>Kotlin</SelectItem>
+              <SelectItem value="go" disabled>Golang</SelectItem>
+              <SelectItem value="csharp" disabled>C# / ASP.NET</SelectItem>
+              <SelectItem value="rust" disabled>Rust</SelectItem>
             </SelectContent>
           </Select>
         </div>

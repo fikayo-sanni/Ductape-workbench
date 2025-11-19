@@ -84,6 +84,7 @@ interface WorkbenchState {
 
   // Actions - UI
   toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   toggleChatbotSidebar: () => void;
   setRequestTab: (tab: 'params' | 'headers' | 'body' | 'auth') => void;
   setResponseTab: (tab: 'response' | 'headers' | 'code') => void;
@@ -435,6 +436,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
 
   // UI Actions
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleChatbotSidebar: () => set((state) => ({ chatbotSidebarOpen: !state.chatbotSidebarOpen })),
   setRequestTab: (tab) => set({ activeTab: tab }),
   setResponseTab: (tab) => set({ responseTab: tab }),

@@ -1,4 +1,4 @@
-import { MessageSquare, Loader2, Server, Database, CloudCog, CheckCircle, Box, Activity, Eye, EyeOff, Layers, Plus } from 'lucide-react';
+import { MessageSquare, Loader2, Server, Database, CloudCog, CheckCircle, Box, Activity, Eye, EyeOff, Layers, Plus, Code } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,7 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
   const [selectedEnv, setSelectedEnv] = useState<string>(messageBroker?.envs?.[0]?.slug || '');
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
+  const [selectedTopic, setSelectedTopic] = useState<any>(null);
 
   // Initialize SDK
   const ductape = useDuctape({
@@ -71,24 +72,20 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
   // Generate SDK code examples
   const generateCodeSections = (language: string, env?: string) => {
     const brokerTag = displayData?.tag || 'message-broker-tag';
-    const productTagValue = productTag || 'your-product-tag';
+    // const productTagValue = productTag || 'your-product-tag';
     const envSlug = env || displayData?.envs?.[0]?.slug || 'prd';
 
     if (language === 'typescript') {
       return [
         {
-          title: 'Initialize SDK',
-          code: `import { DuctapeSDK } from '@ductape/sdk';
+          title: 'Init Ductape',
+          code: `import Ductape from "@ductape/sdk"
 
-const ductape = new DuctapeSDK({
+const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-await ductape.init('${productTagValue}');`,
+  private_key: 'your-private-key'
+});`,
         },
         {
           title: 'Publish Message',
@@ -136,21 +133,437 @@ await ductape.messageBrokers.subscribe('${brokerTag}', {
       ];
     }
 
+    if (language === 'java') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape;
+import com.ductape.sdk.models.*;
+import java.util.*;
+
+Ductape ductape = new Ductape.Builder()
+    .workspaceId("your-workspace-id")
+    .userId("your-user-id")
+    .privateKey("your-private-key")
+    .build();`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+Map<String, Object> payload = new HashMap<>();
+payload.put("userId", "12345");
+payload.put("email", "user@example.com");
+payload.put("timestamp", new Date().toString());
+
+Map<String, Object> data = new HashMap<>();
+data.put("eventType", "user.created");
+data.put("payload", payload);
+
+MessageRequest request = new MessageRequest.Builder()
+    .brokerTag("${brokerTag}")
+    .env("${envSlug}")
+    .data(data)
+    .build();
+
+MessageResponse result = ductape.messageBrokers().publish(request);
+System.out.println("Message published: " + result);`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+ductape.messageBrokers().subscribe("${brokerTag}", new SubscribeOptions.Builder()
+    .env("${envSlug}")
+    .handler((message) -> {
+        System.out.println("Received message: " + message);
+
+        Map<String, Object> data = (Map<String, Object>) message.getData();
+        String eventType = (String) data.get("eventType");
+        Map<String, Object> payload = (Map<String, Object>) data.get("payload");
+
+        if ("user.created".equals(eventType)) {
+            System.out.println("New user created: " + payload);
+        }
+
+        return Map.of("success", true);
+    })
+    .build());`,
+        },
+      ];
+    }
+
+    if (language === 'ruby') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `require 'ductape'
+
+ductape = Ductape::Client.new(
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+)`,
+        },
+        {
+          title: 'Publish Message',
+          code: `# Publish a message to the broker
+result = ductape.message_brokers.publish('${brokerTag}',
+  env: '${envSlug}',
+  data: {
+    eventType: 'user.created',
+    payload: {
+      userId: '12345',
+      email: 'user@example.com',
+      timestamp: Time.now.iso8601
+    }
+  }
+)
+
+puts "Message published: #{result}"`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `# Subscribe to messages from the broker
+ductape.message_brokers.subscribe('${brokerTag}',
+  env: '${envSlug}',
+  handler: ->(message) {
+    puts "Received message: #{message}"
+
+    event_type = message[:data][:eventType]
+    payload = message[:data][:payload]
+
+    if event_type == 'user.created'
+      puts "New user created: #{payload}"
+    elsif event_type == 'order.placed'
+      puts "New order placed: #{payload}"
+    end
+
+    { success: true }
+  }
+)`,
+        },
+      ];
+    }
+
+    if (language === 'php') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `<?php
+require_once 'vendor/autoload.php';
+
+use Ductape\\Client;
+
+$ductape = new Client([
+    'workspace_id' => 'your-workspace-id',
+    'user_id' => 'your-user-id',
+    'private_key' => 'your-private-key'
+]);`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+$result = $ductape->messageBrokers->publish('${brokerTag}', [
+    'env' => '${envSlug}',
+    'data' => [
+        'eventType' => 'user.created',
+        'payload' => [
+            'userId' => '12345',
+            'email' => 'user@example.com',
+            'timestamp' => date('c')
+        ]
+    ]
+]);
+
+echo "Message published: " . json_encode($result);`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+$ductape->messageBrokers->subscribe('${brokerTag}', [
+    'env' => '${envSlug}',
+    'handler' => function($message) {
+        echo "Received message: " . json_encode($message);
+
+        $eventType = $message['data']['eventType'];
+        $payload = $message['data']['payload'];
+
+        if ($eventType === 'user.created') {
+            echo "New user created: " . json_encode($payload);
+        } elseif ($eventType === 'order.placed') {
+            echo "New order placed: " . json_encode($payload);
+        }
+
+        return ['success' => true];
+    }
+]);`,
+        },
+      ];
+    }
+
+    if (language === 'kotlin') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape
+import com.ductape.sdk.models.*
+
+val ductape = Ductape(
+    workspaceId = "your-workspace-id",
+    userId = "your-user-id",
+    privateKey = "your-private-key"
+)`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+val data = mapOf(
+    "eventType" to "user.created",
+    "payload" to mapOf(
+        "userId" to "12345",
+        "email" to "user@example.com",
+        "timestamp" to System.currentTimeMillis()
+    )
+)
+
+val request = MessageRequest(
+    brokerTag = "${brokerTag}",
+    env = "${envSlug}",
+    data = data
+)
+
+val result = ductape.messageBrokers.publish(request)
+println("Message published: $result")`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+ductape.messageBrokers.subscribe("${brokerTag}") { message ->
+    println("Received message: $message")
+
+    val eventType = message.data["eventType"] as String
+    val payload = message.data["payload"] as Map<*, *>
+
+    when (eventType) {
+        "user.created" -> println("New user created: $payload")
+        "order.placed" -> println("New order placed: $payload")
+    }
+
+    mapOf("success" to true)
+}`,
+        },
+      ];
+    }
+
+    if (language === 'go') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `package main
+
+import (
+    "github.com/ductape/ductape-go"
+)
+
+client := ductape.NewClient(&ductape.Config{
+    WorkspaceID: "your-workspace-id",
+    UserID:      "your-user-id",
+    PrivateKey:  "your-private-key",
+})`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+data := map[string]interface{}{
+    "eventType": "user.created",
+    "payload": map[string]interface{}{
+        "userId":    "12345",
+        "email":     "user@example.com",
+        "timestamp": time.Now().Format(time.RFC3339),
+    },
+}
+
+request := &ductape.MessageRequest{
+    BrokerTag: "${brokerTag}",
+    Env:       "${envSlug}",
+    Data:      data,
+}
+
+result, err := client.MessageBrokers.Publish(request)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Message published: %v\\n", result)`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+err := client.MessageBrokers.Subscribe("${brokerTag}", &ductape.SubscribeOptions{
+    Env: "${envSlug}",
+    Handler: func(message *ductape.Message) (map[string]interface{}, error) {
+        fmt.Printf("Received message: %v\\n", message)
+
+        eventType := message.Data["eventType"].(string)
+        payload := message.Data["payload"].(map[string]interface{})
+
+        switch eventType {
+        case "user.created":
+            fmt.Printf("New user created: %v\\n", payload)
+        case "order.placed":
+            fmt.Printf("New order placed: %v\\n", payload)
+        }
+
+        return map[string]interface{}{"success": true}, nil
+    },
+})
+
+if err != nil {
+    log.Fatal(err)
+}`,
+        },
+      ];
+    }
+
+    if (language === 'csharp') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `using Ductape.Sdk;
+
+var ductape = new DuctapeClient(new DuctapeConfig
+{
+    WorkspaceId = "your-workspace-id",
+    UserId = "your-user-id",
+    PrivateKey = "your-private-key"
+});`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+var data = new Dictionary<string, object>
+{
+    ["eventType"] = "user.created",
+    ["payload"] = new Dictionary<string, object>
+    {
+        ["userId"] = "12345",
+        ["email"] = "user@example.com",
+        ["timestamp"] = DateTime.UtcNow.ToString("o")
+    }
+};
+
+var request = new MessageRequest
+{
+    BrokerTag = "${brokerTag}",
+    Env = "${envSlug}",
+    Data = data
+};
+
+var result = await ductape.MessageBrokers.PublishAsync(request);
+Console.WriteLine($"Message published: {result}");`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+await ductape.MessageBrokers.SubscribeAsync("${brokerTag}", new SubscribeOptions
+{
+    Env = "${envSlug}",
+    Handler = async (message) =>
+    {
+        Console.WriteLine($"Received message: {message}");
+
+        var eventType = message.Data["eventType"] as string;
+        var payload = message.Data["payload"] as Dictionary<string, object>;
+
+        switch (eventType)
+        {
+            case "user.created":
+                Console.WriteLine($"New user created: {payload}");
+                break;
+            case "order.placed":
+                Console.WriteLine($"New order placed: {payload}");
+                break;
+        }
+
+        return new Dictionary<string, object> { ["success"] = true };
+    }
+});`,
+        },
+      ];
+    }
+
+    if (language === 'rust') {
+      return [
+        {
+          title: 'Init Ductape',
+          code: `use ductape_sdk::Ductape;
+use std::collections::HashMap;
+
+let ductape = Ductape::new(
+    "your-workspace-id",
+    "your-user-id",
+    "your-private-key"
+)?;`,
+        },
+        {
+          title: 'Publish Message',
+          code: `// Publish a message to the broker
+let mut payload: HashMap<String, serde_json::Value> = HashMap::new();
+payload.insert("userId".to_string(), serde_json::json!("12345"));
+payload.insert("email".to_string(), serde_json::json!("user@example.com"));
+payload.insert("timestamp".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+
+let mut data: HashMap<String, serde_json::Value> = HashMap::new();
+data.insert("eventType".to_string(), serde_json::json!("user.created"));
+data.insert("payload".to_string(), serde_json::json!(payload));
+
+let request = MessageRequest {
+    broker_tag: "${brokerTag}".to_string(),
+    env: "${envSlug}".to_string(),
+    data,
+};
+
+let result = ductape.message_brokers.publish(&request)?;
+println!("Message published: {:?}", result);`,
+        },
+        {
+          title: 'Subscribe to Messages',
+          code: `// Subscribe to messages from the broker
+ductape.message_brokers.subscribe("${brokerTag}", SubscribeOptions {
+    env: "${envSlug}".to_string(),
+    handler: Box::new(|message| {
+        println!("Received message: {:?}", message);
+
+        let event_type = message.data.get("eventType")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        match event_type {
+            "user.created" => {
+                println!("New user created: {:?}", message.data.get("payload"));
+            }
+            "order.placed" => {
+                println!("New order placed: {:?}", message.data.get("payload"));
+            }
+            _ => {}
+        }
+
+        Ok(serde_json::json!({"success": true}))
+    }),
+})?;`,
+        },
+      ];
+    }
+
     // JavaScript examples
     return [
       {
-        title: 'Initialize SDK',
-        code: `const { DuctapeSDK } = require('@ductape/sdk');
+        title: 'Init Ductape',
+        code: `const Ductape = require("@ductape/sdk")
 
-const ductape = new DuctapeSDK({
+const ductape = new Ductape({
   workspace_id: 'your-workspace-id',
   user_id: 'your-user-id',
-  token: 'your-auth-token',
-  public_key: 'your-public-key',
-  type: 'product'
-});
-
-await ductape.init('${productTagValue}');`,
+  private_key: 'your-private-key'
+});`,
       },
       {
         title: 'Publish Message',
@@ -189,6 +602,481 @@ await ductape.messageBrokers.subscribe('${brokerTag}', {
 
     // Acknowledge the message
     return { success: true };
+  }
+});`,
+      },
+    ];
+  };
+
+  // Helper function to generate input message structure from data array
+  const generateInputMessage = (topic: any, indent = '  '): string => {
+    // Check topic's data array
+    let dataArray = topic?.data;
+
+    // If topic has a data array, use it to build the structure
+    if (dataArray && Array.isArray(dataArray) && dataArray.length > 0) {
+      return dataArray
+        .map((field: any) => `${indent}${field.key}: undefined`)
+        .join(',\n');
+    }
+
+    // Otherwise, use the sample data as fallback
+    const sampleData = topic?.sample || {
+      userId: "{{userId}}",
+      eventType: "{{eventType}}",
+      timestamp: "{{timestamp}}"
+    };
+
+    // Convert sample data to undefined format
+    const formatObject = (obj: any, currentIndent: string): string => {
+      return Object.entries(obj)
+        .map(([key, value]): string => {
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            const nested = formatObject(value, currentIndent + '  ');
+            return `${currentIndent}${key}: {\n${nested}\n${currentIndent}}`;
+          }
+          return `${currentIndent}${key}: undefined`;
+        })
+        .join(',\n');
+    };
+
+    return formatObject(sampleData, indent);
+  };
+
+  // Generate topic-specific code examples
+  const generateTopicCodeSections = (language: string, topic: any, env?: string) => {
+    const productTagValue = productTag || 'your-product-tag';
+    const envSlug = env || displayData?.envs?.[0]?.slug || 'prd';
+    const topicTag = topic?.tag || topic?.name || 'topic-tag';
+    const topicName = topic?.name || 'Topic Name';
+
+    if (language === 'typescript') {
+      const inputMessage = generateInputMessage(topic, '      ');
+
+      return [
+        {
+          title: 'Init Ductape',
+          code: `import Ductape from "@ductape/sdk"
+
+const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+});`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `await ductape.processor.messageBroker.publish({
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  session: {
+    token: 'your-session-token',
+    tag: 'your-session-tag'
+  },
+  message: {
+${inputMessage}
+  }
+});`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `await ductape.processor.messageBroker.subscribe({
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  callback: async (message) => {
+    console.log('Received message from ${topicName}:', message);
+    // Implement processing logic here
+  }
+});`,
+        },
+      ];
+    }
+
+    if (language === 'java') {
+      const inputMessage = generateInputMessage(topic, '            ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape;
+import com.ductape.sdk.models.*;
+
+Ductape ductape = new Ductape.Builder()
+    .workspaceId("your-workspace-id")
+    .userId("your-user-id")
+    .privateKey("your-private-key")
+    .build();`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `Map<String, Object> message = new HashMap<>();
+${inputMessage.split('\n').map(line => line.replace(/undefined/g, 'null')).join('\n')}
+
+TopicPublishRequest request = new TopicPublishRequest.Builder()
+    .env("${envSlug}")
+    .event("${topicTag}")
+    .product("${productTagValue}")
+    .sessionToken("your-session-token")
+    .sessionTag("your-session-tag")
+    .message(message)
+    .build();
+
+ductape.processor().messageBroker().publish(request);`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `ductape.processor().messageBroker().subscribe(new SubscribeRequest.Builder()
+    .env("${envSlug}")
+    .event("${topicTag}")
+    .product("${productTagValue}")
+    .callback((message) -> {
+        System.out.println("Received message from ${topicName}: " + message);
+        // Implement processing logic here
+    })
+    .build());`,
+        },
+      ];
+    }
+
+    if (language === 'ruby') {
+      const inputMessage = generateInputMessage(topic, '    ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `require 'ductape'
+
+ductape = Ductape::Client.new(
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+)`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `message = {
+${inputMessage.replace(/undefined/g, 'nil')}
+}
+
+ductape.processor.message_broker.publish(
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  session: {
+    token: 'your-session-token',
+    tag: 'your-session-tag'
+  },
+  message: message
+)`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `ductape.processor.message_broker.subscribe(
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  callback: ->(message) {
+    puts "Received message from ${topicName}: #{message}"
+    # Implement processing logic here
+  }
+)`,
+        },
+      ];
+    }
+
+    if (language === 'php') {
+      const inputMessage = generateInputMessage(topic, '    ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `<?php
+require_once 'vendor/autoload.php';
+
+use Ductape\\Client;
+
+$ductape = new Client([
+    'workspace_id' => 'your-workspace-id',
+    'user_id' => 'your-user-id',
+    'private_key' => 'your-private-key'
+]);`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `$message = [
+${inputMessage.replace(/undefined/g, 'null')}
+];
+
+$ductape->processor->messageBroker->publish([
+    'env' => '${envSlug}',
+    'event' => '${topicTag}',
+    'product' => '${productTagValue}',
+    'session' => [
+        'token' => 'your-session-token',
+        'tag' => 'your-session-tag'
+    ],
+    'message' => $message
+]);`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `$ductape->processor->messageBroker->subscribe([
+    'env' => '${envSlug}',
+    'event' => '${topicTag}',
+    'product' => '${productTagValue}',
+    'callback' => function($message) {
+        echo "Received message from ${topicName}: " . json_encode($message);
+        // Implement processing logic here
+    }
+]);`,
+        },
+      ];
+    }
+
+    if (language === 'kotlin') {
+      const inputMessage = generateInputMessage(topic, '        ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `import com.ductape.sdk.Ductape
+import com.ductape.sdk.models.*
+
+val ductape = Ductape(
+    workspaceId = "your-workspace-id",
+    userId = "your-user-id",
+    privateKey = "your-private-key"
+)`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `val message = mapOf(
+${inputMessage.replace(/undefined/g, 'null')}
+)
+
+ductape.processor.messageBroker.publish(
+    TopicPublishRequest(
+        env = "${envSlug}",
+        event = "${topicTag}",
+        product = "${productTagValue}",
+        session = Session(
+            token = "your-session-token",
+            tag = "your-session-tag"
+        ),
+        message = message
+    )
+)`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `ductape.processor.messageBroker.subscribe(
+    env = "${envSlug}",
+    event = "${topicTag}",
+    product = "${productTagValue}"
+) { message ->
+    println("Received message from ${topicName}: $message")
+    // Implement processing logic here
+}`,
+        },
+      ];
+    }
+
+    if (language === 'go') {
+      const inputMessage = generateInputMessage(topic, '        ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `package main
+
+import (
+    "github.com/ductape/ductape-go"
+)
+
+client := ductape.NewClient(&ductape.Config{
+    WorkspaceID: "your-workspace-id",
+    UserID:      "your-user-id",
+    PrivateKey:  "your-private-key",
+})`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `message := map[string]interface{}{
+${inputMessage.replace(/undefined/g, 'nil')}
+}
+
+request := &ductape.TopicPublishRequest{
+    Env:     "${envSlug}",
+    Event:   "${topicTag}",
+    Product: "${productTagValue}",
+    Session: &ductape.Session{
+        Token: "your-session-token",
+        Tag:   "your-session-tag",
+    },
+    Message: message,
+}
+
+err := client.Processor.MessageBroker.Publish(request)
+if err != nil {
+    log.Fatal(err)
+}`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `err := client.Processor.MessageBroker.Subscribe(&ductape.SubscribeRequest{
+    Env:     "${envSlug}",
+    Event:   "${topicTag}",
+    Product: "${productTagValue}",
+    Callback: func(message map[string]interface{}) error {
+        fmt.Printf("Received message from ${topicName}: %v\\n", message)
+        // Implement processing logic here
+        return nil
+    },
+})
+
+if err != nil {
+    log.Fatal(err)
+}`,
+        },
+      ];
+    }
+
+    if (language === 'csharp') {
+      const inputMessage = generateInputMessage(topic, '        ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `using Ductape.Sdk;
+
+var ductape = new DuctapeClient(new DuctapeConfig
+{
+    WorkspaceId = "your-workspace-id",
+    UserId = "your-user-id",
+    PrivateKey = "your-private-key"
+});`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `var message = new Dictionary<string, object>
+{
+${inputMessage.replace(/undefined/g, 'null')}
+};
+
+var request = new TopicPublishRequest
+{
+    Env = "${envSlug}",
+    Event = "${topicTag}",
+    Product = "${productTagValue}",
+    Session = new Session
+    {
+        Token = "your-session-token",
+        Tag = "your-session-tag"
+    },
+    Message = message
+};
+
+await ductape.Processor.MessageBroker.PublishAsync(request);`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `await ductape.Processor.MessageBroker.SubscribeAsync(new SubscribeRequest
+{
+    Env = "${envSlug}",
+    Event = "${topicTag}",
+    Product = "${productTagValue}",
+    Callback = async (message) =>
+    {
+        Console.WriteLine($"Received message from ${topicName}: {message}");
+        // Implement processing logic here
+    }
+});`,
+        },
+      ];
+    }
+
+    if (language === 'rust') {
+      const inputMessage = generateInputMessage(topic, '        ');
+      return [
+        {
+          title: 'Init Ductape',
+          code: `use ductape_sdk::Ductape;
+use std::collections::HashMap;
+
+let ductape = Ductape::new(
+    "your-workspace-id",
+    "your-user-id",
+    "your-private-key"
+)?;`,
+        },
+        {
+          title: `Publish to ${topicName}`,
+          code: `let mut message: HashMap<String, serde_json::Value> = HashMap::new();
+${inputMessage.replace(/undefined/g, 'serde_json::Value::Null').replace(/:/g, '.insert(')}
+
+let request = TopicPublishRequest {
+    env: "${envSlug}".to_string(),
+    event: "${topicTag}".to_string(),
+    product: "${productTagValue}".to_string(),
+    session: Session {
+        token: "your-session-token".to_string(),
+        tag: "your-session-tag".to_string(),
+    },
+    message,
+};
+
+ductape.processor.message_broker.publish(&request)?;`,
+        },
+        {
+          title: `Subscribe to ${topicName}`,
+          code: `ductape.processor.message_broker.subscribe(SubscribeRequest {
+    env: "${envSlug}".to_string(),
+    event: "${topicTag}".to_string(),
+    product: "${productTagValue}".to_string(),
+    callback: Box::new(|message| {
+        println!("Received message from ${topicName}: {:?}", message);
+        // Implement processing logic here
+        Ok(())
+    }),
+})?;`,
+        },
+      ];
+    }
+
+    // JavaScript examples
+    const inputMessage = generateInputMessage(topic, '      ');
+
+    return [
+      {
+        title: 'Init Ductape',
+        code: `const Ductape = require("@ductape/sdk")
+
+const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  private_key: 'your-private-key'
+});`,
+      },
+      {
+        title: `Publish to ${topicName}`,
+        code: `await ductape.processor.messageBroker.publish({
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  session: {
+    token: 'your-session-token',
+    tag: 'your-session-tag'
+  },
+  message: {
+${inputMessage}
+  }
+});`,
+      },
+      {
+        title: `Subscribe to ${topicName}`,
+        code: `await ductape.processor.messageBroker.subscribe({
+  env: '${envSlug}',
+  event: '${topicTag}',
+  product: '${productTagValue}',
+  callback: async (message) => {
+    console.log('Received message from ${topicName}:', message);
+    // Implement processing logic here
   }
 });`,
       },
@@ -358,7 +1246,7 @@ await ductape.messageBrokers.subscribe('${brokerTag}', {
             <h2 className="text-lg font-semibold text-grey">Topics & Queues</h2>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 openTab({
                   id: `new-topic-${Date.now()}`,
@@ -402,10 +1290,22 @@ await ductape.messageBrokers.subscribe('${brokerTag}', {
                       {topic.type && (
                         <Badge variant="outline" className="text-xs text-grey">{topic.type}</Badge>
                       )}
+                      {topic.env && (
+                        <Badge variant="outline" className="text-xs ml-2">{topic.env}</Badge>
+                      )}
                     </div>
-                    {topic.env && (
-                      <Badge variant="outline" className="text-xs">{topic.env}</Badge>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedTopic(topic);
+                        setShowCodeSidebar(true);
+                      }}
+                      className="flex items-center gap-1.5 text-grey hover:text-primary"
+                    >
+                      <Code className="h-3.5 w-3.5" />
+                      <span className="text-xs">View Code</span>
+                    </Button>
                   </div>
                   {topic.description && (
                     <p className="text-xs text-grey-600 mt-2 ml-6">{topic.description}</p>
@@ -529,9 +1429,15 @@ await ductape.messageBrokers.subscribe('${brokerTag}', {
       {/* Code Sidebar */}
       {showCodeSidebar && (
         <CodeSidebar
-          title=''
-          onClose={() => setShowCodeSidebar(false)}
-          generateCodeSections={generateCodeSections}
+          title={selectedTopic ? `${selectedTopic.name || selectedTopic.topic || selectedTopic.queue} - Code Examples` : 'Message Broker - Code Examples'}
+          onClose={() => {
+            setShowCodeSidebar(false);
+            setSelectedTopic(null);
+          }}
+          generateCodeSections={selectedTopic
+            ? (language: string, env?: string) => generateTopicCodeSections(language, selectedTopic, env)
+            : generateCodeSections
+          }
           environments={displayData?.envs?.map((env: any) => ({
             slug: env.slug,
             env_name: env.slug,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   Database,
@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
   Dialog,
   DialogContent,
@@ -128,6 +129,101 @@ const DUMMY_USERS_DATA = [
   { id: 3, email: 'bob.wilson@example.com', name: 'Bob Wilson', role: 'user', created_at: '2024-01-17 09:15:00', is_active: true },
   { id: 4, email: 'alice.brown@example.com', name: 'Alice Brown', role: 'moderator', created_at: '2024-01-18 16:45:00', is_active: false },
   { id: 5, email: 'charlie.davis@example.com', name: 'Charlie Davis', role: 'user', created_at: '2024-01-19 11:20:00', is_active: true },
+  { id: 6, email: 'emily.johnson@example.com', name: 'Emily Johnson', role: 'user', created_at: '2024-01-20 08:45:00', is_active: true },
+  { id: 7, email: 'michael.chen@example.com', name: 'Michael Chen', role: 'moderator', created_at: '2024-01-21 13:30:00', is_active: true },
+  { id: 8, email: 'sarah.miller@example.com', name: 'Sarah Miller', role: 'user', created_at: '2024-01-22 10:15:00', is_active: true },
+  { id: 9, email: 'david.garcia@example.com', name: 'David Garcia', role: 'user', created_at: '2024-01-23 16:20:00', is_active: false },
+  { id: 10, email: 'lisa.anderson@example.com', name: 'Lisa Anderson', role: 'admin', created_at: '2024-01-24 09:00:00', is_active: true },
+  { id: 11, email: 'james.martinez@example.com', name: 'James Martinez', role: 'user', created_at: '2024-01-25 11:45:00', is_active: true },
+  { id: 12, email: 'maria.rodriguez@example.com', name: 'Maria Rodriguez', role: 'user', created_at: '2024-01-26 14:30:00', is_active: true },
+  { id: 13, email: 'robert.lee@example.com', name: 'Robert Lee', role: 'moderator', created_at: '2024-01-27 10:10:00', is_active: true },
+  { id: 14, email: 'jennifer.white@example.com', name: 'Jennifer White', role: 'user', created_at: '2024-01-28 15:55:00', is_active: false },
+  { id: 15, email: 'william.taylor@example.com', name: 'William Taylor', role: 'user', created_at: '2024-01-29 08:30:00', is_active: true },
+  { id: 16, email: 'patricia.thomas@example.com', name: 'Patricia Thomas', role: 'user', created_at: '2024-01-30 12:40:00', is_active: true },
+  { id: 17, email: 'richard.jackson@example.com', name: 'Richard Jackson', role: 'admin', created_at: '2024-01-31 09:25:00', is_active: true },
+  { id: 18, email: 'linda.harris@example.com', name: 'Linda Harris', role: 'user', created_at: '2024-02-01 14:15:00', is_active: true },
+  { id: 19, email: 'charles.martin@example.com', name: 'Charles Martin', role: 'user', created_at: '2024-02-02 11:50:00', is_active: false },
+  { id: 20, email: 'barbara.thompson@example.com', name: 'Barbara Thompson', role: 'moderator', created_at: '2024-02-03 16:05:00', is_active: true },
+  { id: 21, email: 'joseph.garcia@example.com', name: 'Joseph Garcia', role: 'user', created_at: '2024-02-04 10:30:00', is_active: true },
+  { id: 22, email: 'susan.clark@example.com', name: 'Susan Clark', role: 'user', created_at: '2024-02-05 13:20:00', is_active: true },
+  { id: 23, email: 'thomas.rodriguez@example.com', name: 'Thomas Rodriguez', role: 'user', created_at: '2024-02-06 08:45:00', is_active: true },
+  { id: 24, email: 'jessica.lewis@example.com', name: 'Jessica Lewis', role: 'user', created_at: '2024-02-07 15:35:00', is_active: false },
+  { id: 25, email: 'daniel.walker@example.com', name: 'Daniel Walker', role: 'admin', created_at: '2024-02-08 09:10:00', is_active: true },
+  { id: 26, email: 'nancy.hall@example.com', name: 'Nancy Hall', role: 'user', created_at: '2024-02-09 12:00:00', is_active: true },
+  { id: 27, email: 'matthew.allen@example.com', name: 'Matthew Allen', role: 'moderator', created_at: '2024-02-10 14:45:00', is_active: true },
+  { id: 28, email: 'betty.young@example.com', name: 'Betty Young', role: 'user', created_at: '2024-02-11 10:20:00', is_active: true },
+  { id: 29, email: 'anthony.king@example.com', name: 'Anthony King', role: 'user', created_at: '2024-02-12 16:30:00', is_active: true },
+  { id: 30, email: 'dorothy.wright@example.com', name: 'Dorothy Wright', role: 'user', created_at: '2024-02-13 11:15:00', is_active: false },
+  { id: 31, email: 'mark.hill@example.com', name: 'Mark Hill', role: 'user', created_at: '2024-02-14 13:25:00', is_active: true },
+  { id: 32, email: 'sandra.scott@example.com', name: 'Sandra Scott', role: 'user', created_at: '2024-02-15 09:40:00', is_active: true },
+  { id: 33, email: 'steven.green@example.com', name: 'Steven Green', role: 'moderator', created_at: '2024-02-16 15:10:00', is_active: true },
+  { id: 34, email: 'ashley.baker@example.com', name: 'Ashley Baker', role: 'user', created_at: '2024-02-17 11:35:00', is_active: false },
+  { id: 35, email: 'kevin.adams@example.com', name: 'Kevin Adams', role: 'user', created_at: '2024-02-18 14:05:00', is_active: true },
+  { id: 36, email: 'donna.nelson@example.com', name: 'Donna Nelson', role: 'user', created_at: '2024-02-19 08:20:00', is_active: true },
+  { id: 37, email: 'brian.carter@example.com', name: 'Brian Carter', role: 'admin', created_at: '2024-02-20 12:50:00', is_active: true },
+  { id: 38, email: 'carol.mitchell@example.com', name: 'Carol Mitchell', role: 'user', created_at: '2024-02-21 10:15:00', is_active: true },
+  { id: 39, email: 'george.perez@example.com', name: 'George Perez', role: 'user', created_at: '2024-02-22 16:40:00', is_active: false },
+  { id: 40, email: 'michelle.roberts@example.com', name: 'Michelle Roberts', role: 'moderator', created_at: '2024-02-23 09:05:00', is_active: true },
+  { id: 41, email: 'edward.turner@example.com', name: 'Edward Turner', role: 'user', created_at: '2024-02-24 13:30:00', is_active: true },
+  { id: 42, email: 'laura.phillips@example.com', name: 'Laura Phillips', role: 'user', created_at: '2024-02-25 11:00:00', is_active: true },
+  { id: 43, email: 'ronald.campbell@example.com', name: 'Ronald Campbell', role: 'user', created_at: '2024-02-26 15:20:00', is_active: true },
+  { id: 44, email: 'kimberly.parker@example.com', name: 'Kimberly Parker', role: 'user', created_at: '2024-02-27 08:45:00', is_active: false },
+  { id: 45, email: 'jason.evans@example.com', name: 'Jason Evans', role: 'user', created_at: '2024-02-28 12:10:00', is_active: true },
+  { id: 46, email: 'deborah.edwards@example.com', name: 'Deborah Edwards', role: 'user', created_at: '2024-02-29 14:35:00', is_active: true },
+  { id: 47, email: 'jeffrey.collins@example.com', name: 'Jeffrey Collins', role: 'moderator', created_at: '2024-03-01 10:00:00', is_active: true },
+  { id: 48, email: 'helen.stewart@example.com', name: 'Helen Stewart', role: 'user', created_at: '2024-03-02 16:25:00', is_active: true },
+  { id: 49, email: 'ryan.sanchez@example.com', name: 'Ryan Sanchez', role: 'user', created_at: '2024-03-03 09:50:00', is_active: false },
+  { id: 50, email: 'sharon.morris@example.com', name: 'Sharon Morris', role: 'admin', created_at: '2024-03-04 13:15:00', is_active: true },
+  { id: 51, email: 'jacob.rogers@example.com', name: 'Jacob Rogers', role: 'user', created_at: '2024-03-05 11:40:00', is_active: true },
+  { id: 52, email: 'cynthia.reed@example.com', name: 'Cynthia Reed', role: 'user', created_at: '2024-03-06 15:05:00', is_active: true },
+  { id: 53, email: 'gary.cook@example.com', name: 'Gary Cook', role: 'user', created_at: '2024-03-07 08:30:00', is_active: true },
+  { id: 54, email: 'kathleen.morgan@example.com', name: 'Kathleen Morgan', role: 'user', created_at: '2024-03-08 12:55:00', is_active: false },
+  { id: 55, email: 'nicholas.bell@example.com', name: 'Nicholas Bell', role: 'moderator', created_at: '2024-03-09 10:20:00', is_active: true },
+  { id: 56, email: 'amy.murphy@example.com', name: 'Amy Murphy', role: 'user', created_at: '2024-03-10 14:45:00', is_active: true },
+  { id: 57, email: 'jonathan.bailey@example.com', name: 'Jonathan Bailey', role: 'user', created_at: '2024-03-11 09:10:00', is_active: true },
+  { id: 58, email: 'angela.rivera@example.com', name: 'Angela Rivera', role: 'user', created_at: '2024-03-12 13:35:00', is_active: true },
+  { id: 59, email: 'jeremy.cooper@example.com', name: 'Jeremy Cooper', role: 'user', created_at: '2024-03-13 11:00:00', is_active: false },
+  { id: 60, email: 'melissa.richardson@example.com', name: 'Melissa Richardson', role: 'admin', created_at: '2024-03-14 15:25:00', is_active: true },
+  { id: 61, email: 'timothy.cox@example.com', name: 'Timothy Cox', role: 'user', created_at: '2024-03-15 08:50:00', is_active: true },
+  { id: 62, email: 'brenda.howard@example.com', name: 'Brenda Howard', role: 'user', created_at: '2024-03-16 12:15:00', is_active: true },
+  { id: 63, email: 'sean.ward@example.com', name: 'Sean Ward', role: 'moderator', created_at: '2024-03-17 10:40:00', is_active: true },
+  { id: 64, email: 'katherine.torres@example.com', name: 'Katherine Torres', role: 'user', created_at: '2024-03-18 15:05:00', is_active: false },
+  { id: 65, email: 'eric.peterson@example.com', name: 'Eric Peterson', role: 'user', created_at: '2024-03-19 09:30:00', is_active: true },
+  { id: 66, email: 'anna.gray@example.com', name: 'Anna Gray', role: 'user', created_at: '2024-03-20 13:55:00', is_active: true },
+  { id: 67, email: 'douglas.ramirez@example.com', name: 'Douglas Ramirez', role: 'user', created_at: '2024-03-21 11:20:00', is_active: true },
+  { id: 68, email: 'rebecca.james@example.com', name: 'Rebecca James', role: 'user', created_at: '2024-03-22 15:45:00', is_active: true },
+  { id: 69, email: 'peter.watson@example.com', name: 'Peter Watson', role: 'user', created_at: '2024-03-23 08:10:00', is_active: false },
+  { id: 70, email: 'christine.brooks@example.com', name: 'Christine Brooks', role: 'moderator', created_at: '2024-03-24 12:35:00', is_active: true },
+  { id: 71, email: 'adam.kelly@example.com', name: 'Adam Kelly', role: 'user', created_at: '2024-03-25 10:00:00', is_active: true },
+  { id: 72, email: 'frances.sanders@example.com', name: 'Frances Sanders', role: 'user', created_at: '2024-03-26 14:25:00', is_active: true },
+  { id: 73, email: 'benjamin.price@example.com', name: 'Benjamin Price', role: 'admin', created_at: '2024-03-27 09:50:00', is_active: true },
+  { id: 74, email: 'janet.bennett@example.com', name: 'Janet Bennett', role: 'user', created_at: '2024-03-28 13:15:00', is_active: false },
+  { id: 75, email: 'harold.wood@example.com', name: 'Harold Wood', role: 'user', created_at: '2024-03-29 11:40:00', is_active: true },
+  { id: 76, email: 'diane.barnes@example.com', name: 'Diane Barnes', role: 'user', created_at: '2024-03-30 15:05:00', is_active: true },
+  { id: 77, email: 'jack.ross@example.com', name: 'Jack Ross', role: 'moderator', created_at: '2024-03-31 08:30:00', is_active: true },
+  { id: 78, email: 'joyce.henderson@example.com', name: 'Joyce Henderson', role: 'user', created_at: '2024-04-01 12:55:00', is_active: true },
+  { id: 79, email: 'gerald.coleman@example.com', name: 'Gerald Coleman', role: 'user', created_at: '2024-04-02 10:20:00', is_active: false },
+  { id: 80, email: 'rose.jenkins@example.com', name: 'Rose Jenkins', role: 'user', created_at: '2024-04-03 14:45:00', is_active: true },
+  { id: 81, email: 'carl.perry@example.com', name: 'Carl Perry', role: 'user', created_at: '2024-04-04 09:10:00', is_active: true },
+  { id: 82, email: 'judy.powell@example.com', name: 'Judy Powell', role: 'user', created_at: '2024-04-05 13:35:00', is_active: true },
+  { id: 83, email: 'keith.long@example.com', name: 'Keith Long', role: 'user', created_at: '2024-04-06 11:00:00', is_active: true },
+  { id: 84, email: 'theresa.patterson@example.com', name: 'Theresa Patterson', role: 'user', created_at: '2024-04-07 15:25:00', is_active: false },
+  { id: 85, email: 'roger.hughes@example.com', name: 'Roger Hughes', role: 'admin', created_at: '2024-04-08 08:50:00', is_active: true },
+  { id: 86, email: 'evelyn.flores@example.com', name: 'Evelyn Flores', role: 'user', created_at: '2024-04-09 12:15:00', is_active: true },
+  { id: 87, email: 'arthur.washington@example.com', name: 'Arthur Washington', role: 'moderator', created_at: '2024-04-10 10:40:00', is_active: true },
+  { id: 88, email: 'marie.butler@example.com', name: 'Marie Butler', role: 'user', created_at: '2024-04-11 15:05:00', is_active: true },
+  { id: 89, email: 'lawrence.simmons@example.com', name: 'Lawrence Simmons', role: 'user', created_at: '2024-04-12 09:30:00', is_active: false },
+  { id: 90, email: 'martha.foster@example.com', name: 'Martha Foster', role: 'user', created_at: '2024-04-13 13:55:00', is_active: true },
+  { id: 91, email: 'frank.gonzales@example.com', name: 'Frank Gonzales', role: 'user', created_at: '2024-04-14 11:20:00', is_active: true },
+  { id: 92, email: 'gloria.bryant@example.com', name: 'Gloria Bryant', role: 'user', created_at: '2024-04-15 15:45:00', is_active: true },
+  { id: 93, email: 'terry.alexander@example.com', name: 'Terry Alexander', role: 'user', created_at: '2024-04-16 08:10:00', is_active: true },
+  { id: 94, email: 'judith.russell@example.com', name: 'Judith Russell', role: 'user', created_at: '2024-04-17 12:35:00', is_active: false },
+  { id: 95, email: 'albert.griffin@example.com', name: 'Albert Griffin', role: 'moderator', created_at: '2024-04-18 10:00:00', is_active: true },
+  { id: 96, email: 'julia.diaz@example.com', name: 'Julia Diaz', role: 'user', created_at: '2024-04-19 14:25:00', is_active: true },
+  { id: 97, email: 'randy.hayes@example.com', name: 'Randy Hayes', role: 'user', created_at: '2024-04-20 09:50:00', is_active: true },
+  { id: 98, email: 'cheryl.myers@example.com', name: 'Cheryl Myers', role: 'admin', created_at: '2024-04-21 13:15:00', is_active: true },
+  { id: 99, email: 'eugene.ford@example.com', name: 'Eugene Ford', role: 'user', created_at: '2024-04-22 11:40:00', is_active: false },
+  { id: 100, email: 'kathryn.hamilton@example.com', name: 'Kathryn Hamilton', role: 'user', created_at: '2024-04-23 15:05:00', is_active: true },
 ];
 
 const DUMMY_PRODUCTS_DATA = [
@@ -135,14 +231,125 @@ const DUMMY_PRODUCTS_DATA = [
   { id: 2, name: 'Pro Plan', price: 49.99, category: 'subscription', stock: null, created_at: '2024-01-11 10:30:00' },
   { id: 3, name: 'API Credits (1000)', price: 10.00, category: 'credits', stock: 999999, created_at: '2024-01-12 14:15:00' },
   { id: 4, name: 'Enterprise License', price: 299.99, category: 'license', stock: null, created_at: '2024-01-13 09:45:00' },
+  { id: 5, name: 'Basic Plan', price: 9.99, category: 'subscription', stock: null, created_at: '2024-01-14 11:20:00' },
+  { id: 6, name: 'API Credits (5000)', price: 45.00, category: 'credits', stock: 500000, created_at: '2024-01-15 13:40:00' },
+  { id: 7, name: 'Starter Package', price: 19.99, category: 'package', stock: 250, created_at: '2024-01-16 09:30:00' },
+  { id: 8, name: 'Advanced Analytics', price: 79.99, category: 'addon', stock: null, created_at: '2024-01-17 14:55:00' },
+  { id: 9, name: 'Team License (5 users)', price: 149.99, category: 'license', stock: 100, created_at: '2024-01-18 10:15:00' },
+  { id: 10, name: 'API Credits (10000)', price: 85.00, category: 'credits', stock: 200000, created_at: '2024-01-19 15:20:00' },
+  { id: 11, name: 'Professional Support', price: 99.99, category: 'support', stock: null, created_at: '2024-01-20 08:45:00' },
+  { id: 12, name: 'Custom Domain', price: 15.99, category: 'addon', stock: null, created_at: '2024-01-21 12:30:00' },
+  { id: 13, name: 'Priority Queue Access', price: 24.99, category: 'addon', stock: null, created_at: '2024-01-22 09:10:00' },
+  { id: 14, name: 'Ultimate Plan', price: 199.99, category: 'subscription', stock: null, created_at: '2024-01-23 14:00:00' },
+  { id: 15, name: 'Storage Upgrade (100GB)', price: 12.99, category: 'storage', stock: null, created_at: '2024-01-24 10:40:00' },
+  { id: 16, name: 'Business License', price: 499.99, category: 'license', stock: 50, created_at: '2024-01-25 16:25:00' },
+  { id: 17, name: 'API Credits (25000)', price: 200.00, category: 'credits', stock: 100000, created_at: '2024-01-26 11:50:00' },
+  { id: 18, name: 'White Label Solution', price: 999.99, category: 'enterprise', stock: 10, created_at: '2024-01-27 13:15:00' },
+  { id: 19, name: 'Backup Service', price: 19.99, category: 'service', stock: null, created_at: '2024-01-28 09:35:00' },
+  { id: 20, name: 'SSL Certificate', price: 49.99, category: 'security', stock: null, created_at: '2024-01-29 14:20:00' },
+  { id: 21, name: 'Storage Upgrade (500GB)', price: 49.99, category: 'storage', stock: null, created_at: '2024-01-30 10:05:00' },
+  { id: 22, name: 'API Rate Limit Boost', price: 34.99, category: 'addon', stock: null, created_at: '2024-01-31 15:40:00' },
+  { id: 23, name: 'Dedicated Instance', price: 799.99, category: 'enterprise', stock: 5, created_at: '2024-02-01 08:30:00' },
+  { id: 24, name: 'Migration Service', price: 149.99, category: 'service', stock: 25, created_at: '2024-02-02 12:55:00' },
+  { id: 25, name: 'Compliance Package', price: 299.99, category: 'security', stock: null, created_at: '2024-02-03 09:20:00' },
+  { id: 26, name: 'Monitoring Dashboard', price: 39.99, category: 'addon', stock: null, created_at: '2024-02-04 11:10:00' },
+  { id: 27, name: 'Data Export Tool', price: 24.99, category: 'addon', stock: null, created_at: '2024-02-05 14:25:00' },
+  { id: 28, name: 'Team License (10 users)', price: 249.99, category: 'license', stock: 75, created_at: '2024-02-06 09:40:00' },
+  { id: 29, name: 'API Credits (50000)', price: 375.00, category: 'credits', stock: 50000, created_at: '2024-02-07 16:15:00' },
+  { id: 30, name: 'Storage Upgrade (1TB)', price: 89.99, category: 'storage', stock: null, created_at: '2024-02-08 10:30:00' },
+  { id: 31, name: 'Email Marketing Add-on', price: 54.99, category: 'addon', stock: null, created_at: '2024-02-09 13:45:00' },
+  { id: 32, name: 'Mobile App Builder', price: 129.99, category: 'addon', stock: null, created_at: '2024-02-10 08:20:00' },
+  { id: 33, name: 'Advanced Security Suite', price: 179.99, category: 'security', stock: null, created_at: '2024-02-11 15:35:00' },
+  { id: 34, name: 'Developer Tools Package', price: 69.99, category: 'package', stock: 150, created_at: '2024-02-12 11:50:00' },
+  { id: 35, name: 'Premium Support', price: 199.99, category: 'support', stock: null, created_at: '2024-02-13 14:05:00' },
+  { id: 36, name: 'Load Balancer', price: 299.99, category: 'enterprise', stock: 20, created_at: '2024-02-14 09:20:00' },
+  { id: 37, name: 'Database Replication', price: 349.99, category: 'enterprise', stock: 15, created_at: '2024-02-15 12:35:00' },
+  { id: 38, name: 'API Credits (100000)', price: 650.00, category: 'credits', stock: 25000, created_at: '2024-02-16 10:50:00' },
+  { id: 39, name: 'Multi-Region Hosting', price: 449.99, category: 'enterprise', stock: 10, created_at: '2024-02-17 15:05:00' },
+  { id: 40, name: 'CI/CD Pipeline', price: 89.99, category: 'addon', stock: null, created_at: '2024-02-18 08:15:00' },
+  { id: 41, name: 'Container Registry', price: 44.99, category: 'addon', stock: null, created_at: '2024-02-19 13:30:00' },
+  { id: 42, name: 'Team License (20 users)', price: 449.99, category: 'license', stock: 40, created_at: '2024-02-20 11:45:00' },
+  { id: 43, name: 'Automated Testing Suite', price: 119.99, category: 'addon', stock: null, created_at: '2024-02-21 16:00:00' },
+  { id: 44, name: 'Performance Monitoring', price: 64.99, category: 'addon', stock: null, created_at: '2024-02-22 09:15:00' },
+  { id: 45, name: 'Log Aggregation', price: 74.99, category: 'addon', stock: null, created_at: '2024-02-23 14:30:00' },
+  { id: 46, name: 'Disaster Recovery', price: 549.99, category: 'enterprise', stock: 8, created_at: '2024-02-24 10:45:00' },
+  { id: 47, name: 'API Gateway', price: 159.99, category: 'enterprise', stock: 30, created_at: '2024-02-25 15:55:00' },
+  { id: 48, name: 'Serverless Functions', price: 29.99, category: 'addon', stock: null, created_at: '2024-02-26 08:10:00' },
+  { id: 49, name: 'Edge Computing', price: 199.99, category: 'enterprise', stock: 12, created_at: '2024-02-27 13:25:00' },
+  { id: 50, name: 'API Credits (250000)', price: 1499.99, category: 'credits', stock: 10000, created_at: '2024-02-28 11:40:00' },
+  { id: 51, name: 'Storage Upgrade (5TB)', price: 399.99, category: 'storage', stock: null, created_at: '2024-02-29 16:50:00' },
+  { id: 52, name: 'Content Delivery Network', price: 129.99, category: 'addon', stock: null, created_at: '2024-03-01 09:05:00' },
+  { id: 53, name: 'DDoS Protection', price: 249.99, category: 'security', stock: null, created_at: '2024-03-02 14:20:00' },
+  { id: 54, name: 'Team License (50 users)', price: 999.99, category: 'license', stock: 20, created_at: '2024-03-03 10:35:00' },
+  { id: 55, name: 'Web Application Firewall', price: 179.99, category: 'security', stock: null, created_at: '2024-03-04 15:45:00' },
+  { id: 56, name: 'Identity Management', price: 89.99, category: 'security', stock: null, created_at: '2024-03-05 08:00:00' },
+  { id: 57, name: 'Secret Management', price: 54.99, category: 'security', stock: null, created_at: '2024-03-06 13:15:00' },
+  { id: 58, name: 'Audit Logging', price: 69.99, category: 'security', stock: null, created_at: '2024-03-07 11:30:00' },
+  { id: 59, name: 'Compliance Monitoring', price: 149.99, category: 'security', stock: null, created_at: '2024-03-08 16:40:00' },
+  { id: 60, name: 'Vulnerability Scanning', price: 99.99, category: 'security', stock: null, created_at: '2024-03-09 09:55:00' },
+  { id: 61, name: 'Penetration Testing', price: 499.99, category: 'security', stock: 15, created_at: '2024-03-10 15:10:00' },
+  { id: 62, name: 'Incident Response', price: 299.99, category: 'support', stock: null, created_at: '2024-03-11 10:25:00' },
+  { id: 63, name: 'Training Package', price: 199.99, category: 'support', stock: 50, created_at: '2024-03-12 14:35:00' },
+  { id: 64, name: 'Consulting Hours (10h)', price: 1499.99, category: 'support', stock: 30, created_at: '2024-03-13 08:50:00' },
+  { id: 65, name: 'API Credits (500000)', price: 2799.99, category: 'credits', stock: 5000, created_at: '2024-03-14 13:05:00' },
+  { id: 66, name: 'Storage Upgrade (10TB)', price: 749.99, category: 'storage', stock: null, created_at: '2024-03-15 11:20:00' },
+  { id: 67, name: 'Database Backup Service', price: 79.99, category: 'service', stock: null, created_at: '2024-03-16 16:30:00' },
+  { id: 68, name: 'Managed Kubernetes', price: 599.99, category: 'enterprise', stock: 8, created_at: '2024-03-17 09:45:00' },
+  { id: 69, name: 'Service Mesh', price: 279.99, category: 'enterprise', stock: 12, created_at: '2024-03-18 15:00:00' },
+  { id: 70, name: 'Observability Platform', price: 349.99, category: 'addon', stock: null, created_at: '2024-03-19 10:15:00' },
+  { id: 71, name: 'Infrastructure as Code', price: 119.99, category: 'addon', stock: null, created_at: '2024-03-20 14:25:00' },
+  { id: 72, name: 'Team License (100 users)', price: 1899.99, category: 'license', stock: 10, created_at: '2024-03-21 08:40:00' },
+  { id: 73, name: 'Blue-Green Deployment', price: 159.99, category: 'addon', stock: null, created_at: '2024-03-22 13:55:00' },
+  { id: 74, name: 'A/B Testing Platform', price: 99.99, category: 'addon', stock: null, created_at: '2024-03-23 11:10:00' },
+  { id: 75, name: 'Feature Flags Service', price: 49.99, category: 'addon', stock: null, created_at: '2024-03-24 16:20:00' },
+  { id: 76, name: 'Microservices Gateway', price: 249.99, category: 'enterprise', stock: 15, created_at: '2024-03-25 09:35:00' },
+  { id: 77, name: 'Event Streaming Platform', price: 399.99, category: 'enterprise', stock: 10, created_at: '2024-03-26 14:50:00' },
+  { id: 78, name: 'GraphQL API Layer', price: 139.99, category: 'addon', stock: null, created_at: '2024-03-27 10:05:00' },
+  { id: 79, name: 'API Credits (1000000)', price: 4999.99, category: 'credits', stock: 2000, created_at: '2024-03-28 15:15:00' },
+  { id: 80, name: 'Storage Upgrade (50TB)', price: 2999.99, category: 'storage', stock: null, created_at: '2024-03-29 08:30:00' },
 ];
 
-const DUMMY_ORDERS_DATA = [
-  { id: 1001, user_id: 1, product_id: 1, amount: 29.99, status: 'completed', created_at: '2024-02-01 10:30:00' },
-  { id: 1002, user_id: 2, product_id: 2, amount: 49.99, status: 'completed', created_at: '2024-02-01 11:15:00' },
-  { id: 1003, user_id: 3, product_id: 3, amount: 10.00, status: 'pending', created_at: '2024-02-02 14:20:00' },
-  { id: 1004, user_id: 1, product_id: 4, amount: 299.99, status: 'completed', created_at: '2024-02-03 09:00:00' },
-  { id: 1005, user_id: 5, product_id: 1, amount: 29.99, status: 'failed', created_at: '2024-02-03 16:45:00' },
+const DUMMY_ORDERS_DATA = Array.from({ length: 150 }, (_, i) => {
+  const orderId = 1001 + i;
+  const userId = (i % 100) + 1;
+  const productId = (i % 80) + 1;
+  const statuses = ['completed', 'pending', 'failed'];
+  const status = statuses[i % 10 < 7 ? 0 : (i % 10 < 9 ? 1 : 2)];
+  const baseDate = new Date('2024-02-01');
+  const daysToAdd = Math.floor(i / 3);
+  const hours = 8 + (i % 9);
+  const minutes = (i * 13) % 60;
+  const orderDate = new Date(baseDate);
+  orderDate.setDate(orderDate.getDate() + daysToAdd);
+  const created_at = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+
+  const prices = [29.99, 49.99, 10.00, 299.99, 9.99, 45.00, 19.99, 79.99, 149.99, 85.00, 99.99, 15.99, 24.99, 199.99, 12.99, 499.99, 200.00, 999.99, 19.99, 49.99, 39.99, 24.99, 249.99, 375.00, 89.99, 54.99, 129.99, 179.99, 69.99, 199.99, 299.99, 349.99, 650.00, 449.99, 89.99, 44.99, 449.99, 119.99, 64.99, 74.99, 549.99, 159.99, 29.99, 199.99, 1499.99, 399.99, 129.99, 249.99, 999.99, 179.99];
+  const amount = prices[i % prices.length];
+
+  return { id: orderId, user_id: userId, product_id: productId, amount, status, created_at };
+});
+
+const DUMMY_CUSTOMERS_DATA = [
+  { id: 1, company_name: 'Acme Corporation', contact_email: 'contact@acme.com', phone: '+1-555-0101', country: 'USA', industry: 'Technology', website: 'www.acme.com', total_orders: 45, subscription_tier: 'Enterprise', created_at: '2023-06-15 09:30:00' },
+  { id: 2, company_name: 'TechStart Solutions', contact_email: 'info@techstart.com', phone: '+1-555-0102', country: 'USA', industry: 'Software', website: 'www.techstart.io', total_orders: 32, subscription_tier: 'Professional', created_at: '2023-07-22 14:15:00' },
+  { id: 3, company_name: 'Global Industries', contact_email: 'sales@globalind.com', phone: '+44-20-5550103', country: 'UK', industry: 'Manufacturing', website: 'www.globalind.com', total_orders: 67, subscription_tier: 'Enterprise', created_at: '2023-08-10 11:45:00' },
+  { id: 4, company_name: 'Innovation Labs', contact_email: 'hello@innovationlabs.io', phone: '+1-555-0104', country: 'Canada', industry: 'Research', website: 'www.innovationlabs.io', total_orders: 23, subscription_tier: 'Starter', created_at: '2023-09-05 16:20:00' },
+  { id: 5, company_name: 'Digital Dynamics', contact_email: 'contact@digitaldyn.com', phone: '+61-2-5550105', country: 'Australia', industry: 'Marketing', website: 'www.digitaldyn.com', total_orders: 51, subscription_tier: 'Professional', created_at: '2023-10-18 10:00:00' },
+  { id: 6, company_name: 'CloudNine Systems', contact_email: 'support@cloudnine.com', phone: '+1-555-0106', country: 'USA', industry: 'Cloud Services', website: 'www.cloudnine.com', total_orders: 89, subscription_tier: 'Enterprise', created_at: '2023-11-02 13:30:00' },
+  { id: 7, company_name: 'DataFlow Inc', contact_email: 'info@dataflow.com', phone: '+49-30-5550107', country: 'Germany', industry: 'Analytics', website: 'www.dataflow.de', total_orders: 41, subscription_tier: 'Professional', created_at: '2023-12-14 08:45:00' },
+  { id: 8, company_name: 'NextGen Enterprises', contact_email: 'business@nextgen.com', phone: '+1-555-0108', country: 'USA', industry: 'Consulting', website: 'www.nextgen.com', total_orders: 76, subscription_tier: 'Enterprise', created_at: '2024-01-08 15:10:00' },
+  { id: 9, company_name: 'Quantum Solutions', contact_email: 'contact@quantumsol.com', phone: '+33-1-5550109', country: 'France', industry: 'Technology', website: 'www.quantumsol.fr', total_orders: 28, subscription_tier: 'Starter', created_at: '2024-02-20 12:25:00' },
+  { id: 10, company_name: 'StreamTech Co', contact_email: 'hello@streamtech.io', phone: '+1-555-0110', country: 'USA', industry: 'Media', website: 'www.streamtech.io', total_orders: 94, subscription_tier: 'Enterprise', created_at: '2024-03-05 09:40:00' },
+  { id: 11, company_name: 'Velocity Networks', contact_email: 'sales@velocity.net', phone: '+1-555-0111', country: 'USA', industry: 'Telecommunications', website: 'www.velocity.net', total_orders: 37, subscription_tier: 'Enterprise', created_at: '2024-03-19 14:55:00' },
+  { id: 12, company_name: 'Infinite Systems', contact_email: 'info@infinitesys.com', phone: '+81-3-5550112', country: 'Japan', industry: 'Software', website: 'www.infinitesys.jp', total_orders: 62, subscription_tier: 'Professional', created_at: '2024-04-02 11:15:00' },
+  { id: 13, company_name: 'Horizon Tech', contact_email: 'contact@horizontech.com', phone: '+65-5550113', country: 'Singapore', industry: 'Technology', website: 'www.horizontech.sg', total_orders: 48, subscription_tier: 'Professional', created_at: '2024-04-15 16:30:00' },
+  { id: 14, company_name: 'Pinnacle Group', contact_email: 'business@pinnacle.com', phone: '+1-555-0114', country: 'Canada', industry: 'Finance', website: 'www.pinnacle.ca', total_orders: 71, subscription_tier: 'Enterprise', created_at: '2024-04-28 10:45:00' },
+  { id: 15, company_name: 'Synergy Digital', contact_email: 'hello@synergydigital.com', phone: '+1-555-0115', country: 'USA', industry: 'Marketing', website: 'www.synergydigital.com', total_orders: 55, subscription_tier: 'Professional', created_at: '2024-05-10 13:20:00' },
+  { id: 16, company_name: 'Apex Innovations', contact_email: 'info@apexinnov.com', phone: '+44-20-5550116', country: 'UK', industry: 'Technology', website: 'www.apexinnov.co.uk', total_orders: 83, subscription_tier: 'Enterprise', created_at: '2024-05-22 08:35:00' },
+  { id: 17, company_name: 'Fusion Enterprises', contact_email: 'contact@fusionent.com', phone: '+1-555-0117', country: 'USA', industry: 'Retail', website: 'www.fusionent.com', total_orders: 39, subscription_tier: 'Starter', created_at: '2024-06-04 15:50:00' },
+  { id: 18, company_name: 'Vortex Solutions', contact_email: 'sales@vortexsol.com', phone: '+49-30-5550118', country: 'Germany', industry: 'Consulting', website: 'www.vortexsol.de', total_orders: 66, subscription_tier: 'Professional', created_at: '2024-06-18 12:05:00' },
+  { id: 19, company_name: 'Nexus Technologies', contact_email: 'info@nexustech.io', phone: '+1-555-0119', country: 'USA', industry: 'Software', website: 'www.nexustech.io', total_orders: 91, subscription_tier: 'Enterprise', created_at: '2024-07-01 09:20:00' },
+  { id: 20, company_name: 'Catalyst Systems', contact_email: 'hello@catalystsys.com', phone: '+61-2-5550120', country: 'Australia', industry: 'Technology', website: 'www.catalystsys.com.au', total_orders: 44, subscription_tier: 'Professional', created_at: '2024-07-15 14:40:00' },
 ];
 
 type SidebarView = 'tables' | 'migrations' | 'actions';
@@ -165,6 +372,20 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
                   database.type?.toLowerCase().includes('cassandra');
 
   const tables = isNoSQL ? DUMMY_COLLECTIONS_NOSQL : DUMMY_TABLES_SQL;
+
+  // Get sidebar control from store
+  const { setSidebarCollapsed, sidebarCollapsed } = useWorkbenchStore();
+
+  // Automatically hide the main app sidebar when this tab opens
+  useEffect(() => {
+    const previousSidebarState = sidebarCollapsed;
+    setSidebarCollapsed(true);
+
+    // Restore the previous state when the component unmounts
+    return () => {
+      setSidebarCollapsed(previousSidebarState);
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
 
   // Sidebar state
   const [sidebarView, setSidebarView] = useState<SidebarView>('tables');
@@ -223,6 +444,7 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
       users: DUMMY_USERS_DATA,
       products: DUMMY_PRODUCTS_DATA,
       orders: DUMMY_ORDERS_DATA,
+      customers: DUMMY_CUSTOMERS_DATA,
     };
 
     return tableDataMap[selectedTable.name] || [];
@@ -758,13 +980,13 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
               ) : (
                 <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full relative">
+                    <table className="w-max min-w-full relative overflow-x-auto">
                       <thead className="bg-grey-50 border-b border-grey-400">
                         <tr>
                           {columns.map((col) => (
                             <th
                               key={col}
-                              className="px-4 py-3 text-left text-xs font-semibold text-grey-600 uppercase tracking-wider whitespace-nowrap"
+                              className="px-4 py-3 text-left text-xs font-semibold text-grey-600 uppercase tracking-wider whitespace-nowrap min-w-[150px]"
                             >
                               {col}
                             </th>
@@ -785,7 +1007,7 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
                             {columns.map((col) => (
                               <td
                                 key={col}
-                                className="px-4 py-3 text-sm text-grey whitespace-nowrap"
+                                className="px-4 py-3 text-sm text-grey whitespace-nowrap min-w-[150px]"
                               >
                                 {getValueDisplay(row[col])}
                               </td>

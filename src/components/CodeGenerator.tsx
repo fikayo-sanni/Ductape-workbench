@@ -50,10 +50,12 @@ export default function CodeGenerator() {
       return acc;
     }, {} as Record<string, string>);
 
-    let code = `import { Ductape } from '@ductape/sdk';\n\n`;
+    let code = `import Ductape from "@ductape/sdk";\n\n`;
     code += `// Initialize Ductape SDK\n`;
     code += `const ductape = new Ductape({\n`;
-    code += `  apiKey: process.env.DUCTAPE_API_KEY,\n`;
+    code += `  workspace_id: process.env.DUCTAPE_WORKSPACE_ID,\n`;
+    code += `  user_id: process.env.DUCTAPE_USER_ID,\n`;
+    code += `  private_key: process.env.DUCTAPE_PRIVATE_KEY\n`;
     code += `});\n\n`;
 
     code += `async function ${currentRequest.name.replace(/\s+/g, '')}() {\n`;
@@ -122,7 +124,9 @@ export default function CodeGenerator() {
     let code = `from ductape import Ductape\nimport os\n\n`;
     code += `# Initialize Ductape SDK\n`;
     code += `ductape = Ductape(\n`;
-    code += `    api_key=os.environ.get('DUCTAPE_API_KEY')\n`;
+    code += `    workspace_id=os.environ.get('DUCTAPE_WORKSPACE_ID'),\n`;
+    code += `    user_id=os.environ.get('DUCTAPE_USER_ID'),\n`;
+    code += `    private_key=os.environ.get('DUCTAPE_PRIVATE_KEY')\n`;
     code += `)\n\n`;
 
     code += `def ${currentRequest.name.replace(/\s+/g, '_').toLowerCase()}():\n`;
