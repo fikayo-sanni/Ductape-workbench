@@ -155,7 +155,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     }
 
     if (selectedType === JobEventTypes.PUBLISH) {
-      return product.messageBroker?.map((broker: any) => ({
+      return product.messageBrokers?.map((broker: any) => ({
         label: broker.tag,
         value: broker.tag,
       })) || [];
@@ -226,7 +226,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     }
 
     if (selectedType === JobEventTypes.PUBLISH) {
-      const selectedBroker = product.messageBroker?.find((broker: any) => broker.tag === selectedParent);
+      const selectedBroker = product.messageBrokers?.find((broker: any) => broker.tag === selectedParent);
       return selectedBroker?.topics?.map((topic: any) => ({
         label: topic.tag,
         value: topic.tag,
@@ -270,7 +270,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     }
 
     // PUBLISH - check if there are message brokers
-    if (product.messageBroker && product.messageBroker.length > 0) {
+    if (product.messageBrokers && product.messageBrokers.length > 0) {
       types.push(JobEventTypes.PUBLISH);
     }
 

@@ -32,6 +32,7 @@ import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
 import NewMessageTabContent from './tabs/NewMessageTabContent';
 import MessageTabContent from './tabs/MessageTabContent';
+import NewMessageBrokerTopicContent from './tabs/NewMessageBrokerTopicContent';
 import RequestBuilder from './tabs/RequestBuilder';
 import NewProductTabContent from './tabs/NewProductTabContent';
 import NewAppTabContent from './tabs/NewAppTabContent';
@@ -42,6 +43,7 @@ import NewDatabaseTabContent from './tabs/NewDatabaseTabContent';
 import NewStorageTabContent from './tabs/NewStorageTabContent';
 import NewCacheTabContent from './tabs/NewCacheTabContent';
 import NewMessageBrokerTabContent from './tabs/NewMessageBrokerTabContent';
+import MessageBrokerTabContent from './tabs/MessageBrokerTabContent';
 import StorageComponentContent from './tabs/StorageComponentContent';
 import CacheComponentContent from './tabs/CacheComponentContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
@@ -90,9 +92,10 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
         return <DatabaseComponentContent database={tab.data} />;
       case 'session':
         return <SessionTabContent session={tab.data} />;
+      case 'message-broker':
+        return <MessageBrokerTabContent messageBroker={tab.data} />;
       case 'fallback':
       case 'quota':
-      case 'message-broker':
         return <GenericComponentContent component={tab.data} type={componentType} />;
       case 'job':
         return <JobTabContent job={tab.data} />;
@@ -287,6 +290,10 @@ export default function TabContent() {
       case 'new-message':
         // Create new message
         return <NewMessageTabContent tabId={activeTab.id} data={activeTab.data} />;
+
+      case 'new-topic':
+        // Create new topic/queue for message broker
+        return <NewMessageBrokerTopicContent tabId={activeTab.id} data={activeTab.data} />;
 
       case 'feature':
         // Check if this is a new feature creation tab

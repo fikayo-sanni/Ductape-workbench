@@ -95,7 +95,7 @@ export default function ProductsSidebar() {
         components.push({ type: 'cache', name: cache.name || cache.tag, productName: product.name, data: { ...cache, componentType: 'cache', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Message Brokers
-      product.messageBroker?.forEach((broker: any) => {
+      product.messageBrokers?.forEach((broker: any) => {
         components.push({ type: 'message-broker', name: broker.name || broker.tag, productName: product.name, data: { ...broker, componentType: 'message-broker', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
       // Jobs

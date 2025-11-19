@@ -184,7 +184,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
       case 'notification':
         return []; // TODO: Implement when notifications are available
       case 'message-broker':
-        return (product.messageBroker || []).map((broker: any) => ({
+        return (product.messageBrokers || []).map((broker: any) => ({
           id: broker._id,
           type: 'message-broker' as FeatureEventType,
           tag: broker.tag,
@@ -599,7 +599,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                         No {componentPickerType}s available in this product
                       </p>
                     ) : (
-                      getComponentsByType(componentPickerType).map((component) => (
+                      getComponentsByType(componentPickerType).map((component: any) => (
                         <button
                           key={component.id}
                           onClick={() => handleAddComponent(component)}

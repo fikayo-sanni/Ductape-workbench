@@ -319,7 +319,7 @@ export default function WorkbenchHeader() {
           workspaceId: currentWorkspaceId || '',
           productApps: connectedApps,
           productDatabases: productData.databases || [],
-          productMessageBroker: productData.messageBroker || [],
+          productMessageBroker: productData.messageBrokers || [],
           productNotifications: productData.notifications || [],
           productStorage: productData.storage || [],
           productJobs: productData.jobs || [],
@@ -448,15 +448,8 @@ export default function WorkbenchHeader() {
 
                 {/* Menu */}
                 <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-grey-400 rounded-lg shadow-lg z-20">
-                  <div className="p-3 border-b border-grey-400">
-                    <div className="text-sm font-medium text-grey">
-                      {user.firstname} {user.lastname}
-                    </div>
-                    <div className="text-xs text-grey-600">{user.email}</div>
-                  </div>
-
                   <div className="py-1">
-                    <button 
+                    <button
                       onClick={() => {
                         setShowUserMenu(false);
                         openTab({

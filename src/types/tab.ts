@@ -12,6 +12,7 @@ export type TabType =
   | 'notification'
   | 'message'
   | 'new-message'
+  | 'new-topic'
   | 'fallback'
   | 'quota'
   | 'job'

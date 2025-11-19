@@ -33,7 +33,7 @@ export interface IProduct {
   storage: any[];
   brokers: any[];
   sessions: any[];
-  messageBroker: any[];
+  messageBrokers: any[];
   functions: any[];
   variables?: any[];
   auths?: any[];

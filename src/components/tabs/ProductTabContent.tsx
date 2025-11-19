@@ -232,7 +232,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
         // Additional data for jobs (parent/event selection)
         productApps: connectedApps || [],
         productDatabases: product?.databases || [],
-        productMessageBroker: product?.messageBroker || [],
+        productMessageBroker: product?.messageBrokers || [],
         productNotifications: product?.notifications || [],
         productStorage: product?.storage || [],
         productSessions: product?.sessions || [],
@@ -365,7 +365,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 className="gap-2"
               >
                 <MessageSquare className="h-4 w-4" />
-                Message Brokers ({product?.messageBroker?.length || 0})
+                Message Brokers ({product?.messageBrokers?.length || 0})
               </Button>
               <Button
                 variant={activeFilter === 'jobs' ? 'default' : 'outline'}
@@ -527,7 +527,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                   <MessageSquare className="h-5 w-5 text-cyan-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-grey">{product?.messageBroker?.length || 0}</p>
+                  <p className="text-2xl font-bold text-grey">{product?.messageBrokers?.length || 0}</p>
                   <p className="text-sm text-grey-600">Message Brokers</p>
                 </div>
               </div>
@@ -1051,7 +1051,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
             <div className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Message Brokers</h2>
-              <span className="text-sm text-grey-600">({product?.messageBroker?.length || 0})</span>
+              <span className="text-sm text-grey-600">({product?.messageBrokers?.length || 0})</span>
             </div>
             <Button
               size="sm"
@@ -1063,9 +1063,9 @@ export default function ProductTabContent({ product: initialProduct, productId }
               <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
-          {product?.messageBroker && product?.messageBroker.length > 0 ? (
+          {product?.messageBrokers && product?.messageBrokers.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.messageBroker.map((broker: any) => (
+              {product?.messageBrokers.map((broker: any) => (
                 <button
                   key={broker._id}
                   onClick={() => handleOpenComponent(broker, 'message-broker')}
@@ -1412,7 +1412,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-4 w-4 text-blue-500" />
                   <h3 className="text-sm font-medium text-grey">{notification.name}</h3>
                 </div>
                 <p className="text-xs text-grey-600">{notification.tag}</p>

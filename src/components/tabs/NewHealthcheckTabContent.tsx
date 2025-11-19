@@ -105,7 +105,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   const connectedApps = productAppsRes?.data || [];
   const productDetails = productDetailsRes?.data;
   const databases = productDetails?.databases || [];
-  const messageBrokers = productDetails?.messageBroker || [];
+  const messageBrokers = productDetails?.messageBrokers || [];
   const features = productDetails?.features || [];
 
   // Initialize Ductape SDK for product

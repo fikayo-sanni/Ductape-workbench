@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Mail, Webhook, FileText, Plus, Box, Activity, Loader2, CheckCircle, Eye, EyeOff, Copy, Check, MessageSquare } from 'lucide-react';
+import { Bell, Mail, Webhook, FileText, Plus, Box, Activity, Loader2, CheckCircle, Eye, EyeOff, Copy, Check, MessageSquare, Code } from 'lucide-react';
 import { IProductNotifier } from '@/types/notifier';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import toast from 'react-hot-toast';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface NotificationTabContentProps {
   data?: any;
@@ -31,6 +32,8 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
   const [selectedEnv, setSelectedEnv] = useState<string>(notifier?.envs?.[0]?.slug || '');
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [selectedMessageForCode, setSelectedMessageForCode] = useState<any>(null);
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
 
@@ -97,6 +100,355 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
       ...prev,
       [key]: !prev[key],
     }));
+  };
+
+  const handleViewCode = (message: any) => {
+    setSelectedMessageForCode(message);
+    setShowCodeSidebar(true);
+  };
+
+  // Generate SDK code examples for sending notifications (same as MessageTabContent)
+  const generateCodeSections = (language: string, env?: string) => {
+    if (!selectedMessageForCode) return [];
+
+    const messageTag = selectedMessageForCode?.tag || 'message-tag';
+    const fullTag = notifier.tag ? `${notifier.tag}:${messageTag}` : messageTag;
+    const productTagValue = productTag || 'your-product-tag';
+    const envSlug = env || displayNotifier?.envs?.[0]?.slug || 'prd';
+
+    // Helper function to group fields by parent_key
+    const groupByParentKey = (fields: any[]) => {
+      const grouped: Record<string, any> = {};
+      fields.forEach((field) => {
+        const parent = field.parent_key || 'root';
+        if (parent === 'root') {
+          grouped[field.key] = field.value;
+        } else {
+          if (!grouped[parent]) grouped[parent] = {};
+          grouped[parent][field.key] = field.value;
+        }
+      });
+      return grouped;
+    };
+
+    // Helper to format as JS object
+    const formatAsJsObject = (obj: any, indent = '  '): string => {
+      return Object.entries(obj)
+        .map(([key, value]): string => {
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            return `${indent}${key}: {\n${formatAsJsObject(value, indent + '  ')}\n${indent}}`;
+          }
+          return `${indent}${key}: ${JSON.stringify(value)}`;
+        })
+        .join(',\n');
+    };
+
+    // Helper to format as Python dict
+    const formatAsPythonDict = (obj: any, indent = '    '): string => {
+      return Object.entries(obj)
+        .map(([key, value]): string => {
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            return `${indent}'${key}': {\n${formatAsPythonDict(value, indent + '    ')}\n${indent}}`;
+          }
+          return `${indent}'${key}': ${JSON.stringify(value)}`;
+        })
+        .join(',\n');
+    };
+
+    const hasPushNotification = !!selectedMessageForCode?.push_notification;
+    const hasEmail = !!selectedMessageForCode?.email;
+    const hasCallback = !!selectedMessageForCode?.callback;
+    const hasSms = !!selectedMessageForCode?.sms;
+
+    if (language === 'javascript') {
+      const sections: any[] = [
+        {
+          title: 'Init Ductape',
+          code: `const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+        }
+      ];
+
+      const inputParts: string[] = [];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(selectedMessageForCode?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+        const pushCode = hasPushData
+          ? `const push_notification = {\n  device_token: '{{deviceToken}}', // Replace with the user's device token\n${formatAsJsObject(pushData)}\n};`
+          : `const push_notification = {
+  device_token: '{{deviceToken}}', // Replace with the user's device token
+  title: { en: 'Your title here' },
+  body: { en: 'Your message here' },
+  data: { action: 'open_screen' }
+};`;
+        sections.push({ title: 'Input - Push Notification', code: pushCode });
+        inputParts.push('  push_notification');
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(selectedMessageForCode?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+        const emailCode = hasEmailData
+          ? `const email = {\n  to: ['user@example.com'], // Replace with recipient email addresses\n${formatAsJsObject(emailData)}\n};`
+          : `const email = {
+  to: ['user@example.com'], // Replace with recipient email addresses
+  subject: { en: 'Email subject' },
+  template: { en: '<p>Email content</p>' }
+};`;
+        sections.push({ title: 'Input - Email', code: emailCode });
+        inputParts.push('  email');
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(selectedMessageForCode?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+        const callbackCode = hasCallbackData
+          ? `const callback = {\n${formatAsJsObject(callbackData)}\n};`
+          : `const callback = {
+  url: '{{callbackUrl}}',
+  method: 'POST',
+  body: { data: '{{callbackData}}' }
+};`;
+        sections.push({ title: 'Input - Callback', code: callbackCode });
+        inputParts.push('  callback');
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(selectedMessageForCode?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+        const smsCode = hasSmsData
+          ? `const sms = {\n  recipients: ['+1234567890'], // Replace with recipient phone numbers\n  body: {\n${formatAsJsObject(smsData, '    ')}\n  }\n};`
+          : `const sms = {
+  recipients: ['+1234567890'], // Replace with recipient phone numbers
+  body: {
+    firstname: '{{firstName}}',
+    lastname: '{{lastName}}'
+  }
+};`;
+        sections.push({ title: 'Input - SMS', code: smsCode });
+        inputParts.push('  sms');
+      }
+
+      sections.push({
+        title: 'Execute',
+        code: `const input = {
+${inputParts.join(',\n')}
+};
+
+await ductape.processor.notification.send({
+  env: '${envSlug}',
+  product: '${productTagValue}',
+  event: '${fullTag}',
+  input,
+  retries: 3
+});`
+      });
+
+      return sections;
+    } else if (language === 'typescript') {
+      const sections: any[] = [
+        {
+          title: 'Init Ductape',
+          code: `import { Ductape } from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+        }
+      ];
+
+      const inputParts: string[] = [];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(selectedMessageForCode?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+        const pushCode = hasPushData
+          ? `const push_notification = {\n  device_token: '{{deviceToken}}', // Replace with the user's device token\n${formatAsJsObject(pushData)}\n};`
+          : `const push_notification = {
+  device_token: '{{deviceToken}}', // Replace with the user's device token
+  title: { en: 'Your title here' },
+  body: { en: 'Your message here' },
+  data: { action: 'open_screen' }
+};`;
+        sections.push({ title: 'Input - Push Notification', code: pushCode });
+        inputParts.push('  push_notification');
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(selectedMessageForCode?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+        const emailCode = hasEmailData
+          ? `const email = {\n  to: ['user@example.com'], // Replace with recipient email addresses\n${formatAsJsObject(emailData)}\n};`
+          : `const email = {
+  to: ['user@example.com'], // Replace with recipient email addresses
+  subject: { en: 'Email subject' },
+  template: { en: '<p>Email content</p>' }
+};`;
+        sections.push({ title: 'Input - Email', code: emailCode });
+        inputParts.push('  email');
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(selectedMessageForCode?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+        const callbackCode = hasCallbackData
+          ? `const callback = {\n${formatAsJsObject(callbackData)}\n};`
+          : `const callback = {
+  url: '{{callbackUrl}}',
+  method: 'POST',
+  body: { data: '{{callbackData}}' }
+};`;
+        sections.push({ title: 'Input - Callback', code: callbackCode });
+        inputParts.push('  callback');
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(selectedMessageForCode?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+        const smsCode = hasSmsData
+          ? `const sms = {\n  recipients: ['+1234567890'], // Replace with recipient phone numbers\n  body: {\n${formatAsJsObject(smsData, '    ')}\n  }\n};`
+          : `const sms = {
+  recipients: ['+1234567890'], // Replace with recipient phone numbers
+  body: {
+    firstname: '{{firstName}}',
+    lastname: '{{lastName}}'
+  }
+};`;
+        sections.push({ title: 'Input - SMS', code: smsCode });
+        inputParts.push('  sms');
+      }
+
+      sections.push({
+        title: 'Execute',
+        code: `const input = {
+${inputParts.join(',\n')}
+};
+
+await ductape.processor.notification.send({
+  env: '${envSlug}',
+  product: '${productTagValue}',
+  event: '${fullTag}',
+  input,
+  retries: 3
+});`
+      });
+
+      return sections;
+    } else if (language === 'python') {
+      const sections: any[] = [
+        {
+          title: 'Init Ductape',
+          code: `from ductape import Ductape
+
+ductape = Ductape(
+    workspace_id='your-workspace-id',
+    user_id='your-user-id',
+    token='your-auth-token',
+    public_key='your-public-key',
+    type='product'
+)
+
+# Initialize product
+ductape.init('${productTagValue}')`
+        }
+      ];
+
+      const inputParts: string[] = [];
+
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(selectedMessageForCode?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+        const pushCode = hasPushData
+          ? `push_notification = {\n    'device_token': '{{deviceToken}}',  # Replace with the user's device token\n${formatAsPythonDict(pushData)}\n}`
+          : `push_notification = {
+    'device_token': '{{deviceToken}}',  # Replace with the user's device token
+    'title': { 'en': 'Your title here' },
+    'body': { 'en': 'Your message here' },
+    'data': { 'action': 'open_screen' }
+}`;
+        sections.push({ title: 'Input - Push Notification', code: pushCode });
+        inputParts.push('    push_notification');
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(selectedMessageForCode?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+        const emailCode = hasEmailData
+          ? `email = {\n    'to': ['user@example.com'],  # Replace with recipient email addresses\n${formatAsPythonDict(emailData)}\n}`
+          : `email = {
+    'to': ['user@example.com'],  # Replace with recipient email addresses
+    'subject': { 'en': 'Email subject' },
+    'template': { 'en': '<p>Email content</p>' }
+}`;
+        sections.push({ title: 'Input - Email', code: emailCode });
+        inputParts.push('    email');
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(selectedMessageForCode?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+        const callbackCode = hasCallbackData
+          ? `callback = {\n${formatAsPythonDict(callbackData)}\n}`
+          : `callback = {
+    'url': '{{callbackUrl}}',
+    'method': 'POST',
+    'body': { 'data': '{{callbackData}}' }
+}`;
+        sections.push({ title: 'Input - Callback', code: callbackCode });
+        inputParts.push('    callback');
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(selectedMessageForCode?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+        const smsCode = hasSmsData
+          ? `sms = {\n    'recipients': ['+1234567890'],  # Replace with recipient phone numbers\n    'body': {\n${formatAsPythonDict(smsData, '        ')}\n    }\n}`
+          : `sms = {
+    'recipients': ['+1234567890'],  # Replace with recipient phone numbers
+    'body': {
+        'firstname': '{{firstName}}',
+        'lastname': '{{lastName}}'
+    }
+}`;
+        sections.push({ title: 'Input - SMS', code: smsCode });
+        inputParts.push('    sms');
+      }
+
+      sections.push({
+        title: 'Execute',
+        code: `input_data = {
+${inputParts.join(',\n')}
+}
+
+ductape.processor.notification.send({
+    'env': '${envSlug}',
+    'product': '${productTagValue}',
+    'event': '${fullTag}',
+    'input': input_data,
+    'retries': 3
+})`
+      });
+
+      return sections;
+    }
+
+    return [];
   };
 
   // Extract product info for header
@@ -224,7 +576,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
           <div className="bg-white rounded-lg border border-grey-400 p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-blue" />
+                <FileText className="h-5 w-5 text-blue-500" />
               </div>
               <div>
                 <div className="text-2xl font-bold text-grey">{displayNotifier.messages?.length || 0}</div>
@@ -248,7 +600,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                   title: 'New Message',
                   itemId: 'new',
                   data: {
-                    notification: notifier,
+                    notification: displayNotifier,
                     productTag,
                     isNew: true,
                   },
@@ -271,35 +623,51 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
           ) : (
             <div className="space-y-2">
               {displayNotifier.messages.map((message: any, idx: number) => (
-                <button
+                <div
                   key={message._id || idx}
-                  onClick={() => {
-                    openTab({
-                      id: `message-${message._id || idx}-${Date.now()}`,
-                      type: 'message',
-                      title: message.name,
-                      itemId: message._id,
-                      data: {
-                        ...message,
-                        notification: notifier,
-                        productTag,
-                        notifierTag: notifier.tag,
-                      },
-                    });
-                  }}
                   className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        openTab({
+                          id: `message-${message._id || idx}-${Date.now()}`,
+                          type: 'message',
+                          title: message.name,
+                          itemId: message._id,
+                          data: {
+                            ...message,
+                            notification: displayNotifier,
+                            productTag,
+                            notifierTag: displayNotifier.tag,
+                          },
+                        });
+                      }}
+                      className="flex items-center gap-2 flex-1 text-left"
+                    >
                       <FileText className="h-4 w-4 text-primary" />
                       <span className="font-medium text-grey text-sm">{message.name}</span>
                       {message.tag && (
-                        <Badge variant="outline" className="text-xs">{message.tag}</Badge>
+                        <Badge variant="outline" className="text-xs text-grey">{message.tag}</Badge>
                       )}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      {message.email && <Mail className="h-4 w-4 text-blue-500" />}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewCode(message);
+                        }}
+                        className="h-7 px-2 gap-1"
+                      >
+                        <Code className="h-3 w-3" />
+                        <span className="text-xs">Code</span>
+                      </Button>
                     </div>
-                    {message.email && <Mail className="h-4 w-4 text-blue-500" />}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -680,6 +1048,21 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
           </p>
         </div>
       </div>
+
+      {/* Code Sidebar */}
+      {showCodeSidebar && selectedMessageForCode && (
+        <CodeSidebar
+          title={selectedMessageForCode.name}
+          subtitle={`Send notifications using the ${notifier.tag}:${selectedMessageForCode.tag} message template`}
+          tag={`${notifier.tag}:${selectedMessageForCode.tag}`}
+          onClose={() => {
+            setShowCodeSidebar(false);
+            setSelectedMessageForCode(null);
+          }}
+          generateCodeSections={generateCodeSections}
+          environments={displayNotifier?.envs || []}
+        />
+      )}
     </div>
   );
 }

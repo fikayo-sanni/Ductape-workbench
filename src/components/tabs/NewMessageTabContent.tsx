@@ -27,7 +27,7 @@ interface CallbackField {
   id: string;
   key: string;
   value: string;
-  addTo: 'headers' | 'body' | 'params' | 'query';
+  addTo: 'headers' | 'params' | 'query';
 }
 
 export default function NewMessageTabContent({ tabId, data }: NewMessageTabContentProps) {
@@ -62,8 +62,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
       emailSubject: '',
       emailTemplate: '',
       sms: '',
-      callbackUrl: '',
-      callbackMethod: 'POST',
+      callbackBody: '',
       callbackFields: [] as CallbackField[],
     }
   );
@@ -164,17 +163,11 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
 
       // Build callback object
       let callback: any = undefined;
-      if (availableChannels.callback && (formData.callbackUrl || formData.callbackFields.length > 0)) {
-        callback = {
-          ...(formData.callbackUrl && { url: formData.callbackUrl }),
-          ...(formData.callbackMethod && { method: formData.callbackMethod }),
-        };
-
+      if (availableChannels.callback && (formData.callbackFields.length > 0 || formData.callbackBody)) {
         // Add fields based on addTo
         const headers: Record<string, string> = {};
         const params: Record<string, string> = {};
         const query: Record<string, string> = {};
-        const bodyFields: Record<string, string> = {};
 
         formData.callbackFields.forEach((field: CallbackField) => {
           if (field.key && field.value) {
@@ -188,22 +181,28 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
               case 'query':
                 query[field.key] = field.value;
                 break;
-              case 'body':
-                bodyFields[field.key] = field.value;
-                break;
             }
           }
         });
 
+        callback = {};
         if (Object.keys(headers).length > 0) callback.headers = headers;
         if (Object.keys(params).length > 0) callback.params = params;
         if (Object.keys(query).length > 0) callback.query = query;
-        if (Object.keys(bodyFields).length > 0) callback.body = bodyFields;
+
+        // Parse body JSON if provided
+        if (formData.callbackBody.trim()) {
+          try {
+            callback.body = JSON.parse(formData.callbackBody);
+          } catch (e) {
+            throw new Error('Invalid JSON in callback body');
+          }
+        }
       }
 
       const payload = {
         name: formData.name,
-        tag: formData.tag,
+        tag: `${notifierTag}:${formData.tag}`,
         description: formData.description,
         push_notification,
         callback,
@@ -444,120 +443,114 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
 
             {/* Callback/Webhook */}
             {availableChannels.callback && (
-              <div className="border border-grey-300 rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="border border-grey-300 rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-orange-500" />
                   <h3 className="font-semibold text-grey">Callback/Webhook</h3>
                 </div>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
-                      <Label className="text-sm text-grey-600 mb-1 block">
-                        URL <span className="text-grey-500">(use {`{{}}`} for variables)</span>
-                      </Label>
-                      <Input
-                        value={formData.callbackUrl}
-                        onChange={(e) => setFormData({ ...formData, callbackUrl: e.target.value })}
-                        placeholder='https://api.example.com/webhook?user={{userId}}'
-                        className="font-mono"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm text-grey-600 mb-1 block">Method</Label>
-                      <Select
-                        value={formData.callbackMethod}
-                        onValueChange={(value) => setFormData({ ...formData, callbackMethod: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="GET">GET</SelectItem>
-                          <SelectItem value="POST">POST</SelectItem>
-                          <SelectItem value="PUT">PUT</SelectItem>
-                          <SelectItem value="PATCH">PATCH</SelectItem>
-                          <SelectItem value="DELETE">DELETE</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+
+                {/* Body Section */}
+                <div>
+                  <Label className="text-sm text-grey-600 mb-2 block">
+                    Body (JSON) <span className="text-grey-500">(use {`{{}}`} for variables, supports nested objects)</span>
+                  </Label>
+                  <Textarea
+                    value={formData.callbackBody}
+                    onChange={(e) => setFormData({ ...formData, callbackBody: e.target.value })}
+                    placeholder={`{\n  "transaction_id": "{{transactionId}}",\n  "bank_info": {\n    "bank_code": "{{bankCode}}",\n    "account": {\n      "username": "{{username}}"\n    }\n  },\n  "event_name": "{{eventName}}",\n  "amount": "{{amount}}"\n}`}
+                    className="font-mono text-sm"
+                    rows={8}
+                  />
+                  <p className="text-xs text-grey-500 mt-1">Enter valid JSON. Supports nested structures for complex data.</p>
+                </div>
+
+                {/* Headers, Params, Query Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm text-grey-600 block">
+                      Additional Fields <span className="text-grey-500">(Headers, Params, Query)</span>
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddCallbackField}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Field
+                    </Button>
                   </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-sm text-grey-600 block">
-                        Request Data <span className="text-grey-500">(use {`{{}}`} for variables)</span>
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddCallbackField}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add Field
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {formData.callbackFields.map((field: CallbackField) => (
-                        <div key={field.id} className="flex gap-2 items-end p-3 bg-grey-50 rounded-lg border border-grey-300">
-                          <div className="flex-1">
-                            <Label className="text-xs text-grey-600">Key</Label>
-                            <Input
-                              placeholder="e.g., transaction_id"
-                              value={field.key}
-                              onChange={(e) =>
-                                handleUpdateCallbackField(field.id, { key: e.target.value })
-                              }
-                              className="bg-white"
-                            />
-                          </div>
-
-                          <div className="flex-1">
-                            <Label className="text-xs text-grey-600">Value</Label>
-                            <Input
-                              placeholder='{{transactionId}}'
-                              value={field.value}
-                              onChange={(e) =>
-                                handleUpdateCallbackField(field.id, { value: e.target.value })
-                              }
-                              className="bg-white"
-                            />
-                          </div>
-
-                          <div className="flex-1">
-                            <Label className="text-xs text-grey-600">Add To</Label>
-                            <Select
-                              value={field.addTo}
-                              onValueChange={(value) =>
-                                handleUpdateCallbackField(field.id, { addTo: value as CallbackField['addTo'] })
-                              }
-                            >
-                              <SelectTrigger className="bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="headers">Headers</SelectItem>
-                                <SelectItem value="params">Route Params</SelectItem>
-                                <SelectItem value="query">Query String</SelectItem>
-                                <SelectItem value="body">Body</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleRemoveCallbackField(field.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                  <div className="space-y-2">
+                    {formData.callbackFields.map((field: CallbackField) => (
+                      <div key={field.id} className="flex gap-2 items-end p-3 bg-grey-50 rounded-lg border border-grey-300">
+                        <div className="flex-1">
+                          <Label className="text-xs text-grey-600">Key</Label>
+                          <Input
+                            placeholder="e.g., Authorization"
+                            value={field.key}
+                            onChange={(e) =>
+                              handleUpdateCallbackField(field.id, { key: e.target.value })
+                            }
+                            className="bg-white"
+                          />
                         </div>
-                      ))}
-                      {formData.callbackFields.length === 0 && (
-                        <p className="text-xs text-grey-500 italic">No fields added yet. Click "Add Field" to get started.</p>
-                      )}
-                    </div>
+
+                        <div className="flex-1">
+                          <Label className="text-xs text-grey-600">Value</Label>
+                          <Input
+                            placeholder='{{apiKey}}'
+                            value={field.value}
+                            onChange={(e) => {
+                              let inputValue = e.target.value.trim();
+
+                              // If empty, clear the field
+                              if (!inputValue) {
+                                handleUpdateCallbackField(field.id, { value: '' });
+                                return;
+                              }
+
+                              // Remove all { and } characters to get the clean variable name
+                              const cleaned = inputValue.replace(/[{}]/g, '');
+
+                              // Wrap the cleaned value
+                              handleUpdateCallbackField(field.id, { value: cleaned ? `{{${cleaned}}}` : '' });
+                            }}
+                            className="bg-white font-mono"
+                          />
+                        </div>
+
+                        <div className="flex-1">
+                          <Label className="text-xs text-grey-600">Add To</Label>
+                          <Select
+                            value={field.addTo}
+                            onValueChange={(value) =>
+                              handleUpdateCallbackField(field.id, { addTo: value as CallbackField['addTo'] })
+                            }
+                          >
+                            <SelectTrigger className="bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="headers">Headers</SelectItem>
+                              <SelectItem value="params">Route Params</SelectItem>
+                              <SelectItem value="query">Query String</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRemoveCallbackField(field.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {formData.callbackFields.length === 0 && (
+                      <p className="text-xs text-grey-500 italic">No additional fields. Click "Add Field" to add headers, params, or query strings.</p>
+                    )}
                   </div>
                 </div>
               </div>

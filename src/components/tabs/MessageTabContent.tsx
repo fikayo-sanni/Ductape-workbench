@@ -1,12 +1,15 @@
-import { FileText, Bell, Mail, Phone, Webhook, Loader2 } from 'lucide-react';
+import { FileText, Bell, Mail, Phone, Webhook, Loader2, Code } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface MessageTabContentProps {
   data?: any;
@@ -16,7 +19,9 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
   const message = data;
   const productTag = data?.productTag;
   const notifierTag = data?.notifierTag;
+  const notification = data?.notification;
   const { user, currentWorkspaceId } = useAuth();
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
 
   // Initialize SDK
   const ductape = useDuctape({
@@ -40,6 +45,473 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
   });
 
   const displayData = messageData || message;
+
+  const handleViewCode = () => {
+    setShowCodeSidebar(true);
+  };
+
+  // Generate SDK code examples for sending notifications
+  const generateCodeSections = (language: string, env?: string) => {
+    const messageTag = displayData?.tag || 'message-tag';
+    const fullTag = notifierTag ? `${notifierTag}:${messageTag}` : messageTag;
+    const productTagValue = productTag || 'your-product-tag';
+    const envSlug = env || notification?.envs?.[0]?.slug || 'prd';
+
+    // Build input structure based on configured channels
+    const hasPushNotification = !!displayData?.push_notification;
+    const hasEmail = !!displayData?.email;
+    const hasCallback = !!displayData?.callback;
+    const hasSms = !!displayData?.sms;
+
+    // Helper function to group fields by parent_key
+    const groupByParentKey = (dataArray: any[]) => {
+      const grouped: Record<string, Record<string, any>> = {};
+      dataArray?.forEach((item: any) => {
+        const parentKey = item.parent_key || 'root';
+        if (!grouped[parentKey]) {
+          grouped[parentKey] = {};
+        }
+        grouped[parentKey][item.key] = item.value;
+      });
+      return grouped;
+    };
+
+    // Helper to format grouped data as JavaScript object string
+    const formatAsJsObject = (grouped: Record<string, Record<string, any>>, indent: string = '  ') => {
+      const lines: string[] = [];
+      const hasOnlyRoot = Object.keys(grouped).length === 1 && grouped['root'];
+      const hasRoot = !!grouped['root'];
+
+      // Handle root fields first (they go at the top level)
+      if (hasRoot && !hasOnlyRoot) {
+        Object.entries(grouped['root']).forEach(([key, value]) => {
+          const formattedValue = typeof value === 'string' && !value.startsWith('{{')
+            ? `${value}`
+            : `${value}`;
+          lines.push(`${indent}${key}: ${formattedValue}`);
+        });
+      }
+
+      Object.entries(grouped).forEach(([parentKey, fields]) => {
+        const fieldLines = Object.entries(fields).map(([key, value]) => {
+          const formattedValue = typeof value === 'string' && !value.startsWith('{{')
+            ? `${value}`
+            : `${value}`;
+          // If we only have 'root', output fields at top level
+          if (hasOnlyRoot && parentKey === 'root') {
+            return `${indent}${key}: ${formattedValue}`;
+          }
+          return `${indent}  ${key}: ${formattedValue}`;
+        }).join(',\n');
+
+        // If only 'root' exists, output fields directly without nesting
+        if (hasOnlyRoot && parentKey === 'root') {
+          lines.push(fieldLines);
+        } else if (parentKey !== 'root') {
+          // Only create nested structure for non-root parent keys
+          lines.push(`${indent}${parentKey}: {\n${fieldLines}\n${indent}}`);
+        }
+      });
+      return lines.join(',\n');
+    };
+
+    // Helper to format grouped data as Python dict string
+    const formatAsPythonDict = (grouped: Record<string, Record<string, any>>, indent: string = '    ') => {
+      const lines: string[] = [];
+      const hasOnlyRoot = Object.keys(grouped).length === 1 && grouped['root'];
+      const hasRoot = !!grouped['root'];
+
+      // Handle root fields first (they go at the top level)
+      if (hasRoot && !hasOnlyRoot) {
+        Object.entries(grouped['root']).forEach(([key, value]) => {
+          const formattedValue = typeof value === 'string' && !value.startsWith('{{')
+            ? `'${value}'`
+            : `'${value}'`;
+          lines.push(`${indent}'${key}': ${formattedValue}`);
+        });
+      }
+
+      Object.entries(grouped).forEach(([parentKey, fields]) => {
+        const fieldLines = Object.entries(fields).map(([key, value]) => {
+          const formattedValue = typeof value === 'string' && !value.startsWith('{{')
+            ? `'${value}'`
+            : `'${value}'`;
+          // If we only have 'root', output fields at top level
+          if (hasOnlyRoot && parentKey === 'root') {
+            return `${indent}'${key}': ${formattedValue}`;
+          }
+          return `${indent}    '${key}': ${formattedValue}`;
+        }).join(',\n');
+
+        // If only 'root' exists, output fields directly without nesting
+        if (hasOnlyRoot && parentKey === 'root') {
+          lines.push(fieldLines);
+        } else if (parentKey !== 'root') {
+          // Only create nested structure for non-root parent keys
+          lines.push(`${indent}'${parentKey}': {\n${fieldLines}\n${indent}}`);
+        }
+      });
+      return lines.join(',\n');
+    };
+
+    if (language === 'javascript') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+        }
+      ];
+
+      // Add channel-specific input sections
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        const pushCode = hasPushData
+          ? `const push_notification = {\n  device_token: '{{deviceToken}}', // Replace with the user's device token\n${formatAsJsObject(pushData)}\n};`
+          : `const push_notification = {
+  device_token: '{{deviceToken}}', // Replace with the user's device token
+  title: { en: 'Your title here' },
+  body: { en: 'Your message here' },
+  data: { action: 'open_screen' }
+};`;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: pushCode
+        });
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(displayData?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+
+        const emailCode = hasEmailData
+          ? `const email = {\n  to: ['user@example.com'], // Replace with recipient email addresses\n${formatAsJsObject(emailData)}\n};`
+          : `const email = {
+  to: ['user@example.com'], // Replace with recipient email addresses
+  subject: { en: 'Email subject' },
+  template: { en: '<p>Email content</p>' }
+};`;
+
+        sections.push({
+          title: 'Input - Email',
+          code: emailCode
+        });
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(displayData?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+
+        const callbackCode = hasCallbackData
+          ? `const callback = {\n${formatAsJsObject(callbackData)}\n};`
+          : `const callback = {
+  query: { userId: '{{userId}}' },
+  headers: { Authorization: 'Bearer token' },
+  body: { event: 'notification_sent' }
+};`;
+
+        sections.push({
+          title: 'Input - Callback',
+          code: callbackCode
+        });
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(displayData?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+
+        const smsCode = hasSmsData
+          ? `const sms = {\n  recipients: ['+1234567890'], // Replace with recipient phone numbers\n  body: {\n${formatAsJsObject(smsData, '    ')}\n  }\n};`
+          : `const sms = {
+  recipients: ['+1234567890'], // Replace with recipient phone numbers
+  body: {
+    firstname: '{{firstName}}',
+    lastname: '{{lastName}}'
+  }
+};`;
+
+        sections.push({
+          title: 'Input - SMS',
+          code: smsCode
+        });
+      }
+
+      // Build the final input object
+      const inputParts = [`  slug: '${messageTag}'`];
+      if (hasPushNotification) inputParts.push('  push_notification');
+      if (hasEmail) inputParts.push('  email');
+      if (hasCallback) inputParts.push('  callback');
+      if (hasSms) inputParts.push('  sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `const input = {
+${inputParts.join(',\n')}
+};
+
+await ductape.processor.notification.send({
+  env: '${envSlug}',
+  product: '${productTagValue}',
+  event: '${fullTag}',
+  input,
+  retries: 3
+});`
+
+
+      });
+
+      return sections;
+    } else if (language === 'typescript') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `import { Ductape } from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspace_id: 'your-workspace-id',
+  user_id: 'your-user-id',
+  token: 'your-auth-token',
+  public_key: 'your-public-key',
+  type: 'product'
+});
+
+// Initialize product
+await ductape.init('${productTagValue}');`
+        }
+      ];
+
+      // Add channel-specific input sections
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        const pushCode = hasPushData
+          ? `const push_notification = {\n  device_token: '{{deviceToken}}', // Replace with the user's device token\n${formatAsJsObject(pushData)}\n};`
+          : `const push_notification = {
+  device_token: '{{deviceToken}}', // Replace with the user's device token
+  title: { en: 'Your title here' },
+  body: { en: 'Your message here' },
+  data: { action: 'open_screen' }
+};`;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: pushCode
+        });
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(displayData?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+
+        const emailCode = hasEmailData
+          ? `const email = {\n  to: ['user@example.com'], // Replace with recipient email addresses\n${formatAsJsObject(emailData)}\n};`
+          : `const email = {
+  to: ['user@example.com'], // Replace with recipient email addresses
+  subject: { en: 'Email subject' },
+  template: { en: '<p>Email content</p>' }
+};`;
+
+        sections.push({
+          title: 'Input - Email',
+          code: emailCode
+        });
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(displayData?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+
+        const callbackCode = hasCallbackData
+          ? `const callback = {\n${formatAsJsObject(callbackData)}\n};`
+          : `const callback = {
+  query: { userId: '{{userId}}' },
+  headers: { Authorization: 'Bearer token' },
+  body: { event: 'notification_sent' }
+};`;
+
+        sections.push({
+          title: 'Input - Callback',
+          code: callbackCode
+        });
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(displayData?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+
+        const smsCode = hasSmsData
+          ? `const sms = {\n  recipients: ['+1234567890'], // Replace with recipient phone numbers\n  body: {\n${formatAsJsObject(smsData, '    ')}\n  }\n};`
+          : `const sms = {
+  recipients: ['+1234567890'], // Replace with recipient phone numbers
+  body: {
+    firstname: '{{firstName}}',
+    lastname: '{{lastName}}'
+  }
+};`;
+
+        sections.push({
+          title: 'Input - SMS',
+          code: smsCode
+        });
+      }
+
+      // Build the final input object
+      const inputParts = [`  slug: '${messageTag}'`];
+      if (hasPushNotification) inputParts.push('  push_notification');
+      if (hasEmail) inputParts.push('  email');
+      if (hasCallback) inputParts.push('  callback');
+      if (hasSms) inputParts.push('  sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `const input = {
+${inputParts.join(',\n')}
+};
+
+await ductape.processor.notification.send({
+  env: '${envSlug}',
+  product: '${productTagValue}',
+  event: '${fullTag}',
+  input,
+  retries: 3
+});`
+      });
+
+      return sections;
+    } else if (language === 'python') {
+      const sections = [
+        {
+          title: 'Init Ductape',
+          code: `from ductape import Ductape
+
+ductape = Ductape(
+    workspace_id='your-workspace-id',
+    user_id='your-user-id',
+    token='your-auth-token',
+    public_key='your-public-key',
+    type='product'
+)
+
+# Initialize product
+ductape.init('${productTagValue}')`
+        }
+      ];
+
+      // Add channel-specific input sections
+      if (hasPushNotification) {
+        const pushData = groupByParentKey(displayData?.push_notification_data || []);
+        const hasPushData = Object.keys(pushData).length > 0;
+
+        const pushCode = hasPushData
+          ? `push_notification = {\n    'device_token': '{{deviceToken}}',  # Replace with the user's device token\n${formatAsPythonDict(pushData)}\n}`
+          : `push_notification = {
+    'device_token': '{{deviceToken}}',  # Replace with the user's device token
+    'title': { 'en': 'Your title here' },
+    'body': { 'en': 'Your message here' },
+    'data': { 'action': 'open_screen' }
+}`;
+
+        sections.push({
+          title: 'Input - Push Notification',
+          code: pushCode
+        });
+      }
+
+      if (hasEmail) {
+        const emailData = groupByParentKey(displayData?.email_data || []);
+        const hasEmailData = Object.keys(emailData).length > 0;
+
+        const emailCode = hasEmailData
+          ? `email = {\n    'to': ['user@example.com'],  # Replace with recipient email addresses\n${formatAsPythonDict(emailData)}\n}`
+          : `email = {
+    'to': ['user@example.com'],  # Replace with recipient email addresses
+    'subject': { 'en': 'Email subject' },
+    'template': { 'en': '<p>Email content</p>' }
+}`;
+
+        sections.push({
+          title: 'Input - Email',
+          code: emailCode
+        });
+      }
+
+      if (hasCallback) {
+        const callbackData = groupByParentKey(displayData?.callback_data || []);
+        const hasCallbackData = Object.keys(callbackData).length > 0;
+
+        const callbackCode = hasCallbackData
+          ? `callback = {\n${formatAsPythonDict(callbackData)}\n}`
+          : `callback = {
+    'query': { 'userId': '{{userId}}' },
+    'headers': { 'Authorization': 'Bearer token' },
+    'body': { 'event': 'notification_sent' }
+}`;
+
+        sections.push({
+          title: 'Input - Callback',
+          code: callbackCode
+        });
+      }
+
+      if (hasSms) {
+        const smsData = groupByParentKey(displayData?.sms_data || []);
+        const hasSmsData = Object.keys(smsData).length > 0;
+
+        const smsCode = hasSmsData
+          ? `sms = {\n    'recipients': ['+1234567890'],  # Replace with recipient phone numbers\n    'body': {\n${formatAsPythonDict(smsData, '        ')}\n    }\n}`
+          : `sms = {
+    'recipients': ['+1234567890'],  # Replace with recipient phone numbers
+    'body': {
+        'firstname': '{{firstName}}',
+        'lastname': '{{lastName}}'
+    }
+}`;
+
+        sections.push({
+          title: 'Input - SMS',
+          code: smsCode
+        });
+      }
+
+      // Build the final input object
+      const inputParts = [`    'slug': '${messageTag}'`];
+      if (hasPushNotification) inputParts.push('    push_notification');
+      if (hasEmail) inputParts.push('    email');
+      if (hasCallback) inputParts.push('    callback');
+      if (hasSms) inputParts.push('    sms');
+
+      sections.push({
+        title: 'Execute',
+        code: `input_data = {
+${inputParts.join(',\n')}
+}
+
+ductape.processor.notification.send({
+    'env': '${envSlug}',
+    'product': '${productTagValue}',
+    'event': '${fullTag}',
+    'input': input_data,
+    'retries': 3
+})`
+      });
+
+      return sections;
+    }
+
+    return [];
+  };
 
   if (isLoading) {
     return (
@@ -87,6 +559,14 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                 )}
               </div>
             </div>
+            <Button
+              onClick={handleViewCode}
+              variant="outline"
+              className="gap-2"
+            >
+              <Code className="h-4 w-4" />
+              View Code
+            </Button>
           </div>
         </div>
 
@@ -100,7 +580,7 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                   <Bell className="h-4 w-4 text-purple-500" />
                 </div>
                 <span className="font-medium text-grey">Push Notification</span>
-                <Badge variant="outline" className="ml-auto">Configured</Badge>
+                <Badge variant="outline" className="ml-auto text-grey">Configured</Badge>
               </div>
               <div className="space-y-3">
                 <div>
@@ -131,7 +611,7 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                   <Mail className="h-4 w-4 text-blue-500" />
                 </div>
                 <span className="font-medium text-grey">Email</span>
-                <Badge variant="outline" className="ml-auto">Configured</Badge>
+                <Badge variant="outline" className="ml-auto text-grey">Configured</Badge>
               </div>
               <div className="space-y-3">
                 <div>
@@ -162,7 +642,7 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                   <Phone className="h-4 w-4 text-green-500" />
                 </div>
                 <span className="font-medium text-grey">SMS</span>
-                <Badge variant="outline" className="ml-auto">Configured</Badge>
+                <Badge variant="outline" className="ml-auto text-grey">Configured</Badge>
               </div>
               <div>
                 <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Message</Label>
@@ -183,12 +663,13 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
                   <Webhook className="h-4 w-4 text-orange-500" />
                 </div>
                 <span className="font-medium text-grey">Callback/Webhook</span>
-                <Badge variant="outline" className="ml-auto">Configured</Badge>
+                <Badge variant="outline" className="ml-auto text-grey">Configured</Badge>
               </div>
               <div className="space-y-4">
                 {/* URL */}
                 {displayData.callback.url && (
                   <div>
+                    {JSON.stringify(displayData.callbacks)}
                     <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">URL</Label>
                     <Input
                       value={displayData.callback.url}
@@ -274,6 +755,21 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
           )}
         </div>
       </div>
+
+      {/* Code Sidebar */}
+      {showCodeSidebar && (
+        <CodeSidebar
+          title={displayData.name}
+          subtitle={`Send notifications using the ${notifierTag}:${displayData.tag} message template`}
+          tag={`${notifierTag}:${displayData.tag}`}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateCodeSections}
+          environments={notification?.envs || []}
+          additionalControls={undefined}
+          onSectionAction={undefined}
+          sectionFooter={undefined}
+        />
+      )}
     </div>
   );
 }

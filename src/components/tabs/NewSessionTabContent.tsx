@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { KeyRound, Save, CheckCircle, Loader2 } from 'lucide-react';
+import { KeyRound, Save, CheckCircle, Loader2, XCircle, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
@@ -80,17 +80,23 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
         throw new Error('Invalid JSON schema');
       }
 
+      // Convert selector path to nested curly brace format
+      // e.g., "details.username" -> "$Session{details}{username}"
+      const selectorPath = values.selector.split('.').map((part: string) => `{${part}}`).join('');
+      const formattedSelector = `$Session${selectorPath}`;
+
       const payload = {
         name: values.name,
         tag: values.tag,
         description: values.description,
-        selector: values.selector,
+        selector: formattedSelector,
         schema: parsedSchema,
         expiry: parseInt(values.expiry),
         period: values.period,
       };
       
       try {
+        await ductape.init(data.productTag);
         const session = await ductape.sessions.create(payload);
         return session;
       } catch (error) {
@@ -98,16 +104,27 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
         throw error;
       }
     },
-    onSuccess: (session) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', product?._id] });
+
       closeTab(tabId);
-      openTab({
-        id: `session-${session._id}-${Date.now()}`,
-        type: 'session',
-        title: session.name,
-        itemId: session._id,
-        data: { ...session, componentType: 'session', productName: product?.name },
-      });
+
+      // Reopen the product tab
+      if (product) {
+        openTab({
+          id: `product-${product._id}-${Date.now()}`,
+          type: 'product',
+          title: product.name,
+          itemId: product._id,
+          data: {
+            ...product,
+            componentType: 'product',
+          },
+        });
+      }
+
       toast.success('Session created successfully');
     },
     onError: (error: any) => {
@@ -184,6 +201,53 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
         : formData.description
     });
   };
+
+  // Validate JSON schema and extract selector options
+  const schemaValidation = useMemo(() => {
+    try {
+      const schema = JSON.parse(formData.schema);
+      const options: string[] = [];
+
+      const traverse = (obj: any, path: string = '', parentIsArray: boolean = false) => {
+        if (typeof obj !== 'object' || obj === null) return;
+
+        // If parent is array, skip all children
+        if (parentIsArray) return;
+
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          const isArray = Array.isArray(value);
+          const isObject = typeof value === 'object' && value !== null && !isArray;
+
+          // Only add non-object, non-array keys that are not children of arrays
+          if (!isObject && !isArray) {
+            options.push(currentPath);
+          }
+
+          // Traverse into nested objects (not arrays)
+          if (isObject && !isArray) {
+            traverse(value, currentPath, false);
+          }
+        }
+      };
+
+      traverse(schema);
+
+      return {
+        isValid: true,
+        error: null,
+        selectorOptions: options,
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: error instanceof Error ? error.message : 'Invalid JSON',
+        selectorOptions: [],
+      };
+    }
+  }, [formData.schema]);
+
+  const selectorOptions = schemaValidation.selectorOptions;
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
@@ -262,7 +326,7 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
             <div className="flex gap-2 mt-2">
               <Input
                 id="tag"
-                placeholder="e.g., my-product:user-auth-session"
+                placeholder="e.g. user-auth-session"
                 value={formData.tag}
                 onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
               />
@@ -271,7 +335,7 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
               </Button>
             </div>
             <p className="text-xs text-grey-600 mt-1">
-              Format: product-name:session-name (auto-generated from session name)
+              Format: (auto-generated from session name)
             </p>
           </div>
 
@@ -326,16 +390,50 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
 
           {/* Schema */}
           <div>
-            <Label htmlFor="schema" className="required">
-              Schema (JSON)
-            </Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="schema" className="required">
+                Schema (JSON)
+              </Label>
+              {formData.schema && formData.schema.trim() !== '{}' && formData.schema.trim() !== '' && (
+                <div className="flex items-center gap-1.5">
+                  {schemaValidation.isValid ? (
+                    <>
+                      <Check className="h-4 w-4 text-green" />
+                      <span className="text-xs text-green font-medium">Valid JSON</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 text-red" />
+                      <span className="text-xs text-red font-medium">Invalid JSON</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <Textarea
               id="schema"
-              placeholder='{"user_id": "string", "email": "string"}'
+              placeholder='{"userId": "string", "email": "string"}'
               value={formData.schema}
               onChange={(e) => setFormData({ ...formData, schema: e.target.value })}
-              className="mt-2 min-h-40 font-mono text-sm"
+              className={`mt-2 min-h-40 font-mono text-sm ${
+                formData.schema && formData.schema.trim() !== '{}' && formData.schema.trim() !== ''
+                  ? schemaValidation.isValid
+                    ? 'border-green focus:border-green focus:ring-green'
+                    : 'border-red focus:border-red focus:ring-red'
+                  : ''
+              }`}
             />
+            {!schemaValidation.isValid && formData.schema && formData.schema.trim() !== '{}' && formData.schema.trim() !== '' && (
+              <p className="text-xs text-red mt-1 flex items-center gap-1">
+                <XCircle className="h-3 w-3" />
+                {schemaValidation.error}
+              </p>
+            )}
+            {schemaValidation.isValid && selectorOptions.length === 0 && formData.schema.trim() !== '{}' && (
+              <p className="text-xs text-orange-600 mt-1">
+                Warning: No valid selector fields found in schema. Add non-object, non-array fields.
+              </p>
+            )}
             <p className="text-xs text-grey-600 mt-1">JSON schema defining the session data structure</p>
           </div>
 
@@ -344,14 +442,35 @@ export default function NewSessionTabContent({ tabId, data }: NewSessionTabConte
             <Label htmlFor="selector" className="required">
               Selector
             </Label>
-            <Input
-              id="selector"
-              placeholder="e.g., user_id"
+            <Select
               value={formData.selector}
-              onChange={(e) => setFormData({ ...formData, selector: e.target.value })}
-              className="mt-2"
-            />
-            <p className="text-xs text-grey-600 mt-1">Field used to uniquely identify the session</p>
+              onValueChange={(value) => setFormData({ ...formData, selector: value })}
+            >
+              <SelectTrigger id="selector" className="mt-2">
+                <SelectValue placeholder="Select a field from schema" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectorOptions.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-grey-600">
+                    No valid fields available. Add a valid schema first.
+                  </div>
+                ) : (
+                  selectorOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-grey-600 mt-1">
+              Field used to uniquely identify the session
+              {formData.selector && (
+                <span className="block mt-1 font-mono text-primary">
+                  Preview: $Session{formData.selector.split('.').map((part: string) => `{${part}}`).join('')}
+                </span>
+              )}
+            </p>
           </div>
 
           {/* Actions */}

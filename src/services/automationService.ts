@@ -332,6 +332,11 @@ export class AutomationService {
         canFillForms: true,
         canTriggerActions: false,
       },
+      'new-topic': {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
       fallback: {
         canInspectForms: true,
         canFillForms: true,
@@ -719,6 +724,7 @@ export class AutomationService {
       notifier: 'Notifier',
       message: 'Message',
       'new-message': 'New Message',
+      'new-topic': 'New Topic',
       fallback: 'Fallback',
       quota: 'Quota',
       job: 'Job',

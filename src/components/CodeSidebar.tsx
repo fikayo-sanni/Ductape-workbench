@@ -36,7 +36,7 @@ export default function CodeSidebar({
 }: CodeSidebarProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
   const [selectedEnv, setSelectedEnv] = useState<string>(
-    environments[0]?.slug || 'production'
+    environments[0]?.slug || 'prd'
   );
   const [showInitialize, setShowInitialize] = useState(false);
 
