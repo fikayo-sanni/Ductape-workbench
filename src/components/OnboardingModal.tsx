@@ -82,6 +82,14 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
     description: '',
   });
 
+  // Auto-generate description when workspace name changes
+  useEffect(() => {
+    if (formData.workspace_name.trim()) {
+      const generatedDescription = `Workspace for ${formData.workspace_name} - organize and manage your products, apps, and integrations`;
+      setFormData(prev => ({ ...prev, description: generatedDescription }));
+    }
+  }, [formData.workspace_name]);
+
   const { mutate: createWorkspace, status: creatingWorkspace } = useMutation({
     mutationFn: (data: {
       user_id: string;
@@ -193,6 +201,14 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
     product_name: '',
     description: '',
   });
+
+  // Auto-generate description when product name changes
+  useEffect(() => {
+    if (formData.product_name.trim()) {
+      const generatedDescription = `${formData.product_name} integration - manage APIs, features, and data flows for your ${formData.product_name} service`;
+      setFormData(prev => ({ ...prev, description: generatedDescription }));
+    }
+  }, [formData.product_name]);
 
   const { mutate: createProduct, status: creatingProduct } = useMutation({
     mutationFn: (data: {

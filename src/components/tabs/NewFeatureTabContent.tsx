@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ConditionalModal from '@/components/modals/ConditionalModal';
 import { Copy, Plus, Trash2, GripVertical, ArrowDown, Edit2, Zap, Save, BookOpen, X, List } from 'lucide-react';
 import { DataTypes, FeatureEventTypes } from '@ductape/sdk/dist/types';
@@ -237,7 +238,6 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
   const [newInputMinLength, setNewInputMinLength] = useState<number>(0);
   const [newInputMaxLength, setNewInputMaxLength] = useState<number>(0);
   const [sourceVariable, setSourceVariable] = useState<any>(null);
-  const addInputFormRef = useRef<HTMLDivElement>(null);
   const [editingComponent, setEditingComponent] = useState<string | null>(null);
   const [editingComponentName, setEditingComponentName] = useState<string>('');
   const [selectedAppId, setSelectedAppId] = useState<string>('');
@@ -264,6 +264,7 @@ export default function NewFeatureTabContent({ tabId, data }: NewFeatureTabConte
     eventId?: string;
     responseField?: string;
     selectedValue?: string;
+    authName?: string;
     authField?: string;
     operatorType?: string;
     operatorArgs?: Array<{
@@ -1187,7 +1188,7 @@ console.log('Feature result:', result);`;
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6 relative">
+    <div className="min-h-full overflow-auto bg-grey-100 p-6 relative">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
@@ -2006,81 +2007,6 @@ console.log('Feature result:', result);`;
                     </Button>
                   </div>
 
-                  {/* Add Input Form */}
-                  {showAddInput && (
-                    <div ref={addInputFormRef} className="mb-4 p-3 border border-grey-300 rounded-lg bg-grey-50">
-                      <h5 className="text-grey font-medium mb-3">Add New Input Field</h5>
-                      <div className="flex gap-3 items-end">
-                        <div className="flex-1">
-                          <label className="text-xs text-grey font-medium">Field Name</label>
-                  <Input
-                            value={newInputName}
-                            onChange={(e) => setNewInputName(e.target.value)}
-                            placeholder="Enter field name"
-                            className="h-8"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs text-grey font-medium">Data Type</label>
-                          <Select
-                            value={newInputType}
-                            onValueChange={(value) => setNewInputType(value as DataTypes)}
-                          >
-                            <SelectTrigger className="h-8">
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DATA_TYPES.map((dataType) => (
-                                <SelectItem key={dataType.value} value={dataType.value}>
-                                  {dataType.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs text-grey font-medium">Min Length</label>
-                          <Input
-                            type="number"
-                            value={newInputMinLength}
-                            onChange={(e) => setNewInputMinLength(parseInt(e.target.value) || 0)}
-                            placeholder="Min length"
-                            className="h-8"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs text-grey font-medium">Max Length</label>
-                          <Input
-                            type="number"
-                            value={newInputMaxLength}
-                            onChange={(e) => setNewInputMaxLength(parseInt(e.target.value) || 0)}
-                            placeholder="Max length"
-                            className="h-8"
-                          />
-                        </div>
-                        <Button
-                          onClick={addInputField}
-                          disabled={!newInputName || !newInputType}
-                          size="sm"
-                        >
-                          Add
-                    </Button>
-                        <Button
-                          onClick={() => {
-                            setShowAddInput(false);
-                            setNewInputName('');
-                            setNewInputType(DataTypes.STRING);
-                            setNewInputMinLength(0);
-                            setNewInputMaxLength(0);
-                          }}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="space-y-3">
                     {Object.entries(state.featureInputs).map(([fieldName, input]) => (
@@ -2217,9 +2143,9 @@ console.log('Feature result:', result);`;
                                   return (
                                   <div key={index} className="space-y-3">
                                     {/* Variable Name Header */}
-                                    <div className="p-4 bg-white rounded-lg border border-grey-200">
+                                    <div className="p-4 bg-white rounded-lg border border-grey-300">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="text-base font-semibold text-grey-800">{variable.key}</h3>
+                                        <h3 className="text-base font-semibold text-grey">{variable.key}</h3>
                                         {variable.type === 'action' && (
                                           <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded">
                                             {variable.source}
@@ -2280,6 +2206,7 @@ console.log('Feature result:', result);`;
                                                   ...prev[component.id]?.[variable.key],
                                                   source: value as 'input' | 'sequence' | 'session' | 'auth' | 'variables' | 'constants' | 'hardcode' | 'default' | 'data' | 'filterData',
                                                   selectedValue: undefined,
+                                                  authName: undefined,
                                                   authField: undefined,
                                                   code: code
                                                 }
@@ -2330,14 +2257,6 @@ console.log('Feature result:', result);`;
                                                 setMappingComponentId(component.id);
                                                 setShowAddInput(true);
                                                 setNewInputName(variable.key);
-                                                setTimeout(() => {
-                                                  if (addInputFormRef.current) {
-                                                    addInputFormRef.current.scrollIntoView({
-                                                      behavior: 'smooth',
-                                                      block: 'start'
-                                                    });
-                                                  }
-                                                }, 100);
                                               } else {
                                                 setDataMappings(prev => ({
                                                   ...prev,
@@ -2367,6 +2286,240 @@ console.log('Feature result:', result);`;
                                               </SelectItem>
                                             </SelectContent>
                                           </Select>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'auth' ? (
+                                          <div className="space-y-2">
+                                            {/* First dropdown: Select Auth */}
+                                            <Select
+                                              value={dataMappings[component.id]?.[variable.key]?.authName || ''}
+                                              onValueChange={(value) => {
+                                                setDataMappings(prev => ({
+                                                  ...prev,
+                                                  [component.id]: {
+                                                    ...prev[component.id],
+                                                    [variable.key]: {
+                                                      ...prev[component.id]?.[variable.key],
+                                                      authName: value,
+                                                      authField: undefined,
+                                                      code: ''
+                                                    }
+                                                  }
+                                                }));
+                                              }}
+                                            >
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="Select authentication" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {(() => {
+                                                  const app = selectedAppData?.data;
+                                                  const latestVersion = app?.versions?.find((v: any) => v.latest) || app?.versions?.[0];
+                                                  const auths = latestVersion?.auths || [];
+
+                                                  if (auths.length === 0) {
+                                                    return (
+                                                      <SelectItem value="no-auth" disabled>
+                                                        No authentication methods available
+                                                      </SelectItem>
+                                                    );
+                                                  }
+
+                                                  return auths.map((auth: any) => (
+                                                    <SelectItem key={auth.name} value={auth.name}>
+                                                      {auth.name}
+                                                    </SelectItem>
+                                                  ));
+                                                })()}
+                                              </SelectContent>
+                                            </Select>
+
+                                            {/* Second dropdown: Select Field from Auth (only show if auth is selected) */}
+                                            {dataMappings[component.id]?.[variable.key]?.authName && (
+                                              <Select
+                                                value={dataMappings[component.id]?.[variable.key]?.authField || ''}
+                                                onValueChange={(value) => {
+                                                  const authName = dataMappings[component.id]?.[variable.key]?.authName;
+                                                  setDataMappings(prev => ({
+                                                    ...prev,
+                                                    [component.id]: {
+                                                      ...prev[component.id],
+                                                      [variable.key]: {
+                                                        ...prev[component.id]?.[variable.key],
+                                                        authField: value,
+                                                        code: `$Auth{${authName}}{${value}}`
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                              >
+                                                <SelectTrigger>
+                                                  <SelectValue placeholder="Select auth field" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {(() => {
+                                                    const app = selectedAppData?.data;
+                                                    const latestVersion = app?.versions?.find((v: any) => v.latest) || app?.versions?.[0];
+                                                    const auths = latestVersion?.auths || [];
+                                                    const selectedAuthName = dataMappings[component.id]?.[variable.key]?.authName;
+                                                    const selectedAuth: any = auths.find((a: any) => a.name === selectedAuthName);
+
+                                                    if (!selectedAuth || !selectedAuth.tokens) {
+                                                      return (
+                                                        <SelectItem value="no-fields" disabled>
+                                                          No fields available
+                                                        </SelectItem>
+                                                      );
+                                                    }
+
+                                                    // Collect all token fields from headers, body, params, and query
+                                                    const tokenFields: Array<{ key: string; category: string }> = [];
+                                                    ['headers', 'body', 'params', 'query'].forEach((category: string) => {
+                                                      if (selectedAuth.tokens[category]?.data && Array.isArray(selectedAuth.tokens[category].data)) {
+                                                        selectedAuth.tokens[category].data.forEach((item: any) => {
+                                                          if (item.key) {
+                                                            tokenFields.push({
+                                                              key: item.key,
+                                                              category: category.charAt(0).toUpperCase() + category.slice(1)
+                                                            });
+                                                          }
+                                                        });
+                                                      }
+                                                    });
+
+                                                    if (tokenFields.length === 0) {
+                                                      return (
+                                                        <SelectItem value="no-fields" disabled>
+                                                          No fields in auth tokens
+                                                        </SelectItem>
+                                                      );
+                                                    }
+
+                                                    return tokenFields.map((field, idx) => (
+                                                      <SelectItem key={`${field.key}-${idx}`} value={field.key}>
+                                                        {field.key}
+                                                      </SelectItem>
+                                                    ));
+                                                  })()}
+                                                </SelectContent>
+                                              </Select>
+                                            )}
+                                          </div>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'sequence' ? (
+                                          <div className="space-y-2">
+                                            {/* Sequence Selection */}
+                                            <Select
+                                              value={dataMappings[component.id]?.[variable.key]?.sequenceId || ''}
+                                              onValueChange={(value) => {
+                                                setDataMappings(prev => ({
+                                                  ...prev,
+                                                  [component.id]: {
+                                                    ...prev[component.id],
+                                                    [variable.key]: {
+                                                      ...prev[component.id]?.[variable.key],
+                                                      sequenceId: value,
+                                                      eventId: '',
+                                                      responseField: '',
+                                                      code: `$Sequence{${value}}{event}{field}`
+                                                    }
+                                                  }
+                                                }));
+                                              }}
+                                            >
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="Select sequence" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {state.sequences
+                                                  .filter((_, index) => index < sequenceIndex)
+                                                  .map(seq => (
+                                                    <SelectItem key={seq.id} value={seq.id}>
+                                                      {seq.name}
+                                                    </SelectItem>
+                                                  ))}
+                                              </SelectContent>
+                                            </Select>
+
+                                            {/* Event Selection - Only show if sequence is selected */}
+                                            {dataMappings[component.id]?.[variable.key]?.sequenceId && (
+                                              <Select
+                                                value={dataMappings[component.id]?.[variable.key]?.eventId || ''}
+                                                onValueChange={(value) => {
+                                                  setDataMappings(prev => ({
+                                                    ...prev,
+                                                    [component.id]: {
+                                                      ...prev[component.id],
+                                                      [variable.key]: {
+                                                        ...prev[component.id]?.[variable.key],
+                                                        eventId: value,
+                                                        responseField: '',
+                                                        code: `$Sequence{${dataMappings[component.id]?.[variable.key]?.sequenceId}}{${value}}{field}`
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                              >
+                                                <SelectTrigger>
+                                                  <SelectValue placeholder="Select event" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {(() => {
+                                                    const selectedSequence = state.sequences.find(seq => seq.id === dataMappings[component.id]?.[variable.key]?.sequenceId);
+                                                    if (!selectedSequence) return [];
+
+                                                    return selectedSequence.components.map(componentId => {
+                                                      const eventComponent = state.selectedComponents.find(c => c.id === componentId);
+                                                      if (!eventComponent) return null;
+
+                                                      return (
+                                                        <SelectItem key={componentId} value={componentId}>
+                                                          {eventComponent.name}
+                                                        </SelectItem>
+                                                      );
+                                                    }).filter(Boolean);
+                                                  })()}
+                                                </SelectContent>
+                                              </Select>
+                                            )}
+
+                                            {/* Response Field Selection - Only show if event is selected */}
+                                            {dataMappings[component.id]?.[variable.key]?.eventId && (
+                                              <Select
+                                                value={dataMappings[component.id]?.[variable.key]?.responseField || ''}
+                                                onValueChange={(value) => {
+                                                  setDataMappings(prev => ({
+                                                    ...prev,
+                                                    [component.id]: {
+                                                      ...prev[component.id],
+                                                      [variable.key]: {
+                                                        ...prev[component.id]?.[variable.key],
+                                                        responseField: value,
+                                                        code: `$Sequence{${dataMappings[component.id]?.[variable.key]?.sequenceId}}{${dataMappings[component.id]?.[variable.key]?.eventId}}{${value}}`
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                              >
+                                                <SelectTrigger>
+                                                  <SelectValue placeholder="Select response field" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {(() => {
+                                                    const selectedEvent = state.selectedComponents.find(c => c.id === dataMappings[component.id]?.[variable.key]?.eventId);
+                                                    if (!selectedEvent || !selectedEvent.action) return [];
+
+                                                    // Find the success response and get its body.data array
+                                                    const successResponse = selectedEvent.action.responses?.find((response: any) => response.success === true);
+                                                    if (!successResponse || !successResponse.body?.data) return [];
+
+                                                    return successResponse.body.data.map((field: any, index: number) => (
+                                                      <SelectItem key={field.key || field.name || index} value={field.key || field.name || `field_${index}`}>
+                                                        {field.key || field.name || `Field ${index + 1}`}
+                                                      </SelectItem>
+                                                    ));
+                                                  })()}
+                                                </SelectContent>
+                                              </Select>
+                                            )}
+                                          </div>
                                         ) : dataMappings[component.id]?.[variable.key]?.source === 'hardcode' ? (
                                           <Input
                                             value={dataMappings[component.id]?.[variable.key]?.code || variable.defaultValue || variable.sampleValue || ''}
@@ -3094,6 +3247,116 @@ console.log('Feature result:', result);`;
           }}
         />
       )}
+
+      {/* Add Input Field Dialog */}
+      <Dialog open={showAddInput} onOpenChange={setShowAddInput}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Plus className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-grey">Add New Input Field</DialogTitle>
+                <DialogDescription>
+                  Define a new input field for your feature
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="field-name" className="text-sm font-medium text-grey">
+                Field Name
+              </Label>
+              <Input
+                id="field-name"
+                value={newInputName}
+                onChange={(e) => setNewInputName(e.target.value)}
+                placeholder="Enter field name"
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="data-type" className="text-sm font-medium text-grey">
+                Data Type
+              </Label>
+              <Select
+                value={newInputType}
+                onValueChange={(value) => setNewInputType(value as DataTypes)}
+              >
+                <SelectTrigger id="data-type" className="mt-2">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATA_TYPES.map((dataType) => (
+                    <SelectItem key={dataType.value} value={dataType.value}>
+                      {dataType.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="min-length" className="text-sm font-medium text-grey">
+                  Min Length
+                </Label>
+                <Input
+                  id="min-length"
+                  type="number"
+                  value={newInputMinLength}
+                  onChange={(e) => setNewInputMinLength(parseInt(e.target.value) || 0)}
+                  placeholder="Min length"
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label htmlFor="max-length" className="text-sm font-medium text-grey">
+                  Max Length
+                </Label>
+                <Input
+                  id="max-length"
+                  type="number"
+                  value={newInputMaxLength}
+                  onChange={(e) => setNewInputMaxLength(parseInt(e.target.value) || 0)}
+                  placeholder="Max length"
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowAddInput(false);
+                  setNewInputName('');
+                  setNewInputType(DataTypes.STRING);
+                  setNewInputMinLength(0);
+                  setNewInputMaxLength(0);
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  addInputField();
+                }}
+                disabled={!newInputName || !newInputType}
+                className="flex-1"
+              >
+                Add Input Field
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
 
   )

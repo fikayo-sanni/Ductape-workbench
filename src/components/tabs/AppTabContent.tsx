@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { IApp } from '@/types/app';
-import { Zap, Settings2, Key, FileCode, Globe, Pencil, Search, Folder, Plus, ExternalLink, Building2, Grid3x3, Webhook, Filter, Download } from 'lucide-react';
+import { Zap, Settings2, Key, FileCode, Globe, Pencil, Search, Folder, Plus, ExternalLink, Building2, Grid3x3, Webhook, Filter, Download, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
@@ -11,6 +11,12 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
@@ -21,6 +27,7 @@ import CreateAppEnvironmentModal from '@/components/modals/CreateAppEnvironmentM
 import UpdateAppEnvironmentModal from '@/components/modals/UpdateAppEnvironmentModal';
 import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
+import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
 import { useQuery } from '@tanstack/react-query';
 import appServices from '@/services/appServices';
 
@@ -50,6 +57,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
   const [showCreateVariableModal, setShowCreateVariableModal] = useState(false);
   const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
+  const [showCreateSharedVariableModal, setShowCreateSharedVariableModal] = useState(false);
 
   // Actions search and filter state
   const [actionsSearch, setActionsSearch] = useState('');
@@ -667,6 +675,14 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         constant={editingConstant}
       />
 
+      {/* Create Shared Variable Modal */}
+      <CreateSharedVariableModal
+        open={showCreateSharedVariableModal}
+        onOpenChange={setShowCreateSharedVariableModal}
+        appId={currentApp?._id}
+        actions={selectedVersion?.actions || []}
+      />
+
       {/* Integration Modal */}
       {showIntegrationModal && currentApp && (
         <IntegrationProvider>
@@ -916,34 +932,52 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               <span className="text-sm text-grey-600">({actionsCount})</span>
             </div>
             {isInternalApp && (
-              <Button 
-                size="sm" 
-                className="gap-2" 
-                variant="outline"
-                onClick={() => {
-                  openTab({
-                    id: `new-action-${Date.now()}`,
-                    type: 'request',
-                    title: 'New Action',
-                    data: {
-                      isNew: true,
-                      app: currentApp,
-                      appId: currentApp?._id,
-                      appTag: currentApp?.tag,
-                      appName: currentApp?.app_name,
-                      version: selectedVersionTag,
-                      envs: selectedVersion?.envs || [],
-                      variables: selectedVersion?.variables || [],
-                      constants: selectedVersion?.constants || [],
-                      auths: selectedVersion?.auths || [],
-                    },
-                    isDirty: true,
-                  });
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Add</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      openTab({
+                        id: `new-action-${Date.now()}`,
+                        type: 'request',
+                        title: 'New Action',
+                        data: {
+                          isNew: true,
+                          app: currentApp,
+                          appId: currentApp?._id,
+                          appTag: currentApp?.tag,
+                          appName: currentApp?.app_name,
+                          version: selectedVersionTag,
+                          envs: selectedVersion?.envs || [],
+                          variables: selectedVersion?.variables || [],
+                          constants: selectedVersion?.constants || [],
+                          auths: selectedVersion?.auths || [],
+                        },
+                        isDirty: true,
+                      });
+                    }}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Add Action
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowCreateSharedVariableModal(true)}
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Add Shared Value
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 

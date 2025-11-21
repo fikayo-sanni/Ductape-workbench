@@ -241,7 +241,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                 </Button>
               </div>
 
-              <div className="pt-4 border-t border-grey-200">
+              <div className="pt-4 border-t border-grey-400">
                 <Button
                   variant="outline"
                   onClick={handleSkip}

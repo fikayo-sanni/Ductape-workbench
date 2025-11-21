@@ -19,6 +19,7 @@ interface CodeSidebarProps {
   generateCodeSections: (language: string, env?: string) => CodeSection[];
   environments?: Array<{ slug: string; env_name?: string }>;
   additionalControls?: React.ReactNode;
+  additionalControlsAfterSection?: string; // Section title after which to render additionalControls
   onSectionAction?: (sectionTitle: string) => React.ReactNode;
   sectionFooter?: (sectionTitle: string) => React.ReactNode;
 }
@@ -31,6 +32,7 @@ export default function CodeSidebar({
   generateCodeSections,
   environments = [],
   additionalControls,
+  additionalControlsAfterSection,
   onSectionAction,
   sectionFooter,
 }: CodeSidebarProps) {
@@ -39,6 +41,8 @@ export default function CodeSidebar({
     environments[0]?.slug || 'prd'
   );
   const [showInitialize, setShowInitialize] = useState(false);
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [showConnection, setShowConnection] = useState(false);
 
   const sections = generateCodeSections(selectedLanguage, selectedEnv);
 
@@ -118,8 +122,8 @@ export default function CodeSidebar({
           </Select>
         </div>
 
-        {/* Additional Controls */}
-        {additionalControls && (
+        {/* Additional Controls (before sections) */}
+        {additionalControls && !additionalControlsAfterSection && (
           <div className="border-t border-grey-300 pt-4">
             {additionalControls}
           </div>
@@ -129,54 +133,75 @@ export default function CodeSidebar({
         <div className="space-y-4">
           {sections.map((section, index) => {
             const isInitialize = section.title.toLowerCase().includes('init');
-            const isHidden = isInitialize && !showInitialize;
+            const isTransaction = section.title.toLowerCase().includes('transaction');
+            const isConnection = section.title.toLowerCase().includes('connection');
+            const isCollapsible = isInitialize || isTransaction || isConnection;
+            const isHidden = (isInitialize && !showInitialize) || (isTransaction && !showTransactions) || (isConnection && !showConnection);
+            const shouldRenderControlsAfter = additionalControlsAfterSection === section.title;
 
             return (
-              <div key={index} className="space-y-2">
-                {isInitialize ? (
-                  <button
-                    onClick={() => setShowInitialize(!showInitialize)}
-                    className="flex items-center gap-2 text-sm font-semibold text-grey-700 hover:text-primary transition-colors"
-                  >
-                    {showInitialize ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    {section.title}
-                  </button>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-semibold text-grey-700">
+              <>
+                <div key={index} className="space-y-2">
+                  {isCollapsible ? (
+                    <button
+                      onClick={() => {
+                        if (isInitialize) {
+                          setShowInitialize(!showInitialize);
+                        } else if (isTransaction) {
+                          setShowTransactions(!showTransactions);
+                        } else if (isConnection) {
+                          setShowConnection(!showConnection);
+                        }
+                      }}
+                      className="flex items-center gap-2 text-sm font-semibold text-grey-700 hover:text-primary transition-colors"
+                    >
+                      {(isInitialize && showInitialize) || (isTransaction && showTransactions) || (isConnection && showConnection) ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
                       {section.title}
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      {onSectionAction && onSectionAction(section.title)}
-                      <Button
-                        onClick={() => copySection(section.code, section.title)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 h-7 px-2 text-xs"
-                      >
-                        <Copy className="h-3 w-3" />
-                        Copy
-                      </Button>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold text-grey-700">
+                        {section.title}
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        {onSectionAction && onSectionAction(section.title)}
+                        <Button
+                          onClick={() => copySection(section.code, section.title)}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 h-7 px-2 text-xs"
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copy
+                        </Button>
+                      </div>
                     </div>
+                  )}
+
+                  {!isHidden && (
+                    <>
+                      {sectionFooter && sectionFooter(section.title)}
+                      <Textarea
+                        value={section.code}
+                        readOnly
+                        className="font-mono text-sm bg-grey-50 resize-none"
+                        rows={section.code.split('\n').length}
+                      />
+                    </>
+                  )}
+                </div>
+
+                {/* Render additional controls after this section if specified */}
+                {shouldRenderControlsAfter && additionalControls && (
+                  <div className="border-t border-grey-300 pt-4 mt-4">
+                    {additionalControls}
                   </div>
                 )}
-
-                {!isHidden && (
-                  <>
-                    {sectionFooter && sectionFooter(section.title)}
-                    <Textarea
-                      value={section.code}
-                      readOnly
-                      className="font-mono text-sm bg-grey-50 resize-none"
-                      rows={section.code.split('\n').length}
-                    />
-                  </>
-                )}
-              </div>
+              </>
             );
           })}
         </div>

@@ -787,11 +787,11 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                   </Button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {Object.entries(state.featureInputs).map(([key, input]) => (
                     <div
                       key={key}
-                      className="p-3 bg-grey-100 rounded-lg space-y-2"
+                      className="p-2.5 rounded-lg space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
                         <Input
@@ -800,7 +800,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                           onChange={(e) =>
                             handleUpdateFeatureInput(key, { key: e.target.value })
                           }
-                          className="flex-1 mr-2"
+                          className="flex-1 mr-2 border-0 shadow-none bg-grey-50 focus:bg-white"
                         />
                         <Button
                           variant="ghost"
@@ -811,14 +811,14 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                         </Button>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         <Select
                           value={input.dataType}
                           onValueChange={(value) =>
                             handleUpdateFeatureInput(key, { dataType: value })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="border-0 shadow-none bg-grey-50">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -842,6 +842,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                               minLength: parseInt(e.target.value) || undefined,
                             })
                           }
+                          className="border-0 shadow-none bg-grey-50 focus:bg-white"
                         />
 
                         <Input
@@ -853,10 +854,11 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                               maxLength: parseInt(e.target.value) || undefined,
                             })
                           }
+                          className="border-0 shadow-none bg-grey-50 focus:bg-white"
                         />
                       </div>
 
-                      <div className="text-xs text-grey-600 font-mono bg-white p-2 rounded">
+                      <div className="text-xs text-grey-600 font-mono bg-grey-50 p-1.5 rounded">
                         $Input{'{'}{input.key}{'}'}
                       </div>
                     </div>

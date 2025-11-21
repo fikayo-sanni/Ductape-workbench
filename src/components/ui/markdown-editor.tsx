@@ -96,7 +96,7 @@ export function MarkdownViewer({ content, className }: { content: string; classN
   if (!content) return null;
 
   return (
-    <div className={cn('prose prose-sm max-w-none', className)}>
+    <div className={cn('prose prose-sm max-w-none text-grey', className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>

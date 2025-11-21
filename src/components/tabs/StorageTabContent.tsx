@@ -360,15 +360,15 @@ const ductape = new Ductape({
           {
             title: 'Read File',
             code: `const filePath = 'path/to/file.txt';
-const input = await ductape.processor.storage.readFile(filePath);`
+const file = await ductape.processor.storage.readFile(filePath);`
           },
           {
             title: 'Write File',
             code: `const uploadData = {
   env: '${envSlug}',
-  product_tag: '${productTagValue}',
+  product: '${productTagValue}',
   event: '${storageTag}',
-  input,
+  file,
   retries: 3,
 };
 
@@ -392,15 +392,15 @@ const ductape = new Ductape({
           {
             title: 'Read File',
             code: `const filePath: string = 'path/to/file.txt';
-const input = await ductape.processor.storage.readFile(filePath);`
+const file = await ductape.processor.storage.readFile(filePath);`
           },
           {
             title: 'Write File',
             code: `const uploadData = {
   env: '${envSlug}',
-  product_tag: '${productTagValue}',
+  product: '${productTagValue}',
   event: '${storageTag}',
-  input,
+  file,
   retries: 3,
 };
 

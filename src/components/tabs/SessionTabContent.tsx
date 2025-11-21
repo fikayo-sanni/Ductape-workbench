@@ -1,13 +1,17 @@
-import { KeyRound, Clock, Tag, FileJson } from 'lucide-react';
+import { useState } from 'react';
+import { KeyRound, Clock, Tag, FileJson, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface SessionTabContentProps {
   session: any;
 }
 
 export default function SessionTabContent({ session }: SessionTabContentProps) {
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
   // Early return if session is not provided
   if (!session) {
     return (
@@ -40,6 +44,182 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
       }
     }
     return JSON.stringify(schema, null, 2);
+  };
+
+  // Generate SDK code examples for session management
+  const generateCodeSections = (language: string) => {
+    if (!session) return [];
+
+    const productTag = session.productTag || 'your_product_tag';
+    const sessionTag = session.tag;
+    const selector = session.selector || 'user_id';
+
+    const sections = [];
+
+    if (language === 'typescript') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `import { Ductape } from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspace_id: 'your_workspace_id',
+  user_id: 'your_user_id',
+  token: 'your_auth_token',
+  public_key: 'your_public_key'
+});
+
+// Initialize product
+await ductape.product.init('${productTag}');`,
+      });
+
+      sections.push({
+        title: 'Create Session',
+        code: `// Create a new session for a user
+const sessionData = {
+  ${selector}: 'user_123',
+  // Add other session data according to your schema
+};
+
+const result = await ductape.product.session.create({
+  tag: '${sessionTag}',
+  data: sessionData
+});
+
+console.log('Session created:', result);`,
+      });
+
+      sections.push({
+        title: 'Validate Session',
+        code: `// Validate an active session
+const isValid = await ductape.product.session.validate({
+  tag: '${sessionTag}',
+  ${selector}: 'user_123'
+});
+
+if (isValid) {
+  console.log('Session is valid');
+} else {
+  console.log('Session is invalid or expired');
+}`,
+      });
+
+      sections.push({
+        title: 'Get Session Data',
+        code: `// Retrieve session data
+const sessionData = await ductape.product.session.get({
+  tag: '${sessionTag}',
+  ${selector}: 'user_123'
+});
+
+console.log('Session data:', sessionData);`,
+      });
+
+      sections.push({
+        title: 'Update Session',
+        code: `// Update session data
+await ductape.product.session.update({
+  tag: '${sessionTag}',
+  ${selector}: 'user_123',
+  data: {
+    // Updated session data
+    last_activity: new Date().toISOString()
+  }
+});`,
+      });
+
+      sections.push({
+        title: 'Delete Session',
+        code: `// Delete/logout a session
+await ductape.product.session.delete({
+  tag: '${sessionTag}',
+  ${selector}: 'user_123'
+});
+
+console.log('Session deleted');`,
+      });
+    } else if (language === 'python') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `from ductape import Ductape
+
+ductape = Ductape(
+    workspace_id='your_workspace_id',
+    user_id='your_user_id',
+    token='your_auth_token',
+    public_key='your_public_key'
+)
+
+# Initialize product
+ductape.product.init('${productTag}')`,
+      });
+
+      sections.push({
+        title: 'Create Session',
+        code: `# Create a new session for a user
+session_data = {
+    '${selector}': 'user_123',
+    # Add other session data according to your schema
+}
+
+result = ductape.product.session.create(
+    tag='${sessionTag}',
+    data=session_data
+)
+
+print('Session created:', result)`,
+      });
+
+      sections.push({
+        title: 'Validate Session',
+        code: `# Validate an active session
+is_valid = ductape.product.session.validate(
+    tag='${sessionTag}',
+    ${selector}='user_123'
+)
+
+if is_valid:
+    print('Session is valid')
+else:
+    print('Session is invalid or expired')`,
+      });
+
+      sections.push({
+        title: 'Get Session Data',
+        code: `# Retrieve session data
+session_data = ductape.product.session.get(
+    tag='${sessionTag}',
+    ${selector}='user_123'
+)
+
+print('Session data:', session_data)`,
+      });
+
+      sections.push({
+        title: 'Update Session',
+        code: `# Update session data
+ductape.product.session.update(
+    tag='${sessionTag}',
+    ${selector}='user_123',
+    data={
+        # Updated session data
+        'last_activity': datetime.now().isoformat()
+    }
+)`,
+      });
+
+      sections.push({
+        title: 'Delete Session',
+        code: `# Delete/logout a session
+ductape.product.session.delete(
+    tag='${sessionTag}',
+    ${selector}='user_123'
+)
+
+print('Session deleted')`,
+      });
+    }
+
+    return sections;
   };
 
   return (
@@ -82,7 +262,18 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               <KeyRound className="h-6 w-6 text-blue-500" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-grey mb-2">{session?.name}</h1>
+              <div className="flex items-center justify-between mb-2">
+                <h1 className="text-2xl font-bold text-grey">{session?.name}</h1>
+                <Button
+                  onClick={() => setShowCodeSidebar(true)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Code className="h-4 w-4" />
+                  <span>Code</span>
+                </Button>
+              </div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm text-grey-600 flex items-center gap-1">
                   <Tag className="h-3 w-3" />
@@ -179,7 +370,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
               <textarea
                 value={formatSchema(session?.schema || {})}
                 readOnly
-                className="mt-2 w-full min-h-[200px] px-3 py-2 text-sm rounded-md border border-grey-400 bg-white resize-none font-mono"
+                className="mt-2 w-full min-h-[200px] px-3 py-2 text-sm text-grey rounded-md border border-grey-400 bg-white resize-none font-mono"
               />
               <p className="text-xs text-grey-600 mt-1">
                 JSON schema defining the session data structure
@@ -273,6 +464,17 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
           </p>
         </div>
       </div>
+
+      {/* Code Sidebar */}
+      {showCodeSidebar && (
+        <CodeSidebar
+          title={session.name}
+          subtitle={`Manage user sessions using the ${session.tag} session`}
+          tag={session.tag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateCodeSections}
+        />
+      )}
     </div>
   );
 }

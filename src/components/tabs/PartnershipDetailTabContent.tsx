@@ -995,7 +995,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[550px]">
                   <DialogHeader>
-                    <DialogTitle>Create Support Ticket</DialogTitle>
+                    <DialogTitle className='text-grey'>Create Support Ticket</DialogTitle>
                     <DialogDescription>
                       Report an issue or request assistance. We'll get back to you as soon as possible.
                     </DialogDescription>

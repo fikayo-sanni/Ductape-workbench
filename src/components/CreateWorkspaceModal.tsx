@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { Button } from './ui/button';
@@ -25,10 +25,10 @@ interface CreateWorkspaceModalProps {
   onSuccess?: (workspace: any) => void;
 }
 
-export default function CreateWorkspaceModal({ 
-  open, 
-  onOpenChange, 
-  onSuccess 
+export default function CreateWorkspaceModal({
+  open,
+  onOpenChange,
+  onSuccess
 }: CreateWorkspaceModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -36,6 +36,14 @@ export default function CreateWorkspaceModal({
     name: '',
     description: '',
   });
+
+  // Auto-generate description when workspace name changes
+  useEffect(() => {
+    if (formData.name.trim()) {
+      const generatedDescription = `Workspace for ${formData.name} - organize and manage your products, apps, and integrations`;
+      setFormData(prev => ({ ...prev, description: generatedDescription }));
+    }
+  }, [formData.name]);
 
   const { mutate: createWorkspace, status: creatingWorkspace } = useMutation({
     mutationFn: (data: {
