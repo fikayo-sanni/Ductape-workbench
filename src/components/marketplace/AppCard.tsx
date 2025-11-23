@@ -3,8 +3,6 @@ import { Badge } from '@/components/ui/badge';
 import {
   ExternalLink,
   Download,
-  Calendar,
-  Tag,
   Globe,
 } from 'lucide-react';
 
@@ -16,16 +14,18 @@ interface Domain {
 }
 
 interface MarketplaceApp {
+  domains?: string[];
   _id: string;
   app_name: string;
-  domain_name: string;
   description?: string;
   logo?: string;
+  latest_version: string;
   versions?: Array<{
     _id: string;
     version: string;
     latest: boolean;
     created_at: string;
+    domains?: string[];
   }>;
   created_at: string;
   updated_at: string;
@@ -49,16 +49,6 @@ export default function AppCard({ app, onClick, onIntegrate, viewMode }: AppCard
       .toUpperCase()
       .slice(0, 2);
   };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const latestVersion = app.versions?.find(v => v.latest);
 
   if (viewMode === 'list') {
     return (
@@ -86,24 +76,29 @@ export default function AppCard({ app, onClick, onIntegrate, viewMode }: AppCard
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-grey truncate">{app.app_name}</h3>
-              {latestVersion && (
-                <Badge variant="secondary" className="text-xs">
-                  v{latestVersion.version}
-                </Badge>
-              )}
             </div>
             <p className="text-sm text-grey-600 mb-2 line-clamp-2">
               {app.description || 'No description available'}
             </p>
-            <div className="flex items-center gap-4 text-xs text-grey-500">
-              <div className="flex items-center gap-1">
-                <Tag className="h-3 w-3" />
-                {app.domain_name}
-              </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDate(app.updated_at)}
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className="text-xs font-semibold bg-green/10 text-green border-green/20 hover:bg-green/10">
+                {app?.latest_version || 'v1.0.0'}
+              </Badge>
+              {app?.domains && app.domains.length > 0 ? (
+                <>
+                  {app.domains.slice(0, 3).map((domain, index) => (
+                    <Badge key={index}  variant="outline" className="text-xs text-grey">
+                      <Globe className="h-3 w-3 mr-1" />
+                      {domain}
+                    </Badge>
+                  ))}
+                  {app.domains.length > 3 && (
+                    <span className="text-xs text-grey-600">+{app.domains.length - 3} more</span>
+                  )}
+                </>
+              ) : (
+                <></>
+              )}
             </div>
           </div>
 
@@ -156,11 +151,6 @@ export default function AppCard({ app, onClick, onIntegrate, viewMode }: AppCard
             </span>
           )}
         </div>
-        {latestVersion && (
-          <Badge variant="secondary" className="text-xs">
-            v{latestVersion.version}
-          </Badge>
-        )}
       </div>
 
       {/* Content */}
@@ -171,13 +161,25 @@ export default function AppCard({ app, onClick, onIntegrate, viewMode }: AppCard
         <p className="text-sm text-grey-600 mb-3 line-clamp-3">
           {app.description || 'No description available'}
         </p>
-        <div className="flex items-center gap-1 text-xs text-grey-500 mb-2">
-          <Globe className="h-3 w-3" />
-          {app.domain_name}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-grey-500">
-          <Calendar className="h-3 w-3" />
-          {formatDate(app.created_at)}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className="text-xs font-semibold bg-green/10 text-green border-green/20 hover:bg-green/10">
+            {app?.latest_version || 'v1.0.0'}
+          </Badge>
+          {app?.domains && app.domains.length > 0 ? (
+            <>
+              {app.domains.slice(0, 3).map((domain, index) => (
+                <Badge key={index} variant="outline" className="text-xs text-grey">
+                  <Globe className="h-3 w-3 mr-1" />
+                  {domain}
+                </Badge>
+              ))}
+              {app.domains.length > 3 && (
+                <span className="text-xs text-grey-600">+{app.domains.length - 3} more</span>
+              )}
+            </>
+          ) : (
+            <></>
+          )}
         </div>
       </div>
 

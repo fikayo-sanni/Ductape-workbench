@@ -1,21 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useDebouncedValue } from '@wojtekmaj/react-hooks';
 import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  LinkIcon,
+  ChevronDown,
+  ChevronUp,
   Loader,
 } from 'lucide-react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  createColumnHelper,
-  ColumnDef,
-} from '@tanstack/react-table';
 import { format } from 'date-fns';
 import logsServices from '@/services/logsServices';
 import { useAuth } from '@/store/useAuth';
@@ -28,16 +18,8 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { ILog } from '@/types/logs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '../ui/badge';
-import CopyableTag from '../CopyableTag';
+import { cn } from '@/lib/utils';
 import appServicesReal from '@/services/appServicesReal';
 import productServicesReal from '@/services/productServicesReal';
 
@@ -75,282 +57,782 @@ const timeRangeOptions = [
 
 type ProcessLog = ILog['logs']['data'][number];
 
-const columnHelper = createColumnHelper<ProcessLog>();
+// Dummy logs data for when there's no real data
+const DUMMY_LOGS: ProcessLog[] = [
+  {
+    _id: 'log_1',
+    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
+    process_id: 'proc_abc123def456',
+    app_env: 'production',
+    env: 'production',
+    name: 'user-authentication',
+    type: 'session',
+    message: 'User session created successfully',
+    parent_tag: 'auth',
+    child_tag: 'login',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'session-auth',
+    response: { status: 200, token: 'tok_***' },
+    request: { method: 'POST', endpoint: '/auth/login' },
+    data: JSON.stringify({ user_id: 'usr_1a2b3c4d', email: 'user@example.com', session_token: 'tok_***', ip_address: '192.168.1.100' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_2',
+    timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(), // 12 minutes ago
+    process_id: 'proc_def789ghi012',
+    app_env: 'production',
+    env: 'production',
+    name: 'database-query',
+    type: 'database',
+    message: 'Database query executed',
+    parent_tag: 'users-db',
+    child_tag: 'read',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'database-query',
+    response: { status: 200, rows: 1 },
+    request: { query: 'SELECT * FROM users WHERE id = ?' },
+    data: JSON.stringify({ query: 'SELECT * FROM users WHERE id = ?', duration_ms: 45, rows_returned: 1 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_3',
+    timestamp: new Date(Date.now() - 18 * 60 * 1000).toISOString(), // 18 minutes ago
+    process_id: 'proc_jkl345mno678',
+    app_env: 'production',
+    env: 'production',
+    name: 'cache-operation',
+    type: 'cache',
+    message: 'Cache hit - data retrieved',
+    parent_tag: 'user-cache',
+    child_tag: 'get',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'cache-get',
+    response: { hit: true, value: 'cached_data' },
+    request: { key: 'user:profile:12345' },
+    data: JSON.stringify({ key: 'user:profile:12345', ttl: 3600, hit: true }),
+    __v: 0,
+  },
+  {
+    _id: 'log_4',
+    timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(), // 25 minutes ago
+    process_id: 'proc_pqr901stu234',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'api-request',
+    type: 'app',
+    message: 'API request failed - validation error',
+    parent_tag: 'api',
+    child_tag: 'validate',
+    status: 'fail',
+    successful_execution: false,
+    failed_execution: true,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'api-validation',
+    response: { status: 400, error: 'Email already exists' },
+    request: { method: 'POST', endpoint: '/api/users/create' },
+    data: JSON.stringify({ endpoint: '/api/users/create', error: 'Email already exists', validation_errors: ['email'] }),
+    __v: 0,
+  },
+  {
+    _id: 'log_5',
+    timestamp: new Date(Date.now() - 32 * 60 * 1000).toISOString(), // 32 minutes ago
+    process_id: 'proc_vwx567yza890',
+    app_env: 'production',
+    env: 'production',
+    name: 'file-upload',
+    type: 'storage',
+    message: 'File uploaded to storage',
+    parent_tag: 'document-storage',
+    child_tag: 'upload',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'storage-upload',
+    response: { status: 200, file_id: 'file_123' },
+    request: { file_name: 'report_2024.pdf', bucket: 'documents' },
+    data: JSON.stringify({ file_name: 'report_2024.pdf', size_bytes: 2458624, bucket: 'documents' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_6',
+    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(), // 45 minutes ago
+    process_id: 'proc_bcd123efg456',
+    app_env: 'production',
+    env: 'production',
+    name: 'message-broker',
+    type: 'broker',
+    message: 'Message published to queue',
+    parent_tag: 'notifications',
+    child_tag: 'publish',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'broker-publish',
+    response: { status: 200, message_id: 'msg_789' },
+    request: { queue: 'email-notifications', priority: 'high' },
+    data: JSON.stringify({ queue: 'email-notifications', message_id: 'msg_789', priority: 'high' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_7',
+    timestamp: new Date(Date.now() - 52 * 60 * 1000).toISOString(), // 52 minutes ago
+    process_id: 'proc_hij789klm012',
+    app_env: 'development',
+    env: 'development',
+    name: 'job-execution',
+    type: 'job',
+    message: 'Scheduled job completed',
+    parent_tag: 'data-cleanup',
+    child_tag: 'execute',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'job-cleanup',
+    response: { status: 200, records_deleted: 1247 },
+    request: { job_name: 'cleanup-old-sessions' },
+    data: JSON.stringify({ job_name: 'cleanup-old-sessions', records_deleted: 1247, duration_s: 12.5 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_8',
+    timestamp: new Date(Date.now() - 68 * 60 * 1000).toISOString(), // 68 minutes ago
+    process_id: 'proc_nop345qrs678',
+    app_env: 'production',
+    env: 'production',
+    name: 'payment-processing',
+    type: 'app',
+    message: 'Payment transaction processed',
+    parent_tag: 'payments',
+    child_tag: 'charge',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'payment-charge',
+    response: { status: 200, transaction_id: 'txn_abc123' },
+    request: { amount: 49.99, currency: 'USD', payment_method: 'credit_card' },
+    data: JSON.stringify({ amount: 49.99, currency: 'USD', transaction_id: 'txn_abc123', payment_method: 'credit_card' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_9',
+    timestamp: new Date(Date.now() - 75 * 60 * 1000).toISOString(), // 75 minutes ago
+    process_id: 'proc_tuv901wxy234',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'email-delivery',
+    type: 'app',
+    message: 'Email delivery failed - invalid recipient',
+    parent_tag: 'email',
+    child_tag: 'send',
+    status: 'fail',
+    successful_execution: false,
+    failed_execution: true,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'email-send',
+    response: { status: 400, error: 'Invalid email format' },
+    request: { to: 'invalid@example', subject: 'Welcome' },
+    data: JSON.stringify({ to: 'invalid@example', subject: 'Welcome', error: 'Invalid email format' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_10',
+    timestamp: new Date(Date.now() - 88 * 60 * 1000).toISOString(), // 88 minutes ago
+    process_id: 'proc_zab567cde890',
+    app_env: 'production',
+    env: 'production',
+    name: 'webhook-trigger',
+    type: 'app',
+    message: 'Webhook triggered successfully',
+    parent_tag: 'webhooks',
+    child_tag: 'trigger',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'webhook-trigger',
+    response: { status: 200, response_code: 200 },
+    request: { webhook_url: 'https://api.example.com/webhook', event: 'user.created' },
+    data: JSON.stringify({ webhook_url: 'https://api.example.com/webhook', event: 'user.created', response_code: 200 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_11',
+    timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString(), // 95 minutes ago
+    process_id: 'proc_fgh123ijk456',
+    app_env: 'production',
+    env: 'production',
+    name: 'data-export',
+    type: 'app',
+    message: 'Data export completed',
+    parent_tag: 'exports',
+    child_tag: 'csv',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'export-csv',
+    response: { status: 200, file_size_mb: 12.8, download_url: 'https://storage/exports/data.csv' },
+    request: { format: 'csv' },
+    data: JSON.stringify({ format: 'csv', records: 5432, file_size_mb: 12.8, download_url: 'https://storage/exports/data.csv' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_12',
+    timestamp: new Date(Date.now() - 102 * 60 * 1000).toISOString(), // 102 minutes ago
+    process_id: 'proc_lmn789opq012',
+    app_env: 'production',
+    env: 'production',
+    name: 'cache-invalidation',
+    type: 'cache',
+    message: 'Cache invalidated',
+    parent_tag: 'product-cache',
+    child_tag: 'delete',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'cache-invalidate',
+    response: { status: 200, keys_deleted: 245 },
+    request: { pattern: 'product:*' },
+    data: JSON.stringify({ pattern: 'product:*', keys_deleted: 245 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_13',
+    timestamp: new Date(Date.now() - 115 * 60 * 1000).toISOString(), // 115 minutes ago
+    process_id: 'proc_rst345uvw678',
+    app_env: 'development',
+    env: 'development',
+    name: 'test-execution',
+    type: 'app',
+    message: 'Integration tests passed',
+    parent_tag: 'testing',
+    child_tag: 'integration',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'test-integration',
+    response: { status: 200, passed: 127, failed: 0 },
+    request: { test_type: 'integration' },
+    data: JSON.stringify({ total_tests: 127, passed: 127, failed: 0, duration_s: 45.2 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_14',
+    timestamp: new Date(Date.now() - 128 * 60 * 1000).toISOString(), // 128 minutes ago
+    process_id: 'proc_xyz901abc234',
+    app_env: 'production',
+    env: 'production',
+    name: 'notification-sent',
+    type: 'app',
+    message: 'Push notification sent',
+    parent_tag: 'notifications',
+    child_tag: 'push',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'notification-push',
+    response: { status: 200, delivery_status: 'delivered' },
+    request: { title: 'New Message' },
+    data: JSON.stringify({ recipient: 'device_token_***', title: 'New Message', delivery_status: 'delivered' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_15',
+    timestamp: new Date(Date.now() - 142 * 60 * 1000).toISOString(), // 142 minutes ago
+    process_id: 'proc_def567ghi890',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'data-sync',
+    type: 'database',
+    message: 'Data synchronization completed',
+    parent_tag: 'sync',
+    child_tag: 'replicate',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'sync-replicate',
+    response: { status: 200, records_synced: 8934 },
+    request: { source: 'primary_db', target: 'replica_db' },
+    data: JSON.stringify({ source: 'primary_db', target: 'replica_db', records_synced: 8934, duration_s: 28.7 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_16',
+    timestamp: new Date(Date.now() - 155 * 60 * 1000).toISOString(),
+    process_id: 'proc_hij123klm456',
+    app_env: 'production',
+    env: 'production',
+    name: 'user-logout',
+    type: 'session',
+    message: 'User session terminated',
+    parent_tag: 'auth',
+    child_tag: 'logout',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'session-logout',
+    response: { status: 200, session_duration_s: 3245 },
+    request: { logout_type: 'manual' },
+    data: JSON.stringify({ user_id: 'usr_9a8b7c6d', session_duration_s: 3245, logout_type: 'manual' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_17',
+    timestamp: new Date(Date.now() - 168 * 60 * 1000).toISOString(),
+    process_id: 'proc_nop789qrs012',
+    app_env: 'production',
+    env: 'production',
+    name: 'image-processing',
+    type: 'storage',
+    message: 'Image thumbnail generated',
+    parent_tag: 'media',
+    child_tag: 'thumbnail',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'media-thumbnail',
+    response: { status: 200, thumbnail_size: '128KB', format: 'webp' },
+    request: { original_size: '4.2MB', dimensions: '300x300' },
+    data: JSON.stringify({ original_size: '4.2MB', thumbnail_size: '128KB', format: 'webp', dimensions: '300x300' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_18',
+    timestamp: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
+    process_id: 'proc_tuv345wxy678',
+    app_env: 'development',
+    env: 'development',
+    name: 'database-migration',
+    type: 'database',
+    message: 'Database migration applied',
+    parent_tag: 'migrations',
+    child_tag: 'up',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'migration-up',
+    response: { status: 200, tables_affected: 1 },
+    request: { migration_name: 'add_user_preferences_table', version: '20240123_001' },
+    data: JSON.stringify({ migration_name: 'add_user_preferences_table', version: '20240123_001', tables_affected: 1 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_19',
+    timestamp: new Date(Date.now() - 195 * 60 * 1000).toISOString(),
+    process_id: 'proc_zab901cde234',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'api-rate-limit',
+    type: 'app',
+    message: 'API rate limit exceeded',
+    parent_tag: 'api',
+    child_tag: 'rate-limit',
+    status: 'fail',
+    successful_execution: false,
+    failed_execution: true,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'api-rate-limit',
+    response: { status: 429, error: 'Rate limit exceeded' },
+    request: { endpoint: '/api/search', client_ip: '203.0.113.42' },
+    data: JSON.stringify({ client_ip: '203.0.113.42', endpoint: '/api/search', limit: 100, actual: 156 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_20',
+    timestamp: new Date(Date.now() - 210 * 60 * 1000).toISOString(),
+    process_id: 'proc_fgh567ijk890',
+    app_env: 'production',
+    env: 'production',
+    name: 'backup-creation',
+    type: 'job',
+    message: 'Database backup created',
+    parent_tag: 'backup',
+    child_tag: 'create',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'backup-create',
+    response: { status: 200, backup_size_gb: 45.2, backup_type: 'full' },
+    request: { location: 's3://backups/db-2024-01-23.sql.gz' },
+    data: JSON.stringify({ backup_size_gb: 45.2, backup_type: 'full', location: 's3://backups/db-2024-01-23.sql.gz' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_21',
+    timestamp: new Date(Date.now() - 225 * 60 * 1000).toISOString(),
+    process_id: 'proc_lmn123opq456',
+    app_env: 'production',
+    env: 'production',
+    name: 'search-query',
+    type: 'app',
+    message: 'Search query executed',
+    parent_tag: 'search',
+    child_tag: 'query',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'search-query',
+    response: { status: 200, results: 234, response_time_ms: 87 },
+    request: { query: 'analytics dashboard' },
+    data: JSON.stringify({ query: 'analytics dashboard', results: 234, response_time_ms: 87 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_22',
+    timestamp: new Date(Date.now() - 240 * 60 * 1000).toISOString(),
+    process_id: 'proc_rst789uvw012',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'queue-processing',
+    type: 'broker',
+    message: 'Message consumed from queue',
+    parent_tag: 'processing',
+    child_tag: 'consume',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'broker-consume',
+    response: { status: 200, processing_time_ms: 1240 },
+    request: { queue: 'background-tasks', message_id: 'msg_456' },
+    data: JSON.stringify({ queue: 'background-tasks', message_id: 'msg_456', processing_time_ms: 1240 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_23',
+    timestamp: new Date(Date.now() - 255 * 60 * 1000).toISOString(),
+    process_id: 'proc_xyz345abc678',
+    app_env: 'production',
+    env: 'production',
+    name: 'user-registration',
+    type: 'session',
+    message: 'New user registered',
+    parent_tag: 'auth',
+    child_tag: 'register',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'auth-register',
+    response: { status: 200, user_id: 'usr_new_123' },
+    request: { email: 'newuser@example.com' },
+    data: JSON.stringify({ user_id: 'usr_new_123', email: 'newuser@example.com', verification_sent: true }),
+    __v: 0,
+  },
+  {
+    _id: 'log_24',
+    timestamp: new Date(Date.now() - 270 * 60 * 1000).toISOString(),
+    process_id: 'proc_def901ghi234',
+    app_env: 'development',
+    env: 'development',
+    name: 'code-deployment',
+    type: 'app',
+    message: 'Code deployed to environment',
+    parent_tag: 'deployment',
+    child_tag: 'deploy',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'deployment-deploy',
+    response: { status: 200, environment: 'dev' },
+    request: { commit_hash: 'a1b2c3d', branch: 'feature/new-dashboard' },
+    data: JSON.stringify({ commit_hash: 'a1b2c3d', branch: 'feature/new-dashboard', environment: 'dev' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_25',
+    timestamp: new Date(Date.now() - 285 * 60 * 1000).toISOString(),
+    process_id: 'proc_jkl567mno890',
+    app_env: 'production',
+    env: 'production',
+    name: 'report-generation',
+    type: 'job',
+    message: 'Monthly report generated',
+    parent_tag: 'reports',
+    child_tag: 'generate',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'report-generate',
+    response: { status: 200, pages: 47, format: 'pdf' },
+    request: { report_type: 'monthly_analytics', period: '2024-01' },
+    data: JSON.stringify({ report_type: 'monthly_analytics', period: '2024-01', pages: 47, format: 'pdf' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_26',
+    timestamp: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
+    process_id: 'proc_pqr123stu456',
+    app_env: 'staging',
+    env: 'staging',
+    name: 'api-timeout',
+    type: 'app',
+    message: 'API request timeout',
+    parent_tag: 'api',
+    child_tag: 'timeout',
+    status: 'fail',
+    successful_execution: false,
+    failed_execution: true,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'api-timeout',
+    response: { status: 504, error: 'Gateway Timeout' },
+    request: { endpoint: '/api/analytics/report', timeout_ms: 30000 },
+    data: JSON.stringify({ endpoint: '/api/analytics/report', timeout_ms: 30000, elapsed_ms: 30042 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_27',
+    timestamp: new Date(Date.now() - 315 * 60 * 1000).toISOString(),
+    process_id: 'proc_vwx789yza012',
+    app_env: 'production',
+    env: 'production',
+    name: 'cache-warming',
+    type: 'cache',
+    message: 'Cache warmed successfully',
+    parent_tag: 'cache',
+    child_tag: 'warm',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'cache-warm',
+    response: { status: 200, keys_loaded: 1542, cache_type: 'redis' },
+    request: { duration_s: 8.3 },
+    data: JSON.stringify({ keys_loaded: 1542, duration_s: 8.3, cache_type: 'redis' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_28',
+    timestamp: new Date(Date.now() - 330 * 60 * 1000).toISOString(),
+    process_id: 'proc_bcd345efg678',
+    app_env: 'production',
+    env: 'production',
+    name: 'subscription-renewal',
+    type: 'app',
+    message: 'Subscription renewed',
+    parent_tag: 'billing',
+    child_tag: 'renew',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'billing-renew',
+    response: { status: 200, subscription_id: 'sub_789', plan: 'pro' },
+    request: { amount: 99.99, next_billing: '2024-02-23' },
+    data: JSON.stringify({ subscription_id: 'sub_789', plan: 'pro', amount: 99.99, next_billing: '2024-02-23' }),
+    __v: 0,
+  },
+  {
+    _id: 'log_29',
+    timestamp: new Date(Date.now() - 345 * 60 * 1000).toISOString(),
+    process_id: 'proc_hij901klm234',
+    app_env: 'development',
+    env: 'development',
+    name: 'unit-tests',
+    type: 'app',
+    message: 'Unit tests completed',
+    parent_tag: 'testing',
+    child_tag: 'unit',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'test-unit',
+    response: { status: 200, passed: 854, failed: 2 },
+    request: { test_type: 'unit' },
+    data: JSON.stringify({ total: 856, passed: 854, failed: 2, skipped: 0, duration_s: 24.5 }),
+    __v: 0,
+  },
+  {
+    _id: 'log_30',
+    timestamp: new Date(Date.now() - 360 * 60 * 1000).toISOString(),
+    process_id: 'proc_nop567qrs890',
+    app_env: 'production',
+    env: 'production',
+    name: 'security-scan',
+    type: 'app',
+    message: 'Security vulnerability scan completed',
+    parent_tag: 'security',
+    child_tag: 'scan',
+    status: 'success',
+    successful_execution: true,
+    failed_execution: false,
+    product_tag: 'demo-product',
+    workspace_id: 'ws_demo123',
+    feature_tag: 'security-scan',
+    response: { status: 200, vulnerabilities_found: 3 },
+    request: { severity_levels: { high: 0, medium: 1, low: 2 } },
+    data: JSON.stringify({ vulnerabilities_found: 3, severity_levels: { high: 0, medium: 1, low: 2 } }),
+    __v: 0,
+  },
+];
 
-function TableComponent({ processes }: { processes: ProcessLog[] }) {
+// Helper function for environment badge colors
+const getEnvBadgeColor = (env: string) => {
+  switch (env) {
+    case 'production':
+    case 'prd':
+      return 'bg-green/10 text-green border-green/20';
+    case 'staging':
+    case 'stg':
+      return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
+    case 'development':
+    case 'dev':
+      return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+    default:
+      return 'bg-grey-100 text-grey-600 border-grey-300';
+  }
+};
+
+function LogsCards({ processes }: { processes: ProcessLog[] }) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
-  const columns = useMemo<ColumnDef<ProcessLog, any>[]>(
-    () => [
-      columnHelper.accessor('_id', {
-        header: '',
-        cell: ({ row }) => (
-          <div className="flex items-center">
-            {row.original.successful_execution ? (
-              <div className="-ml-1 h-6 w-[4px] bg-blue-500" />
-            ) : row.original.status === 'fail' ? (
-              <div className="-ml-1 h-6 w-[4px] bg-red" />
-            ) : row.original.status === 'success' ? (
-              <div className="-ml-1 h-6 w-[4px] bg-green" />
-            ) : (
-              <div className="-ml-1 h-6 w-[4px] bg-transparent" />
-            )}
-            <LinkIcon className="mx-2 size-3 text-primary" />
-            <button onClick={() => toggleRow(row.original._id)} className="mr-2">
-              {expandedRows[row.original._id] ? (
-                <ChevronDownIcon className="size-4" />
-              ) : (
-                <ChevronRightIcon className="size-4" />
-              )}
-            </button>
-          </div>
-        ),
-      }),
-      columnHelper.accessor('timestamp', {
-        header: 'Timestamp',
-        cell: ({ row }) => (
-          <div className="flex items-center text-grey font-semibold">
-            {format(new Date(row.original.timestamp), 'yyyy-MM-dd HH:mm:ss')}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('process_id', {
-        header: 'Process ID',
-        cell: ({ row }) => (
-          <div className="flex items-center text-sm text-[#444444] font-semibold px-4 h-6 bg-[#F3F7FD] w-fit rounded-full">
-            {row.original.process_id}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('app_env', {
-        header: 'Environment',
-        cell: ({ row }) => (
-          <Badge
-            variant={row.original.app_env === 'prd' ? 'default' : 'secondary'}
-            className="rounded-full"
-          >
-            {row.original.app_env || row.original.env}
-          </Badge>
-        ),
-      }),
-      columnHelper.accessor('name', {
-        header: 'Name',
-        cell: ({ row }) => (
-          <div className="flex items-center text-sm text-[#444444] font-semibold px-4 h-6 bg-[#F3F7FD] w-fit rounded-full">
-            {row.original.name}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('type', {
-        header: 'Type',
-        cell: ({ row }) => (
-          <div className="flex items-center text-sm text-[#444444] font-semibold px-4 h-6 bg-[#F3F7FD] w-fit rounded-full">
-            {row.original.type}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('message', {
-        header: 'Message',
-        cell: ({ row }) => (
-          <div className="flex items-center text-sm text-[#444444] font-semibold px-4 h-6 bg-[#F3F7FD] w-fit rounded-full">
-            {row.original.message}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('child_tag', {
-        header: 'Operation',
-        cell: ({ row }) => (
-          <div>
-            <CopyableTag
-              tag={String(
-                row.original.child_tag
-                  ? `${row.original.parent_tag ? `${row.original.parent_tag}:` : ''}${row.original.child_tag}`
-                  : row.original.feature_tag || row.original.parent_tag
-              )}
-              className="text-primary bg-primary/15 border-primary border-[0.5px] bg-opacity-[15%] text-xs font-medium px-2 py-1 rounded-sm w-fit h-5 flex items-center justify-center"
-            />
-          </div>
-        ),
-      }),
-    ],
-    [expandedRows]
-  );
-
-  const table = useReactTable({
-    data: processes,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
-    <div className="w-full">
-      <div className="rounded-md border border-grey-400">
-        {/* Desktop View */}
-        <div className="hidden sm:block">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="bg-[#F2F6FF]">
-                      {header.isPlaceholder ? null : (
-                        <div
-                          {...{
-                            className: header.column.getCanSort()
-                              ? 'cursor-pointer select-none flex items-center'
-                              : '',
-                            onClick: header.column.getToggleSortingHandler(),
-                          }}
-                        >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                          {
-                            {
-                              asc: <ChevronUpIcon className="ml-2 h-4 w-4" />,
-                              desc: <ChevronDownIcon className="ml-2 h-4 w-4" />,
-                            }[header.column.getIsSorted() as string] ?? null
-                          }
-                        </div>
-                      )}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <React.Fragment key={row.id}>
-                  <TableRow key={row.id} className="h-11">
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                  {expandedRows[row.original._id] && (
-                    <TableRow>
-                      <TableCell colSpan={columns.length}>
-                        <pre className="bg-gray-100 p-4 rounded-md contain-inline-size overflow-x-auto">
-                          <code className="text-grey text-sm font-medium">
-                            {JSON.stringify(JSON.parse(row.original.data), null, 2)}
-                          </code>
-                        </pre>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+    <div className="space-y-2">
+      {processes.map((log) => (
+        <div key={log._id} className="bg-white rounded-lg border border-grey-400 overflow-hidden hover:border-primary/50 transition-colors">
+          {/* Log Header */}
+          <div
+            className="p-3 cursor-pointer"
+            onClick={() => toggleRow(log._id)}
+          >
+            <div className="flex items-start gap-3">
+              {/* Status Indicator */}
+              <div className="flex-shrink-0 mt-1">
+                {log.successful_execution || log.status === 'success' ? (
+                  <div className="w-2 h-2 rounded-full bg-green" />
+                ) : log.status === 'fail' ? (
+                  <div className="w-2 h-2 rounded-full bg-red" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                )}
+              </div>
 
-        {/* Mobile View */}
-        <div className="sm:hidden">
-          {processes?.length ? (
-            <div className="divide-y divide-grey-400">
-              {processes.map((log) => (
-                <LogCard key={log._id} log={log} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center my-10">
-              <p className="text-sm text-grey font-semibold">No logs found</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+              <div className="flex-1 min-w-0 space-y-2">
+                {/* Top Row: Timestamp & Expand */}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-grey">
+                    {format(new Date(log.timestamp), 'MMM dd, yyyy HH:mm:ss')}
+                  </p>
+                  <button className="flex-shrink-0 text-grey-600 hover:text-grey">
+                    {expandedRows[log._id] ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
 
-function LogCard({ log }: { log: ProcessLog }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+                {/* Details Row */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Process ID */}
+                  <span className="text-xs font-mono text-grey-600 bg-grey-100 px-2 py-0.5 rounded">
+                    {log.process_id}
+                  </span>
 
-  return (
-    <div className="p-4 border-b border-grey-400 last:border-b-0">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0">
-          {log.successful_execution ? (
-            <div className="h-2 w-2 rounded-full bg-blue-500" />
-          ) : log.status === 'fail' ? (
-            <div className="h-2 w-2 rounded-full bg-red" />
-          ) : log.status === 'success' ? (
-            <div className="h-2 w-2 rounded-full bg-green" />
-          ) : (
-            <div className="h-2 w-2 rounded-full bg-transparent" />
-          )}
-        </div>
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-grey font-semibold">
-              {format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}
-            </span>
-            <button onClick={() => setIsExpanded(!isExpanded)}>
-              {isExpanded ? (
-                <ChevronUpIcon className="h-5 w-5 text-grey" />
-              ) : (
-                <ChevronDownIcon className="h-5 w-5 text-grey" />
-              )}
-            </button>
-          </div>
+                  {/* Environment */}
+                  <span className={cn(
+                    'px-2 py-0.5 rounded text-xs font-medium border',
+                    getEnvBadgeColor(log.app_env || log.env)
+                  )}>
+                    {log.app_env || log.env}
+                  </span>
 
-          <div className="flex flex-wrap gap-2">
-            <div className="text-sm text-[#444444] font-semibold px-3 py-1 bg-[#F3F7FD] rounded-full">
-              {log.process_id}
-            </div>
-            <Badge
-              variant={log.app_env === 'prd' ? 'default' : 'secondary'}
-              className="rounded-full"
-            >
-              {log.app_env || log.env}
-            </Badge>
-          </div>
+                  {/* Operation */}
+                  <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
+                    {log.child_tag
+                      ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
+                      : log.feature_tag || log.parent_tag}
+                  </span>
 
-          <div className="flex flex-wrap gap-2">
-            <div className="text-sm text-[#444444] font-semibold px-3 py-1 bg-[#F3F7FD] rounded-full">
-              {log.name}
-            </div>
-            <div className="text-sm text-[#444444] font-semibold px-3 py-1 bg-[#F3F7FD] rounded-full">
-              {log.type}
+                  {/* Name */}
+                  <span className="text-xs text-grey-600">
+                    {log.name}
+                  </span>
+
+                  {/* Type */}
+                  <span className="text-xs text-grey-600">
+                    • {log.type}
+                  </span>
+                </div>
+
+                {/* Message */}
+                <p className="text-sm text-grey-600">{log.message}</p>
+              </div>
             </div>
           </div>
 
-          <div className="text-sm text-[#444444] font-semibold px-3 py-1 bg-[#F3F7FD] rounded-full">
-            {log.message}
-          </div>
-
-          <div>
-            <CopyableTag
-              tag={String(
-                log.child_tag
-                  ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
-                  : log.feature_tag || log.parent_tag
-              )}
-              className="text-primary bg-primary/15 border-primary border-[0.5px] bg-opacity-[15%] text-xs font-medium px-2 py-1 rounded-sm w-fit h-5 flex items-center justify-center"
-            />
-          </div>
-
-          {isExpanded && (
-            <div className="mt-4">
-              <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
-                <code className="text-grey text-sm font-medium">
+          {/* Expanded Details */}
+          {expandedRows[log._id] && (
+            <div className="border-t border-grey-400 bg-grey-50 p-4">
+              <p className="text-xs text-grey-600 mb-2 font-medium">Request Data</p>
+              <pre className="bg-white border border-grey-400 rounded-md p-3 overflow-x-auto">
+                <code className="text-xs font-mono text-grey">
                   {JSON.stringify(JSON.parse(log.data), null, 2)}
                 </code>
               </pre>
             </div>
           )}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -467,8 +949,15 @@ export default function LogsTabContent() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const allLogs = useMemo(() => {
-    return data?.pages.flatMap((page) => page.data.logs.data) ?? [];
-  }, [data]);
+    // If no workspace ID, always show dummy data
+    if (!currentWorkspaceId) {
+      return DUMMY_LOGS;
+    }
+
+    const realLogs = data?.pages.flatMap((page) => page.data?.logs?.data ?? []) ?? [];
+    // Use dummy data if no real logs exist
+    return realLogs.length > 0 ? realLogs : DUMMY_LOGS;
+  }, [data, currentWorkspaceId]);
 
   const clearFilters = () => {
     setFilters({
@@ -485,13 +974,16 @@ export default function LogsTabContent() {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
+  // Show dummy data if query hasn't loaded yet or if there are no real logs
+  const showDummyData = !currentWorkspaceId || (logsStatus === 'success' && allLogs.length === 30);
+
   return (
     <div className="h-full overflow-auto bg-grey-100">
       <div className="bg-white px-6 py-4 border-b border-grey-400">
         <h1 className="text-grey text-xl font-bold">Workspace Logs</h1>
       </div>
 
-      {logsStatus === 'pending' ? (
+      {logsStatus === 'pending' && currentWorkspaceId ? (
         <div className="flex items-center justify-center pt-20">
           <Loader className="animate-spin" />
         </div>
@@ -508,6 +1000,7 @@ export default function LogsTabContent() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full"
+                  disabled={showDummyData}
                 />
               </div>
 
@@ -518,6 +1011,7 @@ export default function LogsTabContent() {
                   onValueChange={(value) =>
                     setFilters((prev) => ({ ...prev, component: value }))
                   }
+                  disabled={showDummyData}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Select component type" />
@@ -537,6 +1031,7 @@ export default function LogsTabContent() {
                   onValueChange={(value) =>
                     setFilters((prev) => ({ ...prev, product: value }))
                   }
+                  disabled={showDummyData}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Select product" />
@@ -556,6 +1051,7 @@ export default function LogsTabContent() {
                   onValueChange={(value) =>
                     setFilters((prev) => ({ ...prev, app: value }))
                   }
+                  disabled={showDummyData}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Select app" />
@@ -575,6 +1071,7 @@ export default function LogsTabContent() {
                   onValueChange={(value) =>
                     setFilters((prev) => ({ ...prev, status: value }))
                   }
+                  disabled={showDummyData}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Select status" />
@@ -594,6 +1091,7 @@ export default function LogsTabContent() {
                   onValueChange={(value) =>
                     setFilters((prev) => ({ ...prev, timeRange: value }))
                   }
+                  disabled={showDummyData}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Select time range" />
@@ -639,12 +1137,12 @@ export default function LogsTabContent() {
                   {filters.product !== 'all' && (
                     <Badge variant="outline" className="text-grey">
                       Product:{' '}
-                      {products.find((p) => p._id === filters.product)?.name}
+                      {products?.find((p) => p._id === filters.product)?.name ?? 'Unknown'}
                     </Badge>
                   )}
                   {filters.app !== 'all' && (
                     <Badge variant="outline" className="text-grey">
-                      App: {apps.find((a) => a._id === filters.app)?.app_name}
+                      App: {apps?.find((a) => a._id === filters.app)?.app_name ?? 'Unknown'}
                     </Badge>
                   )}
                   {filters.status !== 'all' && (
@@ -661,38 +1159,24 @@ export default function LogsTabContent() {
               )}
             </div>
 
-            {/* Table/Cards Component */}
-            {allLogs.length > 0 ? <TableComponent processes={allLogs} /> : null}
+            {/* Logs Cards Component */}
+            <LogsCards processes={allLogs} />
 
-            {/* Load More */}
-            <div ref={loadMoreRef}>
-              {isFetchingNextPage && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader className="animate-spin" />
-                </div>
-              )}
-            </div>
-
-            {/* Empty States */}
-            {!hasNextPage && Number(data?.pages[0]?.data?.logs?.data?.length) > 0 && (
-              <div className="flex items-center justify-center py-4">
-                <p className="text-grey text-sm font-semibold">No more logs</p>
+            {/* Load More - only show for real data */}
+            {!showDummyData && (data?.pages[0]?.data?.logs?.data?.length ?? 0) > 0 && (
+              <div ref={loadMoreRef}>
+                {isFetchingNextPage && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader className="animate-spin" />
+                  </div>
+                )}
               </div>
             )}
 
-            {data?.pages[0].data.logs.data.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10">
-                <p className="text-grey text-sm font-semibold mt-4">No logs found</p>
-                {(filters.component !== 'all' ||
-                  filters.app !== 'all' ||
-                  filters.product !== 'all' ||
-                  filters.status !== 'all' ||
-                  filters.timeRange !== '24h' ||
-                  searchTerm) && (
-                  <p className="text-grey-600 text-sm mt-2">
-                    Try adjusting your filters or search terms
-                  </p>
-                )}
+            {/* No More Logs - only show for real data */}
+            {!showDummyData && (data?.pages[0]?.data?.logs?.data?.length ?? 0) > 0 && !hasNextPage && (
+              <div className="flex items-center justify-center py-4">
+                <p className="text-grey text-sm font-semibold">No more logs</p>
               </div>
             )}
           </div>

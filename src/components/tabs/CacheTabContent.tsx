@@ -1,12 +1,33 @@
-import { Zap, Clock, Tag } from 'lucide-react';
+import { Zap, Clock, Tag, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 interface CacheTabContentProps {
   cache: any;
 }
 
 export default function CacheTabContent({ cache }: CacheTabContentProps) {
+  const { openTab } = useWorkbenchStore();
+  // Show error if cache data is incomplete and can't be fetched
+  if (!cache?.name && !cache?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete cache data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the cache from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Extract product info for header
   const product = cache?.productName && cache?.productTag ? {
     name: cache.productName,
@@ -57,25 +78,48 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-red/10 flex items-center justify-center flex-shrink-0">
-              <Zap className="h-6 w-6 text-red" />
+              <Layers className="h-6 w-6 text-red" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-grey mb-2">{cache.name}</h1>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-sm text-grey-600 flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  <span className="font-mono">{cache.tag}</span>
-                </span>
-                {cache.expiry !== undefined && (
-                  <span className="px-2 py-1 rounded text-xs font-medium bg-red/10 text-red flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatExpiry(cache.expiry)}
-                  </span>
-                )}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold text-grey mb-2">{cache.name}</h1>
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-sm text-grey-600 flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      <span className="font-mono">{cache.tag}</span>
+                    </span>
+                    {cache.expiry !== undefined && (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-red/10 text-red flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatExpiry(cache.expiry)}
+                      </span>
+                    )}
+                  </div>
+                  {cache.description && (
+                    <p className="text-sm text-grey-600">{cache.description}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={() => {
+                    openTab({
+                      id: `cache-values-${cache.tag}-${Date.now()}`,
+                      type: 'cache-values',
+                      title: `${cache.name} - Values`,
+                      itemId: cache._id,
+                      data: {
+                        ...cache,
+                        cacheTag: cache.tag,
+                        productTag: cache.productTag,
+                      },
+                    });
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Layers className="h-4 w-4" />
+                  View Values
+                </Button>
               </div>
-              {cache.description && (
-                <p className="text-sm text-grey-600">{cache.description}</p>
-              )}
             </div>
           </div>
         </div>

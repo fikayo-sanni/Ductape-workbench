@@ -22,6 +22,24 @@ interface MessageBrokerTabContentProps {
 }
 
 export default function MessageBrokerTabContent({ messageBroker }: MessageBrokerTabContentProps) {
+  // Show error if message broker data is incomplete and can't be fetched
+  if (!messageBroker?.name && !messageBroker?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete message broker data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the message broker from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
   const productTag = messageBroker?.productTag;
@@ -666,14 +684,10 @@ const ductape = new Ductape({
         },
         {
           title: `Publish to ${topicName}`,
-          code: `await ductape.processor.messageBroker.publish({
+          code: `await ductape.broker.publish({
   env: '${envSlug}',
   event: '${topicTag}',
   product: '${productTagValue}',
-  session: {
-    token: 'your-session-token',
-    tag: 'your-session-tag'
-  },
   message: {
 ${inputMessage}
   }
@@ -681,7 +695,7 @@ ${inputMessage}
         },
         {
           title: `Subscribe to ${topicName}`,
-          code: `await ductape.processor.messageBroker.subscribe({
+          code: `await ductape.broker.subscribe({
   env: '${envSlug}',
   event: '${topicTag}',
   product: '${productTagValue}',
@@ -762,10 +776,6 @@ ductape.processor.message_broker.publish(
   env: '${envSlug}',
   event: '${topicTag}',
   product: '${productTagValue}',
-  session: {
-    token: 'your-session-token',
-    tag: 'your-session-tag'
-  },
   message: message
 )`,
         },
@@ -972,11 +982,11 @@ var request = new TopicPublishRequest
     Message = message
 };
 
-await ductape.Processor.MessageBroker.PublishAsync(request);`,
+await ductape.broker.PublishAsync(request);`,
         },
         {
           title: `Subscribe to ${topicName}`,
-          code: `await ductape.Processor.MessageBroker.SubscribeAsync(new SubscribeRequest
+          code: `await ductape.broker.SubscribeAsync(new SubscribeRequest
 {
     Env = "${envSlug}",
     Event = "${topicTag}",
@@ -1055,14 +1065,10 @@ const ductape = new Ductape({
       },
       {
         title: `Publish to ${topicName}`,
-        code: `await ductape.processor.messageBroker.publish({
+        code: `await ductape.broker.publish({
   env: '${envSlug}',
   event: '${topicTag}',
   product: '${productTagValue}',
-  session: {
-    token: 'your-session-token',
-    tag: 'your-session-tag'
-  },
   message: {
 ${inputMessage}
   }
@@ -1070,7 +1076,7 @@ ${inputMessage}
       },
       {
         title: `Subscribe to ${topicName}`,
-        code: `await ductape.processor.messageBroker.subscribe({
+        code: `await ductape.broker.subscribe({
   env: '${envSlug}',
   event: '${topicTag}',
   product: '${productTagValue}',
@@ -1178,13 +1184,38 @@ ${inputMessage}
               <MessageSquare className="h-6 w-6 text-purple-500" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-grey mb-2">{displayData.name}</h1>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{displayData.tag}</span></span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold text-grey mb-2">{displayData.name}</h1>
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-sm text-grey-600">Tag: <span className="font-mono">{displayData.tag}</span></span>
+                  </div>
+                  {displayData.description && (
+                    <p className="text-sm text-grey-600">{displayData.description}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={() => {
+                    openTab({
+                      id: `message-broker-events-${displayData.tag}-${Date.now()}`,
+                      type: 'message-broker-events',
+                      title: `${displayData.name} - Events`,
+                      itemId: displayData._id,
+                      data: {
+                        ...displayData,
+                        brokerTag: displayData.tag,
+                        productTag: messageBroker.productTag,
+                        productName: messageBroker.productName,
+                        productLogo: messageBroker.productLogo,
+                      },
+                    });
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Activity className="h-4 w-4" />
+                  View Events
+                </Button>
               </div>
-              {displayData.description && (
-                <p className="text-sm text-grey-600">{displayData.description}</p>
-              )}
             </div>
           </div>
         </div>

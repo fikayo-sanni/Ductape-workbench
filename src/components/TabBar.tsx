@@ -14,13 +14,13 @@ import {
   Bell,
   Shield,
   BarChart3,
-  Activity,
   Heart,
   ListTree,
   LayoutDashboard,
   Key,
   Store,
   Mail,
+  Layers,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -31,7 +31,7 @@ const getTabIcon = (type: Tab['type']) => {
     storage: HardDrive,
     session: Users,
     feature: Zap,
-    cache: Activity,
+    cache: Layers,
     healthcheck: Heart,
     database: Database,
     'message-broker': MessageSquare,

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Send, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, BookOpen, X, List } from 'lucide-react';
+import { Send, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, BookOpen, X, List, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
@@ -663,7 +663,7 @@ ${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.apps.run(payload);
+            code: `const result = await ductape.action.run(payload);
 console.log('Action result:', result);`
           }
         ];
@@ -703,7 +703,7 @@ ${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.apps.run(payload);
+            code: `const result = await ductape.action.run(payload);
 console.log('Action result:', result);`
           }
         ];
@@ -1012,7 +1012,7 @@ var request = new ActionRequest
           },
           {
             title: 'Execute',
-            code: `var result = await ductape.Apps.RunAsync(request);
+            code: `var result = await ductape.Action.RunAsync(request);
 Console.WriteLine($"Action result: {result}");`
           }
         ];
@@ -1067,6 +1067,24 @@ println!("Action result: {:?}", result);`
         return [];
     }
   };
+
+  // Show error if action data is incomplete
+  if (!action?.name && !action?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete action data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the action from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-hidden bg-grey-100 flex flex-col lg:flex-row relative">

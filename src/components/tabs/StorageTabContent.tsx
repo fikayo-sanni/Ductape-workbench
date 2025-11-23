@@ -55,7 +55,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
   });
 
   const displayData = storageData || storage;
-  
+
   // Initialize form data when storage data is available
   useEffect(() => {
     if (displayData && !isEditing) {
@@ -173,18 +173,6 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
       toast.error(error.message || 'Failed to update storage');
     },
   });
-
-  // Early return AFTER all hooks
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center bg-grey-100">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-grey-600">Loading storage details...</p>
-        </div>
-      </div>
-    );
-  }
 
   const handleUpdateStorage = () => {
     setIsEditing(true);
@@ -360,7 +348,7 @@ const ductape = new Ductape({
           {
             title: 'Read File',
             code: `const filePath = 'path/to/file.txt';
-const file = await ductape.processor.storage.readFile(filePath);`
+const file = await ductape.storage.read(filePath);`
           },
           {
             title: 'Write File',
@@ -372,7 +360,7 @@ const file = await ductape.processor.storage.readFile(filePath);`
   retries: 3,
 };
 
-const result = await ductape.processor.storage.run(uploadData);
+const result = await ductape.storage.save(uploadData);
 console.log('File uploaded:', result.url);`
           }
         ];
@@ -392,7 +380,7 @@ const ductape = new Ductape({
           {
             title: 'Read File',
             code: `const filePath: string = 'path/to/file.txt';
-const file = await ductape.processor.storage.readFile(filePath);`
+const file = await ductape.storage.read(filePath);`
           },
           {
             title: 'Write File',
@@ -404,7 +392,7 @@ const file = await ductape.processor.storage.readFile(filePath);`
   retries: 3,
 };
 
-const {url} = await ductape.processor.storage.run(uploadData);
+const {url} = await ductape.storage.save(uploadData);
 console.log('File uploaded:', url);`
           }
         ];
@@ -458,6 +446,36 @@ print(f'File uploaded: {result.url}')`
     logo: storage.productLogo,
     _id: storage.productId,
   } : null;
+
+  // Show loader only when actually loading
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-grey-600">Loading storage details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if storage data is incomplete and can't be fetched
+  if (!storage?.name && !storage?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <HardDrive className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete storage data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the storage from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

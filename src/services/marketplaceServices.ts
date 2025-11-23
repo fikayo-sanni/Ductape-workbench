@@ -14,6 +14,7 @@ export interface MarketplaceApp {
   domain_name: string;
   description?: string;
   logo?: string;
+  latest_version: string;
   versions?: Array<{
     _id: string;
     version: string;

@@ -124,17 +124,121 @@ const DATA_TYPES = [
 ];
 
 // Ductape Operators with adaptive argument configuration
-// const DUCTAPE_OPERATORS = [
-//   { 
-//     value: 'Add', 
-//     label: 'Add - Sum multiple numeric values', 
-//     minArgs: 1, 
-//     maxArgs: 10, 
-//     argTypes: ['value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value'],
-//     canAddArgs: true
-//   },
-//   // ... other operators
-// ];
+const DUCTAPE_OPERATORS = [
+  {
+    value: 'Add',
+    label: 'Add - Sum multiple numeric values',
+    minArgs: 1,
+    maxArgs: 10,
+    argTypes: ['value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value'],
+    canAddArgs: true
+  },
+  {
+    value: 'Subtract',
+    label: 'Subtract - Subtract values from first value',
+    minArgs: 1,
+    maxArgs: 10,
+    argTypes: ['value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value', 'value'],
+    canAddArgs: true
+  },
+  {
+    value: 'Concat',
+    label: 'Concat - Join strings with delimiter',
+    minArgs: 2,
+    maxArgs: 10,
+    argTypes: ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'delimiter'],
+    canAddArgs: true,
+    specialArgs: { delimiter: 8 } // delimiter is always the last argument
+  },
+  {
+    value: 'Substring',
+    label: 'Substring - Extract substring',
+    minArgs: 3,
+    maxArgs: 3,
+    argTypes: ['string', 'start', 'end'],
+    canAddArgs: false
+  },
+  {
+    value: 'Trim',
+    label: 'Trim - Remove whitespace',
+    minArgs: 1,
+    maxArgs: 1,
+    argTypes: ['string'],
+    canAddArgs: false
+  },
+  {
+    value: 'Split',
+    label: 'Split - Split string into array',
+    minArgs: 2,
+    maxArgs: 2,
+    argTypes: ['string', 'separator'],
+    canAddArgs: false
+  },
+  {
+    value: 'Pick',
+    label: 'Pick - Get element at index',
+    minArgs: 2,
+    maxArgs: 2,
+    argTypes: ['value', 'index'],
+    canAddArgs: false
+  },
+  {
+    value: 'Join',
+    label: 'Join - Merge arrays',
+    minArgs: 1,
+    maxArgs: 10,
+    argTypes: ['array', 'array', 'array', 'array', 'array', 'array', 'array', 'array', 'array', 'array'],
+    canAddArgs: true
+  },
+  {
+    value: 'Uppercase',
+    label: 'Uppercase - Convert to uppercase',
+    minArgs: 1,
+    maxArgs: 1,
+    argTypes: ['string'],
+    canAddArgs: false
+  },
+  {
+    value: 'Lowercase',
+    label: 'Lowercase - Convert to lowercase',
+    minArgs: 1,
+    maxArgs: 1,
+    argTypes: ['string'],
+    canAddArgs: false
+  },
+  {
+    value: 'Dateformat',
+    label: 'Dateformat - Format date string',
+    minArgs: 2,
+    maxArgs: 2,
+    argTypes: ['dateString', 'format'],
+    canAddArgs: false
+  },
+  {
+    value: 'Replace',
+    label: 'Replace - Replace substring',
+    minArgs: 3,
+    maxArgs: 3,
+    argTypes: ['string', 'search', 'replace'],
+    canAddArgs: false
+  },
+  {
+    value: 'Filter',
+    label: 'Filter - Filter array by condition',
+    minArgs: 3,
+    maxArgs: 3,
+    argTypes: ['array', 'operator', 'value'],
+    canAddArgs: false
+  },
+  {
+    value: 'Find',
+    label: 'Find - Find element in array',
+    minArgs: 3,
+    maxArgs: 3,
+    argTypes: ['array', 'operator', 'value'],
+    canAddArgs: false
+  },
+];
 
 // Animated Arrow Component
 const AnimatedArrow = () => (
@@ -2552,6 +2656,54 @@ console.log('Feature result:', result);`;
                                             <span className="font-medium">Database Filter Field</span>
                                             <span className="ml-2 text-xs text-green-500">({variable.key})</span>
                                           </div>
+                                        ) : dataMappings[component.id]?.[variable.key]?.source === 'operator' ? (
+                                          <div className="space-y-3">
+                                            {/* Operator Selection */}
+                                            <div>
+                                              <label className="text-xs text-grey-600 font-medium mb-2 block">Choose Operator</label>
+                                              <Select
+                                                value={dataMappings[component.id]?.[variable.key]?.operatorType || ''}
+                                                onValueChange={(operatorType) => {
+                                                  const operator = DUCTAPE_OPERATORS.find(op => op.value === operatorType);
+                                                  const args = operator ? new Array(operator.minArgs).fill(null).map((_, index) => ({
+                                                    source: 'input',
+                                                    code: '',
+                                                    argType: operator.argTypes[index] || 'value'
+                                                  })) : [];
+                                                  setDataMappings(prev => ({
+                                                    ...prev,
+                                                    [component.id]: {
+                                                      ...prev[component.id],
+                                                      [variable.key]: {
+                                                        ...prev[component.id]?.[variable.key],
+                                                        operatorType,
+                                                        operatorArgs: args,
+                                                        code: operatorType ? `$${operatorType}(${args.map(arg => arg.code).join(', ')})` : ''
+                                                      }
+                                                    }
+                                                  }));
+                                                }}
+                                              >
+                                                <SelectTrigger className="h-8">
+                                                  <SelectValue placeholder="Select operator" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {DUCTAPE_OPERATORS.map(operator => (
+                                                    <SelectItem key={operator.value} value={operator.value}>
+                                                      {operator.label}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+
+                                            {/* Generated Code Preview */}
+                                            {dataMappings[component.id]?.[variable.key]?.operatorType && (
+                                              <div className="p-2 bg-grey-50 rounded text-xs text-grey-600">
+                                                <strong>Generated:</strong> {dataMappings[component.id]?.[variable.key]?.code || ''}
+                                              </div>
+                                            )}
+                                          </div>
                                         ) : (
                                           <Input
                                             value={dataMappings[component.id]?.[variable.key]?.code || ''}
@@ -2573,6 +2725,473 @@ console.log('Feature result:', result);`;
                                         </div>
                                         )}
                                       </div>
+
+                                      {/* Args Section for Operators - Only show if this variable has operator source */}
+                                      {dataMappings[component.id]?.[variable.key]?.source === 'operator' && dataMappings[component.id]?.[variable.key]?.operatorType && (() => {
+                                        const operator = DUCTAPE_OPERATORS.find(op => op.value === dataMappings[component.id]?.[variable.key]?.operatorType);
+                                        if (!operator) return null;
+
+                                        return (
+                                          <div className="border-2 border-dashed border-grey-300 rounded-lg p-4 mt-3">
+                                            <div className="flex items-center justify-between mb-3">
+                                              <div className="text-sm font-medium text-grey-700">Args</div>
+                                              <div className="text-xs text-grey-500">
+                                                <strong>Generated:</strong> {dataMappings[component.id]?.[variable.key]?.code || ''}
+                                              </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                              {Array.from({ length: operator.minArgs }, (_, index) => (
+                                                <div key={index} className="space-y-2">
+                                                  <div className="flex items-center justify-between">
+                                                    <label className="text-xs text-grey-600 font-medium">
+                                                      {operator.argTypes[index] === 'delimiter' ? 'Delimiter:' :
+                                                       operator.argTypes[index] === 'separator' ? 'Separator:' :
+                                                       operator.argTypes[index] === 'start' ? 'Start Index:' :
+                                                       operator.argTypes[index] === 'end' ? 'End Index:' :
+                                                       operator.argTypes[index] === 'index' ? 'Index:' :
+                                                       operator.argTypes[index] === 'operator' ? 'Operator:' :
+                                                       operator.argTypes[index] === 'search' ? 'Search:' :
+                                                       operator.argTypes[index] === 'replace' ? 'Replace:' :
+                                                       operator.argTypes[index] === 'format' ? 'Format:' :
+                                                       operator.argTypes[index] === 'dateString' ? 'Date String:' :
+                                                       `Arg ${index + 1}:`}
+                                                    </label>
+                                                  </div>
+
+                                                  <div className="space-y-2">
+                                                    <div>
+                                                      <label className="text-xs text-grey font-medium">Source</label>
+                                                      <Select
+                                                        value={dataMappings[component.id]?.[variable.key]?.operatorArgs?.[index]?.source || 'hardcode'}
+                                                        onValueChange={(source) => {
+                                                          const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                          if (!newArgs[index]) newArgs[index] = { source: 'hardcode', code: '', argType: 'value' };
+                                                          newArgs[index].source = source;
+
+                                                          let code = '';
+                                                          if (source === 'input') {
+                                                            code = '';
+                                                          } else if (source === 'sequence') {
+                                                            code = '';
+                                                          } else if (source === 'session') {
+                                                            code = '$Session{field_name}';
+                                                          } else if (source === 'auth') {
+                                                            code = '$Auth{field_name}';
+                                                          } else if (source === 'hardcode') {
+                                                            code = '';
+                                                          }
+
+                                                          newArgs[index].code = code;
+
+                                                          setDataMappings(prev => ({
+                                                            ...prev,
+                                                            [component.id]: {
+                                                              ...prev[component.id],
+                                                              [variable.key]: {
+                                                                ...prev[component.id]?.[variable.key],
+                                                                operatorArgs: newArgs,
+                                                                code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                              }
+                                                            }
+                                                          }));
+                                                        }}
+                                                      >
+                                                        <SelectTrigger className="h-8">
+                                                          <SelectValue placeholder="Select source" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                          <SelectItem value="hardcode">Hard Code - Static value</SelectItem>
+                                                          <SelectItem value="input">Input - Feature input field</SelectItem>
+                                                          {sequenceIndex > 0 && (
+                                                            <SelectItem value="sequence">Sequence - Previous event response</SelectItem>
+                                                          )}
+                                                          <SelectItem value="session">Session - User session data</SelectItem>
+                                                          <SelectItem value="auth">Auth - User authentication data</SelectItem>
+                                                        </SelectContent>
+                                                      </Select>
+                                                    </div>
+
+                                                    <div>
+                                                      <label className="text-xs text-grey font-medium">Value</label>
+                                                      {(() => {
+                                                        const argSource = dataMappings[component.id]?.[variable.key]?.operatorArgs?.[index]?.source;
+                                                        const argData = dataMappings[component.id]?.[variable.key]?.operatorArgs?.[index] as any;
+
+                                                        if (argSource === 'input') {
+                                                          return (
+                                                            <Select
+                                                              value={argData?.inputField || ''}
+                                                              onValueChange={(value) => {
+                                                                if (value === 'add-new') {
+                                                                  setSourceVariable(variable);
+                                                                  setNewInputType(variable.dataType || DataTypes.STRING);
+                                                                  setNewInputMinLength(variable.minLength || 0);
+                                                                  setNewInputMaxLength(variable.maxLength || 0);
+                                                                  setAddInputFromMapping(true);
+                                                                  setMappingVariableKey(variable.key);
+                                                                  setMappingComponentId(component.id);
+                                                                  setShowAddInput(true);
+                                                                  setNewInputName(variable.key);
+                                                                } else {
+                                                                  const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                  if (!newArgs[index]) newArgs[index] = { source: 'input', code: '', argType: 'value' };
+                                                                  (newArgs[index] as any).inputField = value;
+                                                                  newArgs[index].code = `$Input{${value}}`;
+
+                                                                  setDataMappings(prev => ({
+                                                                    ...prev,
+                                                                    [component.id]: {
+                                                                      ...prev[component.id],
+                                                                      [variable.key]: {
+                                                                        ...prev[component.id]?.[variable.key],
+                                                                        operatorArgs: newArgs,
+                                                                        code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                      }
+                                                                    }
+                                                                  }));
+                                                                }
+                                                              }}
+                                                            >
+                                                              <SelectTrigger className="h-8">
+                                                                <SelectValue placeholder="Select feature input" />
+                                                              </SelectTrigger>
+                                                              <SelectContent>
+                                                                {Object.keys(state.featureInputs).map(inputKey => (
+                                                                  <SelectItem key={inputKey} value={inputKey}>
+                                                                    {inputKey}
+                                                                  </SelectItem>
+                                                                ))}
+                                                                <SelectItem value="add-new" className="text-primary font-medium">
+                                                                  + Add New Feature Input
+                                                                </SelectItem>
+                                                              </SelectContent>
+                                                            </Select>
+                                                          );
+                                                        } else if (argSource === 'sequence') {
+                                                          return (
+                                                            <div className="space-y-2">
+                                                              <Select
+                                                                value={argData?.sequenceId || ''}
+                                                                onValueChange={(value) => {
+                                                                  const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                  if (!newArgs[index]) newArgs[index] = { source: 'sequence', code: '', argType: 'value' };
+                                                                  (newArgs[index] as any).sequenceId = value;
+
+                                                                  setDataMappings(prev => ({
+                                                                    ...prev,
+                                                                    [component.id]: {
+                                                                      ...prev[component.id],
+                                                                      [variable.key]: {
+                                                                        ...prev[component.id]?.[variable.key],
+                                                                        operatorArgs: newArgs
+                                                                      }
+                                                                    }
+                                                                  }));
+                                                                }}
+                                                              >
+                                                                <SelectTrigger className="h-8">
+                                                                  <SelectValue placeholder="Select sequence" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                  {(state.sequences || []).map((seq: any) => (
+                                                                    <SelectItem key={seq.id} value={seq.id}>
+                                                                      {seq.name}
+                                                                    </SelectItem>
+                                                                  ))}
+                                                                </SelectContent>
+                                                              </Select>
+
+                                                              {argData?.sequenceId && (
+                                                                <Select
+                                                                  value={argData?.eventId || ''}
+                                                                  onValueChange={(value) => {
+                                                                    const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                    if (!newArgs[index]) newArgs[index] = { source: 'sequence', code: '', argType: 'value' };
+                                                                    (newArgs[index] as any).eventId = value;
+
+                                                                    setDataMappings(prev => ({
+                                                                      ...prev,
+                                                                      [component.id]: {
+                                                                        ...prev[component.id],
+                                                                        [variable.key]: {
+                                                                          ...prev[component.id]?.[variable.key],
+                                                                          operatorArgs: newArgs
+                                                                        }
+                                                                      }
+                                                                    }));
+                                                                  }}
+                                                                >
+                                                                  <SelectTrigger className="h-8">
+                                                                    <SelectValue placeholder="Select event" />
+                                                                  </SelectTrigger>
+                                                                  <SelectContent>
+                                                                    {(() => {
+                                                                      const seq = (state.sequences || []).find((s: any) => s.id === argData?.sequenceId);
+                                                                      return seq?.components?.map((compId: string) => {
+                                                                        const comp = state.selectedComponents.find(c => c.id === compId);
+                                                                        return (
+                                                                          <SelectItem key={compId} value={compId}>
+                                                                            {comp?.name || compId}
+                                                                          </SelectItem>
+                                                                        );
+                                                                      }) || [];
+                                                                    })()}
+                                                                  </SelectContent>
+                                                                </Select>
+                                                              )}
+
+                                                              {argData?.eventId && (
+                                                                <Select
+                                                                  value={argData?.responseField || ''}
+                                                                  onValueChange={(value) => {
+                                                                    const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                    if (!newArgs[index]) newArgs[index] = { source: 'sequence', code: '', argType: 'value' };
+                                                                    (newArgs[index] as any).responseField = value;
+                                                                    newArgs[index].code = `$Sequence{${argData?.sequenceId}}{${argData?.eventId}}{${value}}`;
+
+                                                                    setDataMappings(prev => ({
+                                                                      ...prev,
+                                                                      [component.id]: {
+                                                                        ...prev[component.id],
+                                                                        [variable.key]: {
+                                                                          ...prev[component.id]?.[variable.key],
+                                                                          operatorArgs: newArgs,
+                                                                          code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                        }
+                                                                      }
+                                                                    }));
+                                                                  }}
+                                                                >
+                                                                  <SelectTrigger className="h-8">
+                                                                    <SelectValue placeholder="Select response field" />
+                                                                  </SelectTrigger>
+                                                                  <SelectContent>
+                                                                    {(() => {
+                                                                      const selectedEvent = state.selectedComponents.find(c => c.id === argData?.eventId);
+                                                                      if (!selectedEvent || !selectedEvent.action) return [];
+
+                                                                      const successResponse = selectedEvent.action.responses?.find((response: any) => response.success === true);
+                                                                      if (!successResponse || !successResponse.body?.data) return [];
+
+                                                                      return successResponse.body.data.map((field: any, idx: number) => (
+                                                                        <SelectItem key={field.key || field.name || idx} value={field.key || field.name || `field_${idx}`}>
+                                                                          {field.key || field.name || `Field ${idx + 1}`}
+                                                                        </SelectItem>
+                                                                      ));
+                                                                    })()}
+                                                                  </SelectContent>
+                                                                </Select>
+                                                              )}
+                                                            </div>
+                                                          );
+                                                        } else if (argSource === 'session') {
+                                                          return (
+                                                            <div className="space-y-2">
+                                                              <Select
+                                                                value={argData?.selectedValue || ''}
+                                                                onValueChange={(value) => {
+                                                                  const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                  if (!newArgs[index]) newArgs[index] = { source: 'session', code: '', argType: 'value' };
+                                                                  (newArgs[index] as any).selectedValue = value;
+                                                                  newArgs[index].code = `$Session{${value}}`;
+
+                                                                  setDataMappings(prev => ({
+                                                                    ...prev,
+                                                                    [component.id]: {
+                                                                      ...prev[component.id],
+                                                                      [variable.key]: {
+                                                                        ...prev[component.id]?.[variable.key],
+                                                                        operatorArgs: newArgs,
+                                                                        code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                      }
+                                                                    }
+                                                                  }));
+                                                                }}
+                                                              >
+                                                                <SelectTrigger className="h-8">
+                                                                  <SelectValue placeholder="Select session field" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                  <SelectItem value="user_id">user_id</SelectItem>
+                                                                  <SelectItem value="email">email</SelectItem>
+                                                                  <SelectItem value="name">name</SelectItem>
+                                                                  <SelectItem value="role">role</SelectItem>
+                                                                  <SelectItem value="workspace_id">workspace_id</SelectItem>
+                                                                </SelectContent>
+                                                              </Select>
+                                                              {argData?.selectedValue && (
+                                                                <div className="text-xs text-grey-600 bg-grey-50 p-2 rounded">
+                                                                  Code: <span className="font-mono">{argData?.code}</span>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          );
+                                                        } else if (argSource === 'auth') {
+                                                          return (
+                                                            <div className="space-y-2">
+                                                              {/* First dropdown: Select Auth */}
+                                                              <Select
+                                                                value={argData?.authName || ''}
+                                                                onValueChange={(value) => {
+                                                                  const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                  if (!newArgs[index]) newArgs[index] = { source: 'auth', code: '', argType: 'value' };
+                                                                  (newArgs[index] as any).authName = value;
+                                                                  (newArgs[index] as any).authField = undefined;
+                                                                  newArgs[index].code = '';
+
+                                                                  setDataMappings(prev => ({
+                                                                    ...prev,
+                                                                    [component.id]: {
+                                                                      ...prev[component.id],
+                                                                      [variable.key]: {
+                                                                        ...prev[component.id]?.[variable.key],
+                                                                        operatorArgs: newArgs,
+                                                                        code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                      }
+                                                                    }
+                                                                  }));
+                                                                }}
+                                                              >
+                                                                <SelectTrigger className="h-8">
+                                                                  <SelectValue placeholder="Select authentication" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                  {(() => {
+                                                                    const app = selectedAppData?.data;
+                                                                    const latestVersion = app?.versions?.find((v: any) => v.latest) || app?.versions?.[0];
+                                                                    const auths = latestVersion?.auths || [];
+
+                                                                    if (auths.length === 0) {
+                                                                      return (
+                                                                        <SelectItem value="no-auth" disabled>
+                                                                          No authentication methods available
+                                                                        </SelectItem>
+                                                                      );
+                                                                    }
+
+                                                                    return auths.map((auth: any) => (
+                                                                      <SelectItem key={auth.name} value={auth.name}>
+                                                                        {auth.name}
+                                                                      </SelectItem>
+                                                                    ));
+                                                                  })()}
+                                                                </SelectContent>
+                                                              </Select>
+
+                                                              {/* Second dropdown: Select Field from Auth */}
+                                                              {argData?.authName && (
+                                                                <Select
+                                                                  value={argData?.authField || ''}
+                                                                  onValueChange={(value) => {
+                                                                    const authName = argData?.authName;
+                                                                    const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                    if (!newArgs[index]) newArgs[index] = { source: 'auth', code: '', argType: 'value' };
+                                                                    (newArgs[index] as any).authField = value;
+                                                                    newArgs[index].code = `$Auth{${authName}}{${value}}`;
+
+                                                                    setDataMappings(prev => ({
+                                                                      ...prev,
+                                                                      [component.id]: {
+                                                                        ...prev[component.id],
+                                                                        [variable.key]: {
+                                                                          ...prev[component.id]?.[variable.key],
+                                                                          operatorArgs: newArgs,
+                                                                          code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                        }
+                                                                      }
+                                                                    }));
+                                                                  }}
+                                                                >
+                                                                  <SelectTrigger className="h-8">
+                                                                    <SelectValue placeholder="Select auth field" />
+                                                                  </SelectTrigger>
+                                                                  <SelectContent>
+                                                                    {(() => {
+                                                                      const app = selectedAppData?.data;
+                                                                      const latestVersion = app?.versions?.find((v: any) => v.latest) || app?.versions?.[0];
+                                                                      const auths = latestVersion?.auths || [];
+                                                                      const selectedAuthName = argData?.authName;
+                                                                      const selectedAuth: any = auths.find((a: any) => a.name === selectedAuthName);
+
+                                                                      if (!selectedAuth || !selectedAuth.tokens) {
+                                                                        return (
+                                                                          <SelectItem value="no-fields" disabled>
+                                                                            No fields available
+                                                                          </SelectItem>
+                                                                        );
+                                                                      }
+
+                                                                      // Collect all token fields from headers, body, params, and query
+                                                                      const tokenFields: Array<{ key: string; category: string }> = [];
+                                                                      ['headers', 'body', 'params', 'query'].forEach((category: string) => {
+                                                                        if (selectedAuth.tokens[category]?.data && Array.isArray(selectedAuth.tokens[category].data)) {
+                                                                          selectedAuth.tokens[category].data.forEach((item: any) => {
+                                                                            if (item.key) {
+                                                                              tokenFields.push({
+                                                                                key: item.key,
+                                                                                category: category.charAt(0).toUpperCase() + category.slice(1)
+                                                                              });
+                                                                            }
+                                                                          });
+                                                                        }
+                                                                      });
+
+                                                                      if (tokenFields.length === 0) {
+                                                                        return (
+                                                                          <SelectItem value="no-fields" disabled>
+                                                                            No fields in auth tokens
+                                                                          </SelectItem>
+                                                                        );
+                                                                      }
+
+                                                                      return tokenFields.map((field, idx) => (
+                                                                        <SelectItem key={`${field.key}-${idx}`} value={field.key}>
+                                                                          {field.key}
+                                                                        </SelectItem>
+                                                                      ));
+                                                                    })()}
+                                                                  </SelectContent>
+                                                                </Select>
+                                                              )}
+                                                            </div>
+                                                          );
+                                                        } else {
+                                                          // hardcode or default
+                                                          return (
+                                                            <Input
+                                                              className="h-8"
+                                                              value={argData?.code || ''}
+                                                              onChange={(e) => {
+                                                                const newArgs = [...(dataMappings[component.id]?.[variable.key]?.operatorArgs || [])];
+                                                                if (!newArgs[index]) newArgs[index] = { source: 'hardcode', code: '', argType: 'value' };
+                                                                newArgs[index].code = e.target.value;
+
+                                                                setDataMappings(prev => ({
+                                                                  ...prev,
+                                                                  [component.id]: {
+                                                                    ...prev[component.id],
+                                                                    [variable.key]: {
+                                                                      ...prev[component.id]?.[variable.key],
+                                                                      operatorArgs: newArgs,
+                                                                      code: `$${dataMappings[component.id]?.[variable.key]?.operatorType}(${newArgs.map(arg => arg.code).join(', ')})`
+                                                                    }
+                                                                  }
+                                                                }));
+                                                              }}
+                                                              placeholder="Enter value"
+                                                            />
+                                                          );
+                                                        }
+                                                      })()}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                   );
@@ -2927,7 +3546,7 @@ console.log('Feature result:', result);`;
             {selectedActionForDocs.resource && (
               <div>
                 <Label className="text-sm font-semibold text-grey-700 mb-2 block">Endpoint</Label>
-                <code className="text-sm bg-grey-100 px-3 py-2 rounded border border-grey-300 block font-mono">
+                <code className="text-sm text-grey bg-grey-100 px-3 py-2 rounded border border-grey-300 block font-mono">
                   {selectedActionForDocs.resource}
                 </code>
               </div>
@@ -2937,7 +3556,7 @@ console.log('Feature result:', result);`;
             {selectedActionForDocs.request_type && (
               <div>
                 <Label className="text-sm font-semibold text-grey-700 mb-2 block">Request Type</Label>
-                <span className="text-sm bg-grey-100 px-3 py-1.5 rounded border border-grey-300 inline-block">
+                <span className="text-sm text-grey bg-grey-100 px-3 py-1.5 rounded border border-grey-300 inline-block">
                   {selectedActionForDocs.request_type}
                 </span>
               </div>
@@ -3031,7 +3650,7 @@ console.log('Feature result:', result);`;
                 </div>
                 {!showBodyDataTable ? (
                   <div className="bg-grey-50 rounded border border-grey-300 p-3">
-                    <pre className="text-xs font-mono overflow-x-auto">
+                    <pre className="text-xs text-grey font-mono overflow-x-auto">
                       {(() => {
                         try {
                           const sample = selectedActionForDocs.body.sample;
@@ -3134,7 +3753,7 @@ console.log('Feature result:', result);`;
                       </div>
                       {!showResponseDataTables[index] ? (
                         <div className="p-3 bg-grey-50">
-                          <pre className="text-xs font-mono overflow-x-auto">
+                          <pre className="text-xs text-grey font-mono overflow-x-auto">
                             {(() => {
                               try {
                                 const sample = response.body?.sample || response.body;

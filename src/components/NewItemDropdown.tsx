@@ -13,10 +13,10 @@ import {
   Bell,
   Shield,
   BarChart3,
-  Activity,
   Heart,
   ListTree,
-  Key
+  Key,
+  Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -87,7 +87,7 @@ const newItemOptions: NewItemOption[] = [
   {
     id: 'cache',
     label: 'Cache',
-    icon: Activity,
+    icon: Layers,
     description: 'Add caching layer',
     category: 'product',
   },

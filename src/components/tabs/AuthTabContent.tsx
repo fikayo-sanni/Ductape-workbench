@@ -1,4 +1,4 @@
-import { Key, Trash2 } from 'lucide-react';
+import { Key, Trash2, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +25,24 @@ interface AuthTabContentProps {
 
 export default function AuthTabContent({ auth }: AuthTabContentProps) {
   const authorizationType = auth.setup_type as 'credential_access' | 'token_access';
+
+  // Show error if auth data is incomplete
+  if (!auth?.name && !auth?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete authorization data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the authorization from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">

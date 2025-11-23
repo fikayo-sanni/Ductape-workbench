@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Filter,
   X as CloseIcon,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
@@ -545,7 +546,7 @@ export default function Dashboard() {
                     case 'storage':
                       return HardDrive;
                     case 'cache':
-                      return Zap;
+                      return Layers;
                     case 'queue':
                       return MessageSquare;
                     default:

@@ -17,10 +17,8 @@ interface DatabaseTabContentProps {
 export default function DatabaseTabContent({ database }: DatabaseTabContentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConnections, setShowConnections] = useState<Record<number, boolean>>({});
-
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
-  const productTag = database?.productTag;
   
   // Initialize SDK
   const ductape = useDuctape({
@@ -33,18 +31,21 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
 
   // Fetch database details from SDK
   const { data: databaseData, isLoading } = useQuery({
-    queryKey: ['database', productTag, database?.tag],
+    queryKey: ['database', database?.tag],
     queryFn: async () => {
-      if (!ductape || !productTag || !database?.tag) return database;
-      const productBuilder = ductape as any;
-      await productBuilder.init(productTag);
-      return await productBuilder.databases.fetch(database.tag);
+      if (!ductape || !database?.tag) {
+        return database;
+      }
+
+      const sdk = ductape as any;
+      const result = await sdk.databases.fetch(database.tag);
+      return result;
     },
-    enabled: !!ductape && !!productTag && !!database?.tag,
+    enabled: !!ductape && !!database?.tag,
   });
 
   const displayData = databaseData || database;
-  
+
   // Extract product info for header
   const product = database?.productName && database?.productTag ? {
     name: database.productName,
@@ -52,12 +53,31 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
     logo: database.productLogo,
   } : null;
 
+  // Show loader only when actually loading
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
           <p className="text-sm text-grey-600">Loading database details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if database data is incomplete and can't be fetched
+  if (!database?.name && !database?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete database data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the database from your product to reload it.
+          </p>
         </div>
       </div>
     );
@@ -164,7 +184,7 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
-              <Database className="h-6 w-6 text-blue" />
+              <Database className="h-6 w-6 text-blue-600" />
             </div>
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-grey mb-2">{displayData.name}</h1>

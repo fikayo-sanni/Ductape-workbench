@@ -11,7 +11,6 @@ interface JobTabContentProps {
 }
 
 export default function JobTabContent({ job }: JobTabContentProps) {
-  
   const { user, currentWorkspaceId } = useAuth();
   const productTag = job?.productTag;
   
@@ -51,6 +50,24 @@ export default function JobTabContent({ job }: JobTabContentProps) {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
           <p className="text-sm text-grey-600">Loading job details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if job data is incomplete and can't be fetched
+  if (!job?.name && !job?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Clock className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete job data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the job from your product to reload it.
+          </p>
         </div>
       </div>
     );

@@ -302,6 +302,11 @@ export class AutomationService {
         canFillForms: true,
         canTriggerActions: false,
       },
+      'session-activity': {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
       cache: {
         canInspectForms: true,
         canFillForms: true,
@@ -398,6 +403,21 @@ export class AutomationService {
         canTriggerActions: false,
       },
       settings: {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
+      'session-dashboard': {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
+      'cache-values': {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
+      'message-broker-events': {
         canInspectForms: false,
         canFillForms: false,
         canTriggerActions: false,
@@ -716,6 +736,7 @@ export class AutomationService {
       feature: 'Feature',
       storage: 'Storage',
       session: 'Session',
+      'session-activity': 'Session Activity',
       cache: 'Cache',
       healthcheck: 'Health Check',
       database: 'Database',
@@ -738,6 +759,9 @@ export class AutomationService {
       partnership: 'Partnership',
       brief: 'Brief',
       settings: 'Settings',
+      'session-dashboard': 'Session Dashboard',
+      'cache-values': 'Cache Values',
+      'message-broker-events': 'Message Broker Events',
     };
     return titles[tabType] || tabType;
   }

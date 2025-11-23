@@ -137,7 +137,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
       // Initialize the app and create the topic
       await (ductape as any).init(productTag);
 
-      alert(JSON.stringify(payload))
+      // alert(JSON.stringify(payload))
       const topic = await (ductape as any).messageBrokers.topics.create(payload);
       return topic;
     },

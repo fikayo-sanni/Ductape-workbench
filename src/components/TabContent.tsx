@@ -27,6 +27,8 @@ import HealthcheckTabContent from './tabs/HealthcheckTabContent';
 import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
 import NewSessionTabContent from './tabs/NewSessionTabContent';
 import SessionTabContent from './tabs/SessionTabContent';
+import SessionActivityTab from './tabs/SessionActivityTab';
+import SessionDashboard from './tabs/SessionDashboard';
 import SettingsTabContent from './tabs/SettingsTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
@@ -46,6 +48,8 @@ import NewMessageBrokerTabContent from './tabs/NewMessageBrokerTabContent';
 import MessageBrokerTabContent from './tabs/MessageBrokerTabContent';
 import StorageComponentContent from './tabs/StorageComponentContent';
 import CacheComponentContent from './tabs/CacheComponentContent';
+import CacheValuesTabContent from './tabs/CacheValuesTabContent';
+import MessageBrokerEventsTabContent from './tabs/MessageBrokerEventsTabContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import JobTabContent from './tabs/JobTabContent';
 import NewJobTabContent from './tabs/NewJobTabContent';
@@ -243,6 +247,12 @@ export default function TabContent() {
         }
         return <CacheTabContent cache={activeTab.data} />;
 
+      case 'cache-values':
+        return <CacheValuesTabContent cache={activeTab.data} />;
+
+      case 'message-broker-events':
+        return <MessageBrokerEventsTabContent broker={activeTab.data} />;
+
       case 'database':
         // Check if this is a database explorer tab
         if (activeTab.data?.isExplorer) {
@@ -329,6 +339,12 @@ export default function TabContent() {
           return <NewSessionTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <SessionTabContent session={activeTab.data} />;
+
+      case 'session-activity':
+        return <SessionActivityTab {...activeTab.data} />;
+
+      case 'session-dashboard':
+        return <SessionDashboard {...activeTab.data} />;
 
       case 'marketplace':
         return <MarketplaceTabContent />;

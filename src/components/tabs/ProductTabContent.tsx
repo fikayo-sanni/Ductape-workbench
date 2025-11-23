@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Activity, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound } from 'lucide-react';
+import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
@@ -205,7 +205,17 @@ export default function ProductTabContent({ product: initialProduct, productId }
       type: type as any,
       title: component.name || component.tag || `${type}`,
       itemId: component._id,
-      data: { ...component, componentType: type, productName: product?.name, productTag: product?.tag, productLogo: product?.logo },
+      data: {
+        ...component,
+        // Explicitly preserve these core properties for localStorage restoration
+        name: component.name,
+        tag: component.tag,
+        componentType: type,
+        productName: product?.name,
+        productTag: product?.tag,
+        productLogo: product?.logo,
+        productEnvironments: product?.envs || []
+      },
     });
   };
 
@@ -355,7 +365,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 onClick={() => setActiveFilter('caches')}
                 className="gap-2"
               >
-                <Activity className="h-4 w-4" />
+                <Layers className="h-4 w-4" />
                 Caches ({product?.caches?.length || 0})
               </Button>
               <Button
@@ -508,7 +518,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Activity className="h-5 w-5 text-orange-500" />
+                  <Layers className="h-5 w-5 text-orange-500" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-grey">{product?.caches?.length || 0}</p>
@@ -604,7 +614,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Heart className="h-5 w-5" />
+                  <Heart className="h-5 w-5 text-grey-600" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-grey">{product?.healthchecks?.length || 0}</p>
@@ -997,7 +1007,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-grey-600" />
+              <Layers className="h-5 w-5 text-grey-600" />
               <h2 className="text-lg font-semibold text-grey">Caches</h2>
               <span className="text-sm text-grey-600">({product?.caches?.length || 0})</span>
             </div>
@@ -1020,7 +1030,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                   className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary flex-shrink-0" />
+                    <Layers className="h-4 w-4 text-primary flex-shrink-0" />
                     <p className="text-sm font-medium text-grey truncate">
                       {cache.name || cache.tag}
                     </p>
@@ -1033,7 +1043,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
             </div>
           ) : (
             <div className="text-center py-8">
-              <Activity className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
               <p className="text-sm text-grey-600 mb-2">No caches added yet</p>
               <p className="text-xs text-grey-500">
                 Add caches to improve your product's performance
@@ -1335,7 +1345,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5" />
+            <Heart className="h-5 w-5 text-grey-600" />
             <h2 className="text-lg font-semibold text-grey">Health Checks</h2>
             <span className="text-sm text-grey-600">({healthchecksCount})</span>
           </div>
@@ -1359,7 +1369,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Heart className="h-4 w-4" />
+                  <Heart className="h-4 w-4 text-grey-600" />
                   <h3 className="text-sm font-medium text-grey">{healthcheck.name}</h3>
                 </div>
                 <p className="text-xs text-grey-600">{healthcheck.tag}</p>
@@ -1388,7 +1398,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
       <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
+            <Bell className="h-5 w-5 text-grey-600" />
             <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
             <span className="text-sm text-grey-600">({notificationsCount})</span>
           </div>

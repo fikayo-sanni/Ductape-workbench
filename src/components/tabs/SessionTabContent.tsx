@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { KeyRound, Clock, Tag, FileJson, Code } from 'lucide-react';
+import { KeyRound, Clock, Tag, FileJson, Code, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import CodeSidebar from '@/components/CodeSidebar';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 interface SessionTabContentProps {
   session: any;
@@ -12,6 +13,26 @@ interface SessionTabContentProps {
 
 export default function SessionTabContent({ session }: SessionTabContentProps) {
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const { openTab } = useWorkbenchStore();
+
+  // Show error if session data is incomplete and can't be fetched
+  if (!session?.name && !session?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <KeyRound className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete session data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the session from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Early return if session is not provided
   if (!session) {
     return (
@@ -46,13 +67,40 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
     return JSON.stringify(schema, null, 2);
   };
 
+  const handleViewActivity = () => {
+    openTab({
+      id: `session-activity-${session._id}-${Date.now()}`,
+      type: 'session-activity' as any,
+      title: `${session.name} - Activity`,
+      itemId: session._id,
+      data: {
+        session,
+        sessionTag: session.tag,
+        productTag: session.productTag,
+        productName: session.productName,
+      },
+    });
+  };
+
   // Generate SDK code examples for session management
-  const generateCodeSections = (language: string) => {
+  const generateCodeSections = (language: string, env: string = 'production') => {
     if (!session) return [];
 
     const productTag = session.productTag || 'your_product_tag';
     const sessionTag = session.tag;
     const selector = session.selector || 'user_id';
+
+    // Parse schema to get sample data structure
+    let schemaSample = {};
+    try {
+      const schema = typeof session.schema === 'string' ? JSON.parse(session.schema) : session.schema;
+      if (schema && typeof schema === 'object') {
+        schemaSample = schema;
+      }
+    } catch (e) {
+      // Use default if schema parsing fails
+      schemaSample = { [selector]: 'user_123' };
+    }
 
     const sections = [];
 
@@ -75,67 +123,102 @@ await ductape.product.init('${productTag}');`,
       sections.push({
         title: 'Create Session',
         code: `// Create a new session for a user
-const sessionData = {
-  ${selector}: 'user_123',
-  // Add other session data according to your schema
-};
+const sessionData = ${JSON.stringify(schemaSample, null, 2)};
 
-const result = await ductape.product.session.create({
+const result = await ductape.sessions.create({
+  product: '${productTag}',
+  env: '${env}',
   tag: '${sessionTag}',
   data: sessionData
 });
 
-console.log('Session created:', result);`,
+console.log('Session created:', result);
+// Returns: { token, refreshToken, ...sessionData }`,
       });
 
       sections.push({
         title: 'Validate Session',
-        code: `// Validate an active session
-const isValid = await ductape.product.session.validate({
+        code: `// Validate and decrypt session data using token
+const sessionData = await ductape.sessions.get({
+  product: '${productTag}',
+  env: '${env}',
   tag: '${sessionTag}',
-  ${selector}: 'user_123'
-});
-
-if (isValid) {
-  console.log('Session is valid');
-} else {
-  console.log('Session is invalid or expired');
-}`,
-      });
-
-      sections.push({
-        title: 'Get Session Data',
-        code: `// Retrieve session data
-const sessionData = await ductape.product.session.get({
-  tag: '${sessionTag}',
-  ${selector}: 'user_123'
+  token: 'session_token_here'
 });
 
 console.log('Session data:', sessionData);`,
       });
 
       sections.push({
-        title: 'Update Session',
-        code: `// Update session data
-await ductape.product.session.update({
+        title: 'Refresh Session',
+        code: `// Refresh an expired session using refresh token
+const refreshedSession = await ductape.sessions.refresh({
+  product: '${productTag}',
+  env: '${env}',
   tag: '${sessionTag}',
-  ${selector}: 'user_123',
-  data: {
-    // Updated session data
-    last_activity: new Date().toISOString()
-  }
-});`,
+  refreshToken: 'refresh_token_here'
+});
+
+console.log('Session refreshed:', refreshedSession);
+// Returns: { token: string, refreshToken: string }`,
+      });
+    } else if (language === 'javascript') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `const { Ductape } = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  workspace_id: 'your_workspace_id',
+  user_id: 'your_user_id',
+  token: 'your_auth_token',
+  public_key: 'your_public_key'
+});
+
+// Initialize product
+await ductape.product.init('${productTag}');`,
       });
 
       sections.push({
-        title: 'Delete Session',
-        code: `// Delete/logout a session
-await ductape.product.session.delete({
+        title: 'Create Session',
+        code: `// Create a new session for a user
+const sessionData = ${JSON.stringify(schemaSample, null, 2)};
+
+const result = await ductape.sessions.create({
+  product: '${productTag}',
+  env: '${env}',
   tag: '${sessionTag}',
-  ${selector}: 'user_123'
+  data: sessionData
 });
 
-console.log('Session deleted');`,
+console.log('Session created:', result);
+// Returns: { token, refreshToken, ...sessionData }`,
+      });
+
+      sections.push({
+        title: 'Validate Session',
+        code: `// Validate and decrypt session data using token
+const sessionData = await ductape.sessions.get({
+  product: '${productTag}',
+  env: '${env}',
+  tag: '${sessionTag}',
+  token: 'session_token_here'
+});
+
+console.log('Session data:', sessionData);`,
+      });
+
+      sections.push({
+        title: 'Refresh Session',
+        code: `// Refresh an expired session using refresh token
+const refreshedSession = await ductape.sessions.refresh({
+  product: '${productTag}',
+  env: '${env}',
+  tag: '${sessionTag}',
+  refreshToken: 'refresh_token_here'
+});
+
+console.log('Session refreshed:', refreshedSession);
+// Returns: { token, refreshToken }`,
       });
     } else if (language === 'python') {
       sections.push({
@@ -156,66 +239,44 @@ ductape.product.init('${productTag}')`,
       sections.push({
         title: 'Create Session',
         code: `# Create a new session for a user
-session_data = {
-    '${selector}': 'user_123',
-    # Add other session data according to your schema
-}
+session_data = ${JSON.stringify(schemaSample, null, 2).replace(/"([^"]+)":/g, "'$1':")}
 
-result = ductape.product.session.create(
-    tag='${sessionTag}',
-    data=session_data
-)
+result = ductape.sessions.create({
+    'product': '${productTag}',
+    'env': '${env}',
+    'tag': '${sessionTag}',
+    'data': session_data
+})
 
-print('Session created:', result)`,
+print('Session created:', result)
+# Returns: { 'token': '...', 'refreshToken': '...', ...sessionData }`,
       });
 
       sections.push({
         title: 'Validate Session',
-        code: `# Validate an active session
-is_valid = ductape.product.session.validate(
-    tag='${sessionTag}',
-    ${selector}='user_123'
-)
-
-if is_valid:
-    print('Session is valid')
-else:
-    print('Session is invalid or expired')`,
-      });
-
-      sections.push({
-        title: 'Get Session Data',
-        code: `# Retrieve session data
-session_data = ductape.product.session.get(
-    tag='${sessionTag}',
-    ${selector}='user_123'
-)
+        code: `# Validate and decrypt session data using token
+session_data = ductape.sessions.get({
+    'product': '${productTag}',
+    'env': '${env}',
+    'tag': '${sessionTag}',
+    'token': 'session_token_here'
+})
 
 print('Session data:', session_data)`,
       });
 
       sections.push({
-        title: 'Update Session',
-        code: `# Update session data
-ductape.product.session.update(
-    tag='${sessionTag}',
-    ${selector}='user_123',
-    data={
-        # Updated session data
-        'last_activity': datetime.now().isoformat()
-    }
-)`,
-      });
+        title: 'Refresh Session',
+        code: `# Refresh an expired session using refresh token
+refreshed_session = ductape.sessions.refresh({
+    'product': '${productTag}',
+    'env': '${env}',
+    'tag': '${sessionTag}',
+    'refreshToken': 'refresh_token_here'
+})
 
-      sections.push({
-        title: 'Delete Session',
-        code: `# Delete/logout a session
-ductape.product.session.delete(
-    tag='${sessionTag}',
-    ${selector}='user_123'
-)
-
-print('Session deleted')`,
+print('Session refreshed:', refreshed_session)
+# Returns: { 'token': '...', 'refreshToken': '...' }`,
       });
     }
 
@@ -264,15 +325,25 @@ print('Session deleted')`,
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
                 <h1 className="text-2xl font-bold text-grey">{session?.name}</h1>
-                <Button
-                  onClick={() => setShowCodeSidebar(true)}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Code className="h-4 w-4" />
-                  <span>Code</span>
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleViewActivity}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Activity className="h-4 w-4" />
+                    <span>View Activity</span>
+                  </Button>
+                  <Button
+                    onClick={() => setShowCodeSidebar(true)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Code className="h-4 w-4" />
+                    <span>Code</span>
+                  </Button>
+                </div>
               </div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm text-grey-600 flex items-center gap-1">
@@ -473,6 +544,7 @@ print('Session deleted')`,
           tag={session.tag}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
+          environments={session.productEnvironments || []}
         />
       )}
     </div>

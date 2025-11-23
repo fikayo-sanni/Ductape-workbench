@@ -8,16 +8,10 @@ interface HealthcheckTabContentProps {
   data?: any;
 }
 
-interface JsonHighlighterProps {
-  data: any;
-}
-
-function JsonHighlighter({ data }: JsonHighlighterProps) {
-  if (!data) return <span className="text-grey-600 italic">No data</span>;
-  
+function JsonHighlighter({ data }: { data: any }) {
   try {
     return (
-      <pre className="text-xs whitespace-pre-wrap break-words">
+      <pre className="text-xs whitespace-pre-wrap break-words font-mono">
         {JSON.stringify(data, null, 2)}
       </pre>
     );
@@ -47,6 +41,24 @@ function DetailRow({ label, value }: { label: string; value: string | React.Reac
 export default function HealthcheckTabContent({ data }: HealthcheckTabContentProps) {
   const healthcheck: IHealthCheck = data;
   const [selectedEnv, setSelectedEnv] = useState<string>(healthcheck?.envs?.[0]?.slug || '');
+
+  // Show error if healthcheck data is incomplete and can't be fetched
+  if (!healthcheck?.name && !healthcheck?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Heart className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete health check data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the health check from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!healthcheck) {
     return (

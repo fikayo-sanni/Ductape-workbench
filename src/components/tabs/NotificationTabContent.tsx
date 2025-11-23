@@ -25,6 +25,24 @@ interface NotificationTabContentProps {
 }
 
 export default function NotificationTabContent({ data }: NotificationTabContentProps) {
+  // Show error if notifier data is incomplete and can't be fetched
+  if (!data?.name && !data?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete notifier data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the notifier from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const notifier: IProductNotifier = data;
   const productTag = data?.productTag;
   const productName = data?.productName;
