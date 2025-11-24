@@ -75,6 +75,7 @@ interface WorkbenchState {
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
   openLogsTab: () => void;
   openDashboardTab: () => void;
   openTokensTab: () => void;
@@ -294,6 +295,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
     })),
+
+  reorderTabs: (fromIndex, toIndex) =>
+    set((state) => {
+      const newTabs = [...state.tabs];
+      const [movedTab] = newTabs.splice(fromIndex, 1);
+      newTabs.splice(toIndex, 0, movedTab);
+      return { tabs: newTabs };
+    }),
 
   openLogsTab: () =>
     set((state) => {
