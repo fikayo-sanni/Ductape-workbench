@@ -1282,14 +1282,14 @@ export default function PricingTabContent() {
                                 )}
                                 <span className="font-medium text-grey">{bundle.name}</span>
                                 {customers.length > 0 && (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs text-grey">
                                     {customers.length} {customers.length === 1 ? 'customer' : 'customers'}
                                   </Badge>
                                 )}
                               </div>
                             </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="gap-1.5">
+                          <Badge variant="outline" className="gap-1.5 text-grey">
                             {getModeIcon(bundle.pricing_mode)}
                             {getModeLabel(bundle.pricing_mode)}
                           </Badge>
@@ -1301,7 +1301,7 @@ export default function PricingTabContent() {
                         </TableCell>
                         <TableCell>
                           {bundle.interval ? (
-                            <Badge variant="secondary">
+                            <Badge variant="secondary" className="text-grey">
                               {getIntervalLabel(bundle.interval)}
                             </Badge>
                           ) : (
@@ -1412,7 +1412,7 @@ export default function PricingTabContent() {
                                           <Package className="h-3.5 w-3.5 text-grey-600" />
                                           <span className="text-xs text-grey-600 font-medium">Apps:</span>
                                           {customer.app_tags.map((tag, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs">
+                                            <Badge key={idx} variant="outline" className="text-xs text-grey">
                                               {tag}
                                             </Badge>
                                           ))}
@@ -1627,7 +1627,7 @@ export default function PricingTabContent() {
                                               </div>
                                             </TableCell>
                                             <TableCell>
-                                              <Badge variant="outline" className="gap-1 text-xs">
+                                              <Badge variant="outline" className="gap-1 text-xs text-grey">
                                                 <Package className="h-3 w-3" />
                                                 {invoice.bundle_name}
                                               </Badge>
@@ -1813,7 +1813,7 @@ export default function PricingTabContent() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="gap-1.5">
+                          <Badge variant="outline" className="gap-1.5 text-grey">
                             {getCategoryIcon(expenditure.category)}
                             {getCategoryLabel(expenditure.category)}
                           </Badge>
@@ -2156,7 +2156,7 @@ export default function PricingTabContent() {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm text-grey-600">Bundle</p>
-                        <Badge variant="outline" className="gap-1 mt-1">
+                        <Badge variant="outline" className="gap-1 mt-1 text-grey">
                           <Package className="h-3 w-3" />
                           {selectedInvoice.bundle_name}
                         </Badge>
