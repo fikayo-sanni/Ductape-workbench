@@ -1760,7 +1760,10 @@ export default function PricingTabContent() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }: { name: string; percent?: number }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                    label={(props: any) => {
+                      const { name, percent } = props;
+                      return `${name || ''} ${percent ? (percent * 100).toFixed(0) : 0}%`;
+                    }}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
