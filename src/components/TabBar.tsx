@@ -22,6 +22,7 @@ import {
   Store,
   Mail,
   Layers,
+  Receipt,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -50,6 +51,7 @@ const getTabIcon = (type: Tab['type']) => {
     marketplace: Store,
     webhook: MessageSquare,
     auth: Key,
+    pricing: Receipt,
   };
   return icons[type] || FileText;
 };

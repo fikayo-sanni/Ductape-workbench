@@ -54,6 +54,7 @@ import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import JobTabContent from './tabs/JobTabContent';
 import NewJobTabContent from './tabs/NewJobTabContent';
 import GenericComponentContent from './tabs/GenericComponentContent';
+import PricingTabContent from './tabs/PricingTabContent';
 
 function FeatureTabContent({ tab }: { tab: Tab }) {
     // Check if this is a component from product (not app)
@@ -348,6 +349,9 @@ export default function TabContent() {
 
       case 'marketplace':
         return <MarketplaceTabContent />;
+
+      case 'pricing':
+        return <PricingTabContent />;
 
       case 'settings':
         return <SettingsTabContent />;

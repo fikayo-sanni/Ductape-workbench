@@ -30,6 +30,7 @@ export type TabType =
   | 'brief'
   | 'marketplace'
   | 'notifier'
+  | 'pricing'
   | 'settings';
 
 export interface Tab {

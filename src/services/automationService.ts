@@ -422,6 +422,11 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
+      pricing: {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
     };
 
     return capabilities[tab.type] || {
@@ -762,6 +767,7 @@ export class AutomationService {
       'session-dashboard': 'Session Dashboard',
       'cache-values': 'Cache Values',
       'message-broker-events': 'Message Broker Events',
+      pricing: 'Pricing',
     };
     return titles[tabType] || tabType;
   }
