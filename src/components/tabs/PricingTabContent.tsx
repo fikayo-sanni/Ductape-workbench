@@ -1223,14 +1223,10 @@ export default function PricingTabContent() {
             {/* Distribution Chart */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-grey mb-4">Bundle Distribution</h3>
-              {/* @ts-expect-error - Recharts React 19 type incompatibility */}
               <ResponsiveContainer width="100%" height={240}>
-                {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                 <BarChart data={modeDistribution}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
@@ -1240,7 +1236,6 @@ export default function PricingTabContent() {
                     }}
                     formatter={(value: number) => [`${value} subscription${value !== 1 ? 's' : ''}`, '']}
                   />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <Bar dataKey="value" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -1500,9 +1495,7 @@ export default function PricingTabContent() {
             {/* Revenue Trend Chart */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-grey mb-4">Revenue Trend</h3>
-              {/* @ts-expect-error - Recharts React 19 type incompatibility */}
               <ResponsiveContainer width="100%" height={300}>
-                {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                 <AreaChart data={revenueTrendData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -1511,9 +1504,7 @@ export default function PricingTabContent() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
@@ -1523,7 +1514,6 @@ export default function PricingTabContent() {
                     }}
                     formatter={(value: any) => [`$${value.toLocaleString()}`, 'Revenue']}
                   />
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <Area
                     type="monotone"
                     dataKey="revenue"
@@ -1763,22 +1753,22 @@ export default function PricingTabContent() {
             {/* Category Distribution Chart */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-grey mb-4">Category Breakdown</h3>
-              {/* @ts-expect-error - Recharts React 19 type incompatibility */}
               <ResponsiveContainer width="100%" height={240}>
-                {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                 <PieChart>
                   <Pie
                     data={categoryDistribution}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                    label={(props: any) => {
+                      const { name, percent } = props;
+                      return `${name || ''} ${percent ? (percent * 100).toFixed(0) : 0}%`;
+                    }}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
                     {categoryDistribution.map((entry, index) => (
-                      /* @ts-expect-error - Recharts React 19 type incompatibility */
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -2608,9 +2598,7 @@ export default function PricingTabContent() {
               {/* Usage History Chart */}
               <div className="bg-white rounded-lg border border-grey-400 p-5">
                 <h3 className="text-lg font-semibold text-grey mb-4">Usage Trends (Last 6 Months)</h3>
-                {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                 <ResponsiveContainer width="100%" height={250}>
-                  {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                   <LineChart data={[
                     { month: 'Jun', api: 800000, storage: 85, users: 7 },
                     { month: 'Jul', api: 850000, storage: 89, users: 7 },
@@ -2620,11 +2608,8 @@ export default function PricingTabContent() {
                     { month: 'Nov', api: 1150000, storage: 108, users: 8 },
                   ]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="#6B7280" />
                     <Tooltip
                       contentStyle={{
@@ -2633,13 +2618,9 @@ export default function PricingTabContent() {
                         borderRadius: '8px',
                       }}
                     />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <Legend />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <Line yAxisId="left" type="monotone" dataKey="api" stroke={CHART_COLORS.blue} name="API Requests (K)" strokeWidth={2} />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <Line yAxisId="right" type="monotone" dataKey="storage" stroke={CHART_COLORS.purple} name="Storage (GB)" strokeWidth={2} />
-                    {/* @ts-expect-error - Recharts React 19 type incompatibility */}
                     <Line yAxisId="right" type="monotone" dataKey="users" stroke={CHART_COLORS.green} name="Users" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
