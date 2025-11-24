@@ -29,6 +29,8 @@ interface IRemoteCache {
   product_tag: string;
   component_tag: string;
   component_type: string;
+  reads?: number;
+  latency?: number;
 }
 
 interface CacheValuesTabContentProps {
@@ -45,6 +47,8 @@ const DUMMY_CACHE_VALUES: IRemoteCache[] = [
     component_tag: 'session-manager',
     component_type: 'session',
     expiry: new Date(Date.now() + 3600000), // 1 hour from now
+    reads: 1247,
+    latency: 5,
   },
   {
     key: 'product:inventory:98765',
@@ -54,6 +58,8 @@ const DUMMY_CACHE_VALUES: IRemoteCache[] = [
     component_tag: 'product-db',
     component_type: 'database',
     expiry: new Date(Date.now() + 7200000), // 2 hours from now
+    reads: 3892,
+    latency: 12,
   },
   {
     key: 'config:feature-flags',
@@ -63,6 +69,8 @@ const DUMMY_CACHE_VALUES: IRemoteCache[] = [
     component_tag: 'config-storage',
     component_type: 'storage',
     expiry: new Date(Date.now() + 86400000), // 24 hours from now
+    reads: 567,
+    latency: 3,
   },
   {
     key: 'api:rate-limit:user-789',
@@ -72,6 +80,8 @@ const DUMMY_CACHE_VALUES: IRemoteCache[] = [
     component_tag: 'notification-service',
     component_type: 'notification',
     expiry: new Date(Date.now() + 900000), // 15 minutes from now
+    reads: 15234,
+    latency: 8,
   },
   {
     key: 'geo:location:ip-192.168.1.1',
@@ -80,6 +90,8 @@ const DUMMY_CACHE_VALUES: IRemoteCache[] = [
     product_tag: 'location-service',
     component_tag: 'message-queue',
     component_type: 'message-broker',
+    reads: 8421,
+    latency: 15,
   },
 ];
 
@@ -271,7 +283,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
               <div>
                 <h1 className="text-2xl font-bold text-grey mb-2">{cache.name}</h1>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-xs font-mono">
+                  <Badge variant="outline" className="text-xs font-mono text-grey">
                     <Tag className="h-3 w-3 mr-1" />
                     {cache.cacheTag || cache.tag}
                   </Badge>
@@ -296,7 +308,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
 
         {/* Stats Cards */}
         {!isLoading && filteredValues.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <Database className="h-5 w-5 text-red" />
@@ -331,6 +343,36 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
               </p>
               <p className="text-xs text-grey-600 mt-1">
                 Unique components
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-5 w-5 text-primary" />
+                <h3 className="text-sm font-semibold text-grey">Total Reads</h3>
+              </div>
+              <p className="text-2xl font-bold text-grey">
+                {filteredValues.reduce((sum, v) => sum + (v.reads ?? 0), 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-grey-600 mt-1">
+                Cumulative reads
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <Timer className="h-5 w-5 text-blue-500" />
+                <h3 className="text-sm font-semibold text-grey">Avg Latency</h3>
+              </div>
+              <p className="text-2xl font-bold text-grey">
+                {(() => {
+                  const latencies = filteredValues.filter(v => v.latency !== undefined).map(v => v.latency!);
+                  const avg = latencies.length > 0 ? latencies.reduce((sum, l) => sum + l, 0) / latencies.length : 0;
+                  return avg.toFixed(1);
+                })()}ms
+              </p>
+              <p className="text-xs text-grey-600 mt-1">
+                Average response time
               </p>
             </div>
           </div>
@@ -423,6 +465,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <TableHead className="font-semibold">Cache Key</TableHead>
                     <TableHead className="font-semibold">Tag</TableHead>
                     <TableHead className="font-semibold">Type</TableHead>
+                    <TableHead className="font-semibold">Reads</TableHead>
                     <TableHead className="font-semibold">Expires In</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -478,6 +521,14 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                                 );
                               })()}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Zap className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-mono text-sm font-semibold text-grey">
+                                {item.reads?.toLocaleString() ?? '0'}
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell>
                             {isNever ? (
