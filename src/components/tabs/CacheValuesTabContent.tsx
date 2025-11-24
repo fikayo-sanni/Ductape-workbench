@@ -467,7 +467,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs font-medium">
+                            <Badge variant="outline" className="text-xs font-medium text-grey">
                               {(() => {
                                 const Icon = getComponentTypeIcon(item.component_type);
                                 return (
@@ -530,26 +530,26 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                                 {/* Metadata Grid */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   <div className="bg-white rounded-lg p-3 border border-grey-300">
-                                    <div className="text-xs font-semibold mb-1">Cache Tag</div>
-                                    <Badge variant="outline" className="text-xs">
+                                    <div className="text-xs font-semibold mb-1 text-grey">Cache Tag</div>
+                                    <Badge variant="outline" className="text-xs text-grey">
                                       <Tag className="h-3 w-3 mr-1" />
                                       {item.cache_tag}
                                     </Badge>
                                   </div>
                                   <div className="bg-white rounded-lg p-3 border border-grey-300">
-                                    <div className="text-xs font-semibold mb-1">Component Tag</div>
-                                    <Badge variant="outline" className="text-xs">
+                                    <div className="text-xs font-semibold mb-1 text-grey">Component Tag</div>
+                                    <Badge variant="outline" className="text-xs text-grey">
                                       <Layers className="h-3 w-3 mr-1" />
                                       {item.component_tag}
                                     </Badge>
                                   </div>
                                   <div className="bg-white rounded-lg p-3 border border-grey-300">
-                                    <div className="text-xs font-semibold mb-1">Product Tag</div>
-                                    <span className="text-xs font-mono">{item.product_tag}</span>
+                                    <div className="text-xs font-semibold mb-1 text-grey">Product Tag</div>
+                                    <span className="text-xs font-mono text-grey">{item.product_tag}</span>
                                   </div>
                                   <div className="bg-white rounded-lg p-3 border border-grey-300">
-                                    <div className="text-xs font-semibold mb-1">Component Type</div>
-                                    <span className="text-xs">{item.component_type}</span>
+                                    <div className="text-xs font-semibold mb-1 text-grey">Component Type</div>
+                                    <span className="text-xs text-grey">{item.component_type}</span>
                                   </div>
                                 </div>
                               </div>
