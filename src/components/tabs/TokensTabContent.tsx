@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Key,
   Plus,
@@ -31,6 +31,8 @@ import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
 import tokensServices from "@/services/tokensServices";
 import { MarkdownEditor } from "../ui/markdown-editor";
+import { connectDuctapeWorkspace } from "@/helpers/ductape";
+import Ductape from "@ductape/sdk";
 
 interface Token {
   name: string;
@@ -45,6 +47,8 @@ interface Token {
   is_active: boolean;
   description?: string;
 }
+
+type ExpiryPeriod = "hours" | "days" | "weeks" | "months" | "years";
 
 // Empty tokens array - will be populated from API
 const initialTokens: Token[] = [];
@@ -61,9 +65,29 @@ export default function TokensTabContent() {
     description: "",
     token_type: "api" as Token["token_type"],
     scope: [] as string[],
-    expires_in: "365",
+    expiryDuration: "",
+    expiryPeriod: "days" as ExpiryPeriod,
     envs: [] as string[],
   });
+
+  // Initialize Ductape SDK instance for workspace operations
+  const ductape = useMemo<Ductape | null>(() => {
+    const token = localStorage.getItem("access_token");
+    if (!currentWorkspaceId || !user?._id || !user?.public_key || !token) {
+      return null;
+    }
+    try {
+      return connectDuctapeWorkspace({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        token,
+        public_key: user.public_key,
+      });
+    } catch (error) {
+      console.error("Failed to initialize Ductape SDK:", error);
+      return null;
+    }
+  }, [currentWorkspaceId, user?._id, user?.public_key]);
 
   // Workspace Credentials State
   const [workspaceCredentials, setWorkspaceCredentials] = useState([
@@ -110,30 +134,33 @@ export default function TokensTabContent() {
 
   // Fetch tokens on mount
   useEffect(() => {
-    if (currentWorkspaceId) {
+    if (ductape) {
       fetchTokens();
     }
-  }, [currentWorkspaceId]);
+  }, [ductape]);
 
   const fetchTokens = async () => {
-    if (!currentWorkspaceId) return;
+    if (!ductape) return;
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/workspaces/${currentWorkspaceId}/tokens`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
-      const data = await response.json();
-      if (data.status) {
-        setTokens(data.data || []);
-      }
+      const secretsList = await ductape.secrets.fetchAll();
+      // Map secrets to token format
+      const tokensData: Token[] = (secretsList || []).map((secret: any) => ({
+        name: secret.key,
+        token_type: secret.token_type || "api",
+        scope: secret.scope || [],
+        expires_in: secret.expires_at,
+        envs: secret.envs || [],
+        created_at: secret.createdAt || new Date(),
+        last_used: null,
+        is_active: !secret.expires_at || secret.expires_at * 1000 > Date.now(),
+        description: secret.description,
+      }));
+      setTokens(tokensData);
     } catch (error) {
       console.error("Failed to fetch tokens:", error);
+      toast.error("Failed to fetch tokens");
     } finally {
       setLoading(false);
     }
@@ -145,12 +172,42 @@ export default function TokensTabContent() {
     return tagPattern.test(name);
   };
 
+  // Generate a random token value
+  const generateTokenValue = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const length = 64;
+    let result = 'dtk_'; // Prefix for Ductape tokens
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  // Calculate expiry timestamp (Unix epoch in seconds)
+  const calculateExpiryTimestamp = (duration: string, period: ExpiryPeriod): number | null => {
+    if (!duration || duration === "") return null;
+
+    const durationNum = parseInt(duration);
+    if (isNaN(durationNum) || durationNum <= 0) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const multipliers: Record<ExpiryPeriod, number> = {
+      hours: 3600,
+      days: 86400,
+      weeks: 604800,
+      months: 2592000,
+      years: 31536000,
+    };
+
+    return now + (durationNum * multipliers[period]);
+  };
+
   const handleCreateToken = async () => {
-    if (!currentWorkspaceId) return;
+    if (!ductape) return;
 
     // Validate token name format
     if (!validateTokenName(newToken.name)) {
-      alert(
+      toast.error(
         "Token name must only contain letters, numbers, and underscores (no spaces or special characters)"
       );
       return;
@@ -158,99 +215,76 @@ export default function TokensTabContent() {
 
     setLoading(true);
     try {
-      const payload = {
-        name: newToken.name,
-        description: newToken.description,
+      const expires_at = calculateExpiryTimestamp(newToken.expiryDuration, newToken.expiryPeriod);
+
+      // Generate token value
+      const tokenValue = generateTokenValue();
+
+      await ductape.secrets.create({
+        key: newToken.name,
+        value: tokenValue,
+        description: newToken.description || undefined,
         token_type: newToken.token_type,
         scope: newToken.scope,
-        expires_in:
-          newToken.expires_in === "never"
-            ? null
-            : parseInt(newToken.expires_in),
         envs: newToken.envs,
-      };
+        expires_at,
+      });
 
-      const response = await fetch(
-        `/api/workspaces/${currentWorkspaceId}/tokens`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      // Show the newly created token (only time it's visible)
+      setCreatedToken(tokenValue);
+      setShowNewTokenDialog(true);
 
-      const data = await response.json();
-      if (data.status) {
-        // Show the newly created token (only time it's visible)
-        setCreatedToken(data.data.token);
-        setShowNewTokenDialog(true);
+      // Refresh tokens list
+      await fetchTokens();
 
-        // Refresh tokens list
-        await fetchTokens();
+      setShowCreateDialog(false);
+      setNewToken({
+        name: "",
+        description: "",
+        token_type: "api",
+        scope: [],
+        expiryDuration: "",
+        expiryPeriod: "days",
+        envs: [],
+      });
 
-        setShowCreateDialog(false);
-        setNewToken({
-          name: "",
-          description: "",
-          token_type: "api",
-          scope: [],
-          expires_in: "365",
-          envs: [],
-        });
-      }
-    } catch (error) {
+      toast.success("Token created successfully");
+    } catch (error: any) {
       console.error("Failed to create token:", error);
+      toast.error(error?.message || "Failed to create token");
     } finally {
       setLoading(false);
     }
   };
 
   const handleRevokeToken = async (tokenName: string) => {
-    if (!currentWorkspaceId) return;
+    if (!ductape) return;
 
     try {
-      const response = await fetch(
-        `/api/workspaces/${currentWorkspaceId}/tokens/${tokenName}/revoke`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      if (data.status) {
-        await fetchTokens();
-      }
-    } catch (error) {
+      // Revoke by setting expiry to now (expired)
+      await ductape.secrets.update(tokenName, {
+        expires_at: Math.floor(Date.now() / 1000) - 1, // Set to past
+      });
+      toast.success("Token revoked successfully");
+      await fetchTokens();
+    } catch (error: any) {
       console.error("Failed to revoke token:", error);
+      toast.error(error?.message || "Failed to revoke token");
     }
   };
 
   const handleDeleteToken = async (tokenName: string) => {
-    if (!currentWorkspaceId) return;
+    if (!ductape) return;
+
+    if (!confirm(`Are you sure you want to delete the token "${tokenName}"?`)) return;
 
     try {
-      const response = await fetch(
-        `/api/workspaces/${currentWorkspaceId}/tokens/${tokenName}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      if (data.status) {
-        await fetchTokens();
-      }
-    } catch (error) {
+      await ductape.secrets.delete(tokenName);
+      toast.success("Token deleted successfully");
+      await fetchTokens();
+    } catch (error: any) {
       console.error("Failed to delete token:", error);
+      toast.error(error?.message || "Failed to delete token");
     }
   };
 
@@ -517,7 +551,7 @@ export default function TokensTabContent() {
             </div>
           </div>
 
-          {/* Right Column - API Tokens */}
+          {/* Right Column - Workspace Tokens */}
           <div className="lg:col-span-2 space-y-6">
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
@@ -567,7 +601,7 @@ export default function TokensTabContent() {
             {/* Tokens List */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-grey mb-4">
-                API Tokens
+                Workspace Tokens
               </h2>
               {loading ? (
                 <div className="text-center py-8 text-grey-600">
@@ -678,6 +712,7 @@ export default function TokensTabContent() {
                 </div>
               )}
             </div>
+
           </div>
         </div>
       </div>
@@ -765,24 +800,39 @@ export default function TokensTabContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="expires-in">Expires In</Label>
-              <Select
-                value={newToken.expires_in}
-                onValueChange={(value) =>
-                  setNewToken({ ...newToken, expires_in: value })
-                }
-              >
-                <SelectTrigger id="expires-in">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
-                  <SelectItem value="180">180 days</SelectItem>
-                  <SelectItem value="365">1 year</SelectItem>
-                  <SelectItem value="never">Never</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Expires In (Optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Duration"
+                  value={newToken.expiryDuration}
+                  onChange={(e) =>
+                    setNewToken({ ...newToken, expiryDuration: e.target.value })
+                  }
+                  className="w-24"
+                  min="1"
+                />
+                <Select
+                  value={newToken.expiryPeriod}
+                  onValueChange={(value) =>
+                    setNewToken({ ...newToken, expiryPeriod: value as ExpiryPeriod })
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">Hours</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="weeks">Weeks</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="years">Years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-grey-600">
+                Leave empty for no expiration
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -946,6 +996,7 @@ export default function TokensTabContent() {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

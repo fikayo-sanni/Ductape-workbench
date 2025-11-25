@@ -357,6 +357,18 @@ export default function WorkbenchHeader() {
     <header className="h-14 md:h-16 border-b border-grey-400 bg-white flex items-center px-3 md:px-6 flex-shrink-0 shadow-sm" data-intro="header">
       {/* Logo/Brand */}
       <div className="flex items-center gap-2 md:gap-3 pr-3 md:pr-8 md:border-r border-grey-400">
+        <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+          <path d="M14 10C10 10 8 14 8 18V22C8 24 6 26 6 26C6 26 8 28 8 30V34C8 38 10 42 14 42"
+            stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" className="text-primary" />
+          <path d="M34 10C38 10 40 14 40 18V22C40 24 42 26 42 26C42 26 40 28 40 30V34C40 38 38 42 34 42"
+            stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" className="text-primary" />
+          <path d="M16 20H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
+          <path d="M16 26H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
+          <path d="M16 32H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
+          <circle cx="16" cy="20" r="2" fill="currentColor" className="text-primary" />
+          <circle cx="32" cy="26" r="2" fill="currentColor" className="text-primary" />
+          <circle cx="16" cy="32" r="2" fill="currentColor" className="text-primary" />
+        </svg>
         <div className="text-lg md:text-xl font-bold text-primary">Ductape</div>
         <span className="hidden sm:inline text-sm text-grey-600 font-medium">Workbench</span>
       </div>

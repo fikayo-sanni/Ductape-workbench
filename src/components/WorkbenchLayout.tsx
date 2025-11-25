@@ -14,6 +14,7 @@ import Dashboard from './Dashboard';
 import TabBar from './TabBar';
 import TabContent from './TabContent';
 import LoginModal from './LoginModal';
+import CreateAccountModal from './CreateAccountModal';
 import OnboardingModal from './OnboardingModal';
 import ChatbotSidebar from './ChatbotSidebar';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
@@ -24,6 +25,7 @@ function WorkbenchContent() {
   const { user, currentWorkspaceId } = useAuth();
   const { isOnboarding, completeOnboarding, skipOnboarding, startOnboarding } = useOnboarding();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [hasTriggeredOnboarding, setHasTriggeredOnboarding] = useState(false);
   const {
     sidebarCollapsed,
@@ -46,7 +48,15 @@ function WorkbenchContent() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token || !user) {
-      setShowLoginModal(true);
+      // Check for signup query param
+      const urlParams = new URLSearchParams(window.location.search);
+      const isSignup = urlParams.get('signup') === 'true';
+
+      if (isSignup) {
+        setShowCreateAccountModal(true);
+      } else {
+        setShowLoginModal(true);
+      }
     }
   }, [user]);
 
@@ -75,8 +85,15 @@ function WorkbenchContent() {
         />
       )}
 
+      {/* Create Account Modal */}
+      <CreateAccountModal
+        open={showCreateAccountModal}
+        onSuccess={() => setShowCreateAccountModal(false)}
+        onClose={() => setShowCreateAccountModal(false)}
+      />
+
       {/* Main Content - Blurred when not authenticated */}
-      <div className={`flex flex-col h-screen bg-grey-100 overflow-hidden ${showLoginModal ? 'blur-sm pointer-events-none' : ''}`}>
+      <div className={`flex flex-col h-screen bg-grey-100 overflow-hidden ${(showLoginModal || showCreateAccountModal) ? 'blur-sm pointer-events-none' : ''}`}>
         {/* Header - Full width at top */}
         <WorkbenchHeader />
 

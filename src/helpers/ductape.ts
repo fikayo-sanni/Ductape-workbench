@@ -29,3 +29,28 @@ export const connectDuctape = ({
     return ductape.app;
   }
 };
+
+/**
+ * Initialize Ductape SDK for workspace-level operations (secrets, etc.)
+ * Returns the full Ductape instance instead of product/app builders
+ */
+interface DuctapeWorkspaceInit extends Omit<IBuilderInit, 'env_type'> {
+  env_type?: IBuilderInit['env_type'];
+}
+
+export const connectDuctapeWorkspace = ({
+  workspace_id,
+  user_id,
+  token,
+  public_key,
+}: DuctapeWorkspaceInit): Ductape => {
+  if (!workspace_id || !user_id || !token || !public_key) {
+    throw new Error('Missing required configuration for Ductape initialization');
+  }
+
+  const ductape = new Ductape({ workspace_id, user_id });
+  ductape.setPublicKey(public_key);
+  ductape.setToken(token);
+
+  return ductape;
+};
