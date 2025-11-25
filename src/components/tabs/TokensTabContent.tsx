@@ -144,7 +144,7 @@ export default function TokensTabContent() {
 
     setLoading(true);
     try {
-      const secretsList = await ductape.secrets.fetchAll();
+      const secretsList = await (ductape as any).secrets.fetchAll();
       // Map secrets to token format
       const tokensData: Token[] = (secretsList || []).map((secret: any) => ({
         name: secret.key,
@@ -220,7 +220,7 @@ export default function TokensTabContent() {
       // Generate token value
       const tokenValue = generateTokenValue();
 
-      await ductape.secrets.create({
+      await (ductape as any).secrets.create({
         key: newToken.name,
         value: tokenValue,
         description: newToken.description || undefined,
@@ -262,7 +262,7 @@ export default function TokensTabContent() {
 
     try {
       // Revoke by setting expiry to now (expired)
-      await ductape.secrets.update(tokenName, {
+      await (ductape as any).secrets.update(tokenName, {
         expires_at: Math.floor(Date.now() / 1000) - 1, // Set to past
       });
       toast.success("Token revoked successfully");
@@ -279,7 +279,7 @@ export default function TokensTabContent() {
     if (!confirm(`Are you sure you want to delete the token "${tokenName}"?`)) return;
 
     try {
-      await ductape.secrets.delete(tokenName);
+      await (ductape as any).secrets.delete(tokenName);
       toast.success("Token deleted successfully");
       await fetchTokens();
     } catch (error: any) {
