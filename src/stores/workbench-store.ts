@@ -35,7 +35,7 @@ interface WorkbenchState {
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
   activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
-  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | null;
+  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | 'pricing' | null;
 
   // Logs Filter State
   logsFilters: {
@@ -75,12 +75,14 @@ interface WorkbenchState {
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
   openLogsTab: () => void;
   openDashboardTab: () => void;
   openTokensTab: () => void;
   openTeamsTab: () => void;
   openPartnershipTab: () => void;
   openMarketplaceTab: () => void;
+  openPricingTab: () => void;
 
   // Actions - UI
   toggleSidebar: () => void;
@@ -295,6 +297,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
     })),
 
+  reorderTabs: (fromIndex, toIndex) =>
+    set((state) => {
+      const newTabs = [...state.tabs];
+      const [movedTab] = newTabs.splice(fromIndex, 1);
+      newTabs.splice(toIndex, 0, movedTab);
+      return { tabs: newTabs };
+    }),
+
   openLogsTab: () =>
     set((state) => {
       // Check if logs tab already exists
@@ -430,6 +440,29 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       return {
         tabs: [...state.tabs, newMarketplaceTab],
         activeTabId: newMarketplaceTab.id,
+      };
+    }),
+
+  openPricingTab: () =>
+    set((state) => {
+      // Check if pricing tab already exists
+      const existingPricingTab = state.tabs.find((t) => t.type === 'pricing');
+
+      if (existingPricingTab) {
+        // Tab already exists, just switch to it
+        return { activeTabId: existingPricingTab.id };
+      }
+
+      // Create new pricing tab
+      const newPricingTab: Tab = {
+        id: `pricing-${Date.now()}`,
+        type: 'pricing',
+        title: 'Pricing',
+      };
+
+      return {
+        tabs: [...state.tabs, newPricingTab],
+        activeTabId: newPricingTab.id,
       };
     }),
 

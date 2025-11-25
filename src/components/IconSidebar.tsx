@@ -1,4 +1,4 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store, MessageCircle, Handshake } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, FileText, Key, Users, Store, MessageCircle, Handshake, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { getDummyWorkspacePartnerships } from '@/data/partnerships.dummy';
@@ -11,7 +11,7 @@ interface IconSidebarProps {
 }
 
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
-  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
+  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openPricingTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
 
   // Calculate unread messages count
   const currentWorkspaceId = 'ws_001';
@@ -201,6 +201,32 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         {/* Tooltip on hover */}
         <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
           Team Members
+        </div>
+      </button>
+
+      {/* Pricing Button - Opens as tab */}
+      <button
+        onClick={() => {
+          setActiveIconSidebar('pricing');
+          openPricingTab();
+          // Close sidebar on mobile when opening pricing
+          if (!sidebarCollapsed) {
+            toggleSidebar();
+          }
+        }}
+        className={cn(
+          'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
+          activeIconSidebar === 'pricing'
+            ? 'bg-primary text-white'
+            : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+        )}
+        aria-label="Pricing"
+      >
+        <Receipt className="h-5 w-5" />
+
+        {/* Tooltip on hover */}
+        <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+          Pricing & Billing
         </div>
       </button>
 
