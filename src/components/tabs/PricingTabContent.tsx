@@ -147,7 +147,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 29,
       api_usage: 5000,
-      app_tags: ['Analytics Dashboard', 'Data Pipeline'],
+      app_tags: ['ductape:dashboard', 'ductape:pipeline'],
     },
     {
       workspace_id: 'ws_007',
@@ -156,7 +156,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 29,
       api_usage: 3500,
-      app_tags: ['CRM System'],
+      app_tags: ['ductape:crm'],
     },
   ],
   price_2: [ // Professional Plan
@@ -167,7 +167,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 99,
       api_usage: 22000,
-      app_tags: ['E-commerce Platform', 'Inventory Manager', 'Customer Portal'],
+      app_tags: ['ductape:ecommerce', 'ductape:inventory'], //['E-commerce Platform', 'Inventory Manager', 'Customer Portal'],
     },
     {
       workspace_id: 'ws_005',
@@ -176,7 +176,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 99,
       api_usage: 18000,
-      app_tags: ['Project Management', 'Team Collaboration'],
+      app_tags: ['ductape:project_management', 'ductape:team_collaboration'],
     },
     {
       workspace_id: 'ws_008',
@@ -185,7 +185,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'trialing',
       mrr: 0,
       api_usage: 12000,
-      app_tags: ['Marketing Automation', 'Analytics'],
+      app_tags: ['ductape:marketing_automation', 'ductape:analytics'],
     },
   ],
   price_3: [ // Enterprise Plan
@@ -196,7 +196,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 299,
       api_usage: 45000,
-      app_tags: ['Enterprise ERP', 'HR Management', 'Financial System', 'Supply Chain'],
+      app_tags: ['ductape:enterprise_erp', 'ductape:hr_management', 'ductape:financial_system', 'ductape:supply_chain'],
     },
     {
       workspace_id: 'ws_009',
@@ -205,7 +205,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 299,
       api_usage: 38000,
-      app_tags: ['Multi-tenant Platform', 'API Gateway', 'Data Warehouse'],
+      app_tags: ['ductape:multi_tenant_platform', 'ductape:api_gateway', 'ductape:data_warehouse'],
     },
   ],
   price_4: [ // Pay Per Request
@@ -216,7 +216,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 0,
       api_usage: 12300,
-      app_tags: ['Mobile App Backend', 'Push Notifications'],
+      app_tags: ['ductape:mobile_app_backend', 'ductape:push_notifications'],
     },
     {
       workspace_id: 'ws_006',
@@ -225,7 +225,7 @@ const BUNDLE_CUSTOMERS: Record<string, BundleCustomer[]> = {
       status: 'active',
       mrr: 0,
       api_usage: 8500,
-      app_tags: ['MVP Product', 'User Auth'],
+      app_tags: ['ductape:mvp_product', 'ductape:user_auth'],
     },
   ],
   price_5: [], // One-Time Setup Fee (no recurring customers)
@@ -1407,7 +1407,7 @@ export default function PricingTabContent() {
 
                                     {/* App Tags */}
                                     {customer.app_tags.length > 0 && (
-                                      <div className="pt-3 border-t border-grey-200">
+                                      <div className="pt-3 border-t border-grey-400">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <Package className="h-3.5 w-3.5 text-grey-600" />
                                           <span className="text-xs text-grey-600 font-medium">Apps:</span>

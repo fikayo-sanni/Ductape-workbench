@@ -485,7 +485,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 className="gap-2"
               >
                 <Webhook className="h-4 w-4" />
-                Webhooks ({webhooksCount})
+                Webhook Channels ({webhooksCount})
               </Button>
               <Button
                 variant={activeFilter === 'auths' ? 'default' : 'outline'}
@@ -560,7 +560,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               </div>
               <div>
                 <p className="text-2xl font-bold text-grey">{webhooksCount}</p>
-                <p className="text-sm text-grey-600">Webhooks</p>
+                <p className="text-sm text-grey-600">Webhook Channels</p>
               </div>
             </div>
           </button>
@@ -789,7 +789,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Webhook className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Webhooks</h2>
+            <h2 className="text-lg font-semibold text-grey">Webhook Channels</h2>
             <span className="text-sm text-grey-600">({webhooksCount})</span>
           </div>
           {isInternalApp && (
@@ -801,7 +801,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 openTab({
                   id: `new-webhook-${Date.now()}`,
                   type: 'webhook',
-                  title: 'New Webhook',
+                  title: 'New Webhook Channel',
                   data: { isNew: true, app: currentApp, product: null },
                   isDirty: true,
                 });
@@ -824,7 +824,14 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                     type: 'webhook',
                     title: webhook.name || webhook.tag,
                     itemId: webhook._id,
-                    data: { ...webhook, appName: currentApp?.app_name, version: selectedVersionTag },
+                    data: {
+                      ...webhook,
+                      appName: currentApp?.app_name,
+                      appTag: currentApp?.tag,
+                      appLogo: currentApp?.logo,
+                      version: selectedVersionTag,
+                      app: currentApp,
+                    },
                   });
                 }}
                 className="w-full flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
