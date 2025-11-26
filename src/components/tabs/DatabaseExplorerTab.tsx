@@ -24,6 +24,11 @@ import {
   ChevronDown,
   ChevronRight,
   Code,
+  Save,
+  Settings2,
+  Bookmark,
+  Loader2,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,22 +65,255 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 
+// Column type definitions
+type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
+
+interface TableColumn {
+  name: string;
+  type: ColumnType;
+  nullable?: boolean;
+}
+
+interface TableDefinition {
+  name: string;
+  type: 'table' | 'collection';
+  rowCount?: number;
+  documentCount?: number;
+  columns: TableColumn[];
+}
+
+// Operators by column type
+const OPERATORS_BY_TYPE: Record<ColumnType, { value: string; label: string }[]> = {
+  string: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: 'LIKE', label: 'LIKE' },
+    { value: 'ILIKE', label: 'ILIKE' },
+    { value: 'STARTS_WITH', label: 'Starts with' },
+    { value: 'ENDS_WITH', label: 'Ends with' },
+    { value: 'CONTAINS', label: 'Contains' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+  number: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: '>', label: '>' },
+    { value: '<', label: '<' },
+    { value: '>=', label: '>=' },
+    { value: '<=', label: '<=' },
+    { value: 'BETWEEN', label: 'Between' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+  boolean: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+  date: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: '>', label: 'After' },
+    { value: '<', label: 'Before' },
+    { value: '>=', label: 'On or after' },
+    { value: '<=', label: 'On or before' },
+    { value: 'BETWEEN', label: 'Between' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+  datetime: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: '>', label: 'After' },
+    { value: '<', label: 'Before' },
+    { value: '>=', label: 'On or after' },
+    { value: '<=', label: 'On or before' },
+    { value: 'BETWEEN', label: 'Between' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+  json: [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: 'IS NULL', label: 'Is null' },
+    { value: 'IS NOT NULL', label: 'Is not null' },
+  ],
+};
+
 // Dummy data for database tables and records
-const DUMMY_TABLES_SQL = [
-  { name: 'users', type: 'table', rowCount: 1247 },
-  { name: 'products', type: 'table', rowCount: 532 },
-  { name: 'orders', type: 'table', rowCount: 8934 },
-  { name: 'customers', type: 'table', rowCount: 3241 },
-  { name: 'sessions', type: 'table', rowCount: 12453 },
-  { name: 'audit_logs', type: 'table', rowCount: 45623 },
+const DUMMY_TABLES_SQL: TableDefinition[] = [
+  {
+    name: 'users',
+    type: 'table',
+    rowCount: 1247,
+    columns: [
+      { name: 'id', type: 'number' },
+      { name: 'email', type: 'string' },
+      { name: 'name', type: 'string' },
+      { name: 'is_active', type: 'boolean' },
+      { name: 'is_verified', type: 'boolean' },
+      { name: 'age', type: 'number', nullable: true },
+      { name: 'balance', type: 'number' },
+      { name: 'created_at', type: 'datetime' },
+      { name: 'updated_at', type: 'datetime' },
+      { name: 'last_login', type: 'datetime', nullable: true },
+    ]
+  },
+  {
+    name: 'products',
+    type: 'table',
+    rowCount: 532,
+    columns: [
+      { name: 'id', type: 'number' },
+      { name: 'name', type: 'string' },
+      { name: 'description', type: 'string', nullable: true },
+      { name: 'sku', type: 'string' },
+      { name: 'price', type: 'number' },
+      { name: 'quantity', type: 'number' },
+      { name: 'is_available', type: 'boolean' },
+      { name: 'category', type: 'string' },
+      { name: 'created_at', type: 'datetime' },
+      { name: 'updated_at', type: 'datetime' },
+    ]
+  },
+  {
+    name: 'orders',
+    type: 'table',
+    rowCount: 8934,
+    columns: [
+      { name: 'id', type: 'number' },
+      { name: 'user_id', type: 'number' },
+      { name: 'total_amount', type: 'number' },
+      { name: 'status', type: 'string' },
+      { name: 'is_paid', type: 'boolean' },
+      { name: 'is_shipped', type: 'boolean' },
+      { name: 'order_date', type: 'datetime' },
+      { name: 'shipped_date', type: 'datetime', nullable: true },
+      { name: 'notes', type: 'string', nullable: true },
+    ]
+  },
+  {
+    name: 'customers',
+    type: 'table',
+    rowCount: 3241,
+    columns: [
+      { name: 'id', type: 'number' },
+      { name: 'company_name', type: 'string' },
+      { name: 'contact_name', type: 'string' },
+      { name: 'contact_email', type: 'string' },
+      { name: 'phone', type: 'string', nullable: true },
+      { name: 'is_active', type: 'boolean' },
+      { name: 'credit_limit', type: 'number' },
+      { name: 'created_at', type: 'datetime' },
+    ]
+  },
+  {
+    name: 'sessions',
+    type: 'table',
+    rowCount: 12453,
+    columns: [
+      { name: 'id', type: 'string' },
+      { name: 'user_id', type: 'number' },
+      { name: 'ip_address', type: 'string' },
+      { name: 'user_agent', type: 'string' },
+      { name: 'is_active', type: 'boolean' },
+      { name: 'created_at', type: 'datetime' },
+      { name: 'expires_at', type: 'datetime' },
+    ]
+  },
+  {
+    name: 'audit_logs',
+    type: 'table',
+    rowCount: 45623,
+    columns: [
+      { name: 'id', type: 'number' },
+      { name: 'user_id', type: 'number', nullable: true },
+      { name: 'action', type: 'string' },
+      { name: 'entity_type', type: 'string' },
+      { name: 'entity_id', type: 'string' },
+      { name: 'old_values', type: 'json', nullable: true },
+      { name: 'new_values', type: 'json', nullable: true },
+      { name: 'created_at', type: 'datetime' },
+    ]
+  },
 ];
 
-const DUMMY_COLLECTIONS_NOSQL = [
-  { name: 'users', type: 'collection', documentCount: 1247 },
-  { name: 'products', type: 'collection', documentCount: 532 },
-  { name: 'orders', type: 'collection', documentCount: 8934 },
-  { name: 'analytics', type: 'collection', documentCount: 125834 },
-  { name: 'sessions', type: 'collection', documentCount: 12453 },
+const DUMMY_COLLECTIONS_NOSQL: TableDefinition[] = [
+  {
+    name: 'users',
+    type: 'collection',
+    documentCount: 1247,
+    columns: [
+      { name: '_id', type: 'string' },
+      { name: 'email', type: 'string' },
+      { name: 'name', type: 'string' },
+      { name: 'isActive', type: 'boolean' },
+      { name: 'isVerified', type: 'boolean' },
+      { name: 'age', type: 'number', nullable: true },
+      { name: 'createdAt', type: 'datetime' },
+      { name: 'updatedAt', type: 'datetime' },
+    ]
+  },
+  {
+    name: 'products',
+    type: 'collection',
+    documentCount: 532,
+    columns: [
+      { name: '_id', type: 'string' },
+      { name: 'name', type: 'string' },
+      { name: 'description', type: 'string', nullable: true },
+      { name: 'sku', type: 'string' },
+      { name: 'price', type: 'number' },
+      { name: 'quantity', type: 'number' },
+      { name: 'isAvailable', type: 'boolean' },
+      { name: 'category', type: 'string' },
+      { name: 'createdAt', type: 'datetime' },
+    ]
+  },
+  {
+    name: 'orders',
+    type: 'collection',
+    documentCount: 8934,
+    columns: [
+      { name: '_id', type: 'string' },
+      { name: 'userId', type: 'string' },
+      { name: 'totalAmount', type: 'number' },
+      { name: 'status', type: 'string' },
+      { name: 'isPaid', type: 'boolean' },
+      { name: 'isShipped', type: 'boolean' },
+      { name: 'orderDate', type: 'datetime' },
+      { name: 'items', type: 'json' },
+    ]
+  },
+  {
+    name: 'analytics',
+    type: 'collection',
+    documentCount: 125834,
+    columns: [
+      { name: '_id', type: 'string' },
+      { name: 'event', type: 'string' },
+      { name: 'userId', type: 'string', nullable: true },
+      { name: 'sessionId', type: 'string' },
+      { name: 'timestamp', type: 'datetime' },
+      { name: 'data', type: 'json' },
+    ]
+  },
+  {
+    name: 'sessions',
+    type: 'collection',
+    documentCount: 12453,
+    columns: [
+      { name: '_id', type: 'string' },
+      { name: 'userId', type: 'string' },
+      { name: 'ipAddress', type: 'string' },
+      { name: 'userAgent', type: 'string' },
+      { name: 'isActive', type: 'boolean' },
+      { name: 'createdAt', type: 'datetime' },
+      { name: 'expiresAt', type: 'datetime' },
+    ]
+  },
 ];
 
 const DUMMY_MIGRATIONS = [
@@ -108,40 +346,149 @@ const DUMMY_MIGRATIONS = [
   },
 ];
 
-const DUMMY_ACTIONS = [
+// Database operation types based on SDK
+type DatabaseOperation =
+  | 'query' | 'insert' | 'update' | 'delete' | 'upsert'
+  | 'count' | 'sum' | 'avg' | 'min' | 'max'
+  | 'groupBy' | 'aggregate' | 'raw';
+
+// Database Action interface
+interface IDatabaseAction {
+  id: string;
+  tag: string;
+  name: string;
+  description?: string;
+  operation: DatabaseOperation;
+  query: Record<string, any>;
+  parameters: Array<{
+    name: string;
+    path: string;
+    defaultValue: any;
+    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  }>;
+  createdAt: string;
+}
+
+// Helper function to generate tag from name
+const generateActionTag = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+// Sample saved actions with the new structure
+const DUMMY_ACTIONS: IDatabaseAction[] = [
   {
-    name: 'getUser',
-    tag: 'action_get_user',
-    type: 'read',
-    tableName: 'users',
-    description: 'Fetch user by ID or email',
-    parameters: ['id', 'email'],
+    id: 'action_1',
+    tag: 'get-users-paginated',
+    name: 'Get Users Paginated',
+    description: 'Fetch users with configurable pagination',
+    operation: 'query',
+    query: {
+      operation: 'query',
+      options: {
+        table: 'users',
+        where: { is_active: true },
+        limit: '{{limit}}',
+        offset: '{{offset}}',
+        orderBy: { column: '{{orderColumn}}', direction: '{{orderDirection}}' }
+      }
+    },
+    parameters: [
+      { name: 'limit', path: 'options.limit', defaultValue: 25, type: 'number' },
+      { name: 'offset', path: 'options.offset', defaultValue: 0, type: 'number' },
+      { name: 'orderColumn', path: 'options.orderBy.column', defaultValue: 'created_at', type: 'string' },
+      { name: 'orderDirection', path: 'options.orderBy.direction', defaultValue: 'DESC', type: 'string' },
+    ],
+    createdAt: '2024-03-01T10:30:00Z',
   },
   {
-    name: 'createOrder',
-    tag: 'action_create_order',
-    type: 'create',
-    tableName: 'orders',
-    description: 'Create a new order',
-    parameters: ['user_id', 'product_id', 'amount'],
+    id: 'action_2',
+    tag: 'count-orders-by-status',
+    name: 'Count Orders by Status',
+    description: 'Count orders filtered by status',
+    operation: 'count',
+    query: {
+      operation: 'count',
+      options: {
+        table: 'orders',
+        where: { status: '{{status}}' }
+      }
+    },
+    parameters: [
+      { name: 'status', path: 'options.where.status', defaultValue: 'pending', type: 'string' },
+    ],
+    createdAt: '2024-03-05T14:15:00Z',
   },
   {
-    name: 'updateProduct',
-    tag: 'action_update_product',
-    type: 'update',
-    tableName: 'products',
-    description: 'Update product details',
-    parameters: ['id', 'name', 'price', 'stock'],
+    id: 'action_3',
+    tag: 'sum-product-sales',
+    name: 'Sum Product Sales',
+    description: 'Calculate total sales amount for a product',
+    operation: 'sum',
+    query: {
+      operation: 'sum',
+      options: {
+        table: 'orders',
+        column: 'amount',
+        where: { product_id: '{{productId}}' }
+      }
+    },
+    parameters: [
+      { name: 'productId', path: 'options.where.product_id', defaultValue: 1, type: 'number' },
+    ],
+    createdAt: '2024-03-10T09:45:00Z',
   },
   {
-    name: 'deleteSession',
-    tag: 'action_delete_session',
-    type: 'delete',
-    tableName: 'sessions',
-    description: 'Remove expired sessions',
-    parameters: ['session_id'],
+    id: 'action_4',
+    tag: 'insert-new-user',
+    name: 'Insert New User',
+    description: 'Create a new user record',
+    operation: 'insert',
+    query: {
+      operation: 'insert',
+      options: {
+        table: 'users',
+        data: {
+          email: '{{email}}',
+          name: '{{name}}',
+          role: '{{role}}',
+          is_active: true
+        },
+        returning: ['id', 'email', 'name']
+      }
+    },
+    parameters: [
+      { name: 'email', path: 'options.data.email', defaultValue: 'user@example.com', type: 'string' },
+      { name: 'name', path: 'options.data.name', defaultValue: 'New User', type: 'string' },
+      { name: 'role', path: 'options.data.role', defaultValue: 'user', type: 'string' },
+    ],
+    createdAt: '2024-03-12T11:20:00Z',
   },
 ];
+
+// Database operations configuration for query builder
+const DATABASE_OPERATIONS: Record<DatabaseOperation, {
+  label: string;
+  description: string;
+  color: string;
+  fields: string[];
+}> = {
+  query: { label: 'Query', description: 'Select rows from a table', color: 'bg-blue/10 text-blue', fields: ['table', 'columns', 'where', 'orderBy', 'limit', 'offset'] },
+  insert: { label: 'Insert', description: 'Add new rows to a table', color: 'bg-green/10 text-green', fields: ['table', 'data', 'returning'] },
+  update: { label: 'Update', description: 'Modify existing rows', color: 'bg-yellow/10 text-yellow-600', fields: ['table', 'data', 'where', 'returning'] },
+  delete: { label: 'Delete', description: 'Remove rows from a table', color: 'bg-red/10 text-red', fields: ['table', 'where', 'returning'] },
+  upsert: { label: 'Upsert', description: 'Insert or update on conflict', color: 'bg-purple-500/10 text-purple-500', fields: ['table', 'data', 'conflictColumn', 'returning'] },
+  count: { label: 'Count', description: 'Count matching rows', color: 'bg-grey-400/10 text-grey', fields: ['table', 'where'] },
+  sum: { label: 'Sum', description: 'Sum a numeric column', color: 'bg-orange-500/10 text-orange-500', fields: ['table', 'column', 'where'] },
+  avg: { label: 'Average', description: 'Average of a numeric column', color: 'bg-cyan-500/10 text-cyan-500', fields: ['table', 'column', 'where'] },
+  min: { label: 'Minimum', description: 'Minimum value in a column', color: 'bg-teal-500/10 text-teal-500', fields: ['table', 'column', 'where'] },
+  max: { label: 'Maximum', description: 'Maximum value in a column', color: 'bg-pink-500/10 text-pink-500', fields: ['table', 'column', 'where'] },
+  groupBy: { label: 'Group By', description: 'Group rows by column(s)', color: 'bg-indigo-500/10 text-indigo-500', fields: ['table', 'groupColumns', 'aggregations', 'where', 'having'] },
+  aggregate: { label: 'Aggregate', description: 'Complex aggregation query', color: 'bg-violet-500/10 text-violet-500', fields: ['table', 'aggregations', 'where', 'groupBy'] },
+  raw: { label: 'Raw SQL', description: 'Execute raw SQL query', color: 'bg-grey-400/10 text-grey', fields: ['sql', 'params'] },
+};
 
 const DUMMY_USERS_DATA = [
   { id: 1, email: 'john.doe@example.com', name: 'John Doe', role: 'admin', phone: '+1-555-0101', address: '123 Main St', city: 'New York', country: 'USA', subscription: 'enterprise', total_orders: 47, lifetime_value: '$12,450', last_login: '2024-03-15 09:23:00', created_at: '2024-01-15 10:30:00', is_active: true },
@@ -397,7 +744,8 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const [sidebarView, setSidebarView] = useState<SidebarView>('tables');
   const [selectedTable, setSelectedTable] = useState<typeof tables[0] | null>(null);
   const [selectedMigration, setSelectedMigration] = useState<typeof DUMMY_MIGRATIONS[0] | null>(null);
-  const [selectedAction, setSelectedAction] = useState<typeof DUMMY_ACTIONS[0] | null>(null);
+  const [selectedAction, setSelectedAction] = useState<IDatabaseAction | null>(null);
+  const [savedActions, setSavedActions] = useState<IDatabaseAction[]>(DUMMY_ACTIONS);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
@@ -410,7 +758,6 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
-  const [showCreateActionDialog, setShowCreateActionDialog] = useState(false);
   const [showAddColumnsDialog, setShowAddColumnsDialog] = useState(false);
   const [showEditColumnsDialog, setShowEditColumnsDialog] = useState(false);
   const [showDeleteColumnsDialog, setShowDeleteColumnsDialog] = useState(false);
@@ -485,15 +832,46 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
   // Action form state
   const [actionName, setActionName] = useState('');
+  const [actionDescription, setActionDescription] = useState('');
+
+  // Query Builder state
+  const [showQueryBuilder, setShowQueryBuilder] = useState(false);
+  const [queryBuilderOperation, setQueryBuilderOperation] = useState<DatabaseOperation>('query');
+  const [queryBuilderTable, setQueryBuilderTable] = useState('');
+  const [queryBuilderColumns, setQueryBuilderColumns] = useState<string[]>([]);
+  const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ column: string; operator: string; value: string }>>([]);
+  const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ column: string; direction: 'ASC' | 'DESC' } | null>(null);
+  const [queryBuilderLimit, setQueryBuilderLimit] = useState('25');
+  const [queryBuilderOffset, setQueryBuilderOffset] = useState('0');
+  const [queryBuilderData, setQueryBuilderData] = useState<Array<{ column: string; value: string }>>([]);
+  const [queryBuilderAggColumn, setQueryBuilderAggColumn] = useState('');
+  const [queryBuilderRawSql, setQueryBuilderRawSql] = useState('');
+  const [queryBuilderReturning, setQueryBuilderReturning] = useState<string[]>([]);
+
+  // Generated query preview
+  const [generatedQuery, setGeneratedQuery] = useState<Record<string, any> | null>(null);
+  const [queryTestResult, setQueryTestResult] = useState<any>(null);
+  const [isTestingQuery, setIsTestingQuery] = useState(false);
+
+  // CodeSidebar state for actions
+  const [showActionCodeSidebar, setShowActionCodeSidebar] = useState(false);
+
+  // Save action modal state
+  const [showSaveActionModal, setShowSaveActionModal] = useState(false);
+  const [showExecuteActionModal, setShowExecuteActionModal] = useState(false);
+  const [extractedValues, setExtractedValues] = useState<Array<{
+    path: string;
+    value: any;
+    type: string;
+    selected: boolean;
+    paramName: string;
+  }>>([]);
+  const [actionParamValues, setActionParamValues] = useState<Record<string, any>>({});
 
   // Code generator state
   const [selectedOperation, setSelectedOperation] = useState<
     'query' | 'insert' | 'update' | 'delete' | 'upsert' | 'count' | 'sum' | 'avg' | 'min' | 'max' | 'aggregate' | 'aggregate-conditional' | 'groupBy' | 'raw'
   >('query');
-  const [actionDescription, setActionDescription] = useState('');
-  const [actionType, setActionType] = useState<'read' | 'create' | 'update' | 'delete'>('read');
-  const [actionTable, setActionTable] = useState('');
-  const [actionParameters, setActionParameters] = useState<string[]>(['']);
 
   // Get current table data
   const getCurrentTableData = () => {
@@ -830,50 +1208,351 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     toast.success(`Migration ${migration.name} completed`);
   };
 
-  const handleRunAction = async (action: typeof DUMMY_ACTIONS[0]) => {
-    toast.success(`Executing action: ${action.name}...`);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    toast.success(`Action ${action.name} completed`);
+  // Helper to build where clause with proper operator handling
+  const buildWhereClause = (conditions: Array<{ column: string; operator: string; value: string }>) => {
+    if (conditions.length === 0) return null;
+
+    const whereObj = conditions.reduce((acc, w) => {
+      if (!w.column) return acc;
+
+      // Handle operators that don't need a value
+      if (w.operator === 'IS NULL') {
+        acc[w.column] = { isNull: true };
+      } else if (w.operator === 'IS NOT NULL') {
+        acc[w.column] = { isNotNull: true };
+      } else if (w.value !== '' && w.value !== undefined) {
+        // For operators with values
+        if (w.operator === '=') {
+          acc[w.column] = w.value;
+        } else {
+          acc[w.column] = { [w.operator]: w.value };
+        }
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    return Object.keys(whereObj).length > 0 ? whereObj : null;
   };
 
-  const handleCreateAction = async () => {
+  // Generate query from query builder state
+  const generateQueryFromBuilder = (): Record<string, any> => {
+    const options: Record<string, any> = {};
+
+    if (queryBuilderTable) {
+      options.table = queryBuilderTable;
+    }
+
+    if (queryBuilderOperation === 'query') {
+      if (queryBuilderColumns.length > 0) {
+        options.columns = queryBuilderColumns;
+      }
+      const whereClause = buildWhereClause(queryBuilderWhere);
+      if (whereClause) {
+        options.where = whereClause;
+      }
+      if (queryBuilderOrderBy) {
+        options.orderBy = queryBuilderOrderBy;
+      }
+      if (queryBuilderLimit) {
+        options.limit = parseInt(queryBuilderLimit) || 25;
+      }
+      if (queryBuilderOffset) {
+        options.offset = parseInt(queryBuilderOffset) || 0;
+      }
+    } else if (queryBuilderOperation === 'insert' || queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') {
+      if (queryBuilderData.length > 0) {
+        options.data = queryBuilderData.reduce((acc, d) => {
+          if (d.column && d.value !== undefined) {
+            // Try to parse value as JSON, otherwise use as string
+            try {
+              acc[d.column] = JSON.parse(d.value);
+            } catch {
+              acc[d.column] = d.value;
+            }
+          }
+          return acc;
+        }, {} as Record<string, any>);
+      }
+      if (queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') {
+        const whereClause = buildWhereClause(queryBuilderWhere);
+        if (whereClause) {
+          options.where = whereClause;
+        }
+      }
+      if (queryBuilderReturning.length > 0) {
+        options.returning = queryBuilderReturning;
+      }
+    } else if (queryBuilderOperation === 'delete') {
+      const whereClause = buildWhereClause(queryBuilderWhere);
+      if (whereClause) {
+        options.where = whereClause;
+      }
+    } else if (['count', 'sum', 'avg', 'min', 'max'].includes(queryBuilderOperation)) {
+      if (['sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && queryBuilderAggColumn) {
+        options.column = queryBuilderAggColumn;
+      }
+      const whereClause = buildWhereClause(queryBuilderWhere);
+      if (whereClause) {
+        options.where = whereClause;
+      }
+    } else if (queryBuilderOperation === 'raw') {
+      return {
+        operation: 'raw',
+        options: {
+          sql: queryBuilderRawSql,
+        }
+      };
+    }
+
+    return {
+      operation: queryBuilderOperation,
+      options
+    };
+  };
+
+  // Update generated query when builder state changes
+  React.useEffect(() => {
+    if (showQueryBuilder || (sidebarView === 'actions' && queryBuilderTable)) {
+      setGeneratedQuery(generateQueryFromBuilder());
+    }
+  }, [queryBuilderOperation, queryBuilderTable, queryBuilderColumns, queryBuilderWhere, queryBuilderOrderBy, queryBuilderLimit, queryBuilderOffset, queryBuilderData, queryBuilderAggColumn, queryBuilderRawSql, queryBuilderReturning, sidebarView, showQueryBuilder]);
+
+  // Test the generated query
+  const handleTestQuery = async () => {
+    if (!generatedQuery) {
+      toast.error('Please configure a query first');
+      return;
+    }
+
+    setIsTestingQuery(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setQueryTestResult({
+        success: true,
+        rowCount: Math.floor(Math.random() * 100) + 1,
+        executionTime: Math.floor(Math.random() * 50) + 5,
+        data: [
+          { id: 1, name: 'Sample Result 1' },
+          { id: 2, name: 'Sample Result 2' },
+        ]
+      });
+      toast.success('Query executed successfully');
+    } catch (error) {
+      toast.error('Query execution failed');
+      setQueryTestResult({ success: false, error: 'Query execution failed' });
+    } finally {
+      setIsTestingQuery(false);
+    }
+  };
+
+  // Extract parameterizable values from an object
+  const extractParameterizableValues = (obj: any, path = ''): Array<{ path: string; value: any; type: string }> => {
+    const results: Array<{ path: string; value: any; type: string }> = [];
+
+    const processValue = (key: string, value: any, currentPath: string) => {
+      const fullPath = currentPath ? `${currentPath}.${key}` : key;
+
+      if (value === null || value === undefined) return;
+
+      if (Array.isArray(value)) {
+        if (value.every(v => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) {
+          results.push({ path: fullPath, value, type: 'array' });
+        }
+      } else if (typeof value === 'object') {
+        Object.entries(value).forEach(([k, v]) => processValue(k, v, fullPath));
+      } else {
+        results.push({ path: fullPath, value, type: typeof value });
+      }
+    };
+
+    Object.entries(obj).forEach(([key, value]) => {
+      if (key === 'operation') return;
+      processValue(key, value, path);
+    });
+
+    return results;
+  };
+
+  const generateParamName = (path: string): string => {
+    const parts = path.split('.');
+    return parts[parts.length - 1].replace(/\[\d+\]/g, '');
+  };
+
+  // Open save action modal
+  const handleOpenSaveActionModal = () => {
+    if (!generatedQuery) {
+      toast.error('Please generate a query first');
+      return;
+    }
+
+    const values = extractParameterizableValues(generatedQuery);
+    setExtractedValues(values.map(v => ({
+      ...v,
+      selected: false,
+      paramName: generateParamName(v.path),
+    })));
+    setActionName('');
+    setActionDescription('');
+    setShowSaveActionModal(true);
+  };
+
+  // Save the action
+  const handleSaveAction = () => {
     if (!actionName.trim()) {
       toast.error('Please enter an action name');
       return;
     }
-    if (!actionTable.trim()) {
-      toast.error('Please select a target table');
+
+    if (!generatedQuery) {
+      toast.error('No query to save');
       return;
     }
 
-    const validParams = actionParameters.filter(p => p.trim() !== '');
+    const selectedParams = extractedValues.filter(v => v.selected);
+    let parameterizedQuery = JSON.parse(JSON.stringify(generatedQuery));
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    toast.success(`Action "${actionName}" created successfully with ${validParams.length} parameters`);
-    setShowCreateActionDialog(false);
-    // Reset form
-    setActionName('');
-    setActionDescription('');
-    setActionType('read');
-    setActionTable('');
-    setActionParameters(['']);
+    const setNestedValue = (obj: any, path: string, value: any) => {
+      const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+      let current = obj;
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]];
+      }
+      current[keys[keys.length - 1]] = value;
+    };
+
+    selectedParams.forEach(param => {
+      setNestedValue(parameterizedQuery, param.path, `{{${param.paramName}}}`);
+    });
+
+    const actionTag = generateActionTag(actionName);
+
+    const newAction: IDatabaseAction = {
+      id: `action_${Date.now()}`,
+      tag: actionTag,
+      name: actionName,
+      description: actionDescription || undefined,
+      operation: generatedQuery.operation,
+      query: parameterizedQuery,
+      parameters: selectedParams.map(p => ({
+        name: p.paramName,
+        path: p.path,
+        defaultValue: p.value,
+        type: p.type as 'string' | 'number' | 'boolean' | 'array' | 'object',
+      })),
+      createdAt: new Date().toISOString(),
+    };
+
+    setSavedActions([newAction, ...savedActions]);
+    setShowSaveActionModal(false);
+    setSelectedAction(newAction); // Show the newly created action
+    setShowQueryBuilder(false);
+    toast.success(`Action "${actionName}" saved with tag: ${actionTag}`);
   };
 
-  const addActionParameter = () => {
-    setActionParameters([...actionParameters, '']);
+  // Open execute action modal
+  const handleOpenExecuteActionModal = (action: IDatabaseAction) => {
+    setSelectedAction(action);
+    const defaultValues: Record<string, any> = {};
+    action.parameters.forEach(param => {
+      defaultValues[param.name] = param.defaultValue;
+    });
+    setActionParamValues(defaultValues);
+    setShowExecuteActionModal(true);
   };
 
-  const removeActionParameter = (index: number) => {
-    if (actionParameters.length > 1) {
-      setActionParameters(actionParameters.filter((_, i) => i !== index));
+  // Execute action with parameters
+  const handleExecuteAction = async () => {
+    if (!selectedAction) return;
+
+    let query = JSON.parse(JSON.stringify(selectedAction.query));
+
+    const setNestedValue = (obj: any, path: string, value: any) => {
+      const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+      let current = obj;
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]];
+      }
+      current[keys[keys.length - 1]] = value;
+    };
+
+    selectedAction.parameters.forEach(param => {
+      setNestedValue(query, param.path, actionParamValues[param.name]);
+    });
+
+    setShowExecuteActionModal(false);
+    toast.success(`Executing action: ${selectedAction.name}...`);
+    await new Promise(resolve => setTimeout(resolve, 800));
+    toast.success(`Action ${selectedAction.name} completed`);
+  };
+
+  // Delete action
+  const handleDeleteAction = (actionId: string) => {
+    setSavedActions(savedActions.filter(a => a.id !== actionId));
+    if (selectedAction?.id === actionId) {
+      setSelectedAction(null);
     }
+    toast.success('Action deleted');
   };
 
-  const updateActionParameter = (index: number, value: string) => {
-    const newParams = [...actionParameters];
-    newParams[index] = value;
-    setActionParameters(newParams);
+  // Load action - show action details (not query builder)
+  const handleLoadAction = (action: IDatabaseAction) => {
+    setSelectedAction(action);
+    // Load action's query for display
+    setGeneratedQuery(action.query);
+    // Hide query builder - show action details view instead
+    setShowQueryBuilder(false);
   };
+
+  // Generate code sections for action CodeSidebar
+  const generateActionCodeSections = (language: string, env?: string) => {
+    if (!selectedAction) return [];
+
+    const envSlug = env || database.env.slug;
+    const inputParams = selectedAction.parameters.length > 0
+      ? selectedAction.parameters.reduce((acc, p) => {
+          acc[p.name] = p.defaultValue;
+          return acc;
+        }, {} as Record<string, any>)
+      : {};
+
+    const inputString = JSON.stringify(inputParams, null, 4).split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n');
+
+    if (language === 'typescript' || language === 'javascript') {
+      return [
+        {
+          title: 'Execute Database Action',
+          code: `await ductape.database.execute({
+  product: '${database.tag.split(':')[0] || 'your-product'}',
+  env: '${envSlug}',
+  database: '${database.tag}',
+  action: '${selectedAction.tag}',
+  input: ${inputString}
+});`,
+        },
+        {
+          title: 'Initialize Ductape (collapsible)',
+          code: `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspaceId: 'your-workspace-id',
+  publicKey: 'your-public-key',
+  secretKey: 'your-secret-key',
+});
+
+await ductape.init();`,
+        },
+      ];
+    }
+
+    return [];
+  };
+
+  // Filter actions
+  const filteredActions = savedActions.filter(a =>
+    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    a.operation.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // State for expandable JSON cells (tracks individual cells for independent expansion)
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set());
@@ -1755,27 +2434,12 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
     m.tag.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredActions = DUMMY_ACTIONS.filter(a =>
-    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.tag.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const handleViewChange = (view: SidebarView) => {
     setSidebarView(view);
     setSearchQuery('');
     setSelectedTable(null);
     setSelectedMigration(null);
     setSelectedAction(null);
-  };
-
-  const getActionTypeColor = (type: string) => {
-    switch (type) {
-      case 'read': return 'bg-blue/10 text-blue';
-      case 'create': return 'bg-green/10 text-green';
-      case 'update': return 'bg-yellow/10 text-yellow';
-      case 'delete': return 'bg-red/10 text-red';
-      default: return 'bg-grey-400/10 text-grey-600';
-    }
   };
 
   return (
@@ -1875,7 +2539,25 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
               )}
               {sidebarView === 'actions' && (
                 <button
-                  onClick={() => setShowCreateActionDialog(true)}
+                  onClick={() => {
+                    // Reset query builder state
+                    setQueryBuilderOperation('query');
+                    setQueryBuilderTable('');
+                    setQueryBuilderColumns([]);
+                    setQueryBuilderWhere([]);
+                    setQueryBuilderOrderBy(null);
+                    setQueryBuilderLimit('25');
+                    setQueryBuilderOffset('0');
+                    setQueryBuilderData([]);
+                    setQueryBuilderAggColumn('');
+                    setQueryBuilderRawSql('');
+                    setQueryBuilderReturning([]);
+                    setGeneratedQuery(null);
+                    setQueryTestResult(null);
+                    setSelectedAction(null);
+                    // Show query builder
+                    setShowQueryBuilder(true);
+                  }}
                   className="text-grey-600 hover:text-primary transition-colors"
                   title="Create new action"
                 >
@@ -1946,29 +2628,72 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           {/* Actions List */}
           {sidebarView === 'actions' && (
             <div className="space-y-1">
-              {filteredActions.map((action) => (
-                <button
-                  key={action.tag}
-                  onClick={() => setSelectedAction(action)}
-                  className={cn(
-                    'w-full px-2 py-2 rounded text-sm transition-colors text-left',
-                    selectedAction?.tag === action.tag
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
-                  )}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate font-medium">{action.name}</span>
+              {filteredActions.length === 0 ? (
+                <div className="px-2 py-4 text-center">
+                  <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
+                  <p className="text-xs text-grey">No saved actions yet</p>
+                  <p className="text-xs text-grey mt-1">
+                    Build a query and save it as an action
+                  </p>
+                </div>
+              ) : (
+                filteredActions.map((action) => (
+                  <div
+                    key={action.id}
+                    className={cn(
+                      'px-2 py-2 rounded text-sm transition-colors cursor-pointer',
+                      selectedAction?.id === action.id
+                        ? 'bg-primary/10 border border-primary/20'
+                        : 'hover:bg-grey-100'
+                    )}
+                    onClick={() => handleLoadAction(action)}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Bookmark className="h-3.5 w-3.5 flex-shrink-0 text-grey" />
+                        <span className="truncate font-medium text-grey">{action.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenExecuteActionModal(action);
+                          }}
+                          className="p-1 text-grey hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                          title="Execute with parameters"
+                        >
+                          <Play className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAction(action.id);
+                          }}
+                          className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
+                          title="Delete action"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap ml-5">
+                      <span className={cn('px-1.5 py-0.5 rounded text-xs', DATABASE_OPERATIONS[action.operation as DatabaseOperation]?.color || 'bg-grey-100 text-grey')}>
+                        {action.operation}
+                      </span>
+                      {action.parameters.length > 0 && (
+                        <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
+                          {action.parameters.length} param{action.parameters.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {action.description && (
+                      <div className="text-xs text-grey mt-1 truncate ml-5">
+                        {action.description}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-grey-600 ml-5">
-                    <span className={cn('px-1.5 py-0.5 rounded uppercase', getActionTypeColor(action.type))}>
-                      {action.type}
-                    </span>
-                    <span className="truncate">{action.tableName}</span>
-                  </div>
-                </button>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>
@@ -2518,75 +3243,923 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           </div>
         )}
 
-        {/* Actions View */}
-        {sidebarView === 'actions' && !selectedAction && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-grey mb-2">No Action Selected</h3>
-              <p className="text-sm text-grey-600">
-                Select an action from the sidebar to view its details
-              </p>
-            </div>
-          </div>
-        )}
-
-        {sidebarView === 'actions' && selectedAction && (
+        {/* Actions View - Query Builder */}
+        {sidebarView === 'actions' && (
           <div className="flex-1 overflow-auto p-6">
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-yellow" />
-                    </div>
-                    <div>
+            {!showQueryBuilder && !selectedAction ? (
+              /* Empty state when no query builder and no action selected */
+              <div className="max-w-4xl mx-auto flex flex-col items-center justify-center h-full py-20">
+                <div className="text-center">
+                  <Zap className="h-16 w-16 text-grey-300 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-grey mb-2">Database Actions</h2>
+                  <p className="text-sm text-grey mb-6 max-w-md">
+                    Create reusable database queries with parameterized values.
+                    Select an action from the sidebar or create a new one.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setQueryBuilderOperation('query');
+                      setQueryBuilderTable('');
+                      setQueryBuilderColumns([]);
+                      setQueryBuilderWhere([]);
+                      setQueryBuilderOrderBy(null);
+                      setQueryBuilderLimit('25');
+                      setQueryBuilderOffset('0');
+                      setQueryBuilderData([]);
+                      setQueryBuilderAggColumn('');
+                      setQueryBuilderRawSql('');
+                      setQueryBuilderReturning([]);
+                      setGeneratedQuery(null);
+                      setQueryTestResult(null);
+                      setSelectedAction(null);
+                      setShowQueryBuilder(true);
+                    }}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create New Action
+                  </Button>
+                </div>
+              </div>
+            ) : !showQueryBuilder && selectedAction ? (
+              /* Action Details View */
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Action Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
                       <h2 className="text-xl font-bold text-grey">{selectedAction.name}</h2>
-                      <p className="text-sm text-grey-600">{selectedAction.tag}</p>
+                      <span className={cn(
+                        'px-2 py-0.5 rounded text-xs font-medium',
+                        DATABASE_OPERATIONS[selectedAction.operation as DatabaseOperation]?.color || 'bg-grey-100 text-grey'
+                      )}>
+                        {DATABASE_OPERATIONS[selectedAction.operation as DatabaseOperation]?.label || selectedAction.operation}
+                      </span>
                     </div>
+                    {/* Action Tag */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="h-3.5 w-3.5 text-primary" />
+                      <code className="text-sm font-mono px-2 py-0.5 bg-primary/10 text-primary rounded">
+                        {selectedAction.tag}
+                      </code>
+                    </div>
+                    {selectedAction.description && (
+                      <p className="text-sm text-grey">{selectedAction.description}</p>
+                    )}
                   </div>
-                  <span className={cn('px-3 py-1 rounded text-xs font-medium uppercase', getActionTypeColor(selectedAction.type))}>
-                    {selectedAction.type}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowActionCodeSidebar(true)}
+                      className="gap-2"
+                    >
+                      <Code className="h-4 w-4" />
+                      Code
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenExecuteActionModal(selectedAction)}
+                      className="gap-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      Execute
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAction(null);
+                        setGeneratedQuery(null);
+                      }}
+                      className="gap-2 text-grey"
+                    >
+                      <X className="h-4 w-4" />
+                      Close
+                    </Button>
+                  </div>
                 </div>
 
-                {selectedAction.description && (
-                  <p className="text-grey-600 mb-4">{selectedAction.description}</p>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="p-3 bg-grey-50 rounded-lg">
-                    <p className="text-xs text-grey-600 mb-1">Target Table</p>
-                    <p className="text-sm font-medium text-grey">{selectedAction.tableName}</p>
+                {/* Action Info */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <Label className="text-xs text-grey uppercase tracking-wide mb-2 block">Operation Type</Label>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-grey">
+                        {DATABASE_OPERATIONS[selectedAction.operation as DatabaseOperation]?.label || selectedAction.operation}
+                      </span>
+                    </div>
+                    <p className="text-xs text-grey mt-1">
+                      {DATABASE_OPERATIONS[selectedAction.operation as DatabaseOperation]?.description}
+                    </p>
                   </div>
-                  <div className="p-3 bg-grey-50 rounded-lg">
-                    <p className="text-xs text-grey-600 mb-1">Parameters</p>
-                    <p className="text-sm font-medium text-grey">{selectedAction.parameters.length}</p>
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <Label className="text-xs text-grey uppercase tracking-wide mb-2 block">Database</Label>
+                    <span className="font-medium text-grey">{database.name}</span>
+                    <p className="text-xs text-grey mt-1 font-mono">{database.tag}</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <Label className="text-xs text-grey uppercase tracking-wide mb-2 block">Created</Label>
+                    <span className="font-medium text-grey">
+                      {selectedAction.createdAt ? new Date(selectedAction.createdAt).toLocaleDateString() : 'Unknown'}
+                    </span>
                   </div>
                 </div>
 
-                {selectedAction.parameters.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-grey mb-3">Parameters</h3>
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleOpenExecuteActionModal(selectedAction)}
+                    className="gap-2"
+                  >
+                    <Play className="h-4 w-4" />
+                    Execute Action
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowQueryBuilder(true);
+                      setSelectedAction(null);
+                    }}
+                    className="gap-2"
+                  >
+                    <Settings2 className="h-4 w-4" />
+                    Edit in Query Builder
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleDeleteAction(selectedAction.id);
+                    }}
+                    className="gap-2 text-red hover:text-red hover:bg-red/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                </div>
+
+                {/* Parameters */}
+                {selectedAction.parameters && selectedAction.parameters.length > 0 && (
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <Label className="text-sm font-semibold text-grey mb-3 block">
+                      Parameters ({selectedAction.parameters.length})
+                    </Label>
                     <div className="space-y-2">
-                      {selectedAction.parameters.map((param) => (
-                        <div key={param} className="p-2 bg-grey-50 rounded border border-grey-400">
-                          <code className="text-sm text-grey">{param}</code>
+                      {selectedAction.parameters.map((param, idx) => (
+                        <div key={idx} className="flex items-center gap-4 p-3 bg-grey-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm font-mono text-primary">{`{{${param.name}}}`}</code>
+                              <span className="text-xs px-1.5 py-0.5 bg-grey-100 rounded text-grey">{param.type}</span>
+                            </div>
+                            <p className="text-xs text-grey mt-1">Path: {param.path}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-grey">Default value:</p>
+                            <code className="text-sm font-mono text-grey">
+                              {JSON.stringify(param.defaultValue)}
+                            </code>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <Button
-                  onClick={() => handleRunAction(selectedAction)}
-                  className="gap-2"
-                >
-                  <Play className="h-4 w-4" />
-                  Execute Action
-                </Button>
+                {/* Query Template */}
+                <div className="bg-white rounded-lg border border-grey-400 p-4">
+                  <Label className="text-sm font-semibold text-grey mb-3 block">Query Template</Label>
+                  <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey max-h-64 overflow-y-auto">
+                    {JSON.stringify(selectedAction.query, null, 2)}
+                  </pre>
+                </div>
               </div>
+            ) : (
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Query Builder Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-grey">Query Builder</h2>
+                  <p className="text-sm text-grey">Build database queries and save them as reusable actions</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestQuery}
+                    disabled={!generatedQuery || isTestingQuery}
+                    className="gap-2"
+                  >
+                    {isTestingQuery ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                    Test Query
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleOpenSaveActionModal}
+                    disabled={!generatedQuery || !queryTestResult?.success}
+                    className="gap-2"
+                    title={!queryTestResult?.success ? 'Test the query successfully before saving' : undefined}
+                  >
+                    <Save className="h-4 w-4" />
+                    Save as Action
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowQueryBuilder(false)}
+                    className="gap-2 text-grey"
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Operation Selection */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4">
+                <Label className="text-sm font-semibold text-grey mb-3 block">Operation Type</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {Object.entries(DATABASE_OPERATIONS).map(([op, config]) => (
+                    <button
+                      key={op}
+                      onClick={() => setQueryBuilderOperation(op as DatabaseOperation)}
+                      className={cn(
+                        'p-3 rounded-lg border text-left transition-colors',
+                        queryBuilderOperation === op
+                          ? 'border-primary bg-primary/5'
+                          : 'border-grey-400 hover:border-grey-400 hover:bg-grey-50'
+                      )}
+                    >
+                      <div className={cn('text-xs font-semibold uppercase mb-1', config.color.split(' ')[1])}>
+                        {config.label}
+                      </div>
+                      <div className="text-xs text-grey">{config.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Query Configuration */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4">
+                <Label className="text-sm font-semibold text-grey mb-3 block">Query Configuration</Label>
+
+                <div className="space-y-4">
+                  {/* Table Selection */}
+                  {queryBuilderOperation !== 'raw' && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">Table *</Label>
+                      <Select value={queryBuilderTable} onValueChange={setQueryBuilderTable}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a table..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tables.map((table) => (
+                            <SelectItem key={table.name} value={table.name}>
+                              {table.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Query-specific fields */}
+                  {queryBuilderOperation === 'query' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs text-grey mb-2 block">Limit</Label>
+                          <Input
+                            type="number"
+                            value={queryBuilderLimit}
+                            onChange={(e) => setQueryBuilderLimit(e.target.value)}
+                            placeholder="25"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-grey mb-2 block">Offset</Label>
+                          <Input
+                            type="number"
+                            value={queryBuilderOffset}
+                            onChange={(e) => setQueryBuilderOffset(e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
+                        {queryBuilderWhere.map((condition, idx) => {
+                          const selectedTable = tables.find(t => t.name === queryBuilderTable);
+                          const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                          const columnType: ColumnType = selectedColumn?.type || 'string';
+                          const operators = OPERATORS_BY_TYPE[columnType];
+                          const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
+
+                          return (
+                            <div key={idx} className="flex gap-2 mb-2">
+                              {/* Column Dropdown */}
+                              <Select
+                                value={condition.column}
+                                onValueChange={(v) => {
+                                  const newWhere = [...queryBuilderWhere];
+                                  newWhere[idx].column = v;
+                                  // Reset operator and value when column changes
+                                  const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                  const newType = newColumn?.type || 'string';
+                                  const newOperators = OPERATORS_BY_TYPE[newType];
+                                  if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
+                                    newWhere[idx].operator = '=';
+                                  }
+                                  newWhere[idx].value = '';
+                                  setQueryBuilderWhere(newWhere);
+                                }}
+                              >
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder="Select column..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {selectedTable?.columns.map((col) => (
+                                    <SelectItem key={col.name} value={col.name}>
+                                      <span className="flex items-center gap-2">
+                                        {col.name}
+                                        <span className="text-xs text-grey-400">({col.type})</span>
+                                      </span>
+                                    </SelectItem>
+                                  )) || (
+                                    <SelectItem value="" disabled>Select a table first</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Operator Dropdown - Dynamic based on column type */}
+                              <Select
+                                value={condition.operator}
+                                onValueChange={(v) => {
+                                  const newWhere = [...queryBuilderWhere];
+                                  newWhere[idx].operator = v;
+                                  // Clear value if operator doesn't need one
+                                  if (['IS NULL', 'IS NOT NULL'].includes(v)) {
+                                    newWhere[idx].value = '';
+                                  }
+                                  setQueryBuilderWhere(newWhere);
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {operators.map((op) => (
+                                    <SelectItem key={op.value} value={op.value}>
+                                      {op.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Value Input - Dynamic based on column type */}
+                              {needsValue && (
+                                columnType === 'boolean' ? (
+                                  <Select
+                                    value={condition.value}
+                                    onValueChange={(v) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = v;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue placeholder="Select value..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="true">true</SelectItem>
+                                      <SelectItem value="false">false</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : columnType === 'number' ? (
+                                  <Input
+                                    type="number"
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    placeholder="Enter number..."
+                                    className="flex-1"
+                                  />
+                                ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                  <Input
+                                    type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    className="flex-1"
+                                  />
+                                ) : (
+                                  <Input
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    placeholder="Enter value..."
+                                    className="flex-1"
+                                  />
+                                )
+                              )}
+
+                              {/* Placeholder for alignment when no value needed */}
+                              {!needsValue && <div className="flex-1" />}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
+                          disabled={!queryBuilderTable}
+                        >
+                          + Add Condition
+                        </Button>
+                        {!queryBuilderTable && queryBuilderWhere.length === 0 && (
+                          <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Insert/Update Data fields */}
+                  {(queryBuilderOperation === 'insert' || queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">Data</Label>
+                      {queryBuilderData.map((data, idx) => (
+                        <div key={idx} className="flex gap-2 mb-2">
+                          <Input
+                            value={data.column}
+                            onChange={(e) => {
+                              const newData = [...queryBuilderData];
+                              newData[idx].column = e.target.value;
+                              setQueryBuilderData(newData);
+                            }}
+                            placeholder="Column"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={data.value}
+                            onChange={(e) => {
+                              const newData = [...queryBuilderData];
+                              newData[idx].value = e.target.value;
+                              setQueryBuilderData(newData);
+                            }}
+                            placeholder="Value"
+                            className="flex-1"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQueryBuilderData(queryBuilderData.filter((_, i) => i !== idx))}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQueryBuilderData([...queryBuilderData, { column: '', value: '' }])}
+                      >
+                        + Add Field
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Where conditions for update/delete/upsert */}
+                  {(queryBuilderOperation === 'update' || queryBuilderOperation === 'delete' || queryBuilderOperation === 'upsert') && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
+                      {queryBuilderWhere.map((condition, idx) => {
+                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
+                        const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                        const columnType: ColumnType = selectedColumn?.type || 'string';
+                        const operators = OPERATORS_BY_TYPE[columnType];
+                        const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
+
+                        return (
+                          <div key={idx} className="flex gap-2 mb-2">
+                            <Select
+                              value={condition.column}
+                              onValueChange={(v) => {
+                                const newWhere = [...queryBuilderWhere];
+                                newWhere[idx].column = v;
+                                const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                const newType = newColumn?.type || 'string';
+                                const newOperators = OPERATORS_BY_TYPE[newType];
+                                if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
+                                  newWhere[idx].operator = '=';
+                                }
+                                newWhere[idx].value = '';
+                                setQueryBuilderWhere(newWhere);
+                              }}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select column..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedTable?.columns.map((col) => (
+                                  <SelectItem key={col.name} value={col.name}>
+                                    <span className="flex items-center gap-2">
+                                      {col.name}
+                                      <span className="text-xs text-grey-400">({col.type})</span>
+                                    </span>
+                                  </SelectItem>
+                                )) || (
+                                  <SelectItem value="" disabled>Select a table first</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={condition.operator}
+                              onValueChange={(v) => {
+                                const newWhere = [...queryBuilderWhere];
+                                newWhere[idx].operator = v;
+                                if (['IS NULL', 'IS NOT NULL'].includes(v)) {
+                                  newWhere[idx].value = '';
+                                }
+                                setQueryBuilderWhere(newWhere);
+                              }}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {operators.map((op) => (
+                                  <SelectItem key={op.value} value={op.value}>
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {needsValue && (
+                              columnType === 'boolean' ? (
+                                <Select
+                                  value={condition.value}
+                                  onValueChange={(v) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = v;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Select value..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="true">true</SelectItem>
+                                    <SelectItem value="false">false</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : columnType === 'number' ? (
+                                <Input
+                                  type="number"
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  placeholder="Enter number..."
+                                  className="flex-1"
+                                />
+                              ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                <Input
+                                  type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  className="flex-1"
+                                />
+                              ) : (
+                                <Input
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  placeholder="Enter value..."
+                                  className="flex-1"
+                                />
+                              )
+                            )}
+
+                            {!needsValue && <div className="flex-1" />}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
+                        disabled={!queryBuilderTable}
+                      >
+                        + Add Condition
+                      </Button>
+                      {!queryBuilderTable && queryBuilderWhere.length === 0 && (
+                        <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Aggregation column for sum/avg/min/max */}
+                  {['sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">Column to Aggregate *</Label>
+                      <Select
+                        value={queryBuilderAggColumn}
+                        onValueChange={setQueryBuilderAggColumn}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select column to aggregate..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tables.find(t => t.name === queryBuilderTable)?.columns
+                            .filter(col => col.type === 'number')
+                            .map((col) => (
+                              <SelectItem key={col.name} value={col.name}>
+                                {col.name}
+                              </SelectItem>
+                            )) || (
+                            <SelectItem value="" disabled>Select a table first</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Where conditions for count and aggregation operations */}
+                  {['count', 'sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">Where Conditions (Optional)</Label>
+                      {queryBuilderWhere.map((condition, idx) => {
+                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
+                        const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                        const columnType: ColumnType = selectedColumn?.type || 'string';
+                        const operators = OPERATORS_BY_TYPE[columnType];
+                        const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
+
+                        return (
+                          <div key={idx} className="flex gap-2 mb-2">
+                            <Select
+                              value={condition.column}
+                              onValueChange={(v) => {
+                                const newWhere = [...queryBuilderWhere];
+                                newWhere[idx].column = v;
+                                const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                const newType = newColumn?.type || 'string';
+                                const newOperators = OPERATORS_BY_TYPE[newType];
+                                if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
+                                  newWhere[idx].operator = '=';
+                                }
+                                newWhere[idx].value = '';
+                                setQueryBuilderWhere(newWhere);
+                              }}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select column..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedTable?.columns.map((col) => (
+                                  <SelectItem key={col.name} value={col.name}>
+                                    <span className="flex items-center gap-2">
+                                      {col.name}
+                                      <span className="text-xs text-grey-400">({col.type})</span>
+                                    </span>
+                                  </SelectItem>
+                                )) || (
+                                  <SelectItem value="" disabled>Select a table first</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={condition.operator}
+                              onValueChange={(v) => {
+                                const newWhere = [...queryBuilderWhere];
+                                newWhere[idx].operator = v;
+                                if (['IS NULL', 'IS NOT NULL'].includes(v)) {
+                                  newWhere[idx].value = '';
+                                }
+                                setQueryBuilderWhere(newWhere);
+                              }}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {operators.map((op) => (
+                                  <SelectItem key={op.value} value={op.value}>
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {needsValue && (
+                              columnType === 'boolean' ? (
+                                <Select
+                                  value={condition.value}
+                                  onValueChange={(v) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = v;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Select value..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="true">true</SelectItem>
+                                    <SelectItem value="false">false</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : columnType === 'number' ? (
+                                <Input
+                                  type="number"
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  placeholder="Enter number..."
+                                  className="flex-1"
+                                />
+                              ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                <Input
+                                  type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  className="flex-1"
+                                />
+                              ) : (
+                                <Input
+                                  value={condition.value}
+                                  onChange={(e) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].value = e.target.value;
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                  placeholder="Enter value..."
+                                  className="flex-1"
+                                />
+                              )
+                            )}
+
+                            {!needsValue && <div className="flex-1" />}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
+                        disabled={!queryBuilderTable}
+                      >
+                        + Add Condition
+                      </Button>
+                      {!queryBuilderTable && queryBuilderWhere.length === 0 && (
+                        <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Raw SQL */}
+                  {queryBuilderOperation === 'raw' && (
+                    <div>
+                      <Label className="text-xs text-grey mb-2 block">SQL Query *</Label>
+                      <Textarea
+                        value={queryBuilderRawSql}
+                        onChange={(e) => setQueryBuilderRawSql(e.target.value)}
+                        placeholder="SELECT * FROM users WHERE id = $1"
+                        rows={4}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Generated Query Preview */}
+              {generatedQuery && (
+                <div className="bg-white rounded-lg border border-grey-400 p-4">
+                  <Label className="text-sm font-semibold text-grey mb-3 block">Generated Query</Label>
+                  <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey">
+                    {JSON.stringify(generatedQuery, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Test Results */}
+              {queryTestResult && (
+                <div className={cn(
+                  'rounded-lg border p-4',
+                  queryTestResult.success
+                    ? 'bg-green/5 border-green/20'
+                    : 'bg-red/5 border-red/20'
+                )}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {queryTestResult.success ? (
+                      <Check className="h-4 w-4 text-green" />
+                    ) : (
+                      <X className="h-4 w-4 text-red" />
+                    )}
+                    <span className={cn('text-sm font-medium', queryTestResult.success ? 'text-green' : 'text-red')}>
+                      {queryTestResult.success ? 'Query executed successfully' : 'Query failed'}
+                    </span>
+                  </div>
+                  {queryTestResult.success && (
+                    <div className="text-xs text-grey">
+                      {queryTestResult.rowCount} rows returned in {queryTestResult.executionTime}ms
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Selected Action Details */}
+              {selectedAction && (
+                <div className="bg-white rounded-lg border border-grey-400 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-semibold text-grey">Selected Action: {selectedAction.name}</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenExecuteActionModal(selectedAction)}
+                      className="gap-2"
+                    >
+                      <Play className="h-3 w-3" />
+                      Execute
+                    </Button>
+                  </div>
+                  {selectedAction.description && (
+                    <p className="text-sm text-grey mb-3">{selectedAction.description}</p>
+                  )}
+                  {selectedAction.parameters.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedAction.parameters.map((param) => (
+                        <span key={param.name} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+                          <Settings2 className="h-3 w-3" />
+                          {`{{${param.name}}}`}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+            )}
           </div>
         )}
       </div>
@@ -3050,138 +4623,186 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
         </DialogContent>
       </Dialog>
 
-      {/* Create Action Dialog */}
-      <Dialog open={showCreateActionDialog} onOpenChange={setShowCreateActionDialog}>
+      {/* Save Action Modal */}
+      <Dialog open={showSaveActionModal} onOpenChange={setShowSaveActionModal}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className='text-grey'>Create New Action</DialogTitle>
+            <DialogTitle className="text-grey">Save Query as Action</DialogTitle>
             <DialogDescription>
-              Define a new database action for performing operations on your data
+              Select which values to parameterize. These can be changed when executing the action.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="action-name">Action Name *</Label>
-              <Input
-                id="action-name"
-                placeholder="e.g., getUser, createOrder, updateProduct"
-                value={actionName}
-                onChange={(e) => setActionName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="action-description">Description</Label>
-              <Textarea
-                id="action-description"
-                placeholder="Describe what this action does..."
-                rows={2}
-                value={actionDescription}
-                onChange={(e) => setActionDescription(e.target.value)}
-              />
-            </div>
-
+          <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="action-type">Action Type *</Label>
-                <select
-                  id="action-type"
-                  value={actionType}
-                  onChange={(e) => setActionType(e.target.value as any)}
-                  className="w-full h-10 px-3 py-2 text-sm border border-grey-400 rounded bg-white"
-                >
-                  <option value="read">Read (SELECT)</option>
-                  <option value="create">Create (INSERT)</option>
-                  <option value="update">Update (UPDATE)</option>
-                  <option value="delete">Delete (DELETE)</option>
-                </select>
+              <div>
+                <Label className="text-xs text-grey mb-2 block">Action Name *</Label>
+                <Input
+                  value={actionName}
+                  onChange={(e) => setActionName(e.target.value)}
+                  placeholder="e.g., Get Users Paginated"
+                />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="action-table">Target Table *</Label>
-                <select
-                  id="action-table"
-                  value={actionTable}
-                  onChange={(e) => setActionTable(e.target.value)}
-                  className="w-full h-10 px-3 py-2 text-sm border border-grey-400 rounded bg-white"
-                >
-                  <option value="">Select a table...</option>
-                  {tables.map((table) => (
-                    <option key={table.name} value={table.name}>
-                      {table.name}
-                    </option>
-                  ))}
-                </select>
+              <div>
+                <Label className="text-xs text-grey mb-2 block">Description</Label>
+                <Input
+                  value={actionDescription}
+                  onChange={(e) => setActionDescription(e.target.value)}
+                  placeholder="What does this action do?"
+                />
               </div>
             </div>
 
-            {/* Parameters */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Parameters</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addActionParameter}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Parameter
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {actionParameters.map((param, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      placeholder={`e.g., ${actionTable ? actionTable.slice(0, -1) : 'user'}_id, email, limit`}
-                      value={param}
-                      onChange={(e) => updateActionParameter(index, e.target.value)}
-                      className="flex-1"
-                    />
-                    {actionParameters.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeActionParameter(index)}
-                        className="h-10 w-10 p-0 text-grey-600 hover:text-red"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-xs text-grey-600">
-                Parameters define the inputs this action will accept when executed
+            <div>
+              <Label className="text-xs text-grey mb-2 block">Select Values to Parameterize</Label>
+              <p className="text-xs text-grey mb-3">
+                Check the values you want to make configurable. Each will become a parameter with a placeholder like {"{{name}}"}.
               </p>
+
+              <div className="border border-grey-400 rounded-lg divide-y divide-grey-400 max-h-64 overflow-y-auto">
+                {extractedValues.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-grey">
+                    No parameterizable values found in the query
+                  </div>
+                ) : (
+                  extractedValues.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 hover:bg-grey-50">
+                      <Checkbox
+                        checked={item.selected}
+                        onCheckedChange={(checked) => {
+                          const newValues = [...extractedValues];
+                          newValues[idx].selected = !!checked;
+                          setExtractedValues(newValues);
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-grey-100 px-2 py-0.5 rounded font-mono text-grey">
+                            {item.path}
+                          </code>
+                          <span className="text-xs text-grey px-1.5 py-0.5 bg-grey-100 rounded">
+                            {item.type}
+                          </span>
+                        </div>
+                        <div className="text-xs text-grey mt-1 truncate">
+                          Current value: <span className="font-mono">{JSON.stringify(item.value)}</span>
+                        </div>
+                      </div>
+                      {item.selected && (
+                        <Input
+                          value={item.paramName}
+                          onChange={(e) => {
+                            const newValues = [...extractedValues];
+                            newValues[idx].paramName = e.target.value;
+                            setExtractedValues(newValues);
+                          }}
+                          className="w-32 h-8 text-xs"
+                          placeholder="Param name"
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex gap-3">
-                <Zap className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-900">
-                  <p className="font-medium mb-1">About Actions</p>
-                  <p className="text-blue-800">
-                    Actions are reusable database operations. Once created, you can execute them with different parameter values directly from the database explorer.
-                  </p>
+            {/* Preview of selected parameters */}
+            {extractedValues.some(v => v.selected) && (
+              <div className="bg-grey-50 border border-grey-400 rounded-lg p-3">
+                <Label className="text-xs text-grey mb-2 block">Parameters Preview</Label>
+                <div className="flex flex-wrap gap-2">
+                  {extractedValues.filter(v => v.selected).map((param, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+                      <Settings2 className="h-3 w-3" />
+                      {`{{${param.paramName}}}`}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateActionDialog(false)}>
+            <Button variant="outline" onClick={() => setShowSaveActionModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateAction} className="gap-2">
+            <Button onClick={handleSaveAction} className="gap-2">
               <Check className="h-4 w-4" />
-              Create Action
+              Save Action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Execute Action Modal */}
+      <Dialog open={showExecuteActionModal} onOpenChange={setShowExecuteActionModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-grey">Execute Action: {selectedAction?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedAction?.description || 'Fill in the parameter values to execute this action.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {selectedAction?.parameters.map((param) => (
+              <div key={param.name}>
+                <Label className="text-xs text-grey mb-2 block">
+                  {param.name}
+                  <span className="text-grey-400 font-normal ml-2">({param.type})</span>
+                </Label>
+                {param.type === 'boolean' ? (
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={!!actionParamValues[param.name]}
+                      onCheckedChange={(checked) => {
+                        setActionParamValues({ ...actionParamValues, [param.name]: !!checked });
+                      }}
+                    />
+                    <span className="text-sm text-grey">
+                      {actionParamValues[param.name] ? 'True' : 'False'}
+                    </span>
+                  </div>
+                ) : param.type === 'number' ? (
+                  <Input
+                    type="number"
+                    value={actionParamValues[param.name] ?? param.defaultValue}
+                    onChange={(e) => {
+                      setActionParamValues({
+                        ...actionParamValues,
+                        [param.name]: parseFloat(e.target.value) || 0,
+                      });
+                    }}
+                  />
+                ) : (
+                  <Input
+                    value={actionParamValues[param.name] ?? param.defaultValue}
+                    onChange={(e) => {
+                      setActionParamValues({ ...actionParamValues, [param.name]: e.target.value });
+                    }}
+                  />
+                )}
+                <p className="text-xs text-grey mt-1">
+                  Default: <code className="bg-grey-100 px-1 rounded">{JSON.stringify(param.defaultValue)}</code>
+                </p>
+              </div>
+            ))}
+
+            {selectedAction?.parameters.length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-sm text-grey">This action has no parameters.</p>
+                <p className="text-xs text-grey mt-1">It will execute with default values.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExecuteActionModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExecuteAction} className="gap-2">
+              <Play className="h-4 w-4" />
+              Execute
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4298,6 +5919,18 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
               </Select>
             </div>
           }
+        />
+      )}
+
+      {/* Code Sidebar for Actions */}
+      {showActionCodeSidebar && selectedAction && (
+        <CodeSidebar
+          title={selectedAction.name}
+          subtitle={selectedAction.description}
+          tag={`${database.tag}:${selectedAction.tag}`}
+          onClose={() => setShowActionCodeSidebar(false)}
+          generateCodeSections={generateActionCodeSections}
+          environments={[{ slug: database.env.slug, env_name: database.env.slug.toUpperCase() }]}
         />
       )}
     </div>
