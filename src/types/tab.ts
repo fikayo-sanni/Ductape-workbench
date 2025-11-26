@@ -11,6 +11,7 @@ export type TabType =
   | 'cache-values'
   | 'healthcheck'
   | 'database'
+  | 'graph'
   | 'message-broker'
   | 'message-broker-events'
   | 'notification'

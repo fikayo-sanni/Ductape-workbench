@@ -38,6 +38,7 @@ export interface IProduct {
   variables?: any[];
   auths?: any[];
   databases: any[];
+  graphs?: any[];
   jobs: any[];
   healthchecks?: any[];
   notifications?: any[];

@@ -20,6 +20,9 @@ import StorageTabContent from './tabs/StorageTabContent';
 import StorageExplorerTab from './tabs/StorageExplorerTab';
 import DatabaseTabContent from './tabs/DatabaseTabContent';
 import DatabaseExplorerTab from './tabs/DatabaseExplorerTab';
+import GraphTabContent from './tabs/GraphTabContent';
+import GraphExplorerTab from './tabs/GraphExplorerTab';
+import NewGraphTabContent from './tabs/NewGraphTabContent';
 import CacheTabContent from './tabs/CacheTabContent';
 import WebhookTabContent from './tabs/WebhookTabContent';
 import NewWebhookTabContent from './tabs/NewWebhookTabContent';
@@ -264,6 +267,17 @@ export default function TabContent() {
           return <NewDatabaseTabContent tabId={activeTab.id} data={activeTab.data} />;
         }
         return <DatabaseTabContent database={activeTab.data} />;
+
+      case 'graph':
+        // Check if this is a graph explorer tab
+        if (activeTab.data?.isExplorer) {
+          return <GraphExplorerTab graph={activeTab.data.graph} />;
+        }
+        // Check if this is a new graph creation tab
+        if (activeTab.isDirty && activeTab.data?.isNew) {
+          return <NewGraphTabContent tabId={activeTab.id} data={activeTab.data} />;
+        }
+        return <GraphTabContent graph={activeTab.data} />;
 
       case 'message-broker':
         // Check if this is a new message broker creation tab

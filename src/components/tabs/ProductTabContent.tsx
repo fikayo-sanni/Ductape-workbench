@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound } from 'lucide-react';
+import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound, Share2, Network } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
@@ -351,6 +351,15 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 Databases ({product?.databases?.length || 0})
               </Button>
               <Button
+                variant={activeFilter === 'graphs' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('graphs')}
+                className="gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Graphs ({product?.graphs?.length || 0})
+              </Button>
+              <Button
                 variant={activeFilter === 'storage' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setActiveFilter('storage')}
@@ -491,6 +500,22 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 <div>
                   <p className="text-2xl font-bold text-grey">{product?.databases?.length || 0}</p>
                   <p className="text-sm text-grey-600">Databases</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Graphs */}
+            <button
+              onClick={() => setActiveFilter('graphs')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Share2 className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product?.graphs?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Graphs</p>
                 </div>
               </div>
             </button>
@@ -664,6 +689,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
             {renderConnectedAppsCard()}
             {renderEnvironmentsCard()}
             {renderDatabasesCard()}
+            {renderGraphsCard()}
             {renderStorageCard()}
             {renderCachesCard()}
             {renderMessageBrokersCard()}
@@ -680,6 +706,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
         {activeFilter === 'apps' && renderConnectedAppsCard()}
         {activeFilter === 'environments' && renderEnvironmentsCard()}
         {activeFilter === 'databases' && renderDatabasesCard()}
+        {activeFilter === 'graphs' && renderGraphsCard()}
         {activeFilter === 'storage' && renderStorageCard()}
         {activeFilter === 'caches' && renderCachesCard()}
         {activeFilter === 'messageBrokers' && renderMessageBrokersCard()}
@@ -941,6 +968,104 @@ export default function ProductTabContent({ product: initialProduct, productId }
               <p className="text-sm text-grey-600 mb-2">No databases added yet</p>
               <p className="text-xs text-grey-500">
                 Add databases to store your product's data
+              </p>
+            </div>
+          )}
+      </div>
+    );
+  }
+
+  function renderGraphsCard() {
+    return (
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Graph Databases</h2>
+              <span className="text-sm text-grey-600">({product?.graphs?.length || 0})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const firstGraph = product?.graphs?.[0];
+                  const env = firstGraph?.envs?.[0] || { slug: 'development', connection_url: 'neo4j://localhost:7687' };
+                  const graphData = firstGraph ? {
+                    name: firstGraph.name,
+                    tag: firstGraph.tag,
+                    type: firstGraph.type,
+                    env: env,
+                  } : {
+                    name: 'Sample Graph',
+                    tag: 'sample-graph',
+                    type: 'neo4j',
+                    env: {
+                      slug: 'development',
+                      connection_url: 'neo4j://localhost:7687',
+                      database: 'neo4j',
+                    },
+                  };
+                  openTab({
+                    id: `graph-explorer-${graphData.tag}-${graphData.env.slug}`,
+                    type: 'graph',
+                    title: `${graphData.name} (${graphData.env.slug})`,
+                    itemId: `${graphData.tag}-${graphData.env.slug}`,
+                    data: {
+                      graph: graphData,
+                      isExplorer: true,
+                    },
+                  });
+                }}
+                className="h-8 gap-1"
+              >
+                <Network className="h-4 w-4" />
+                <span className="hidden sm:inline">Open</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleAddComponent('graph')}
+                className="h-8 gap-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add</span>
+              </Button>
+            </div>
+          </div>
+          {product?.graphs && product?.graphs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {product?.graphs.map((graph: any) => (
+                <button
+                  key={graph._id}
+                  onClick={() => handleOpenComponent(graph, 'graph')}
+                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Share2 className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                    <p className="text-sm font-medium text-grey truncate">
+                      {graph.name || graph.tag}
+                    </p>
+                    {graph.type && (
+                      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 uppercase">
+                        {graph.type}
+                      </span>
+                    )}
+                  </div>
+                  {graph.description && (
+                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
+                      {graph.description}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <p className="text-sm text-grey-600 mb-2">No graph databases added yet</p>
+              <p className="text-xs text-grey-500">
+                Add graph databases for connected data like social networks or knowledge graphs
               </p>
             </div>
           )}

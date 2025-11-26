@@ -322,6 +322,11 @@ export class AutomationService {
         canFillForms: true,
         canTriggerActions: false,
       },
+      graph: {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
       'message-broker': {
         canInspectForms: true,
         canFillForms: true,
@@ -745,6 +750,7 @@ export class AutomationService {
       cache: 'Cache',
       healthcheck: 'Health Check',
       database: 'Database',
+      graph: 'Graph',
       'message-broker': 'Message Broker',
       notification: 'Notification',
       notifier: 'Notifier',
