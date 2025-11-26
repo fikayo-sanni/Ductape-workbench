@@ -3318,15 +3318,6 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                       Code
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenExecuteActionModal(selectedAction)}
-                      className="gap-2"
-                    >
-                      <Play className="h-4 w-4" />
-                      Execute
-                    </Button>
-                    <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
