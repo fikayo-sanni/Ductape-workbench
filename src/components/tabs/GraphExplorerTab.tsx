@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Share2,
   Network,
@@ -14,6 +14,10 @@ import {
   Zap,
   Circle,
   ArrowRight,
+  Table2,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,6 +196,9 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [queryError, setQueryError] = useState<string | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<any>(null);
   const [selectedRelType, setSelectedRelType] = useState<any>(null);
+  const [resultsView, setResultsView] = useState<'table' | 'graph'>('table');
+  const [graphZoom, setGraphZoom] = useState(1);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const getGraphTypeColor = (type: string) => {
     switch (type?.toLowerCase()) {
@@ -274,7 +281,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       case 'UNIQUENESS': return 'bg-blue/10 text-blue';
       case 'NODE_PROPERTY_EXISTENCE': return 'bg-green/10 text-green';
       case 'NODE_KEY': return 'bg-purple-500/10 text-purple-500';
-      default: return 'bg-grey-400/10 text-grey-600';
+      default: return 'bg-grey-400/10 text-grey';
     }
   };
 
@@ -284,7 +291,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       case 'FULLTEXT': return 'bg-green/10 text-green';
       case 'POINT': return 'bg-orange-500/10 text-orange-500';
       case 'VECTOR': return 'bg-purple-500/10 text-purple-500';
-      default: return 'bg-grey-400/10 text-grey-600';
+      default: return 'bg-grey-400/10 text-grey';
     }
   };
 
@@ -293,7 +300,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       case 'ONLINE': return 'text-green';
       case 'POPULATING': return 'text-yellow-500';
       case 'FAILED': return 'text-red';
-      default: return 'text-grey-500';
+      default: return 'text-grey';
     }
   };
 
@@ -303,12 +310,12 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
         <div className="flex items-center gap-2 mb-2">
           <Circle className="h-3 w-3 text-blue fill-blue" />
           <span className="text-sm font-semibold text-grey">:{node.labels?.join(':')}</span>
-          <span className="text-xs text-grey-600 font-mono bg-grey-100 px-1.5 py-0.5 rounded">id: {node.id}</span>
+          <span className="text-xs text-grey font-mono bg-grey-100 px-1.5 py-0.5 rounded">id: {node.id}</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
           {Object.entries(node.properties || {}).map(([key, value]) => (
             <div key={key} className="text-xs flex items-baseline gap-1">
-              <span className="text-grey-600 font-medium">{key}:</span>
+              <span className="text-grey font-medium">{key}:</span>
               <span className="text-grey font-mono truncate">{JSON.stringify(value)}</span>
             </div>
           ))}
@@ -320,20 +327,88 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const renderRelationshipValue = (rel: any) => {
     return (
       <div className="p-2 bg-white rounded-lg border border-grey-400 inline-flex items-center gap-2">
-        <span className="text-xs text-grey-600 font-mono bg-grey-100 px-1.5 py-0.5 rounded">({rel.startNode})</span>
-        <ArrowRight className="h-3 w-3 text-grey-500" />
+        <span className="text-xs text-grey font-mono bg-grey-100 px-1.5 py-0.5 rounded">({rel.startNode})</span>
+        <ArrowRight className="h-3 w-3 text-grey" />
         <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-xs font-medium">
           {rel.type}
         </span>
-        <ArrowRight className="h-3 w-3 text-grey-500" />
-        <span className="text-xs text-grey-600 font-mono bg-grey-100 px-1.5 py-0.5 rounded">({rel.endNode})</span>
+        <ArrowRight className="h-3 w-3 text-grey" />
+        <span className="text-xs text-grey font-mono bg-grey-100 px-1.5 py-0.5 rounded">({rel.endNode})</span>
         {rel.properties && Object.keys(rel.properties).length > 0 && (
-          <span className="text-xs text-grey-500 ml-1">
+          <span className="text-xs text-grey ml-1">
             ({Object.keys(rel.properties).join(', ')})
           </span>
         )}
       </div>
     );
+  };
+
+  // Extract nodes and relationships from query results for visualization
+  const graphData = useMemo(() => {
+    if (!queryResult?.data) return { nodes: [], edges: [] };
+
+    const nodesMap = new Map<string, any>();
+    const edges: any[] = [];
+
+    queryResult.data.forEach((row: any) => {
+      Object.values(row).forEach((value: any) => {
+        if (value?.labels && value?.id) {
+          // It's a node
+          if (!nodesMap.has(value.id)) {
+            nodesMap.set(value.id, {
+              id: value.id,
+              labels: value.labels,
+              properties: value.properties,
+              label: value.labels[0] || 'Node',
+              displayName: value.properties?.name || value.properties?.title || value.id,
+            });
+          }
+        } else if (value?.type && value?.startNode && value?.endNode) {
+          // It's a relationship
+          edges.push({
+            id: value.id || `${value.startNode}-${value.type}-${value.endNode}`,
+            source: value.startNode,
+            target: value.endNode,
+            type: value.type,
+            properties: value.properties,
+          });
+        }
+      });
+    });
+
+    return {
+      nodes: Array.from(nodesMap.values()),
+      edges,
+    };
+  }, [queryResult]);
+
+  // Get color for node based on label
+  const getNodeColor = (label: string) => {
+    const colors: Record<string, { bg: string; border: string; text: string }> = {
+      Person: { bg: '#3B82F6', border: '#2563EB', text: '#fff' },
+      Company: { bg: '#10B981', border: '#059669', text: '#fff' },
+      Product: { bg: '#8B5CF6', border: '#7C3AED', text: '#fff' },
+      Location: { bg: '#F97316', border: '#EA580C', text: '#fff' },
+      Order: { bg: '#EC4899', border: '#DB2777', text: '#fff' },
+      Category: { bg: '#EAB308', border: '#CA8A04', text: '#000' },
+    };
+    return colors[label] || { bg: '#6B7280', border: '#4B5563', text: '#fff' };
+  };
+
+  // Simple circular layout calculation
+  const calculateNodePositions = (nodes: any[], _edges: any[], width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) * 0.35;
+
+    return nodes.map((node, i) => {
+      const angle = (2 * Math.PI * i) / nodes.length;
+      return {
+        ...node,
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
+      };
+    });
   };
 
   return (
@@ -348,7 +423,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="font-semibold text-grey text-sm truncate">{graph.name}</h2>
-              <p className="text-xs text-grey-600 truncate">{graph.env.slug}</p>
+              <p className="text-xs text-grey truncate">{graph.env.slug}</p>
             </div>
           </div>
 
@@ -360,7 +435,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                 'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
                 sidebarView === 'labels'
                   ? 'bg-primary/10 text-primary'
-                  : 'text-grey-600 hover:bg-grey-100'
+                  : 'text-grey hover:bg-grey-100'
               )}
             >
               <Database className="h-3 w-3" />
@@ -372,7 +447,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                 'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
                 sidebarView === 'relationships'
                   ? 'bg-primary/10 text-primary'
-                  : 'text-grey-600 hover:bg-grey-100'
+                  : 'text-grey hover:bg-grey-100'
               )}
             >
               <GitBranch className="h-3 w-3" />
@@ -384,7 +459,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                 'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
                 sidebarView === 'constraints'
                   ? 'bg-primary/10 text-primary'
-                  : 'text-grey-600 hover:bg-grey-100'
+                  : 'text-grey hover:bg-grey-100'
               )}
             >
               <Key className="h-3 w-3" />
@@ -396,7 +471,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                 'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
                 sidebarView === 'indexes'
                   ? 'bg-primary/10 text-primary'
-                  : 'text-grey-600 hover:bg-grey-100'
+                  : 'text-grey hover:bg-grey-100'
               )}
             >
               <Zap className="h-3 w-3" />
@@ -406,7 +481,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey" />
             <Input
               type="text"
               placeholder={`Search ${sidebarView}...`}
@@ -420,7 +495,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
         {/* List - Scrollable */}
         <div className="flex-1 overflow-y-auto p-2 min-h-0">
           <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+            <div className="text-xs font-semibold text-grey uppercase tracking-wide">
               {sidebarView === 'labels' && `Node Labels (${filteredLabels.length})`}
               {sidebarView === 'relationships' && `Relationship Types (${filteredRelationships.length})`}
               {sidebarView === 'constraints' && `Constraints (${filteredConstraints.length})`}
@@ -430,13 +505,13 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
               <button
                 onClick={handleSidebarRefresh}
                 disabled={isSidebarRefreshing}
-                className="text-grey-600 hover:text-primary transition-colors"
+                className="text-grey hover:text-primary transition-colors"
                 title="Refresh schema"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
               </button>
               <button
-                className="text-grey-600 hover:text-primary transition-colors"
+                className="text-grey hover:text-primary transition-colors"
                 title="Add new"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -465,7 +540,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                     <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', label.color)}></span>
                     <span className="truncate">{label.name}</span>
                   </div>
-                  <span className="text-xs text-grey-500 flex-shrink-0">
+                  <span className="text-xs text-grey flex-shrink-0">
                     {label.count.toLocaleString()}
                   </span>
                 </button>
@@ -492,9 +567,9 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium truncate">{rel.type}</span>
-                    <span className="text-xs text-grey-500">{rel.count.toLocaleString()}</span>
+                    <span className="text-xs text-grey">{rel.count.toLocaleString()}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-grey-500">
+                  <div className="flex items-center gap-1 text-xs text-grey">
                     <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.fromLabel}</span>
                     <ArrowRight className="h-3 w-3" />
                     <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.toLabel}</span>
@@ -519,11 +594,11 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                     <span className={cn('px-1.5 py-0.5 rounded text-xs', getConstraintTypeColor(constraint.type))}>
                       {constraint.type.replace(/_/g, ' ')}
                     </span>
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey-600">
+                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
                       :{constraint.labelsOrTypes.join(':')}
                     </span>
                   </div>
-                  <div className="text-xs text-grey-500 mt-1">
+                  <div className="text-xs text-grey mt-1">
                     {constraint.properties.join(', ')}
                   </div>
                 </div>
@@ -549,11 +624,11 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
                     <span className={cn('px-1.5 py-0.5 rounded text-xs', getIndexTypeColor(index.type))}>
                       {index.type}
                     </span>
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey-600">
+                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
                       :{index.labelsOrTypes.join(':')}
                     </span>
                   </div>
-                  <div className="text-xs text-grey-500 mt-1">
+                  <div className="text-xs text-grey mt-1">
                     {index.properties.join(', ')}
                   </div>
                 </div>
@@ -567,11 +642,11 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="text-center">
               <div className="font-semibold text-grey">14,127</div>
-              <div className="text-grey-500">Nodes</div>
+              <div className="text-grey">Nodes</div>
             </div>
             <div className="text-center">
               <div className="font-semibold text-grey">27,045</div>
-              <div className="text-grey-500">Relationships</div>
+              <div className="text-grey">Relationships</div>
             </div>
           </div>
         </div>
@@ -589,7 +664,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
               <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
                 {graph.type}
               </span>
-              <span className="text-xs text-grey-500">
+              <span className="text-xs text-grey">
                 ({getQueryLanguageName(graph.type)} backend)
               </span>
             </div>
@@ -632,11 +707,11 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
           {queryResult && (
             <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-50 rounded-lg border border-grey-400">
               <div className="flex items-center gap-4">
-                <span className="text-xs text-grey-600">
+                <span className="text-xs text-grey">
                   <span className="font-semibold text-grey">{queryResult.count}</span> rows in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
                 </span>
                 {queryResult.statistics && (
-                  <div className="flex items-center gap-3 text-xs text-grey-500 border-l border-grey-400 pl-4">
+                  <div className="flex items-center gap-3 text-xs text-grey border-l border-grey-400 pl-4">
                     {queryResult.statistics.nodesCreated > 0 && (
                       <span><span className="font-medium text-green">{queryResult.statistics.nodesCreated}</span> nodes+</span>
                     )}
@@ -663,7 +738,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {queryResult.columns?.map((col: string) => (
-                  <span key={col} className="px-1.5 py-0.5 bg-white border border-grey-400 rounded font-mono text-grey-600">
+                  <span key={col} className="px-1.5 py-0.5 bg-white border border-grey-400 rounded font-mono text-grey">
                     {col}
                   </span>
                 ))}
@@ -685,47 +760,307 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
           )}
 
           {queryResult && (
-            <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-grey-50 border-b border-grey-400">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-grey-600 uppercase tracking-wider w-12">
-                        #
-                      </th>
-                      {queryResult.columns?.map((col: string) => (
-                        <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey-600 uppercase tracking-wider">
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-grey-400">
-                    {queryResult.data.map((row: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-grey-50 transition-colors">
-                        <td className="px-4 py-3 text-sm text-grey-500 font-mono align-top">
-                          {idx + 1}
-                        </td>
-                        {queryResult.columns?.map((col: string) => (
-                          <td key={col} className="px-4 py-3 align-top">
-                            {row[col]?.labels ? (
-                              renderNodeValue(row[col])
-                            ) : row[col]?.type && row[col]?.startNode ? (
-                              renderRelationshipValue(row[col])
-                            ) : (
-                              <span className="text-sm text-grey">
-                                {typeof row[col] === 'object'
-                                  ? JSON.stringify(row[col], null, 2)
-                                  : String(row[col])}
-                              </span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="h-full flex flex-col">
+              {/* View Toggle Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1 bg-grey-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => setResultsView('table')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                      resultsView === 'table'
+                        ? 'bg-white text-grey shadow-sm'
+                        : 'text-grey hover:text-grey'
+                    )}
+                  >
+                    <Table2 className="h-3.5 w-3.5" />
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setResultsView('graph')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                      resultsView === 'graph'
+                        ? 'bg-white text-grey shadow-sm'
+                        : 'text-grey hover:text-grey'
+                    )}
+                  >
+                    <Network className="h-3.5 w-3.5" />
+                    Graph
+                    {graphData.nodes.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                        {graphData.nodes.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {resultsView === 'graph' && graphData.nodes.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGraphZoom(Math.max(0.5, graphZoom - 0.25))}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-xs text-grey w-12 text-center">{Math.round(graphZoom * 100)}%</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGraphZoom(Math.min(2, graphZoom + 0.25))}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGraphZoom(1)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
               </div>
+
+              {/* Table View */}
+              {resultsView === 'table' && (
+                <div className="bg-white rounded-lg border border-grey-400 overflow-hidden flex-1">
+                  <div className="overflow-x-auto h-full">
+                    <table className="w-full">
+                      <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                            #
+                          </th>
+                          {queryResult.columns?.map((col: string) => (
+                            <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-grey-400">
+                        {queryResult.data.map((row: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-grey-50 transition-colors">
+                            <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                              {idx + 1}
+                            </td>
+                            {queryResult.columns?.map((col: string) => (
+                              <td key={col} className="px-4 py-3 align-top">
+                                {row[col]?.labels ? (
+                                  renderNodeValue(row[col])
+                                ) : row[col]?.type && row[col]?.startNode ? (
+                                  renderRelationshipValue(row[col])
+                                ) : (
+                                  <span className="text-sm text-grey">
+                                    {typeof row[col] === 'object'
+                                      ? JSON.stringify(row[col], null, 2)
+                                      : String(row[col])}
+                                  </span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Graph Visualization View */}
+              {resultsView === 'graph' && (
+                <div className="bg-white rounded-lg border border-grey-400 flex-1 flex">
+                  {graphData.nodes.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <Network className="h-12 w-12 text-grey-300 mx-auto mb-3" />
+                        <h4 className="text-sm font-medium text-grey mb-1">No Graph Data</h4>
+                        <p className="text-xs text-grey">
+                          Query results don't contain nodes or relationships to visualize
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex">
+                      {/* Graph Canvas */}
+                      <div className="flex-1 relative overflow-hidden">
+                        <svg
+                          className="w-full h-full"
+                          style={{ transform: `scale(${graphZoom})`, transformOrigin: 'center center' }}
+                        >
+                          <defs>
+                            <marker
+                              id="arrowhead"
+                              markerWidth="10"
+                              markerHeight="7"
+                              refX="9"
+                              refY="3.5"
+                              orient="auto"
+                            >
+                              <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
+                            </marker>
+                          </defs>
+
+                          {/* Edges */}
+                          {(() => {
+                            const positionedNodes = calculateNodePositions(graphData.nodes, graphData.edges, 600, 400);
+                            const nodePositions = new Map(positionedNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+
+                            return graphData.edges.map((edge, i) => {
+                              const source = nodePositions.get(edge.source);
+                              const target = nodePositions.get(edge.target);
+                              if (!source || !target) return null;
+
+                              const midX = (source.x + target.x) / 2;
+                              const midY = (source.y + target.y) / 2;
+
+                              return (
+                                <g key={edge.id || i}>
+                                  <line
+                                    x1={source.x}
+                                    y1={source.y}
+                                    x2={target.x}
+                                    y2={target.y}
+                                    stroke="#D1D5DB"
+                                    strokeWidth="2"
+                                    markerEnd="url(#arrowhead)"
+                                  />
+                                  <text
+                                    x={midX}
+                                    y={midY - 5}
+                                    textAnchor="middle"
+                                    className="text-[10px] fill-grey"
+                                  >
+                                    {edge.type}
+                                  </text>
+                                </g>
+                              );
+                            });
+                          })()}
+
+                          {/* Nodes */}
+                          {calculateNodePositions(graphData.nodes, graphData.edges, 600, 400).map((node) => {
+                            const colors = getNodeColor(node.label);
+                            const isSelected = selectedNode?.id === node.id;
+
+                            return (
+                              <g
+                                key={node.id}
+                                className="cursor-pointer"
+                                onClick={() => setSelectedNode(isSelected ? null : node)}
+                              >
+                                <circle
+                                  cx={node.x}
+                                  cy={node.y}
+                                  r={isSelected ? 32 : 28}
+                                  fill={colors.bg}
+                                  stroke={isSelected ? '#000' : colors.border}
+                                  strokeWidth={isSelected ? 3 : 2}
+                                />
+                                <text
+                                  x={node.x}
+                                  y={node.y - 5}
+                                  textAnchor="middle"
+                                  className="text-[10px] font-medium pointer-events-none"
+                                  fill={colors.text}
+                                >
+                                  {node.label}
+                                </text>
+                                <text
+                                  x={node.x}
+                                  y={node.y + 8}
+                                  textAnchor="middle"
+                                  className="text-[9px] pointer-events-none"
+                                  fill={colors.text}
+                                  opacity={0.8}
+                                >
+                                  {node.displayName?.substring(0, 10)}
+                                </text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+
+                        {/* Legend */}
+                        <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg border border-grey-400 p-2">
+                          <div className="text-[10px] font-medium text-grey mb-1">Legend</div>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.from(new Set(graphData.nodes.map(n => n.label))).map(label => {
+                              const colors = getNodeColor(label);
+                              return (
+                                <div key={label} className="flex items-center gap-1">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: colors.bg }}
+                                  />
+                                  <span className="text-[10px] text-grey">{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Node Details Panel */}
+                      {selectedNode && (
+                        <div className="w-64 border-l border-grey-400 bg-grey-50 p-4 overflow-y-auto">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-grey">Node Details</h4>
+                            <button
+                              onClick={() => setSelectedNode(null)}
+                              className="text-grey-400 hover:text-grey"
+                            >
+                              ×
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <div className="text-xs text-grey mb-1">Labels</div>
+                              <div className="flex flex-wrap gap-1">
+                                {selectedNode.labels?.map((label: string) => (
+                                  <span
+                                    key={label}
+                                    className="px-2 py-0.5 bg-blue/10 text-blue text-xs rounded"
+                                  >
+                                    :{label}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-xs text-grey mb-1">ID</div>
+                              <div className="font-mono text-xs text-grey bg-white px-2 py-1 rounded border border-grey-400">
+                                {selectedNode.id}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-xs text-grey mb-2">Properties</div>
+                              <div className="space-y-1">
+                                {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                  <div key={key} className="bg-white rounded border border-grey-400 p-2">
+                                    <div className="text-[10px] text-grey">{key}</div>
+                                    <div className="text-xs text-grey font-mono truncate">
+                                      {JSON.stringify(value)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -734,7 +1069,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
               <div className="text-center">
                 <Network className="h-16 w-16 text-grey-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-grey mb-2">Ready to Explore</h3>
-                <p className="text-sm text-grey-600 max-w-md mb-4">
+                <p className="text-sm text-grey max-w-md mb-4">
                   Write a graph adapter query above and click Execute to explore your graph data.
                   The SDK will translate it to {getQueryLanguageName(graph.type)} for {graph.type}.
                 </p>
