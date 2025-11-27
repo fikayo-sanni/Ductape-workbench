@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   Database,
@@ -64,6 +64,7 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 // Column type definitions
 type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
@@ -734,17 +735,56 @@ interface DatabaseExplorerTabProps {
 }
 
 export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabProps) {
+  const { setSidebarCollapsed } = useWorkbenchStore();
+
+  // Collapse workbench sidebar when DatabaseExplorer opens
+  useEffect(() => {
+    setSidebarCollapsed(true);
+  }, [setSidebarCollapsed]);
+
   const isNoSQL = database.type?.toLowerCase().includes('mongo') ||
                   database.type?.toLowerCase().includes('redis') ||
                   database.type?.toLowerCase().includes('cassandra');
 
   const tables = isNoSQL ? DUMMY_COLLECTIONS_NOSQL : DUMMY_TABLES_SQL;
 
-  // Sidebar state
-  const [sidebarView, setSidebarView] = useState<SidebarView>('tables');
-  const [selectedTable, setSelectedTable] = useState<typeof tables[0] | null>(null);
-  const [selectedMigration, setSelectedMigration] = useState<typeof DUMMY_MIGRATIONS[0] | null>(null);
-  const [selectedAction, setSelectedAction] = useState<IDatabaseAction | null>(null);
+  // Persistent state key
+  const stateKey = `db-explorer-state-${database.tag}-${database.env.slug}`;
+
+  // Load persisted state from localStorage
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedState = getPersistedState();
+
+  // Initialize state from persisted values
+  const [sidebarView, setSidebarView] = useState<SidebarView>(
+    persistedState?.sidebarView || 'tables'
+  );
+  const [selectedTable, setSelectedTable] = useState<typeof tables[0] | null>(() => {
+    if (persistedState?.selectedTableName) {
+      return tables.find(t => t.name === persistedState.selectedTableName) || null;
+    }
+    return null;
+  });
+  const [selectedMigration, setSelectedMigration] = useState<typeof DUMMY_MIGRATIONS[0] | null>(() => {
+    if (persistedState?.selectedMigrationId) {
+      return DUMMY_MIGRATIONS.find(m => m.id === persistedState.selectedMigrationId) || null;
+    }
+    return null;
+  });
+  const [selectedAction, setSelectedAction] = useState<IDatabaseAction | null>(() => {
+    if (persistedState?.selectedActionTag) {
+      return DUMMY_ACTIONS.find(a => a.tag === persistedState.selectedActionTag) || null;
+    }
+    return null;
+  });
   const [savedActions, setSavedActions] = useState<IDatabaseAction[]>(DUMMY_ACTIONS);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -834,23 +874,68 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const [actionName, setActionName] = useState('');
   const [actionDescription, setActionDescription] = useState('');
 
-  // Query Builder state
-  const [showQueryBuilder, setShowQueryBuilder] = useState(false);
-  const [queryBuilderOperation, setQueryBuilderOperation] = useState<DatabaseOperation>('query');
-  const [queryBuilderTable, setQueryBuilderTable] = useState('');
-  const [queryBuilderColumns, setQueryBuilderColumns] = useState<string[]>([]);
-  const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ column: string; operator: string; value: string }>>([]);
-  const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ column: string; direction: 'ASC' | 'DESC' } | null>(null);
-  const [queryBuilderLimit, setQueryBuilderLimit] = useState('25');
-  const [queryBuilderOffset, setQueryBuilderOffset] = useState('0');
-  const [queryBuilderData, setQueryBuilderData] = useState<Array<{ column: string; value: string }>>([]);
-  const [queryBuilderAggColumn, setQueryBuilderAggColumn] = useState('');
-  const [queryBuilderRawSql, setQueryBuilderRawSql] = useState('');
-  const [queryBuilderReturning, setQueryBuilderReturning] = useState<string[]>([]);
+  // Query Builder state - initialized from persisted state
+  const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
+  const [queryBuilderOperation, setQueryBuilderOperation] = useState<DatabaseOperation>(persistedState?.queryBuilderOperation || 'query');
+  const [queryBuilderTable, setQueryBuilderTable] = useState(persistedState?.queryBuilderTable || '');
+  const [queryBuilderColumns, setQueryBuilderColumns] = useState<string[]>(persistedState?.queryBuilderColumns || []);
+  const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ column: string; operator: string; value: string }>>(persistedState?.queryBuilderWhere || []);
+  const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ column: string; direction: 'ASC' | 'DESC' } | null>(persistedState?.queryBuilderOrderBy || null);
+  const [queryBuilderLimit, setQueryBuilderLimit] = useState(persistedState?.queryBuilderLimit || '25');
+  const [queryBuilderOffset, setQueryBuilderOffset] = useState(persistedState?.queryBuilderOffset || '0');
+  const [queryBuilderData, setQueryBuilderData] = useState<Array<{ column: string; value: string }>>(persistedState?.queryBuilderData || []);
+  const [queryBuilderAggColumn, setQueryBuilderAggColumn] = useState(persistedState?.queryBuilderAggColumn || '');
+  const [queryBuilderRawSql, setQueryBuilderRawSql] = useState(persistedState?.queryBuilderRawSql || '');
+  const [queryBuilderReturning, setQueryBuilderReturning] = useState<string[]>(persistedState?.queryBuilderReturning || []);
 
   // Generated query preview
-  const [generatedQuery, setGeneratedQuery] = useState<Record<string, any> | null>(null);
-  const [queryTestResult, setQueryTestResult] = useState<any>(null);
+  const [generatedQuery, setGeneratedQuery] = useState<Record<string, any> | null>(persistedState?.generatedQuery || null);
+  const [queryTestResult, setQueryTestResult] = useState<any>(persistedState?.queryTestResult || null);
+
+  // Persist state to localStorage whenever relevant state changes
+  useEffect(() => {
+    const stateToSave = {
+      sidebarView,
+      selectedTableName: selectedTable?.name,
+      selectedMigrationId: selectedMigration?.id,
+      selectedActionTag: selectedAction?.tag,
+      showQueryBuilder,
+      queryBuilderOperation,
+      queryBuilderTable,
+      queryBuilderColumns,
+      queryBuilderWhere,
+      queryBuilderOrderBy,
+      queryBuilderLimit,
+      queryBuilderOffset,
+      queryBuilderData,
+      queryBuilderAggColumn,
+      queryBuilderRawSql,
+      queryBuilderReturning,
+      generatedQuery,
+      queryTestResult,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [
+    stateKey,
+    sidebarView,
+    selectedTable,
+    selectedMigration,
+    selectedAction,
+    showQueryBuilder,
+    queryBuilderOperation,
+    queryBuilderTable,
+    queryBuilderColumns,
+    queryBuilderWhere,
+    queryBuilderOrderBy,
+    queryBuilderLimit,
+    queryBuilderOffset,
+    queryBuilderData,
+    queryBuilderAggColumn,
+    queryBuilderRawSql,
+    queryBuilderReturning,
+    generatedQuery,
+    queryTestResult,
+  ]);
   const [isTestingQuery, setIsTestingQuery] = useState(false);
 
   // CodeSidebar state for actions
@@ -3702,44 +3787,117 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                   {(queryBuilderOperation === 'insert' || queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') && (
                     <div>
                       <Label className="text-xs text-grey mb-2 block">Data</Label>
-                      {queryBuilderData.map((data, idx) => (
-                        <div key={idx} className="flex gap-2 mb-2">
-                          <Input
-                            value={data.column}
-                            onChange={(e) => {
-                              const newData = [...queryBuilderData];
-                              newData[idx].column = e.target.value;
-                              setQueryBuilderData(newData);
-                            }}
-                            placeholder="Column"
-                            className="flex-1"
-                          />
-                          <Input
-                            value={data.value}
-                            onChange={(e) => {
-                              const newData = [...queryBuilderData];
-                              newData[idx].value = e.target.value;
-                              setQueryBuilderData(newData);
-                            }}
-                            placeholder="Value"
-                            className="flex-1"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setQueryBuilderData(queryBuilderData.filter((_, i) => i !== idx))}
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      ))}
+                      {queryBuilderData.map((data, idx) => {
+                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
+                        const selectedColumn = selectedTable?.columns.find(c => c.name === data.column);
+                        const columnType: ColumnType = selectedColumn?.type || 'string';
+
+                        return (
+                          <div key={idx} className="flex gap-2 mb-2">
+                            {/* Column Dropdown */}
+                            <Select
+                              value={data.column}
+                              onValueChange={(v) => {
+                                const newData = [...queryBuilderData];
+                                newData[idx].column = v;
+                                newData[idx].value = '';
+                                setQueryBuilderData(newData);
+                              }}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select column..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedTable?.columns.length ? (
+                                  selectedTable.columns.map((col) => (
+                                    <SelectItem key={col.name} value={col.name}>
+                                      <span className="flex items-center gap-2">
+                                        {col.name}
+                                        <span className="text-xs text-grey-400">({col.type})</span>
+                                      </span>
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                )}
+                              </SelectContent>
+                            </Select>
+
+                            {/* Value Input - Dynamic based on column type */}
+                            {columnType === 'boolean' ? (
+                              <Select
+                                value={data.value}
+                                onValueChange={(v) => {
+                                  const newData = [...queryBuilderData];
+                                  newData[idx].value = v;
+                                  setQueryBuilderData(newData);
+                                }}
+                              >
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder="Select value..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="true">true</SelectItem>
+                                  <SelectItem value="false">false</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : columnType === 'number' ? (
+                              <Input
+                                type="number"
+                                value={data.value}
+                                onChange={(e) => {
+                                  const newData = [...queryBuilderData];
+                                  newData[idx].value = e.target.value;
+                                  setQueryBuilderData(newData);
+                                }}
+                                placeholder="Enter number..."
+                                className="flex-1"
+                              />
+                            ) : (columnType === 'date' || columnType === 'datetime') ? (
+                              <Input
+                                type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                value={data.value}
+                                onChange={(e) => {
+                                  const newData = [...queryBuilderData];
+                                  newData[idx].value = e.target.value;
+                                  setQueryBuilderData(newData);
+                                }}
+                                className="flex-1"
+                              />
+                            ) : (
+                              <Input
+                                value={data.value}
+                                onChange={(e) => {
+                                  const newData = [...queryBuilderData];
+                                  newData[idx].value = e.target.value;
+                                  setQueryBuilderData(newData);
+                                }}
+                                placeholder="Enter value..."
+                                className="flex-1"
+                              />
+                            )}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setQueryBuilderData(queryBuilderData.filter((_, i) => i !== idx))}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        );
+                      })}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setQueryBuilderData([...queryBuilderData, { column: '', value: '' }])}
+                        disabled={!queryBuilderTable}
                       >
                         + Add Field
                       </Button>
+                      {!queryBuilderTable && queryBuilderData.length === 0 && (
+                        <p className="text-xs text-grey-400 mt-1">Select a table first to add fields</p>
+                      )}
                     </div>
                   )}
 
@@ -3775,15 +3933,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {selectedTable?.columns.map((col) => (
-                                  <SelectItem key={col.name} value={col.name}>
-                                    <span className="flex items-center gap-2">
-                                      {col.name}
-                                      <span className="text-xs text-grey-400">({col.type})</span>
-                                    </span>
-                                  </SelectItem>
-                                )) || (
-                                  <SelectItem value="" disabled>Select a table first</SelectItem>
+                                {selectedTable?.columns.length ? (
+                                  selectedTable.columns.map((col) => (
+                                    <SelectItem key={col.name} value={col.name}>
+                                      <span className="flex items-center gap-2">
+                                        {col.name}
+                                        <span className="text-xs text-grey-400">({col.type})</span>
+                                      </span>
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
                                 )}
                               </SelectContent>
                             </Select>
@@ -3950,15 +4110,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {selectedTable?.columns.map((col) => (
-                                  <SelectItem key={col.name} value={col.name}>
-                                    <span className="flex items-center gap-2">
-                                      {col.name}
-                                      <span className="text-xs text-grey-400">({col.type})</span>
-                                    </span>
-                                  </SelectItem>
-                                )) || (
-                                  <SelectItem value="" disabled>Select a table first</SelectItem>
+                                {selectedTable?.columns.length ? (
+                                  selectedTable.columns.map((col) => (
+                                    <SelectItem key={col.name} value={col.name}>
+                                      <span className="flex items-center gap-2">
+                                        {col.name}
+                                        <span className="text-xs text-grey-400">({col.type})</span>
+                                      </span>
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
                                 )}
                               </SelectContent>
                             </Select>

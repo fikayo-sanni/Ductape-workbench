@@ -229,15 +229,24 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
                  fieldType !== 'json';
         });
 
-        setHeaders([
-          { key: 'Content-Type', value: 'application/json', enabled: true },
-          ...simpleHeaders.map((header: any) => ({
-            key: header.key || '',
-            value: header.default || header.defaultValue || '',
-            description: header.description || '',
-            enabled: true,
-          }))
-        ]);
+        // Check if Content-Type already exists in action headers
+        const hasContentType = simpleHeaders.some(
+          (header: any) => header.key?.toLowerCase() === 'content-type'
+        );
+
+        const mappedHeaders = simpleHeaders.map((header: any) => ({
+          key: header.key || '',
+          value: header.sampleValue || '',
+          description: header.description || '',
+          enabled: true,
+        }));
+
+        // Only add default Content-Type if it's not already in the action headers
+        setHeaders(
+          hasContentType
+            ? mappedHeaders
+            : [{ key: 'Content-Type', value: 'application/json', enabled: true }, ...mappedHeaders]
+        );
       }
 
       // Initialize body with reconstruction from sample data

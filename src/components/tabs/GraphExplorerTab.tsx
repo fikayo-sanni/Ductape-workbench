@@ -50,6 +50,7 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 interface GraphExplorerTabProps {
   graph: {
@@ -451,16 +452,51 @@ const getQueryLanguageName = (type: string): string => {
 };
 
 export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
-  const [sidebarView, setSidebarView] = useState<SidebarView>('labels');
+  const { setSidebarCollapsed } = useWorkbenchStore();
+
+  // Collapse workbench sidebar when GraphExplorer opens
+  useEffect(() => {
+    setSidebarCollapsed(true);
+  }, [setSidebarCollapsed]);
+
+  // Persistent state key
+  const stateKey = `graph-explorer-state-${graph.tag}-${graph.env.slug}`;
+
+  // Load persisted state from localStorage
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedState = getPersistedState();
+
+  // Initialize state from persisted values
+  const [sidebarView, setSidebarView] = useState<SidebarView>(
+    persistedState?.sidebarView || 'labels'
+  );
   const [searchQuery, setSearchQuery] = useState('');
-  const [queryInput, setQueryInput] = useState(getDefaultQuery());
+  const [queryInput, setQueryInput] = useState(persistedState?.queryInput || getDefaultQuery());
   const [isExecuting, setIsExecuting] = useState(false);
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
-  const [queryResult, setQueryResult] = useState<any>(null);
-  const [queryError, setQueryError] = useState<string | null>(null);
-  const [selectedLabel, setSelectedLabel] = useState<any>(null);
-  const [selectedRelType, setSelectedRelType] = useState<any>(null);
-  const [resultsView, setResultsView] = useState<'table' | 'graph'>('table');
+  const [queryResult, setQueryResult] = useState<any>(persistedState?.queryResult || null);
+  const [queryError, setQueryError] = useState<string | null>(persistedState?.queryError || null);
+  const [selectedLabel, setSelectedLabel] = useState<any>(() => {
+    if (persistedState?.selectedLabelName) {
+      return LABELS.find(l => l.name === persistedState.selectedLabelName) || null;
+    }
+    return null;
+  });
+  const [selectedRelType, setSelectedRelType] = useState<any>(() => {
+    if (persistedState?.selectedRelTypeName) {
+      return RELATIONSHIP_TYPES.find(r => r.name === persistedState.selectedRelTypeName) || null;
+    }
+    return null;
+  });
+  const [resultsView, setResultsView] = useState<'table' | 'graph'>(persistedState?.resultsView || 'table');
   const [graphZoom, setGraphZoom] = useState(1);
   const [selectedNode, setSelectedNode] = useState<any>(null);
 
@@ -497,29 +533,93 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
   // Actions state
   const [savedActions, setSavedActions] = useState<IGraphAction[]>(DUMMY_ACTIONS);
-  const [selectedAction, setSelectedAction] = useState<IGraphAction | null>(null);
+  const [selectedAction, setSelectedAction] = useState<IGraphAction | null>(() => {
+    if (persistedState?.selectedActionTag) {
+      return DUMMY_ACTIONS.find(a => a.tag === persistedState.selectedActionTag) || null;
+    }
+    return null;
+  });
   const [showSaveActionModal, setShowSaveActionModal] = useState(false);
   const [showExecuteActionModal, setShowExecuteActionModal] = useState(false);
 
-  // Query Builder state
-  const [showQueryBuilder, setShowQueryBuilder] = useState(false);
-  const [queryBuilderOperation, setQueryBuilderOperation] = useState<GraphOperation>('findNodes');
-  const [queryBuilderLabel, setQueryBuilderLabel] = useState('');
-  const [queryBuilderRelType, setQueryBuilderRelType] = useState('');
-  const [queryBuilderDirection, setQueryBuilderDirection] = useState<'OUTGOING' | 'INCOMING' | 'BOTH'>('OUTGOING');
-  const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ property: string; operator: string; value: string }>>([]);
-  const [queryBuilderLimit, setQueryBuilderLimit] = useState('25');
-  const [queryBuilderSkip, setQueryBuilderSkip] = useState('0');
-  const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ property: string; direction: 'ASC' | 'DESC' } | null>(null);
-  const [queryBuilderMaxDepth, setQueryBuilderMaxDepth] = useState('2');
-  const [queryBuilderNodeId, setQueryBuilderNodeId] = useState('');
-  const [queryBuilderFromNode, setQueryBuilderFromNode] = useState({ label: '', property: '', value: '' });
-  const [queryBuilderToNode, setQueryBuilderToNode] = useState({ label: '', property: '', value: '' });
-  const [queryBuilderProperties, setQueryBuilderProperties] = useState<Array<{ key: string; value: string }>>([]);
-  const [queryBuilderRawQuery, setQueryBuilderRawQuery] = useState('');
-  const [generatedQuery, setGeneratedQuery] = useState<Record<string, any> | null>(null);
-  const [queryTestResult, setQueryTestResult] = useState<any>(null);
+  // Query Builder state - initialized from persisted state
+  const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
+  const [queryBuilderOperation, setQueryBuilderOperation] = useState<GraphOperation>(persistedState?.queryBuilderOperation || 'findNodes');
+  const [queryBuilderLabel, setQueryBuilderLabel] = useState(persistedState?.queryBuilderLabel || '');
+  const [queryBuilderRelType, setQueryBuilderRelType] = useState(persistedState?.queryBuilderRelType || '');
+  const [queryBuilderDirection, setQueryBuilderDirection] = useState<'OUTGOING' | 'INCOMING' | 'BOTH'>(persistedState?.queryBuilderDirection || 'OUTGOING');
+  const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ property: string; operator: string; value: string }>>(persistedState?.queryBuilderWhere || []);
+  const [queryBuilderLimit, setQueryBuilderLimit] = useState(persistedState?.queryBuilderLimit || '25');
+  const [queryBuilderSkip, setQueryBuilderSkip] = useState(persistedState?.queryBuilderSkip || '0');
+  const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ property: string; direction: 'ASC' | 'DESC' } | null>(persistedState?.queryBuilderOrderBy || null);
+  const [queryBuilderMaxDepth, setQueryBuilderMaxDepth] = useState(persistedState?.queryBuilderMaxDepth || '2');
+  const [queryBuilderNodeId, setQueryBuilderNodeId] = useState(persistedState?.queryBuilderNodeId || '');
+  const [queryBuilderFromNode, setQueryBuilderFromNode] = useState(persistedState?.queryBuilderFromNode || { label: '', property: '', value: '' });
+  const [queryBuilderToNode, setQueryBuilderToNode] = useState(persistedState?.queryBuilderToNode || { label: '', property: '', value: '' });
+  const [queryBuilderProperties, setQueryBuilderProperties] = useState<Array<{ key: string; value: string }>>(persistedState?.queryBuilderProperties || []);
+  const [queryBuilderRawQuery, setQueryBuilderRawQuery] = useState(persistedState?.queryBuilderRawQuery || '');
+  const [generatedQuery, setGeneratedQuery] = useState<Record<string, any> | null>(persistedState?.generatedQuery || null);
+  const [queryTestResult, setQueryTestResult] = useState<any>(persistedState?.queryTestResult || null);
   const [isTestingQuery, setIsTestingQuery] = useState(false);
+
+  // Persist state to localStorage whenever relevant state changes
+  useEffect(() => {
+    const stateToSave = {
+      sidebarView,
+      queryInput,
+      queryResult,
+      queryError,
+      selectedLabelName: selectedLabel?.name,
+      selectedRelTypeName: selectedRelType?.name,
+      resultsView,
+      selectedActionTag: selectedAction?.tag,
+      showQueryBuilder,
+      queryBuilderOperation,
+      queryBuilderLabel,
+      queryBuilderRelType,
+      queryBuilderDirection,
+      queryBuilderWhere,
+      queryBuilderLimit,
+      queryBuilderSkip,
+      queryBuilderOrderBy,
+      queryBuilderMaxDepth,
+      queryBuilderNodeId,
+      queryBuilderFromNode,
+      queryBuilderToNode,
+      queryBuilderProperties,
+      queryBuilderRawQuery,
+      generatedQuery,
+      queryTestResult,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [
+    stateKey,
+    sidebarView,
+    queryInput,
+    queryResult,
+    queryError,
+    selectedLabel,
+    selectedRelType,
+    resultsView,
+    selectedAction,
+    showQueryBuilder,
+    queryBuilderOperation,
+    queryBuilderLabel,
+    queryBuilderRelType,
+    queryBuilderDirection,
+    queryBuilderWhere,
+    queryBuilderLimit,
+    queryBuilderSkip,
+    queryBuilderOrderBy,
+    queryBuilderMaxDepth,
+    queryBuilderNodeId,
+    queryBuilderFromNode,
+    queryBuilderToNode,
+    queryBuilderProperties,
+    queryBuilderRawQuery,
+    generatedQuery,
+    queryTestResult,
+  ]);
 
   // CodeSidebar state
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
@@ -2347,99 +2447,125 @@ await ductape.init();`,
         ) : (
           <>
             {/* Query Editor - Fixed */}
-            <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm font-semibold text-grey">
-                    Graph Adapter Query
-                  </Label>
-                  <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
-                    {graph.type}
-                  </span>
-                  <span className="text-xs text-grey">
-                    ({getQueryLanguageName(graph.type)} backend)
-                  </span>
+            <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
+              {/* Code Editor Container */}
+              <div className="rounded-lg overflow-hidden border border-grey-300 dark:border-[#2a2a2a] shadow-sm">
+                {/* Editor Header */}
+                <div className="flex items-center justify-between px-4 py-2 bg-grey-100 dark:bg-[#1a1a1a] border-b border-grey-300 dark:border-[#2a2a2a]">
+                  <div className="flex items-center gap-3">
+                    {/* Traffic light dots */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                    </div>
+                    <div className="h-4 w-px bg-grey-300 dark:bg-[#3a3a3a]" />
+                    <Label className="text-sm font-semibold text-grey dark:text-grey-200">
+                      Graph Adapter Query
+                    </Label>
+                    <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
+                      {graph.type}
+                    </span>
+                    <span className="text-xs text-grey-500 dark:text-grey-400">
+                      {getQueryLanguageName(graph.type)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setQueryInput(getDefaultQuery())}
+                      className="text-grey hover:text-grey dark:hover:text-white"
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenSaveActionModal}
+                      className="gap-2 text-grey hover:text-grey dark:hover:text-white"
+                    >
+                      <Save className="h-4 w-4" />
+                      Save as Action
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleExecuteQuery}
+                      disabled={isExecuting}
+                      className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {isExecuting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Run
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQueryInput(getDefaultQuery())}
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenSaveActionModal}
-                    className="gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save as Action
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleExecuteQuery}
-                    disabled={isExecuting}
-                    className="gap-2"
-                  >
-                    {isExecuting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Executing...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Execute
-                      </>
-                    )}
-                  </Button>
+                {/* Editor Body */}
+                <div className="relative">
+                  {/* Line numbers gutter */}
+                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-grey-100 dark:bg-[#1a1a1a] border-r border-grey-300 dark:border-[#2a2a2a] flex flex-col pt-3 text-right pr-3 text-xs text-grey-400 dark:text-grey-600 font-mono select-none pointer-events-none overflow-hidden">
+                    {Array.from({ length: Math.max(10, queryInput.split('\n').length + 2) }, (_, i) => (
+                      <div key={i} style={{ lineHeight: '1.6', height: '1.6em' }}>{i + 1}</div>
+                    ))}
+                  </div>
+                  <textarea
+                    value={queryInput}
+                    onChange={(e) => setQueryInput(e.target.value)}
+                    placeholder={getDefaultQuery()}
+                    spellCheck={false}
+                    className="w-full min-h-[160px] max-h-[500px] pl-14 pr-4 py-3 font-mono text-sm resize-y focus:outline-none bg-white dark:bg-[#0d0d0d] text-black dark:text-[#d4d4d4] placeholder-grey-400 dark:placeholder-grey-600 selection:bg-blue-500/20 dark:selection:bg-blue-500/30 caret-black dark:caret-white"
+                    style={{
+                      lineHeight: '1.6',
+                      tabSize: 2,
+                    }}
+                  />
                 </div>
               </div>
-              <textarea
-                value={queryInput}
-                onChange={(e) => setQueryInput(e.target.value)}
-                placeholder={getDefaultQuery()}
-                className="w-full h-32 px-3 py-2 border border-grey-400 rounded-lg font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-grey-50"
-              />
 
               {/* Query Statistics Bar - Shows after execution */}
               {queryResult && (
-                <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-50 rounded-lg border border-grey-400">
+                <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-100 dark:bg-[#1a1a1a] rounded-lg border border-grey-300 dark:border-[#2a2a2a]">
                   <div className="flex items-center gap-4">
                     <span className="text-xs text-grey">
                       <span className="font-semibold text-grey">{queryResult.count}</span> rows in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
                     </span>
                     {queryResult.statistics && (
-                      <div className="flex items-center gap-3 text-xs text-grey border-l border-grey-400 pl-4">
+                      <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-300 border-l border-grey-400 dark:border-grey-600 pl-4">
                         {queryResult.statistics.nodesCreated > 0 && (
-                          <span><span className="font-medium text-green">{queryResult.statistics.nodesCreated}</span> nodes+</span>
+                          <span><span className="font-medium text-green-600 dark:text-green-400">{queryResult.statistics.nodesCreated}</span> nodes+</span>
                         )}
                         {queryResult.statistics.nodesDeleted > 0 && (
-                          <span><span className="font-medium text-red">{queryResult.statistics.nodesDeleted}</span> nodes-</span>
+                          <span><span className="font-medium text-red-600 dark:text-red-400">{queryResult.statistics.nodesDeleted}</span> nodes-</span>
                         )}
                         {queryResult.statistics.relationshipsCreated > 0 && (
-                          <span><span className="font-medium text-blue">{queryResult.statistics.relationshipsCreated}</span> rels+</span>
+                          <span><span className="font-medium text-blue-600 dark:text-blue-400">{queryResult.statistics.relationshipsCreated}</span> rels+</span>
                         )}
                         {queryResult.statistics.relationshipsDeleted > 0 && (
-                          <span><span className="font-medium text-orange-500">{queryResult.statistics.relationshipsDeleted}</span> rels-</span>
+                          <span><span className="font-medium text-orange-600 dark:text-orange-400">{queryResult.statistics.relationshipsDeleted}</span> rels-</span>
                         )}
                         {queryResult.statistics.propertiesSet > 0 && (
-                          <span><span className="font-medium text-purple-500">{queryResult.statistics.propertiesSet}</span> props</span>
+                          <span><span className="font-medium text-purple-600 dark:text-purple-400">{queryResult.statistics.propertiesSet}</span> props</span>
                         )}
                         {queryResult.statistics.labelsAdded > 0 && (
-                          <span><span className="font-medium text-yellow-600">{queryResult.statistics.labelsAdded}</span> labels</span>
+                          <span><span className="font-medium text-yellow-600 dark:text-yellow-400">{queryResult.statistics.labelsAdded}</span> labels</span>
                         )}
                         {Object.values(queryResult.statistics).every((v: any) => v === 0) && (
-                          <span className="text-grey-400">read-only</span>
+                          <span className="text-grey">read-only</span>
                         )}
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {queryResult.columns?.map((col: string) => (
-                      <span key={col} className="px-1.5 py-0.5 bg-white border border-grey-400 rounded font-mono text-grey">
+                      <span key={col} className="px-1.5 py-0.5 bg-white dark:bg-grey-700 border border-grey-300 dark:border-grey-600 rounded font-mono text-grey dark:text-grey-200">
                         {col}
                       </span>
                     ))}
