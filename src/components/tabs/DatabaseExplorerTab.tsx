@@ -319,6 +319,7 @@ const DUMMY_COLLECTIONS_NOSQL: TableDefinition[] = [
 
 const DUMMY_MIGRATIONS = [
   {
+    id: 'migration_001',
     name: 'create_users_table',
     tag: 'migration_001',
     status: 'completed',
@@ -328,6 +329,7 @@ const DUMMY_MIGRATIONS = [
     down_statements: 1
   },
   {
+    id: 'migration_002',
     name: 'add_email_verification',
     tag: 'migration_002',
     status: 'completed',
@@ -337,6 +339,7 @@ const DUMMY_MIGRATIONS = [
     down_statements: 2
   },
   {
+    id: 'migration_003',
     name: 'create_products_index',
     tag: 'migration_003',
     status: 'pending',

@@ -215,7 +215,7 @@ export default function SessionDashboard({
                       style={{ width: `${percentage}%` }}
                     ></div>
                     <div className="absolute inset-0 flex items-center px-3">
-                      <span className="text-xs font-semibold text-grey-700">
+                      <span className="text-xs font-semibold text-white dark:text-grey">
                         {day.sessions.toLocaleString()} sessions
                       </span>
                     </div>
@@ -247,7 +247,7 @@ export default function SessionDashboard({
                         style={{ width: `${percentage}%` }}
                       ></div>
                       <div className="absolute inset-0 flex items-center px-2">
-                        <span className="text-xs font-semibold text-grey-700">
+                        <span className="text-xs font-semibold text-white dark:text-grey">
                           {hour.count}
                         </span>
                       </div>

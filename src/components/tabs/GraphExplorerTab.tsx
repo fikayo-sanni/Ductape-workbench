@@ -486,13 +486,13 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [queryError, setQueryError] = useState<string | null>(persistedState?.queryError || null);
   const [selectedLabel, setSelectedLabel] = useState<any>(() => {
     if (persistedState?.selectedLabelName) {
-      return LABELS.find(l => l.name === persistedState.selectedLabelName) || null;
+      return DUMMY_LABELS.find((l: LabelDefinition) => l.name === persistedState.selectedLabelName) || null;
     }
     return null;
   });
   const [selectedRelType, setSelectedRelType] = useState<any>(() => {
     if (persistedState?.selectedRelTypeName) {
-      return RELATIONSHIP_TYPES.find(r => r.name === persistedState.selectedRelTypeName) || null;
+      return DUMMY_RELATIONSHIPS.find((r: typeof DUMMY_RELATIONSHIPS[0]) => r.type === persistedState.selectedRelTypeName) || null;
     }
     return null;
   });
