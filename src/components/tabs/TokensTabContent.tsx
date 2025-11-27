@@ -7,6 +7,9 @@ import {
   EyeOff,
   Trash2,
   AlertCircle,
+  AlertTriangle,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +41,7 @@ interface Token {
   name: string;
   token?: string; // Only available on creation
   encrypted_token?: string;
-  token_type: "api" | "access";
+  token_type: string;
   scope: string[];
   expires_in?: number | null;
   envs: string[];
@@ -47,6 +50,8 @@ interface Token {
   is_active: boolean;
   description?: string;
 }
+
+type ConfirmAction = 'revoke' | 'delete';
 
 type ExpiryPeriod = "hours" | "days" | "weeks" | "months" | "years";
 
@@ -63,31 +68,40 @@ export default function TokensTabContent() {
   const [newToken, setNewToken] = useState({
     name: "",
     description: "",
-    token_type: "api" as Token["token_type"],
+    token_type: "api",
     scope: [] as string[],
     expiryDuration: "",
     expiryPeriod: "days" as ExpiryPeriod,
     envs: [] as string[],
   });
 
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>('delete');
+  const [confirmTokenName, setConfirmTokenName] = useState('');
+  const [confirmInputValue, setConfirmInputValue] = useState('');
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+
+  // Copy feedback state
+  const [copiedTokenName, setCopiedTokenName] = useState<string | null>(null);
+
   // Initialize Ductape SDK instance for workspace operations
   const ductape = useMemo<Ductape | null>(() => {
-    const token = localStorage.getItem("access_token");
-    if (!currentWorkspaceId || !user?._id || !user?.public_key || !token) {
+    if (!currentWorkspaceId || !user?._id || !user?.public_key || !user?.auth_token) {
       return null;
     }
     try {
       return connectDuctapeWorkspace({
         workspace_id: currentWorkspaceId,
         user_id: user._id,
-        token,
+        token: user.auth_token,
         public_key: user.public_key,
       });
     } catch (error) {
       console.error("Failed to initialize Ductape SDK:", error);
       return null;
     }
-  }, [currentWorkspaceId, user?._id, user?.public_key]);
+  }, [currentWorkspaceId, user?._id, user?.public_key, user?.auth_token]);
 
   // Workspace Credentials State
   const [workspaceCredentials, setWorkspaceCredentials] = useState([
@@ -129,7 +143,16 @@ export default function TokensTabContent() {
 
   const handleCopyToken = (token: string) => {
     navigator.clipboard.writeText(token);
-    // Could add toast notification here
+    toast.success("Token copied to clipboard!");
+  };
+
+  // Copy token key in $Token{key} format
+  const handleCopyTokenKey = (tokenName: string) => {
+    const formattedKey = `$Token{${tokenName}}`;
+    navigator.clipboard.writeText(formattedKey);
+    setCopiedTokenName(tokenName);
+    toast.success(`Copied: ${formattedKey}`);
+    setTimeout(() => setCopiedTokenName(null), 2000);
   };
 
   // Fetch tokens on mount
@@ -203,13 +226,26 @@ export default function TokensTabContent() {
   };
 
   const handleCreateToken = async () => {
-    if (!ductape) return;
+    if (!ductape) {
+      toast.error("Unable to connect to Ductape. Please check your credentials and try again.");
+      return;
+    }
 
     // Validate token name format
     if (!validateTokenName(newToken.name)) {
       toast.error(
         "Token name must only contain letters, numbers, and underscores (no spaces or special characters)"
       );
+      return;
+    }
+
+    if (!newToken.name.trim()) {
+      toast.error("Please enter a token key");
+      return;
+    }
+
+    if (newToken.scope.length === 0) {
+      toast.error("Please select at least one scope");
       return;
     }
 
@@ -257,34 +293,60 @@ export default function TokensTabContent() {
     }
   };
 
-  const handleRevokeToken = async (tokenName: string) => {
-    if (!ductape) return;
+  // Open confirmation dialog for revoke/delete
+  const openConfirmDialog = (tokenName: string, action: ConfirmAction) => {
+    setConfirmTokenName(tokenName);
+    setConfirmAction(action);
+    setConfirmInputValue('');
+    setShowConfirmDialog(true);
+  };
 
+  // Handle confirmed revoke action
+  const handleConfirmedRevoke = async () => {
+    if (!ductape || confirmInputValue !== confirmTokenName) return;
+
+    setIsConfirmLoading(true);
     try {
       // Revoke by setting expiry to now (expired)
-      await (ductape as any).secrets.update(tokenName, {
+      await (ductape as any).secrets.update(confirmTokenName, {
         expires_at: Math.floor(Date.now() / 1000) - 1, // Set to past
       });
       toast.success("Token revoked successfully");
       await fetchTokens();
+      setShowConfirmDialog(false);
+      setConfirmInputValue('');
     } catch (error: any) {
       console.error("Failed to revoke token:", error);
       toast.error(error?.message || "Failed to revoke token");
+    } finally {
+      setIsConfirmLoading(false);
     }
   };
 
-  const handleDeleteToken = async (tokenName: string) => {
-    if (!ductape) return;
+  // Handle confirmed delete action
+  const handleConfirmedDelete = async () => {
+    if (!ductape || confirmInputValue !== confirmTokenName) return;
 
-    if (!confirm(`Are you sure you want to delete the token "${tokenName}"?`)) return;
-
+    setIsConfirmLoading(true);
     try {
-      await (ductape as any).secrets.delete(tokenName);
+      await (ductape as any).secrets.delete(confirmTokenName);
       toast.success("Token deleted successfully");
       await fetchTokens();
+      setShowConfirmDialog(false);
+      setConfirmInputValue('');
     } catch (error: any) {
       console.error("Failed to delete token:", error);
       toast.error(error?.message || "Failed to delete token");
+    } finally {
+      setIsConfirmLoading(false);
+    }
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmAction === 'revoke') {
+      handleConfirmedRevoke();
+    } else {
+      handleConfirmedDelete();
     }
   };
 
@@ -669,7 +731,26 @@ export default function TokensTabContent() {
                             {token.expires_in && (
                               <>
                                 <span>•</span>
-                                <span>Expires in: {token.expires_in} days</span>
+                                <span>
+                                  {(() => {
+                                    const expiryMs = token.expires_in * 1000;
+                                    const now = Date.now();
+                                    if (expiryMs < now) {
+                                      return 'Expired';
+                                    }
+                                    const diffMs = expiryMs - now;
+                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                    if (diffDays > 0) {
+                                      return `Expires in: ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+                                    } else if (diffHours > 0) {
+                                      return `Expires in: ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
+                                    } else {
+                                      const diffMins = Math.floor(diffMs / (1000 * 60));
+                                      return `Expires in: ${diffMins} minute${diffMins === 1 ? '' : 's'}`;
+                                    }
+                                  })()}
+                                </span>
                               </>
                             )}
                             {token.last_used && (
@@ -687,11 +768,30 @@ export default function TokensTabContent() {
                         </div>
 
                         <div className="flex gap-2">
+                          {/* Copy Token Key Button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCopyTokenKey(token.name)}
+                            className="gap-1.5"
+                          >
+                            {copiedTokenName === token.name ? (
+                              <>
+                                <Check className="h-4 w-4 text-green" />
+                                <span className="text-green">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4" />
+                                Copy Key
+                              </>
+                            )}
+                          </Button>
                           {token.is_active && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleRevokeToken(token.name)}
+                              onClick={() => openConfirmDialog(token.name, 'revoke')}
                               className="text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
                             >
                               Revoke
@@ -700,7 +800,7 @@ export default function TokensTabContent() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDeleteToken(token.name)}
+                            onClick={() => openConfirmDialog(token.name, 'delete')}
                             className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -993,6 +1093,110 @@ export default function TokensTabContent() {
                 {formatTime(secondsLeft)}
               </span>
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog for Revoke/Delete */}
+      <Dialog open={showConfirmDialog} onOpenChange={(open) => {
+        if (!isConfirmLoading) {
+          setShowConfirmDialog(open);
+          if (!open) {
+            setConfirmInputValue('');
+          }
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-grey">
+              <AlertTriangle className={cn(
+                "h-5 w-5",
+                confirmAction === 'delete' ? "text-red-500" : "text-orange-500"
+              )} />
+              {confirmAction === 'delete' ? 'Delete Token' : 'Revoke Token'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-grey-600 pt-2">
+              {confirmAction === 'delete' ? (
+                <>
+                  <strong className="text-red-600">Warning:</strong> Deleting this token is permanent and cannot be undone.
+                  Any applications or services using this token will immediately lose access.
+                </>
+              ) : (
+                <>
+                  <strong className="text-orange-600">Warning:</strong> Revoking this token will immediately invalidate it.
+                  Any applications or services using this token will lose access until a new token is created.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Token Info */}
+            <div className="bg-grey-100 rounded-lg p-4 border border-grey-400">
+              <p className="text-xs text-grey-600 mb-1">Token Key</p>
+              <code className="text-sm font-mono font-semibold text-grey">
+                {confirmTokenName}
+              </code>
+            </div>
+
+            {/* Confirmation Input */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-grey">
+                Type <code className="bg-grey-100 px-1.5 py-0.5 rounded font-mono text-xs">{confirmTokenName}</code> to confirm
+              </Label>
+              <Input
+                value={confirmInputValue}
+                onChange={(e) => setConfirmInputValue(e.target.value)}
+                placeholder="Enter token key to confirm"
+                className="font-mono"
+                disabled={isConfirmLoading}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setConfirmInputValue('');
+                }}
+                disabled={isConfirmLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmAction}
+                disabled={confirmInputValue !== confirmTokenName || isConfirmLoading}
+                className={cn(
+                  "gap-2",
+                  confirmAction === 'delete'
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-orange-500 hover:bg-orange-600"
+                )}
+              >
+                {isConfirmLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {confirmAction === 'delete' ? 'Deleting...' : 'Revoking...'}
+                  </>
+                ) : (
+                  <>
+                    {confirmAction === 'delete' ? (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        Delete Token
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4" />
+                        Revoke Token
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

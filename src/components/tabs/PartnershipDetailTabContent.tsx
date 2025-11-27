@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +24,8 @@ import {
   Plus,
   Eye,
   Shield,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import { IPartnership, PartnershipStatus } from '@/types/partnership';
 import { cn } from '@/lib/utils';
@@ -44,7 +46,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { connectDuctapeWorkspace } from '@/helpers/ductape';
+import Ductape from '@ductape/sdk';
+import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 // Issue types
 type IssuePriority = 'low' | 'medium' | 'high' | 'critical';
@@ -136,6 +143,10 @@ interface PartnershipDetailTabContentProps {
 
 export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTabContentProps) {
   const { user } = useAuth();
+  const tabId = tab.id;
+
+  // Restore saved state
+  const savedTabState = getInitialTabState(tabId, null as any);
 
   // Fetch partnership data from API
   const { data: partnershipResponse, isLoading } = useQuery({
@@ -151,31 +162,94 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
   const partnership = partnershipResponse?.data;
 
-  const [newMessage, setNewMessage] = useState('');
-  const [deliverableKey, setDeliverableKey] = useState('');
-  const [deliverableValue, setDeliverableValue] = useState('');
+  // Active tab state (messages, funnel, issues, deliverables, brief)
+  const [activeInnerTab, setActiveInnerTab] = useState<string>(savedTabState?.activeInnerTab || 'messages');
+
+  const [newMessage, setNewMessage] = useState(savedTabState?.newMessage || '');
+  const [deliverableKey, setDeliverableKey] = useState(savedTabState?.deliverableKey || '');
+  const [deliverableValue, setDeliverableValue] = useState(savedTabState?.deliverableValue || '');
   const [isSending, setIsSending] = useState(false);
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<string[]>(savedTabState?.attachments || []);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Issues state
-  const [issues, setIssues] = useState<Issue[]>(getDummyIssues());
-  const [issueTitle, setIssueTitle] = useState('');
-  const [issueDescription, setIssueDescription] = useState('');
-  const [issuePriority, setIssuePriority] = useState<IssuePriority>('medium');
-  const [issueCategory, setIssueCategory] = useState('');
-  const [statusFilter, setStatusFilter] = useState<IssueFilterStatus>('all');
-  const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
+  const [issues, setIssues] = useState<Issue[]>(savedTabState?.issues || getDummyIssues());
+  const [issueTitle, setIssueTitle] = useState(savedTabState?.issueTitle || '');
+  const [issueDescription, setIssueDescription] = useState(savedTabState?.issueDescription || '');
+  const [issuePriority, setIssuePriority] = useState<IssuePriority>(savedTabState?.issuePriority || 'medium');
+  const [issueCategory, setIssueCategory] = useState(savedTabState?.issueCategory || '');
+  const [statusFilter, setStatusFilter] = useState<IssueFilterStatus>(savedTabState?.statusFilter || 'all');
+  const [expandedIssueId, setExpandedIssueId] = useState<string | null>(savedTabState?.expandedIssueId || null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // OTP state for deliverables
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
   const [selectedDeliverableIndex, setSelectedDeliverableIndex] = useState<number | null>(null);
   const [otpValue, setOtpValue] = useState('');
-  const [verifiedDeliverables, setVerifiedDeliverables] = useState<Set<number>>(new Set());
+  const [verifiedDeliverables, setVerifiedDeliverables] = useState<Set<number>>(
+    savedTabState?.verifiedDeliverables ? new Set(savedTabState.verifiedDeliverables) : new Set()
+  );
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  // Save token state
+  const [saveTokenDialogOpen, setSaveTokenDialogOpen] = useState(false);
+  const [saveTokenKey, setSaveTokenKey] = useState('');
+  const [saveTokenValue, setSaveTokenValue] = useState('');
+  const [saveTokenDeliverableIndex, setSaveTokenDeliverableIndex] = useState<number | null>(null);
+  const [isSavingToken, setIsSavingToken] = useState(false);
+  const [savedDeliverables, setSavedDeliverables] = useState<Set<number>>(
+    savedTabState?.savedDeliverables ? new Set(savedTabState.savedDeliverables) : new Set()
+  );
+  const [saveTokenScope, setSaveTokenScope] = useState<string[]>(['read']);
+  const [saveTokenEnvs, setSaveTokenEnvs] = useState<string[]>([]);
+  const [saveTokenExpiryDuration, setSaveTokenExpiryDuration] = useState('');
+  const [saveTokenExpiryPeriod, setSaveTokenExpiryPeriod] = useState<'hours' | 'days' | 'weeks' | 'months' | 'years'>('days');
+
+  // Persist tab state automatically
+  useTabState(
+    tabId,
+    'partnership-detail',
+    partnership?.client?.name || partnership?.serviceProvider?.name || 'Partnership',
+    {},
+    {
+      activeInnerTab,
+      newMessage,
+      deliverableKey,
+      deliverableValue,
+      attachments,
+      issues,
+      issueTitle,
+      issueDescription,
+      issuePriority,
+      issueCategory,
+      statusFilter,
+      expandedIssueId,
+      verifiedDeliverables: Array.from(verifiedDeliverables),
+      savedDeliverables: Array.from(savedDeliverables),
+    },
+    tab.itemId
+  );
+
+  // Initialize Ductape SDK for saving tokens
+  const { currentWorkspaceId } = useAuth();
+  const ductape = useMemo<Ductape | null>(() => {
+    if (!currentWorkspaceId || !user?._id || !user?.public_key || !user?.auth_token) {
+      return null;
+    }
+    try {
+      return connectDuctapeWorkspace({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        token: user.auth_token,
+        public_key: user.public_key,
+      });
+    } catch (error) {
+      console.error('Failed to initialize Ductape SDK:', error);
+      return null;
+    }
+  }, [currentWorkspaceId, user?._id, user?.public_key, user?.auth_token]);
 
   // Show loading state if partnership data is not available yet
   if (isLoading || !partnership) {
@@ -301,6 +375,100 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
     setDeliverableKey('');
     setDeliverableValue('');
     setIsSending(false);
+  };
+
+  // Open save token dialog
+  const handleOpenSaveTokenDialog = (index: number, key: string, value: string) => {
+    setSaveTokenDeliverableIndex(index);
+    setSaveTokenKey(key);
+    setSaveTokenValue(value);
+    setSaveTokenDialogOpen(true);
+  };
+
+  // Calculate expiry timestamp (Unix epoch in seconds)
+  const calculateExpiryTimestamp = (duration: string, period: 'hours' | 'days' | 'weeks' | 'months' | 'years'): number | null => {
+    if (!duration || duration === '') return null;
+
+    const durationNum = parseInt(duration);
+    if (isNaN(durationNum) || durationNum <= 0) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const multipliers: Record<typeof period, number> = {
+      hours: 3600,
+      days: 86400,
+      weeks: 604800,
+      months: 2592000,
+      years: 31536000,
+    };
+
+    return now + (durationNum * multipliers[period]);
+  };
+
+  // Get current workspace for environments
+  const currentWorkspace = user?.workspaces?.find(
+    (ws: any) => ws.workspace_id === currentWorkspaceId || ws._id === currentWorkspaceId
+  );
+
+  // Save deliverable as workspace token
+  const handleSaveAsWorkspaceToken = async () => {
+    if (!ductape || !saveTokenKey.trim()) {
+      toast.error('Please enter a token key');
+      return;
+    }
+
+    // Validate token key format
+    const tagPattern = /^[a-zA-Z0-9_]+$/;
+    if (!tagPattern.test(saveTokenKey)) {
+      toast.error('Token key must only contain letters, numbers, and underscores');
+      return;
+    }
+
+    if (saveTokenScope.length === 0) {
+      toast.error('Please select at least one scope');
+      return;
+    }
+
+    setIsSavingToken(true);
+    try {
+      const expires_at = calculateExpiryTimestamp(saveTokenExpiryDuration, saveTokenExpiryPeriod);
+
+      await (ductape as any).secrets.create({
+        key: saveTokenKey,
+        value: saveTokenValue,
+        description: `Saved from partnership deliverable`,
+        token_type: 'api',
+        scope: saveTokenScope,
+        envs: saveTokenEnvs,
+        expires_at,
+      });
+
+      // Mark deliverable as saved
+      if (saveTokenDeliverableIndex !== null) {
+        const newSaved = new Set(savedDeliverables);
+        newSaved.add(saveTokenDeliverableIndex);
+        setSavedDeliverables(newSaved);
+      }
+
+      toast.success(`Token saved as $Token{${saveTokenKey}}`);
+      setSaveTokenDialogOpen(false);
+      resetSaveTokenState();
+    } catch (error: any) {
+      console.error('Failed to save token:', error);
+      toast.error(error?.message || 'Failed to save token');
+    } finally {
+      setIsSavingToken(false);
+    }
+  };
+
+  // Reset save token dialog state
+  const resetSaveTokenState = () => {
+    setSaveTokenKey('');
+    setSaveTokenValue('');
+    setSaveTokenDeliverableIndex(null);
+    setSaveTokenScope(['read']);
+    setSaveTokenEnvs([]);
+    setSaveTokenExpiryDuration('');
+    setSaveTokenExpiryPeriod('days');
   };
 
   const handleCreateIssue = async () => {
@@ -450,7 +618,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
       </div>
 
       {/* Tabs */}
-      <Tabs key={partnership._id} defaultValue="messages" className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <Tabs key={partnership._id} value={activeInnerTab} onValueChange={setActiveInnerTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Tabs Header - Fixed */}
         <div className="flex-shrink-0 border-b border-grey-400 px-6 bg-white">
           <TabsList className="bg-transparent h-12">
@@ -804,24 +972,43 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                                 View
                               </Button>
                             ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopyDeliverable(hasKeyValue ? value : deliverable, index)}
-                                className="gap-2"
-                              >
-                                {copiedIndex === index ? (
-                                  <>
-                                    <Check className="h-4 w-4 text-green" />
-                                    <span className="text-green">Copied</span>
-                                  </>
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCopyDeliverable(hasKeyValue ? value : deliverable, index)}
+                                  className="gap-2"
+                                >
+                                  {copiedIndex === index ? (
+                                    <>
+                                      <Check className="h-4 w-4 text-green" />
+                                      <span className="text-green">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-4 w-4" />
+                                      Copy
+                                    </>
+                                  )}
+                                </Button>
+                                {/* Save Token Button */}
+                                {savedDeliverables.has(index) ? (
+                                  <Badge variant="secondary" className="text-xs bg-green/10 text-green h-8 px-3 flex items-center gap-1.5">
+                                    <Check className="h-3 w-3" />
+                                    Saved
+                                  </Badge>
                                 ) : (
-                                  <>
-                                    <Copy className="h-4 w-4" />
-                                    Copy
-                                  </>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenSaveTokenDialog(index, hasKeyValue ? key : `token_${index}`, hasKeyValue ? value : deliverable)}
+                                    className="gap-2"
+                                  >
+                                    <Save className="h-4 w-4" />
+                                    Save Token
+                                  </Button>
                                 )}
-                              </Button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -907,6 +1094,204 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                   </Button>
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Save Token Dialog */}
+          <Dialog open={saveTokenDialogOpen} onOpenChange={(open) => {
+            if (!isSavingToken) {
+              setSaveTokenDialogOpen(open);
+              if (!open) {
+                resetSaveTokenState();
+              }
+            }
+          }}>
+            <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-grey">
+                  <Key className="h-5 w-5 text-primary" />
+                  Save as Workspace Token
+                </DialogTitle>
+                <DialogDescription>
+                  Save this deliverable as a workspace token so you can reference it in your integrations using the <code className="bg-grey-100 px-1.5 py-0.5 rounded text-xs font-mono">$Token{'{key}'}</code> syntax.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Secure Storage</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        The token will be securely encrypted and stored in your workspace. You can manage it from the Tokens tab.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Token Key Input */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-grey">Token Key *</Label>
+                  <Input
+                    value={saveTokenKey}
+                    onChange={(e) => {
+                      // Allow only alphanumeric and underscores
+                      const value = e.target.value
+                        .replace(/[^a-zA-Z0-9_\s]+/g, '')
+                        .replace(/\s+/g, '_')
+                        .replace(/_+/g, '_')
+                        .replace(/^_+/, '');
+                      setSaveTokenKey(value);
+                    }}
+                    placeholder="e.g., stripe_api_key"
+                    className="font-mono"
+                    disabled={isSavingToken}
+                  />
+                  <p className="text-xs text-grey-600">
+                    Only letters, numbers, and underscores allowed. This will be used as <code className="bg-grey-100 px-1 rounded">$Token{'{' + (saveTokenKey || 'key') + '}'}</code>
+                  </p>
+                </div>
+
+                {/* Token Value Preview */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-grey">Token Value (Preview)</Label>
+                  <div className="bg-grey-100 rounded-lg p-3 border border-grey-400">
+                    <code className="text-sm text-grey-700 font-mono break-all">
+                      {saveTokenValue.length > 50 ? saveTokenValue.substring(0, 50) + '...' : saveTokenValue}
+                    </code>
+                  </div>
+                </div>
+
+                {/* Expires In */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-grey">Expires In (Optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Duration"
+                      value={saveTokenExpiryDuration}
+                      onChange={(e) => setSaveTokenExpiryDuration(e.target.value)}
+                      className="w-24"
+                      min="1"
+                      disabled={isSavingToken}
+                    />
+                    <Select
+                      value={saveTokenExpiryPeriod}
+                      onValueChange={(value) => setSaveTokenExpiryPeriod(value as typeof saveTokenExpiryPeriod)}
+                      disabled={isSavingToken}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hours">Hours</SelectItem>
+                        <SelectItem value="days">Days</SelectItem>
+                        <SelectItem value="weeks">Weeks</SelectItem>
+                        <SelectItem value="months">Months</SelectItem>
+                        <SelectItem value="years">Years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-grey-600">
+                    Leave empty for no expiration
+                  </p>
+                </div>
+
+                {/* Scope */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-grey">Scope *</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {['read', 'write', 'delete', 'admin'].map((scope) => (
+                      <Badge
+                        key={scope}
+                        variant="secondary"
+                        className={cn(
+                          'cursor-pointer transition-colors px-3 py-1.5',
+                          saveTokenScope.includes(scope)
+                            ? 'bg-primary text-white hover:bg-primary/90'
+                            : 'bg-grey-100 text-grey-600 hover:bg-grey-200'
+                        )}
+                        onClick={() => {
+                          if (isSavingToken) return;
+                          const newScope = saveTokenScope.includes(scope)
+                            ? saveTokenScope.filter((s) => s !== scope)
+                            : [...saveTokenScope, scope];
+                          setSaveTokenScope(newScope);
+                        }}
+                      >
+                        {scope}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Environments */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-grey">Environments</Label>
+                  <p className="text-xs text-grey-600">
+                    Select which environments this token can access
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {currentWorkspace?.defaultEnvs?.map((env: any) => (
+                      <Badge
+                        key={env.slug}
+                        variant="secondary"
+                        className={cn(
+                          'cursor-pointer transition-colors px-3 py-1.5',
+                          saveTokenEnvs.includes(env.slug)
+                            ? 'bg-primary text-white hover:bg-primary/90'
+                            : 'bg-grey-100 text-grey-600 hover:bg-grey-200'
+                        )}
+                        onClick={() => {
+                          if (isSavingToken) return;
+                          const newEnvs = saveTokenEnvs.includes(env.slug)
+                            ? saveTokenEnvs.filter((e) => e !== env.slug)
+                            : [...saveTokenEnvs, env.slug];
+                          setSaveTokenEnvs(newEnvs);
+                        }}
+                      >
+                        {env.env_name}
+                      </Badge>
+                    )) || (
+                      <p className="text-sm text-grey-600">
+                        No environments configured
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSaveTokenDialogOpen(false);
+                    resetSaveTokenState();
+                  }}
+                  disabled={isSavingToken}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveAsWorkspaceToken}
+                  disabled={!saveTokenKey.trim() || saveTokenScope.length === 0 || isSavingToken}
+                  className="gap-2"
+                >
+                  {isSavingToken ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Token
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </TabsContent>
