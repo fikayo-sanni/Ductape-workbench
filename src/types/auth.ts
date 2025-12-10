@@ -10,6 +10,8 @@ export interface User {
   public_key: string;
   workspaces: Workspace[];
   profilePicture?: string;
+  requires_verification?: boolean;
+  verified?: boolean;
 }
 
 export interface SignupPayload {

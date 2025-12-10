@@ -7,7 +7,6 @@ import {
   Package,
   HardDrive,
   Users,
-  Zap,
   Database,
   MessageSquare,
   Bell,
@@ -35,14 +34,6 @@ const newItemOptions: NewItemOption[] = [
     label: 'Request',
     icon: FileText,
     description: 'Create a new API request',
-    category: 'common',
-  },
-
-    {
-    id: 'feature',
-    label: 'Feature',
-    icon: Zap,
-    description: 'Add a new workflow',
     category: 'common',
   },
 

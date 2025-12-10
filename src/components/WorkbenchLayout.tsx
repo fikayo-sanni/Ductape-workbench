@@ -60,19 +60,18 @@ function WorkbenchContent() {
     }
   }, [user]);
 
-  // Trigger onboarding when user logs in but has no workspace
+  // Trigger onboarding when user logs in/signs up but has no workspace
   useEffect(() => {
     const hasNoWorkspace = !currentWorkspaceId || (workspacesData?.data?.length === 0);
 
-    if (user && hasNoWorkspace && !hasTriggeredOnboarding && !showLoginModal) {
-
+    if (user && hasNoWorkspace && !hasTriggeredOnboarding && !showLoginModal && !showCreateAccountModal) {
         // Small delay to ensure DOM is ready
         setTimeout(() => {
           startOnboarding();
           setHasTriggeredOnboarding(true);
-        }, 1000);
+        }, 500);
     }
-  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, startOnboarding]);
+  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding]);
 
 
   return (

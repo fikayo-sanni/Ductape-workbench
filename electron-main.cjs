@@ -17,7 +17,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
     },
-    title: 'Ductape Workbench',
+    title: 'Ductape',
     backgroundColor: '#ffffff',
   });
 

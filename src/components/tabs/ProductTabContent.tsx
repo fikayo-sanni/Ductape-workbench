@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound, Share2, Network } from 'lucide-react';
+import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound, Share2, Network, Bot, Boxes, Brain, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
@@ -396,6 +396,42 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 Jobs ({product?.jobs?.length || 0})
               </Button>
               <Button
+                variant={activeFilter === 'workflows' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('workflows')}
+                className="gap-2"
+              >
+                <GitBranch className="h-4 w-4" />
+                Workflows ({product?.workflows?.length || 0})
+              </Button>
+              <Button
+                variant={activeFilter === 'vectors' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('vectors')}
+                className="gap-2"
+              >
+                <Boxes className="h-4 w-4" />
+                Vectors ({product?.vectors?.length || 0})
+              </Button>
+              <Button
+                variant={activeFilter === 'agents' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('agents')}
+                className="gap-2"
+              >
+                <Bot className="h-4 w-4" />
+                Agents ({product?.agents?.length || 0})
+              </Button>
+              <Button
+                variant={activeFilter === 'models' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('models')}
+                className="gap-2"
+              >
+                <Brain className="h-4 w-4" />
+                Models ({product?.models?.length || 0})
+              </Button>
+              <Button
                 variant={activeFilter === 'features' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setActiveFilter('features')}
@@ -584,6 +620,70 @@ export default function ProductTabContent({ product: initialProduct, productId }
               </div>
             </button>
 
+            {/* Workflows */}
+            <button
+              onClick={() => setActiveFilter('workflows')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <GitBranch className="h-5 w-5 text-violet-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product?.workflows?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Workflows</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Vectors */}
+            <button
+              onClick={() => setActiveFilter('vectors')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <Boxes className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product?.vectors?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Vectors</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Agents */}
+            <button
+              onClick={() => setActiveFilter('agents')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Bot className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product?.agents?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Agents</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Models */}
+            <button
+              onClick={() => setActiveFilter('models')}
+              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                  <Brain className="h-5 w-5 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-grey">{product?.models?.length || 0}</p>
+                  <p className="text-sm text-grey-600">Models</p>
+                </div>
+              </div>
+            </button>
+
             {/* Features */}
             <button
               onClick={() => setActiveFilter('features')}
@@ -694,6 +794,10 @@ export default function ProductTabContent({ product: initialProduct, productId }
             {renderCachesCard()}
             {renderMessageBrokersCard()}
             {renderJobsCard()}
+            {renderWorkflowsCard()}
+            {renderVectorsCard()}
+            {renderAgentsCard()}
+            {renderModelsCard()}
             {renderFeaturesCard()}
             {renderFallbacksCard()}
             {renderQuotasCard()}
@@ -711,6 +815,10 @@ export default function ProductTabContent({ product: initialProduct, productId }
         {activeFilter === 'caches' && renderCachesCard()}
         {activeFilter === 'messageBrokers' && renderMessageBrokersCard()}
         {activeFilter === 'jobs' && renderJobsCard()}
+        {activeFilter === 'workflows' && renderWorkflowsCard()}
+        {activeFilter === 'vectors' && renderVectorsCard()}
+        {activeFilter === 'agents' && renderAgentsCard()}
+        {activeFilter === 'models' && renderModelsCard()}
         {activeFilter === 'features' && renderFeaturesCard()}
         {activeFilter === 'fallbacks' && renderFallbacksCard()}
         {activeFilter === 'quotas' && renderQuotasCard()}
@@ -1284,6 +1392,228 @@ export default function ProductTabContent({ product: initialProduct, productId }
             </div>
           )}
         </div>
+    );
+  }
+
+  function renderWorkflowsCard() {
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Workflows</h2>
+            <span className="text-sm text-grey-600">({product?.workflows?.length || 0})</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleAddComponent('workflow')}
+            className="h-8 gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+        {product?.workflows && product?.workflows.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {product?.workflows.map((workflow: any) => (
+              <button
+                key={workflow._id}
+                onClick={() => handleOpenComponent(workflow, 'workflow')}
+                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-violet-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-grey truncate">
+                    {workflow.name || workflow.tag}
+                  </p>
+                </div>
+                {workflow.description && (
+                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
+                    {workflow.description}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <GitBranch className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No workflows added yet</p>
+            <p className="text-xs text-grey-500">
+              Create automated workflows for your product
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderVectorsCard() {
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Boxes className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Vectors</h2>
+            <span className="text-sm text-grey-600">({product?.vectors?.length || 0})</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleAddComponent('vector')}
+            className="h-8 gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+        {product?.vectors && product?.vectors.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {product?.vectors.map((vector: any) => (
+              <button
+                key={vector._id}
+                onClick={() => handleOpenComponent(vector, 'vector')}
+                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Boxes className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-grey truncate">
+                    {vector.name || vector.tag}
+                  </p>
+                </div>
+                {vector.description && (
+                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
+                    {vector.description}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No vector stores added yet</p>
+            <p className="text-xs text-grey-500">
+              Add vector stores for semantic search and embeddings
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderAgentsCard() {
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Bot className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Agents</h2>
+            <span className="text-sm text-grey-600">({product?.agents?.length || 0})</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleAddComponent('agent')}
+            className="h-8 gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+        {product?.agents && product?.agents.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {product?.agents.map((agent: any) => (
+              <button
+                key={agent._id}
+                onClick={() => handleOpenComponent(agent, 'agent')}
+                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-grey truncate">
+                    {agent.name || agent.tag}
+                  </p>
+                </div>
+                {agent.description && (
+                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
+                    {agent.description}
+                  </p>
+                )}
+                {agent.model && (
+                  <p className="text-xs text-grey-500 mt-1">
+                    Model: {typeof agent.model === 'string' ? agent.model : agent.model.model}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Bot className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No agents added yet</p>
+            <p className="text-xs text-grey-500">
+              Create AI agents to automate tasks with LLM capabilities
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderModelsCard() {
+    return (
+      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-grey-600" />
+            <h2 className="text-lg font-semibold text-grey">Models</h2>
+            <span className="text-sm text-grey-600">({product?.models?.length || 0})</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleAddComponent('model')}
+            className="h-8 gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add</span>
+          </Button>
+        </div>
+        {product?.models && product?.models.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {product?.models.map((model: any) => (
+              <button
+                key={model._id}
+                onClick={() => handleOpenComponent(model, 'model')}
+                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-grey truncate">
+                    {model.name || model.tag}
+                  </p>
+                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-grey-100 text-grey-600 uppercase">
+                    {model.provider}
+                  </span>
+                </div>
+                <p className="text-xs text-grey-600 mt-1">
+                  {model.model}
+                </p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Brain className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <p className="text-sm text-grey-600 mb-2">No models configured yet</p>
+            <p className="text-xs text-grey-500">
+              Configure LLM models for your agents to use
+            </p>
+          </div>
+        )}
+      </div>
     );
   }
 

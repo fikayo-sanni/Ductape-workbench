@@ -120,6 +120,8 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
           tag: displayData.tag,
           type: displayData.type,
           env: env,
+          productTag: database?.productTag,
+          productName: database?.productName,
         },
         isExplorer: true,
       },

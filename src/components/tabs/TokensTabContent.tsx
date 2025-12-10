@@ -400,6 +400,7 @@ export default function TokensTabContent() {
       const response = await tokensServices.postTwoFA({
         user_id: user?._id ?? "",
         public_key: user?.public_key ?? "",
+        workspace_id: currentWorkspaceId || "",
         token: otp,
       });
 

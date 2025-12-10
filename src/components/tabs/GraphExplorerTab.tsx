@@ -27,6 +27,18 @@ import {
   Code,
   Tag,
 } from 'lucide-react';
+// Import SDK types for graph operations
+import type {
+  IGraphAction,
+  IGraphActionParameter,
+  GraphActionParameterType,
+  IGraphLabel,
+  IGraphLabelProperty,
+  GraphPropertyType,
+  IGraphRelationshipType,
+  IGraphIndex,
+  IGraphConstraint,
+} from '@ductape/sdk';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -128,22 +140,7 @@ const GRAPH_OPERATIONS: Record<GraphOperation, {
   executeRaw: { label: 'Raw Query', description: 'Execute a raw Cypher/Gremlin/AQL query', color: 'bg-grey/10 text-grey', category: 'raw' },
 };
 
-// Action interface for saved parameterized queries
-interface IGraphAction {
-  id: string;
-  tag: string;          // Auto-generated unique tag
-  name: string;
-  description?: string;
-  operation: string;
-  query: Record<string, any>;
-  parameters: Array<{
-    name: string;
-    path: string;       // JSON path to the value e.g., "options.limit"
-    defaultValue: any;
-    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  }>;
-  createdAt: string;
-}
+// IGraphAction is now imported from SDK
 
 // Helper function to generate tag from name
 const generateActionTag = (name: string): string => {
@@ -221,23 +218,10 @@ const DUMMY_ACTIONS: IGraphAction[] = [
   },
 ];
 
-// Property type definitions
-type PropertyType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'array' | 'point';
-
-interface LabelProperty {
-  name: string;
-  type: PropertyType;
-}
-
-interface LabelDefinition {
-  name: string;
-  count: number;
-  color: string;
-  properties: LabelProperty[];
-}
+// Property types and label definitions now imported from SDK (GraphPropertyType, IGraphLabelProperty, IGraphLabel)
 
 // Dummy data for graph schema based on SDK types
-const DUMMY_LABELS: LabelDefinition[] = [
+const DUMMY_LABELS: IGraphLabel[] = [
   {
     name: 'Person',
     count: 1247,
@@ -317,27 +301,27 @@ const DUMMY_LABELS: LabelDefinition[] = [
   },
 ];
 
-const DUMMY_RELATIONSHIPS = [
-  { type: 'KNOWS', count: 3456, fromLabel: 'Person', toLabel: 'Person' },
-  { type: 'WORKS_AT', count: 1234, fromLabel: 'Person', toLabel: 'Company' },
-  { type: 'PURCHASED', count: 8934, fromLabel: 'Person', toLabel: 'Product' },
-  { type: 'LOCATED_IN', count: 988, fromLabel: 'Company', toLabel: 'Location' },
-  { type: 'BELONGS_TO', count: 2891, fromLabel: 'Product', toLabel: 'Category' },
-  { type: 'CONTAINS', count: 12453, fromLabel: 'Order', toLabel: 'Product' },
+const DUMMY_RELATIONSHIPS: IGraphRelationshipType[] = [
+  { type: 'KNOWS', count: 3456, fromLabels: ['Person'], toLabels: ['Person'] },
+  { type: 'WORKS_AT', count: 1234, fromLabels: ['Person'], toLabels: ['Company'] },
+  { type: 'PURCHASED', count: 8934, fromLabels: ['Person'], toLabels: ['Product'] },
+  { type: 'LOCATED_IN', count: 988, fromLabels: ['Company'], toLabels: ['Location'] },
+  { type: 'BELONGS_TO', count: 2891, fromLabels: ['Product'], toLabels: ['Category'] },
+  { type: 'CONTAINS', count: 12453, fromLabels: ['Order'], toLabels: ['Product'] },
 ];
 
-const DUMMY_CONSTRAINTS = [
-  { name: 'person_email_unique', type: 'UNIQUENESS', entityType: 'NODE', labelsOrTypes: ['Person'], properties: ['email'] },
-  { name: 'company_id_unique', type: 'UNIQUENESS', entityType: 'NODE', labelsOrTypes: ['Company'], properties: ['companyId'] },
-  { name: 'product_sku_unique', type: 'UNIQUENESS', entityType: 'NODE', labelsOrTypes: ['Product'], properties: ['sku'] },
-  { name: 'person_email_exists', type: 'NODE_PROPERTY_EXISTENCE', entityType: 'NODE', labelsOrTypes: ['Person'], properties: ['email'] },
+const DUMMY_CONSTRAINTS: IGraphConstraint[] = [
+  { name: 'person_email_unique', type: 'UNIQUE', label: 'Person', property: 'email' },
+  { name: 'company_id_unique', type: 'UNIQUE', label: 'Company', property: 'companyId' },
+  { name: 'product_sku_unique', type: 'UNIQUE', label: 'Product', property: 'sku' },
+  { name: 'person_email_exists', type: 'EXISTS', label: 'Person', property: 'email' },
 ];
 
-const DUMMY_INDEXES = [
-  { name: 'person_name_index', type: 'RANGE', entityType: 'NODE', labelsOrTypes: ['Person'], properties: ['name'], state: 'ONLINE' },
-  { name: 'product_search_index', type: 'FULLTEXT', entityType: 'NODE', labelsOrTypes: ['Product'], properties: ['name', 'description'], state: 'ONLINE' },
-  { name: 'company_location_index', type: 'POINT', entityType: 'NODE', labelsOrTypes: ['Company'], properties: ['location'], state: 'ONLINE' },
-  { name: 'person_vector_index', type: 'VECTOR', entityType: 'NODE', labelsOrTypes: ['Person'], properties: ['embedding'], state: 'POPULATING' },
+const DUMMY_INDEXES: IGraphIndex[] = [
+  { name: 'person_name_index', type: 'RANGE', labelOrType: 'Person', properties: ['name'], unique: false, state: 'ONLINE' },
+  { name: 'product_search_index', type: 'FULLTEXT', labelOrType: 'Product', properties: ['name', 'description'], unique: false, state: 'ONLINE' },
+  { name: 'company_location_index', type: 'POINT', labelOrType: 'Company', properties: ['location'], unique: false, state: 'ONLINE' },
+  { name: 'person_vector_index', type: 'VECTOR', labelOrType: 'Person', properties: ['embedding'], unique: false, state: 'POPULATING' },
 ];
 
 // Sample query results based on SDK IGraphQueryResult
@@ -486,7 +470,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [queryError, setQueryError] = useState<string | null>(persistedState?.queryError || null);
   const [selectedLabel, setSelectedLabel] = useState<any>(() => {
     if (persistedState?.selectedLabelName) {
-      return DUMMY_LABELS.find((l: LabelDefinition) => l.name === persistedState.selectedLabelName) || null;
+      return DUMMY_LABELS.find((l: IGraphLabel) => l.name === persistedState.selectedLabelName) || null;
     }
     return null;
   });
@@ -570,7 +554,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       queryResult,
       queryError,
       selectedLabelName: selectedLabel?.name,
-      selectedRelTypeName: selectedRelType?.name,
+      selectedRelTypeName: selectedRelType?.type,
       resultsView,
       selectedActionTag: selectedAction?.tag,
       showQueryBuilder,
@@ -1523,9 +1507,9 @@ await ductape.init();`,
                     <span className="text-xs text-grey">{rel.count.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-grey">
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.fromLabel}</span>
+                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.fromLabels?.join(', ') || '-'}</span>
                     <ArrowRight className="h-3 w-3" />
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.toLabel}</span>
+                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.toLabels?.join(', ') || '-'}</span>
                   </div>
                 </button>
               ))}
@@ -1548,11 +1532,11 @@ await ductape.init();`,
                       {constraint.type.replace(/_/g, ' ')}
                     </span>
                     <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                      :{constraint.labelsOrTypes.join(':')}
+                      :{constraint.label}
                     </span>
                   </div>
                   <div className="text-xs text-grey mt-1">
-                    {constraint.properties.join(', ')}
+                    {constraint.property}
                   </div>
                 </div>
               ))}
@@ -1578,7 +1562,7 @@ await ductape.init();`,
                       {index.type}
                     </span>
                     <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                      :{index.labelsOrTypes.join(':')}
+                      :{index.labelOrType}
                     </span>
                   </div>
                   <div className="text-xs text-grey mt-1">
@@ -1795,7 +1779,7 @@ await ductape.init();`,
                         <SelectContent>
                           {DUMMY_RELATIONSHIPS.map((rel) => (
                             <SelectItem key={rel.type} value={rel.type}>
-                              {rel.type} ({rel.fromLabel} → {rel.toLabel})
+                              {rel.type} ({rel.fromLabels?.join('/') || '-'} → {rel.toLabels?.join('/') || '-'})
                             </SelectItem>
                           ))}
                         </SelectContent>

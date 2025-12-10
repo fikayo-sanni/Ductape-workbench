@@ -21,15 +21,16 @@ const getTwoFA = async (data: {
 const postTwoFA = async (data: {
   user_id: string;
   public_key: string;
+  workspace_id: string;
   token: string;
 }): Promise<TokenResponse> => {
-  const { user_id, public_key, token } = data;
+  const { user_id, public_key, workspace_id, token } = data;
   const response = await apiClient.post<TokenResponse>(
     `/users/v1/validate/otp`,
     {
       token,
     },
-    { params: { user_id, public_key } }
+    { params: { user_id, public_key, workspace_id } }
   );
   return response.data;
 };

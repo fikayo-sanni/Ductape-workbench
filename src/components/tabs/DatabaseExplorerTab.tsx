@@ -65,6 +65,9 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDuctapeDatabase } from '@/hooks/useDuctapeDatabase';
+import { useAuth } from '@/store/useAuth';
 
 // Column type definitions
 type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
@@ -730,6 +733,8 @@ interface DatabaseExplorerTabProps {
     name: string;
     tag: string;
     type?: string;
+    productTag?: string;
+    productName?: string;
     env: {
       slug: string;
       connection_url: string;
@@ -739,6 +744,16 @@ interface DatabaseExplorerTabProps {
 
 export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabProps) {
   const { setSidebarCollapsed } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Initialize SDK Database Service
+  const databaseService = useDuctapeDatabase({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+  });
 
   // Collapse workbench sidebar when DatabaseExplorer opens
   useEffect(() => {
@@ -749,7 +764,32 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
                   database.type?.toLowerCase().includes('redis') ||
                   database.type?.toLowerCase().includes('cassandra');
 
-  const tables = isNoSQL ? DUMMY_COLLECTIONS_NOSQL : DUMMY_TABLES_SQL;
+  // Use SDK to fetch tables/collections - fallback to dummy data if SDK not available
+  const { data: sdkTables, isLoading: isLoadingTables } = useQuery({
+    queryKey: ['database-tables', database.productTag, database.tag, database.env.slug],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag) {
+        return null;
+      }
+      try {
+        // Use SDK listTables to get real tables
+        const result = await databaseService.listTables({
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        });
+        return result;
+      } catch (error) {
+        console.error('Error fetching tables:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag,
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
+  // Fallback to dummy data if SDK data is not available
+  const tables = sdkTables || (isNoSQL ? DUMMY_COLLECTIONS_NOSQL : DUMMY_TABLES_SQL);
 
   // Persistent state key
   const stateKey = `db-explorer-state-${database.tag}-${database.env.slug}`;
@@ -961,10 +1001,99 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     'query' | 'insert' | 'update' | 'delete' | 'upsert' | 'count' | 'sum' | 'avg' | 'min' | 'max' | 'aggregate' | 'aggregate-conditional' | 'groupBy' | 'raw'
   >('query');
 
-  // Get current table data
+  // Serialize queryConditions for use in query key (ensures refetch on filter change)
+  const queryConditionsKey = JSON.stringify(queryConditions);
+
+  // SDK Query for fetching table data
+  const { data: sdkTableData, isLoading: isLoadingTableData, refetch: refetchTableData } = useQuery({
+    queryKey: ['table-data', database.productTag, database.tag, database.env.slug, selectedTable?.name, currentPage, pageSize, queryConditionsKey],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        return null;
+      }
+      try {
+        // Build where clause from query conditions
+        const where: Record<string, any> = {};
+        queryConditions.forEach(condition => {
+          if (condition.field && condition.operator && condition.value !== '') {
+            // Map UI operators to SDK operators
+            const operatorMap: Record<string, string> = {
+              '=': '$EQ',
+              '!=': '$NE',
+              '>': '$GT',
+              '<': '$LT',
+              '>=': '$GTE',
+              '<=': '$LTE',
+              'LIKE': '$LIKE',
+              'ILIKE': '$ILIKE',
+              'CONTAINS': '$LIKE',
+              'STARTS_WITH': '$LIKE',
+              'ENDS_WITH': '$LIKE',
+              'IS NULL': '$IS_NULL',
+              'IS NOT NULL': '$IS_NOT_NULL',
+              'BETWEEN': '$BETWEEN',
+              'IN': '$IN',
+              'NOT IN': '$NOT_IN',
+            };
+
+            let value: any = condition.value;
+
+            // Handle LIKE patterns
+            if (condition.operator === 'CONTAINS') {
+              value = `%${condition.value}%`;
+            } else if (condition.operator === 'STARTS_WITH') {
+              value = `${condition.value}%`;
+            } else if (condition.operator === 'ENDS_WITH') {
+              value = `%${condition.value}`;
+            } else if (condition.operator === 'BETWEEN') {
+              // BETWEEN expects an array of two values: [min, max]
+              const parts = condition.value.split(',').map((v: string) => v.trim());
+              if (parts.length === 2) {
+                value = parts;
+              }
+            } else if (condition.operator === 'IN' || condition.operator === 'NOT IN') {
+              // IN/NOT IN expects an array of values
+              value = condition.value.split(',').map((v: string) => v.trim());
+            } else if (condition.operator === 'IS NULL' || condition.operator === 'IS NOT NULL') {
+              // NULL checks don't need a value
+              value = true;
+            }
+
+            const sdkOperator = operatorMap[condition.operator] || '$EQ';
+            where[condition.field] = { [sdkOperator]: value };
+          }
+        });
+
+        const result = await databaseService.query({
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+          table: selectedTable.name,
+          where: Object.keys(where).length > 0 ? where : undefined,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+        });
+
+        return result?.data || [];
+      } catch (error) {
+        console.error('Error fetching table data:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag && !!selectedTable,
+    staleTime: 10000, // Cache for 10 seconds
+  });
+
+  // Get current table data - use SDK data if available, fallback to dummy data
   const getCurrentTableData = () => {
     if (!selectedTable) return [];
 
+    // If SDK data is available, use it
+    if (sdkTableData) {
+      return sdkTableData;
+    }
+
+    // Fallback to dummy data for demo/testing
     const tableDataMap: Record<string, any[]> = {
       users: DUMMY_USERS_DATA,
       products: DUMMY_PRODUCTS_DATA,
@@ -978,8 +1107,10 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const rawTableData = getCurrentTableData();
 
   // Apply search filter and query conditions to table data
+  // Note: When SDK is available, filtering is done server-side, so we only apply client-side
+  // filtering for the search box and when using dummy data
   const tableData = rawTableData.filter(row => {
-    // Apply search filter
+    // Apply search filter (always client-side for quick search)
     if (filterSearch) {
       const matchesSearch = Object.values(row).some(value =>
         String(value || '').toLowerCase().includes(filterSearch.toLowerCase())
@@ -987,27 +1118,65 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
       if (!matchesSearch) return false;
     }
 
-    // Apply query conditions
-    if (queryConditions.length > 0) {
+    // Apply query conditions client-side ONLY when SDK is not available (dummy data mode)
+    // When SDK is available, queryConditions are sent to the server
+    if (!sdkTableData && queryConditions.length > 0) {
       return queryConditions.every(condition => {
-        if (!condition.field || !condition.operator || condition.value === '') return true;
+        if (!condition.field || !condition.operator) return true;
+        // For NULL operators, we don't need a value
+        if (condition.operator !== 'IS NULL' && condition.operator !== 'IS NOT NULL' && condition.value === '') return true;
 
-        const cellValue = String(row[condition.field] || '').toLowerCase();
+        const rawValue = row[condition.field];
+        const cellValue = String(rawValue || '').toLowerCase();
         const conditionValue = condition.value.toLowerCase();
 
         switch (condition.operator) {
+          case '=':
           case 'equals':
             return cellValue === conditionValue;
+          case '!=':
+            return cellValue !== conditionValue;
+          case 'LIKE':
+          case 'ILIKE':
+          case 'CONTAINS':
           case 'contains':
             return cellValue.includes(conditionValue);
+          case 'STARTS_WITH':
           case 'starts_with':
             return cellValue.startsWith(conditionValue);
+          case 'ENDS_WITH':
           case 'ends_with':
             return cellValue.endsWith(conditionValue);
+          case '>':
           case 'greater_than':
             return parseFloat(cellValue) > parseFloat(conditionValue);
+          case '<':
           case 'less_than':
             return parseFloat(cellValue) < parseFloat(conditionValue);
+          case '>=':
+            return parseFloat(cellValue) >= parseFloat(conditionValue);
+          case '<=':
+            return parseFloat(cellValue) <= parseFloat(conditionValue);
+          case 'IS NULL':
+            return rawValue === null || rawValue === undefined || rawValue === '';
+          case 'IS NOT NULL':
+            return rawValue !== null && rawValue !== undefined && rawValue !== '';
+          case 'BETWEEN': {
+            const parts = condition.value.split(',').map((v: string) => parseFloat(v.trim()));
+            if (parts.length === 2) {
+              const numValue = parseFloat(cellValue);
+              return numValue >= parts[0] && numValue <= parts[1];
+            }
+            return true;
+          }
+          case 'IN': {
+            const values = condition.value.split(',').map((v: string) => v.trim().toLowerCase());
+            return values.includes(cellValue);
+          }
+          case 'NOT IN': {
+            const values = condition.value.split(',').map((v: string) => v.trim().toLowerCase());
+            return !values.includes(cellValue);
+          }
           default:
             return true;
         }
@@ -1022,17 +1191,701 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsRefreshing(false);
-    toast.success('Data refreshed');
+    try {
+      // Refetch data from SDK if available
+      if (databaseService && database.productTag && selectedTable) {
+        await refetchTableData();
+      } else {
+        // Fallback delay for demo mode
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+      toast.success('Data refreshed');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast.error('Failed to refresh data');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleSidebarRefresh = async () => {
     setIsSidebarRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSidebarRefreshing(false);
-    toast.success(`${sidebarView.charAt(0).toUpperCase() + sidebarView.slice(1)} list refreshed`);
+    try {
+      // Refetch tables list from SDK if available
+      if (databaseService && database.productTag) {
+        await queryClient.invalidateQueries({
+          queryKey: ['database-tables', database.productTag, database.tag, database.env.slug]
+        });
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+      toast.success(`${sidebarView.charAt(0).toUpperCase() + sidebarView.slice(1)} list refreshed`);
+    } catch (error) {
+      console.error('Error refreshing sidebar:', error);
+      toast.error('Failed to refresh');
+    } finally {
+      setIsSidebarRefreshing(false);
+    }
   };
+
+  // SDK Mutation for inserting data
+  const insertMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.insert({
+        product: database.productTag,
+        database: database.tag,
+        env: database.env.slug,
+        table: selectedTable.name,
+        data: [data],
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-data', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`New record inserted into ${selectedTable?.name}`);
+      setShowInsertDialog(false);
+      setFormData({});
+      setJsonValidationErrors({});
+    },
+    onError: (error) => {
+      console.error('Insert error:', error);
+      toast.error('Failed to insert record');
+    },
+  });
+
+  // SDK Mutation for updating data
+  const updateMutation = useMutation({
+    mutationFn: async ({ data, where }: { data: Record<string, any>; where: Record<string, any> }) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.update({
+        product: database.productTag,
+        database: database.tag,
+        env: database.env.slug,
+        table: selectedTable.name,
+        data,
+        where,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-data', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`Record updated in ${selectedTable?.name}`);
+      setShowEditDialog(false);
+      setFormData({});
+      setSelectedRow(null);
+      setJsonValidationErrors({});
+    },
+    onError: (error) => {
+      console.error('Update error:', error);
+      toast.error('Failed to update record');
+    },
+  });
+
+  // SDK Mutation for deleting data
+  const deleteMutation = useMutation({
+    mutationFn: async (where: Record<string, any>) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.delete({
+        product: database.productTag,
+        database: database.tag,
+        env: database.env.slug,
+        table: selectedTable.name,
+        where,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-data', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`Record deleted from ${selectedTable?.name}`);
+      setShowDeleteDialog(false);
+      setSelectedRow(null);
+    },
+    onError: (error) => {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete record');
+    },
+  });
+
+  // ==================== TABLE SCHEMA MUTATIONS ====================
+
+  // SDK Mutation for creating a table
+  const createTableMutation = useMutation({
+    mutationFn: async (tableDefinition: {
+      name: string;
+      columns: Array<{
+        name: string;
+        type: string;
+        nullable?: boolean;
+        primaryKey?: boolean;
+        unique?: boolean;
+        defaultValue?: any;
+      }>;
+    }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.createTable(
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        },
+        {
+          name: tableDefinition.name,
+          columns: tableDefinition.columns.map(col => ({
+            name: col.name,
+            type: col.type as any,
+            nullable: col.nullable ?? true,
+            primaryKey: col.primaryKey ?? false,
+            unique: col.unique ?? false,
+            defaultValue: col.defaultValue,
+          })),
+        },
+        { ifNotExists: true }
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-tables', database.productTag, database.tag, database.env.slug]
+      });
+      toast.success(`${isNoSQL ? 'Collection' : 'Table'} created successfully`);
+      setShowCreateTableDialog(false);
+      setTableName('');
+      setTableTag('');
+      setTableDescription('');
+      setTableColumns([{ name: 'id', type: 'integer', nullable: false, primaryKey: true, unique: true }]);
+      setTableRelationships([]);
+    },
+    onError: (error) => {
+      console.error('Create table error:', error);
+      toast.error(`Failed to create ${isNoSQL ? 'collection' : 'table'}`);
+    },
+  });
+
+  // SDK Mutation for dropping a table
+  const dropTableMutation = useMutation({
+    mutationFn: async (tableName: string) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.dropTable(
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        },
+        tableName
+      );
+    },
+    onSuccess: (_, tableName) => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-tables', database.productTag, database.tag, database.env.slug]
+      });
+      toast.success(`${isNoSQL ? 'Collection' : 'Table'} "${tableName}" dropped successfully`);
+      if (selectedTable?.name === tableName) {
+        setSelectedTable(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Drop table error:', error);
+      toast.error(`Failed to drop ${isNoSQL ? 'collection' : 'table'}`);
+    },
+  });
+
+  // SDK Mutation for altering table (add columns)
+  const addColumnsMutation = useMutation({
+    mutationFn: async (columns: Array<{
+      name: string;
+      type: string;
+      nullable?: boolean;
+      defaultValue?: any;
+    }>) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.alterTable(
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        },
+        selectedTable.name,
+        columns.map(col => ({
+          type: 'ADD' as any,
+          column: {
+            name: col.name,
+            type: col.type as any,
+            nullable: col.nullable ?? true,
+            defaultValue: col.defaultValue,
+          },
+        }))
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-schema', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`Column(s) added successfully`);
+      setShowAddColumnsDialog(false);
+      setShowAddColumnsConfirm(false);
+      setNewColumns([]);
+    },
+    onError: (error) => {
+      console.error('Add columns error:', error);
+      toast.error('Failed to add columns');
+    },
+  });
+
+  // SDK Mutation for altering table (drop columns)
+  const dropColumnsMutation = useMutation({
+    mutationFn: async (columnNames: string[]) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.alterTable(
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        },
+        selectedTable.name,
+        columnNames.map(colName => ({
+          type: 'DROP' as any,
+          columnName: colName,
+        }))
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-schema', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`Column(s) deleted successfully`);
+      setShowDeleteColumnsDialog(false);
+      setShowDeleteColumnsConfirm(false);
+      setColumnsToDelete([]);
+    },
+    onError: (error) => {
+      console.error('Drop columns error:', error);
+      toast.error('Failed to delete columns');
+    },
+  });
+
+  // ==================== INDEX MUTATIONS ====================
+
+  // SDK Mutation for creating an index
+  const createIndexMutation = useMutation({
+    mutationFn: async (indexDef: {
+      name: string;
+      columns: string[];
+      unique?: boolean;
+    }) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.createIndex({
+        product: database.productTag,
+        database: database.tag,
+        env: database.env.slug,
+        table: selectedTable.name,
+        index: {
+          name: indexDef.name,
+          table: selectedTable.name,
+          columns: indexDef.columns.map(col => ({ name: col })),
+          unique: indexDef.unique ?? false,
+        },
+        ifNotExists: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-indexes', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success('Index created successfully');
+      setShowCreateIndexDialog(false);
+    },
+    onError: (error) => {
+      console.error('Create index error:', error);
+      toast.error('Failed to create index');
+    },
+  });
+
+  // SDK Mutation for dropping an index
+  const dropIndexMutation = useMutation({
+    mutationFn: async (indexName: string) => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.dropIndex({
+        product: database.productTag,
+        database: database.tag,
+        env: database.env.slug,
+        table: selectedTable.name,
+        indexName,
+        ifExists: true,
+      });
+    },
+    onSuccess: (_, indexName) => {
+      queryClient.invalidateQueries({
+        queryKey: ['table-indexes', database.productTag, database.tag, database.env.slug, selectedTable?.name]
+      });
+      toast.success(`Index "${indexName}" dropped successfully`);
+    },
+    onError: (error) => {
+      console.error('Drop index error:', error);
+      toast.error('Failed to drop index');
+    },
+  });
+
+  // SDK Query for listing indexes
+  const { data: tableIndexes, isLoading: isLoadingIndexes, refetch: refetchIndexes } = useQuery({
+    queryKey: ['table-indexes', database.productTag, database.tag, database.env.slug, selectedTable?.name],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag || !selectedTable) {
+        return null;
+      }
+      try {
+        const result = await databaseService.listIndexes({
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+          table: selectedTable.name,
+        });
+        return result;
+      } catch (error) {
+        console.error('Error fetching indexes:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag && !!selectedTable && showViewIndexesDialog,
+    staleTime: 10000,
+  });
+
+  // ==================== MIGRATION MUTATIONS ====================
+
+  // SDK Query for fetching migrations
+  const { data: sdkMigrations, isLoading: isLoadingMigrations, refetch: refetchMigrations } = useQuery({
+    queryKey: ['database-migrations', database.productTag, database.tag],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag) {
+        return null;
+      }
+      try {
+        const result = await databaseService.migration.fetchAll({
+          product: database.productTag,
+          database: database.tag,
+        });
+        return result;
+      } catch (error) {
+        console.error('Error fetching migrations:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag,
+    staleTime: 30000,
+  });
+
+  // SDK Query for migration history (which migrations have been run)
+  const { data: migrationHistory, refetch: refetchMigrationHistory } = useQuery({
+    queryKey: ['migration-history', database.productTag, database.tag, database.env.slug],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag) {
+        return null;
+      }
+      try {
+        const result = await databaseService.getMigrationHistory({
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        });
+        return result;
+      } catch (error) {
+        console.error('Error fetching migration history:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag,
+    staleTime: 30000,
+  });
+
+  // SDK Mutation for running a migration
+  const runMigrationMutation = useMutation({
+    mutationFn: async (migration: { tag: string; name: string; value: { up: Array<string | object>; down: Array<string | object> } }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.runMigration(
+        {
+          tag: migration.tag,
+          name: migration.name,
+          up: migration.value.up,
+          down: migration.value.down,
+        },
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        }
+      );
+    },
+    onSuccess: (result, migration) => {
+      queryClient.invalidateQueries({
+        queryKey: ['migration-history', database.productTag, database.tag, database.env.slug]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['database-tables', database.productTag, database.tag, database.env.slug]
+      });
+      toast.success(`Migration "${migration.name}" completed successfully`);
+    },
+    onError: (error, migration) => {
+      console.error('Run migration error:', error);
+      toast.error(`Failed to run migration "${migration.name}"`);
+    },
+  });
+
+  // SDK Mutation for rolling back a migration
+  const rollbackMigrationMutation = useMutation({
+    mutationFn: async (migration: { tag: string; name: string; value: { up: Array<string | object>; down: Array<string | object> } }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.rollbackMigration(
+        {
+          tag: migration.tag,
+          name: migration.name,
+          up: migration.value.up,
+          down: migration.value.down,
+        },
+        {
+          product: database.productTag,
+          database: database.tag,
+          env: database.env.slug,
+        }
+      );
+    },
+    onSuccess: (result, migration) => {
+      queryClient.invalidateQueries({
+        queryKey: ['migration-history', database.productTag, database.tag, database.env.slug]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['database-tables', database.productTag, database.tag, database.env.slug]
+      });
+      toast.success(`Migration "${migration.name}" rolled back successfully`);
+    },
+    onError: (error, migration) => {
+      console.error('Rollback migration error:', error);
+      toast.error(`Failed to rollback migration "${migration.name}"`);
+    },
+  });
+
+  // SDK Mutation for creating a migration
+  const createMigrationMutation = useMutation({
+    mutationFn: async (migrationData: {
+      name: string;
+      tag: string;
+      description?: string;
+      value: { up: Array<string | object>; down: Array<string | object> };
+    }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.migration.create({
+        product: database.productTag,
+        database: database.tag,
+        data: migrationData,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-migrations', database.productTag, database.tag]
+      });
+      toast.success('Migration created successfully');
+    },
+    onError: (error) => {
+      console.error('Create migration error:', error);
+      toast.error('Failed to create migration');
+    },
+  });
+
+  // SDK Mutation for deleting a migration
+  const deleteMigrationMutation = useMutation({
+    mutationFn: async (tag: string) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.migration.delete({
+        product: database.productTag,
+        tag,
+      });
+    },
+    onSuccess: (_, tag) => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-migrations', database.productTag, database.tag]
+      });
+      toast.success('Migration deleted successfully');
+      if (selectedMigration?.tag === tag) {
+        setSelectedMigration(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Delete migration error:', error);
+      toast.error('Failed to delete migration');
+    },
+  });
+
+  // ==================== ACTION MUTATIONS ====================
+
+  // SDK Query for fetching database actions
+  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery({
+    queryKey: ['database-actions', database.productTag, database.tag],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag) {
+        return null;
+      }
+      try {
+        const result = await databaseService.action.fetchAll(`${database.productTag}:${database.tag}`);
+        return result;
+      } catch (error) {
+        console.error('Error fetching actions:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag,
+    staleTime: 30000,
+  });
+
+  // SDK Mutation for creating an action
+  const createActionMutation = useMutation({
+    mutationFn: async (actionData: {
+      name: string;
+      tag: string;
+      tableName: string;
+      operation: string;
+      description?: string;
+      template: any;
+      filterTemplate?: any;
+    }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.action.create({
+        name: actionData.name,
+        tag: `${database.productTag}:${database.tag}:${actionData.tag}`,
+        tableName: actionData.tableName,
+        operation: actionData.operation,
+        description: actionData.description,
+        template: actionData.template,
+        filterTemplate: actionData.filterTemplate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-actions', database.productTag, database.tag]
+      });
+      toast.success('Action created successfully');
+      setShowSaveActionModal(false);
+    },
+    onError: (error) => {
+      console.error('Create action error:', error);
+      toast.error('Failed to create action');
+    },
+  });
+
+  // SDK Mutation for updating an action
+  const updateActionMutation = useMutation({
+    mutationFn: async (actionData: {
+      tag: string;
+      name?: string;
+      description?: string;
+      template?: any;
+      filterTemplate?: any;
+    }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.action.update({
+        tag: actionData.tag,
+        name: actionData.name,
+        description: actionData.description,
+        template: actionData.template,
+        filterTemplate: actionData.filterTemplate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-actions', database.productTag, database.tag]
+      });
+      toast.success('Action updated successfully');
+    },
+    onError: (error) => {
+      console.error('Update action error:', error);
+      toast.error('Failed to update action');
+    },
+  });
+
+  // SDK Mutation for deleting an action
+  const deleteActionMutation = useMutation({
+    mutationFn: async (tag: string) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.action.delete(tag);
+    },
+    onSuccess: (_, tag) => {
+      queryClient.invalidateQueries({
+        queryKey: ['database-actions', database.productTag, database.tag]
+      });
+      toast.success('Action deleted successfully');
+      if (selectedAction?.tag === tag) {
+        setSelectedAction(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Delete action error:', error);
+      toast.error('Failed to delete action');
+    },
+  });
+
+  // SDK Mutation for executing an action
+  const executeActionMutation = useMutation({
+    mutationFn: async (options: {
+      product: string;
+      database: string;
+      action: string;
+      input: Record<string, any>;
+    }) => {
+      if (!databaseService || !database.productTag) {
+        throw new Error('SDK not available');
+      }
+      return databaseService.execute({
+        product: options.product,
+        database: options.database,
+        action: options.action,
+        env: database.env.slug,
+        input: options.input,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Action executed successfully');
+      // Optionally refresh table data if the action modified data
+      queryClient.invalidateQueries({
+        queryKey: ['table-data', database.productTag, database.tag, database.env.slug]
+      });
+    },
+    onError: (error) => {
+      console.error('Execute action error:', error);
+      toast.error('Failed to execute action');
+    },
+  });
 
   const handleInsertOpen = () => {
     const emptyData: Record<string, any> = {};
@@ -1071,17 +1924,22 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
         try {
           processedData[key] = JSON.parse(processedData[key]);
         } catch (error) {
-          // This shouldn't happen as we've already validated, but just in case
           console.error(`Failed to parse JSON for column ${key}:`, error);
         }
       }
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    toast.success(`New record inserted into ${selectedTable?.name}`);
-    setShowInsertDialog(false);
-    setFormData({});
-    setJsonValidationErrors({});
+    // Use SDK mutation if available, otherwise use demo mode
+    if (databaseService && database.productTag && selectedTable) {
+      insertMutation.mutate(processedData);
+    } else {
+      // Fallback demo mode
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success(`New record inserted into ${selectedTable?.name}`);
+      setShowInsertDialog(false);
+      setFormData({});
+      setJsonValidationErrors({});
+    }
   };
 
   const handleUpdate = async () => {
@@ -1099,25 +1957,42 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
         try {
           processedData[key] = JSON.parse(processedData[key]);
         } catch (error) {
-          // This shouldn't happen as we've already validated, but just in case
           console.error(`Failed to parse JSON for column ${key}:`, error);
         }
       }
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    toast.success(`Record updated in ${selectedTable?.name}`);
-    setShowEditDialog(false);
-    setFormData({});
-    setSelectedRow(null);
-    setJsonValidationErrors({});
+    // Use SDK mutation if available, otherwise use demo mode
+    if (databaseService && database.productTag && selectedTable && selectedRow) {
+      // Build where clause from the original row's primary key (id or _id)
+      const primaryKey = selectedRow.id !== undefined ? 'id' : '_id';
+      const where = { [primaryKey]: selectedRow[primaryKey] };
+      updateMutation.mutate({ data: processedData, where });
+    } else {
+      // Fallback demo mode
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success(`Record updated in ${selectedTable?.name}`);
+      setShowEditDialog(false);
+      setFormData({});
+      setSelectedRow(null);
+      setJsonValidationErrors({});
+    }
   };
 
   const handleDelete = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    toast.success(`Record deleted from ${selectedTable?.name}`);
-    setShowDeleteDialog(false);
-    setSelectedRow(null);
+    // Use SDK mutation if available, otherwise use demo mode
+    if (databaseService && database.productTag && selectedTable && selectedRow) {
+      // Build where clause from the row's primary key
+      const primaryKey = selectedRow.id !== undefined ? 'id' : '_id';
+      const where = { [primaryKey]: selectedRow[primaryKey] };
+      deleteMutation.mutate(where);
+    } else {
+      // Fallback demo mode
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success(`Record deleted from ${selectedTable?.name}`);
+      setShowDeleteDialog(false);
+      setSelectedRow(null);
+    }
   };
 
   const handleCreateTable = async () => {
@@ -1134,18 +2009,27 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
       return;
     }
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const relationshipText = !isNoSQL && tableRelationships.length > 0
-      ? ` and ${tableRelationships.length} relationship${tableRelationships.length > 1 ? 's' : ''}`
-      : '';
-    toast.success(`${isNoSQL ? 'Collection' : 'Table'} "${tableName}" created successfully with ${tableColumns.length} columns${relationshipText}`);
-    setShowCreateTableDialog(false);
-    // Reset form
-    setTableName('');
-    setTableTag('');
-    setTableDescription('');
-    setTableColumns([{ name: 'id', type: 'integer', nullable: false, primaryKey: true, unique: true }]);
-    setTableRelationships([]);
+    // Use SDK mutation if available
+    if (databaseService && database.productTag) {
+      createTableMutation.mutate({
+        name: tableName,
+        columns: tableColumns,
+      });
+    } else {
+      // Fallback demo mode
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const relationshipText = !isNoSQL && tableRelationships.length > 0
+        ? ` and ${tableRelationships.length} relationship${tableRelationships.length > 1 ? 's' : ''}`
+        : '';
+      toast.success(`${isNoSQL ? 'Collection' : 'Table'} "${tableName}" created successfully with ${tableColumns.length} columns${relationshipText}`);
+      setShowCreateTableDialog(false);
+      // Reset form
+      setTableName('');
+      setTableTag('');
+      setTableDescription('');
+      setTableColumns([{ name: 'id', type: 'integer', nullable: false, primaryKey: true, unique: true }]);
+      setTableRelationships([]);
+    }
   };
 
   const generateTableTag = () => {
@@ -1206,11 +2090,17 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   };
 
   const confirmAddColumns = () => {
-    toast.success(`${newColumns.length} column(s) added successfully`);
-    setShowAddColumnsConfirm(false);
-    setShowAddColumnsDialog(false);
-    // Reset new columns
-    setNewColumns([]);
+    // Use SDK mutation if available
+    if (databaseService && database.productTag && selectedTable) {
+      addColumnsMutation.mutate(newColumns);
+    } else {
+      // Fallback demo mode
+      toast.success(`${newColumns.length} column(s) added successfully`);
+      setShowAddColumnsConfirm(false);
+      setShowAddColumnsDialog(false);
+      // Reset new columns
+      setNewColumns([]);
+    }
   };
 
   // Helper functions for edit columns management
@@ -1264,10 +2154,16 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   };
 
   const confirmDeleteColumns = () => {
-    toast.success(`${columnsToDelete.length} column(s) deleted successfully`);
-    setShowDeleteColumnsConfirm(false);
-    setShowDeleteColumnsDialog(false);
-    setColumnsToDelete([]);
+    // Use SDK mutation if available
+    if (databaseService && database.productTag && selectedTable) {
+      dropColumnsMutation.mutate(columnsToDelete);
+    } else {
+      // Fallback demo mode
+      toast.success(`${columnsToDelete.length} column(s) deleted successfully`);
+      setShowDeleteColumnsConfirm(false);
+      setShowDeleteColumnsDialog(false);
+      setColumnsToDelete([]);
+    }
   };
 
   const addRelationship = () => {
@@ -1290,10 +2186,48 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     setTableRelationships(newRelationships);
   };
 
-  const handleRunMigration = async (migration: typeof DUMMY_MIGRATIONS[0]) => {
-    toast.success(`Running migration: ${migration.name}...`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success(`Migration ${migration.name} completed`);
+  const handleRunMigration = async (migration: any) => {
+    // Use SDK mutation if available
+    if (databaseService && database.productTag && migration.value) {
+      toast.info(`Running migration: ${migration.name}...`);
+      runMigrationMutation.mutate({
+        tag: migration.tag,
+        name: migration.name,
+        value: migration.value,
+      });
+    } else {
+      // Fallback demo mode
+      toast.success(`Running migration: ${migration.name}...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success(`Migration ${migration.name} completed`);
+    }
+  };
+
+  const handleRollbackMigration = async (migration: any) => {
+    // Use SDK mutation if available
+    if (databaseService && database.productTag && migration.value) {
+      toast.info(`Rolling back migration: ${migration.name}...`);
+      rollbackMigrationMutation.mutate({
+        tag: migration.tag,
+        name: migration.name,
+        value: migration.value,
+      });
+    } else {
+      // Fallback demo mode
+      toast.success(`Rolling back migration: ${migration.name}...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success(`Migration ${migration.name} rolled back`);
+    }
+  };
+
+  const handleDeleteMigration = async (migration: any) => {
+    // Use SDK mutation if available
+    if (databaseService && database.productTag) {
+      deleteMigrationMutation.mutate(migration.tag);
+    } else {
+      // Fallback demo mode
+      toast.success(`Migration ${migration.name} deleted`);
+    }
   };
 
   // Helper to build where clause with proper operator handling
@@ -1515,27 +2449,58 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
     const actionTag = generateActionTag(actionName);
 
-    const newAction: IDatabaseAction = {
-      id: `action_${Date.now()}`,
-      tag: actionTag,
-      name: actionName,
-      description: actionDescription || undefined,
-      operation: generatedQuery.operation,
-      query: parameterizedQuery,
-      parameters: selectedParams.map(p => ({
-        name: p.paramName,
-        path: p.path,
-        defaultValue: p.value,
-        type: p.type as 'string' | 'number' | 'boolean' | 'array' | 'object',
-      })),
-      createdAt: new Date().toISOString(),
-    };
+    // Use SDK mutation if available
+    if (databaseService && database.productTag) {
+      createActionMutation.mutate({
+        name: actionName,
+        tag: actionTag,
+        tableName: generatedQuery.table || selectedTable?.name || '',
+        operation: generatedQuery.operation,
+        description: actionDescription || undefined,
+        template: parameterizedQuery,
+      });
+      // Also update local state for immediate UI feedback
+      const newAction: IDatabaseAction = {
+        id: `action_${Date.now()}`,
+        tag: actionTag,
+        name: actionName,
+        description: actionDescription || undefined,
+        operation: generatedQuery.operation,
+        query: parameterizedQuery,
+        parameters: selectedParams.map((p: any) => ({
+          name: p.paramName,
+          path: p.path,
+          defaultValue: p.value,
+          type: p.type as 'string' | 'number' | 'boolean' | 'array' | 'object',
+        })),
+        createdAt: new Date().toISOString(),
+      };
+      setSelectedAction(newAction);
+      setShowQueryBuilder(false);
+    } else {
+      // Fallback demo mode
+      const newAction: IDatabaseAction = {
+        id: `action_${Date.now()}`,
+        tag: actionTag,
+        name: actionName,
+        description: actionDescription || undefined,
+        operation: generatedQuery.operation,
+        query: parameterizedQuery,
+        parameters: selectedParams.map((p: any) => ({
+          name: p.paramName,
+          path: p.path,
+          defaultValue: p.value,
+          type: p.type as 'string' | 'number' | 'boolean' | 'array' | 'object',
+        })),
+        createdAt: new Date().toISOString(),
+      };
 
-    setSavedActions([newAction, ...savedActions]);
-    setShowSaveActionModal(false);
-    setSelectedAction(newAction); // Show the newly created action
-    setShowQueryBuilder(false);
-    toast.success(`Action "${actionName}" saved with tag: ${actionTag}`);
+      setSavedActions([newAction, ...savedActions]);
+      setShowSaveActionModal(false);
+      setSelectedAction(newAction);
+      setShowQueryBuilder(false);
+      toast.success(`Action "${actionName}" saved with tag: ${actionTag}`);
+    }
   };
 
   // Open execute action modal
@@ -1553,34 +2518,53 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const handleExecuteAction = async () => {
     if (!selectedAction) return;
 
-    let query = JSON.parse(JSON.stringify(selectedAction.query));
+    // Use SDK mutation if available
+    if (databaseService && database.productTag) {
+      setShowExecuteActionModal(false);
+      toast.info(`Executing action: ${selectedAction.name}...`);
+      executeActionMutation.mutate({
+        product: database.productTag,
+        database: database.tag,
+        action: selectedAction.tag,
+        input: actionParamValues,
+      });
+    } else {
+      // Fallback demo mode
+      let query = JSON.parse(JSON.stringify(selectedAction.query));
 
-    const setNestedValue = (obj: any, path: string, value: any) => {
-      const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
-      let current = obj;
-      for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]];
-      }
-      current[keys[keys.length - 1]] = value;
-    };
+      const setNestedValue = (obj: any, path: string, value: any) => {
+        const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        let current = obj;
+        for (let i = 0; i < keys.length - 1; i++) {
+          current = current[keys[i]];
+        }
+        current[keys[keys.length - 1]] = value;
+      };
 
-    selectedAction.parameters.forEach(param => {
-      setNestedValue(query, param.path, actionParamValues[param.name]);
-    });
+      selectedAction.parameters.forEach((param: any) => {
+        setNestedValue(query, param.path, actionParamValues[param.name]);
+      });
 
-    setShowExecuteActionModal(false);
-    toast.success(`Executing action: ${selectedAction.name}...`);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    toast.success(`Action ${selectedAction.name} completed`);
+      setShowExecuteActionModal(false);
+      toast.success(`Executing action: ${selectedAction.name}...`);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      toast.success(`Action ${selectedAction.name} completed`);
+    }
   };
 
   // Delete action
-  const handleDeleteAction = (actionId: string) => {
-    setSavedActions(savedActions.filter(a => a.id !== actionId));
-    if (selectedAction?.id === actionId) {
-      setSelectedAction(null);
+  const handleDeleteAction = (action: IDatabaseAction) => {
+    // Use SDK mutation if available
+    if (databaseService && database.productTag) {
+      deleteActionMutation.mutate(action.tag);
+    } else {
+      // Fallback demo mode
+      setSavedActions(savedActions.filter((a: any) => a.id !== action.id));
+      if (selectedAction?.id === action.id) {
+        setSelectedAction(null);
+      }
+      toast.success('Action deleted');
     }
-    toast.success('Action deleted');
   };
 
   // Load action - show action details (not query builder)
@@ -1636,10 +2620,22 @@ await ductape.init();`,
     return [];
   };
 
+  // Use SDK actions if available, otherwise fall back to local saved actions
+  const allActions = sdkActions ? sdkActions.map((a: any) => ({
+    id: a.tag,
+    tag: a.tag,
+    name: a.name,
+    description: a.description,
+    operation: a.operation,
+    query: a.template,
+    parameters: [],
+    createdAt: a.createdAt || new Date().toISOString(),
+  })) : savedActions;
+
   // Filter actions
-  const filteredActions = savedActions.filter(a =>
+  const filteredActions = allActions.filter((a: any) =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.operation.toLowerCase().includes(searchQuery.toLowerCase())
+    a.operation?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // State for expandable JSON cells (tracks individual cells for independent expansion)
@@ -2517,7 +3513,20 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredMigrations = DUMMY_MIGRATIONS.filter(m =>
+  // Use SDK migrations if available, otherwise fall back to dummy data
+  const migrations = sdkMigrations || DUMMY_MIGRATIONS;
+
+  // Combine migration data with history to determine status
+  const migrationsWithStatus = migrations.map((m: any) => {
+    const historyEntry = migrationHistory?.find((h: any) => h.tag === m.tag);
+    return {
+      ...m,
+      status: historyEntry ? 'completed' : 'pending',
+      appliedAt: historyEntry?.appliedAt,
+    };
+  });
+
+  const filteredMigrations = migrationsWithStatus.filter((m: any) =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.tag.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -2755,7 +3764,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteAction(action.id);
+                            handleDeleteAction(action);
                           }}
                           className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
                           title="Delete action"
@@ -3470,7 +4479,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                   <Button
                     variant="outline"
                     onClick={() => {
-                      handleDeleteAction(selectedAction.id);
+                      handleDeleteAction(selectedAction);
                     }}
                     className="gap-2 text-red hover:text-red hover:bg-red/10"
                   >
@@ -5954,9 +6963,20 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                 ] : [])
               ];
 
-              return dummyIndexes.length > 0 ? (
+              const indexes = tableIndexes || dummyIndexes;
+
+              if (isLoadingIndexes) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                    <span className="ml-2 text-sm text-grey-600">Loading indexes...</span>
+                  </div>
+                );
+              }
+
+              return indexes.length > 0 ? (
                 <div className="space-y-3">
-                  {dummyIndexes.map((index, idx) => (
+                  {indexes.map((index: any, idx: number) => (
                     <div key={idx} className="border border-grey-300 rounded-lg p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -5964,21 +6984,23 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                             <h4 className="text-sm font-semibold text-grey">{index.name}</h4>
                             <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                               index.type === 'PRIMARY' ? 'bg-blue-100 text-blue-700' :
-                              index.type === 'UNIQUE' ? 'bg-purple-100 text-purple-700' :
+                              index.type === 'UNIQUE' || index.unique ? 'bg-purple-100 text-purple-700' :
                               'bg-grey-100 text-grey-700'
                             }`}>
-                              {index.type}
+                              {index.type || (index.unique ? 'UNIQUE' : 'INDEX')}
                             </span>
                           </div>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-xs text-grey-600">
                               <span className="font-medium">Columns:</span>
-                              <span className="font-mono">{index.columns.join(', ')}</span>
+                              <span className="font-mono">{Array.isArray(index.columns) ? index.columns.map((c: any) => typeof c === 'string' ? c : c.name).join(', ') : index.columns}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-grey-600">
-                              <span className="font-medium">Method:</span>
-                              <span>{index.method}</span>
-                            </div>
+                            {index.method && (
+                              <div className="flex items-center gap-2 text-xs text-grey-600">
+                                <span className="font-medium">Method:</span>
+                                <span>{index.method}</span>
+                              </div>
+                            )}
                             {index.unique && (
                               <div className="flex items-center gap-1 text-xs text-grey-600">
                                 <Check className="h-3 w-3 text-green-600" />
@@ -5987,7 +7009,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                             )}
                           </div>
                         </div>
-                        {index.type !== 'PRIMARY' && (
+                        {index.type !== 'PRIMARY' && !index.name?.includes('pkey') && (
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
@@ -6002,7 +7024,13 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                               size="sm"
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                               title="Drop Index"
-                              onClick={() => toast.success(`Index "${index.name}" dropped successfully`)}
+                              onClick={() => {
+                                if (databaseService && database.productTag) {
+                                  dropIndexMutation.mutate(index.name);
+                                } else {
+                                  toast.success(`Index "${index.name}" dropped successfully`);
+                                }
+                              }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

@@ -528,7 +528,7 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
   const CurrentComponent = currentStepData.component;
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onSkip(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
