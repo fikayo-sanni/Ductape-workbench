@@ -30,6 +30,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import pricingServices from '@/services/pricingServices';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/store/useAuth';
+// import { PricingPlan } from '@/types/pricing';
 
 // Pricing types based on backend pricing service
 enum PricingMode {
@@ -776,6 +781,7 @@ const bundleFormSchema = z.object({
 type BundleFormValues = z.infer<typeof bundleFormSchema>;
 
 export default function PricingTabContent() {
+  const {currentWorkspaceId, user} = useAuth();
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>(DUMMY_PRICING_BUNDLES);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
@@ -799,6 +805,8 @@ export default function PricingTabContent() {
 
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const handleMonthClick = (incomeId: string) => {
     setExpandedMonth(expandedMonth === incomeId ? null : incomeId);
@@ -867,13 +875,44 @@ export default function PricingTabContent() {
     }
   };
 
-  const onSubmit = (data: BundleFormValues) => {
-    const limits: PricingBundle['limits'] = {};
-    if (data.per_minute) limits.per_minute = data.per_minute;
-    if (data.per_hour) limits.per_hour = data.per_hour;
-    if (data.per_day) limits.per_day = data.per_day;
-    if (data.per_week) limits.per_week = data.per_week;
-    if (data.per_month) limits.per_month = data.per_month;
+  const useCreateBundle = useMutation({
+    mutationFn: pricingServices.createBundle,
+    onSuccess: newBundle => {
+      
+      if (newBundle) {
+        toast.success('Bundle created successfully');
+        form.reset();
+      }
+
+       queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+      
+    },
+    onError: error => {
+      console.error('Error creating bundle:', error);
+      toast.error('Failed to create bundle');
+    },
+  });
+
+  const onSubmit = async (data: BundleFormValues) => {
+    // Prepare limits object
+    const limits: Record<string, number> = {};
+    if (data.per_minute) limits.per_minute = data.per_minute || 0;
+    if (data.per_hour) limits.per_hour = data.per_hour || 0;
+    if (data.per_day) limits.per_day = data.per_day || 0;
+    if (data.per_week) limits.per_week = data.per_week || 0;
+    if (data.per_month) limits.per_month = data.per_month || 0;
+
+    // Prepare API payload
+    const payload = {
+      name: data.name,
+      pricing_mode: data.pricing_mode,
+      interval: data.interval,
+      unit_price: data.unit_price,
+      currency: data.currency,
+      overage_price: data.overage_price,
+      ...limits,
+    };
+
 
     if (editingBundle) {
       // Update existing bundle
@@ -892,17 +931,12 @@ export default function PricingTabContent() {
       ));
     } else {
       // Add new bundle
-      const newBundle: PricingBundle = {
-        _id: `price_${Date.now()}`,
-        name: data.name,
-        pricing_mode: data.pricing_mode,
-        interval: data.interval,
-        unit_price: data.unit_price,
-        currency: data.currency,
-        limits: Object.keys(limits).length > 0 ? limits : undefined,
-        created_at: new Date().toISOString(),
-      };
-      setPricingBundles([...pricingBundles, newBundle]);
+      useCreateBundle.mutate({
+        user_id: user?._id || "",
+        public_key: user?.public_key || "",
+        workspace_id: currentWorkspaceId || "",
+        payload,
+      });
     }
 
     setBundleFormOpen(false);
