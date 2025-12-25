@@ -54,7 +54,7 @@ const componentTypes = [
   { id: 'database', name: 'Database' },
   { id: 'storage', name: 'Storage' },
   { id: 'cache', name: 'Cache' },
-  { id: 'broker', name: 'Message Broker' },
+  { id: 'broker', name: 'Messaging' },
   { id: 'job', name: 'Job' },
 ];
 

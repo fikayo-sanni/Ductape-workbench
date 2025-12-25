@@ -32,16 +32,24 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
     type: 'product',
   });
 
+  // Check if this is dummy data (dummy data has _id starting with 'dummy-')
+  const isDummyData = message?._id?.startsWith('dummy-');
+
   // Fetch message details from SDK
   const { data: messageData, isLoading } = useQuery({
     queryKey: ['message', productTag, notifierTag, message?.tag],
     queryFn: async () => {
       if (!ductape || !productTag || !notifierTag || !message?.tag) return null;
-      const productBuilder = ductape as any;
-      await productBuilder.init(productTag);
-      return await productBuilder.notifications.messages.fetch(message.tag);
+      try {
+        const productBuilder = ductape as any;
+        await productBuilder.init(productTag);
+        return await productBuilder.notifications.messages.fetch(message.tag);
+      } catch (error) {
+        console.warn('Failed to fetch message details:', error);
+        return message;
+      }
     },
-    enabled: !!ductape && !!productTag && !!notifierTag && !!message?.tag,
+    enabled: !!ductape && !!productTag && !!notifierTag && !!message?.tag && !isDummyData,
   });
 
   const displayData = messageData || message;
@@ -562,7 +570,7 @@ sms.put("body", smsBody);`
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`input.put("slug", "${messageTag}");`);
       if (hasPushNotification) inputParts.push('input.put("push_notification", pushNotification);');
       if (hasEmail) inputParts.push('input.put("email", email);');
@@ -655,7 +663,7 @@ ${Object.entries(pushData).map(([key, value]) => `  ${key}: ${JSON.stringify(val
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`  slug: '${messageTag}'`);
       if (hasPushNotification) inputParts.push('  push_notification: push_notification');
       if (hasEmail) inputParts.push('  email: email');
@@ -750,7 +758,7 @@ ${Object.entries(pushData).map(([key, value]) => `    '${key}' => ${JSON.stringi
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`    'slug' => '${messageTag}'`);
       if (hasPushNotification) inputParts.push("    'push_notification' => $pushNotification");
       if (hasEmail) inputParts.push("    'email' => $email");
@@ -843,7 +851,7 @@ ${Object.entries(pushData).map(([key, value]) => `    "${key}" to ${JSON.stringi
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`    "slug" to "${messageTag}"`);
       if (hasPushNotification) inputParts.push('    "push_notification" to pushNotification');
       if (hasEmail) inputParts.push('    "email" to email');
@@ -941,7 +949,7 @@ ${Object.entries(pushData).map(([key, value]) => `    "${key}": ${JSON.stringify
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`    "slug": "${messageTag}",`);
       if (hasPushNotification) inputParts.push('    "push_notification": pushNotification,');
       if (hasEmail) inputParts.push('    "email": email,');
@@ -1045,7 +1053,7 @@ ${Object.entries(pushData).map(([key, value]) => `    ["${key}"] = ${JSON.string
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`    ["slug"] = "${messageTag}"`);
       if (hasPushNotification) inputParts.push('    ["push_notification"] = pushNotification');
       if (hasEmail) inputParts.push('    ["email"] = email');
@@ -1137,7 +1145,7 @@ sms.insert("body".to_string(), serde_json::json!(sms_body));`
         });
       }
 
-      const inputParts = [];
+      const inputParts: string[] = [];
       inputParts.push(`input.insert("slug".to_string(), serde_json::json!("${messageTag}"));`);
       if (hasPushNotification) inputParts.push('input.insert("push_notification".to_string(), serde_json::json!(push_notification));');
       if (hasEmail) inputParts.push('input.insert("email".to_string(), serde_json::json!(email));');

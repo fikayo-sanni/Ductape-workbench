@@ -255,7 +255,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
                   </span>
                 </div>
                 <p className="text-sm text-grey-600">
-                  This topic will be automatically connected to your message broker for {productName}
+                  This topic will be automatically connected to your messaging for {productName}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-grey-600">
@@ -275,7 +275,7 @@ export default function NewMessageBrokerTopicContent({ tabId, data }: NewMessage
             <div>
               <h1 className="text-2xl font-bold text-grey">Create New Topic</h1>
               <p className="text-sm text-grey-600">
-                {messageBroker?.name ? `Adding to ${messageBroker.name}` : 'Configure topic/queue for message broker'}
+                {messageBroker?.name ? `Adding to ${messageBroker.name}` : 'Configure topic/queue for messaging'}
               </p>
             </div>
           </div>

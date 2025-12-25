@@ -10,6 +10,9 @@ import { Tab } from '@/types/tab';
 import { deleteTabState, cleanupOldTabStates } from '@/lib/tab-state-manager';
 
 interface WorkbenchState {
+  // Hydration state
+  _hasHydrated: boolean;
+
   // Workspaces
   workspaces: Workspace[];
   currentWorkspaceId: string | null;
@@ -101,6 +104,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   persist(
     (set) => ({
   // Initial State
+  _hasHydrated: false,
   workspaces: [],
   currentWorkspaceId: null,
   projects: [],
@@ -514,6 +518,9 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         activeTabId: state.activeTabId,
         chatbotSidebarOpen: state.chatbotSidebarOpen,
       }),
+      onRehydrateStorage: () => () => {
+        useWorkbenchStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

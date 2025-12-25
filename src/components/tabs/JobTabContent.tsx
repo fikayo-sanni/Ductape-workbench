@@ -23,16 +23,25 @@ export default function JobTabContent({ job }: JobTabContentProps) {
     type: 'product',
   });
 
-  // Fetch job details from SDK
+  // Check if this is dummy data (dummy data has _id starting with 'dummy-')
+  const isDummyData = job?._id?.startsWith('dummy-');
+
+  // Fetch job details from SDK (skip for dummy data)
   const { data: jobData, isLoading } = useQuery({
     queryKey: ['job', productTag, job?.tag],
     queryFn: async () => {
       if (!ductape || !productTag || !job?.tag) return job;
-      const productBuilder = ductape as any;
-      await productBuilder.init(productTag);
-      return await productBuilder.jobs?.fetch(job.tag);
+      try {
+        const productBuilder = ductape as any;
+        await productBuilder.init(productTag);
+        return await productBuilder.jobs?.fetch(job.tag);
+      } catch (error) {
+        // Return original job data if fetch fails
+        console.warn('Failed to fetch job details:', error);
+        return job;
+      }
     },
-    enabled: !!ductape && !!productTag && !!job?.tag,
+    enabled: !!ductape && !!productTag && !!job?.tag && !isDummyData,
   });
 
   const displayData = jobData || job;
@@ -203,8 +212,8 @@ export default function JobTabContent({ job }: JobTabContentProps) {
       'notification': 'Notification',
       'function': 'Function',
       'storage': 'Storage',
-      'publish': 'Message Broker',
-      'message-broker': 'Message Broker',
+      'publish': 'Messaging',
+      'message-broker': 'Messaging',
       'fallback': 'Fallback',
       'quota': 'Quota',
       'feature': 'Feature',

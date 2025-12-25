@@ -1,23 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Boxes,
   Search,
   RefreshCw,
   Loader2,
+  AlertCircle,
   Plus,
+  Play,
+  Zap,
+  Table2,
+  Save,
+  Bookmark,
+  Trash2,
+  Check,
   Settings2,
+  X,
   Code,
   Tag,
-  Trash2,
+  Hash,
+  FileText,
   Upload,
   Download,
   Filter,
   ChevronRight,
   Database,
-  FileText,
-  Hash,
   Sparkles,
   Target,
+  Layers,
+  Copy,
+  MoreHorizontal,
+  ArrowUpDown,
+  Eye,
+  EyeOff,
+  Braces,
+  BarChart3,
+  Gauge,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Grid3X3,
+  List,
+  ArrowLeft,
+  Activity,
+  Server,
+  Cpu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +59,8 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -37,7 +68,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -48,117 +78,265 @@ interface VectorExplorerTabProps {
   vector: {
     name: string;
     tag: string;
-    productTag: string;
-    env: {
+    type?: string;
+    productTag?: string;
+    productName?: string;
+    dimensions?: number;
+    metric?: string;
+    env?: {
       slug: string;
+      endpoint?: string;
+      index?: string;
+      namespace?: string;
     };
+    envs?: Array<{ slug: string; active?: boolean }>;
   };
 }
 
-type SidebarView = 'collections' | 'documents';
+type SidebarView = 'namespaces' | 'actions';
+type MainView = 'overview' | 'namespace' | 'vector' | 'query' | 'results';
 
-// Vector collection types
-interface VectorCollection {
+// Vector operation types based on SDK VectorDatabaseService
+type VectorOperation =
+  | 'upsert'
+  | 'upsertOne'
+  | 'query'
+  | 'findSimilar'
+  | 'fetch'
+  | 'fetchOne'
+  | 'update'
+  | 'deleteByIds'
+  | 'deleteByFilter'
+  | 'deleteAll'
+  | 'list'
+  | 'count'
+  | 'exists'
+  | 'listNamespaces'
+  | 'getStats'
+  | 'describeIndex';
+
+// Vector operations configuration
+const VECTOR_OPERATIONS: Record<VectorOperation, {
+  label: string;
+  description: string;
+  color: string;
+  category: 'write' | 'read' | 'search' | 'delete' | 'info';
+}> = {
+  // Write operations
+  upsert: { label: 'Upsert Vectors', description: 'Insert or update multiple vectors', color: 'bg-green/10 text-green', category: 'write' },
+  upsertOne: { label: 'Upsert One', description: 'Insert or update a single vector', color: 'bg-green/10 text-green', category: 'write' },
+  update: { label: 'Update Metadata', description: 'Update vector metadata by ID', color: 'bg-yellow/10 text-yellow', category: 'write' },
+
+  // Search operations
+  query: { label: 'Query', description: 'Perform semantic similarity search', color: 'bg-primary/10 text-primary', category: 'search' },
+  findSimilar: { label: 'Find Similar', description: 'Find similar vectors with optional filters', color: 'bg-primary/10 text-primary', category: 'search' },
+
+  // Read operations
+  fetch: { label: 'Fetch Vectors', description: 'Fetch multiple vectors by IDs', color: 'bg-blue/10 text-blue', category: 'read' },
+  fetchOne: { label: 'Fetch One', description: 'Fetch a single vector by ID', color: 'bg-blue/10 text-blue', category: 'read' },
+  list: { label: 'List Vectors', description: 'List vectors in a namespace', color: 'bg-blue/10 text-blue', category: 'read' },
+  exists: { label: 'Check Exists', description: 'Check if a vector exists', color: 'bg-blue/10 text-blue', category: 'read' },
+  count: { label: 'Count', description: 'Count vectors in namespace', color: 'bg-blue/10 text-blue', category: 'read' },
+
+  // Delete operations
+  deleteByIds: { label: 'Delete by IDs', description: 'Delete vectors by their IDs', color: 'bg-red/10 text-red', category: 'delete' },
+  deleteByFilter: { label: 'Delete by Filter', description: 'Delete vectors matching filter', color: 'bg-red/10 text-red', category: 'delete' },
+  deleteAll: { label: 'Delete All', description: 'Delete all vectors in namespace', color: 'bg-red/10 text-red', category: 'delete' },
+
+  // Info operations
+  listNamespaces: { label: 'List Namespaces', description: 'List all namespaces/collections', color: 'bg-grey/10 text-grey', category: 'info' },
+  getStats: { label: 'Get Stats', description: 'Get index statistics', color: 'bg-grey/10 text-grey', category: 'info' },
+  describeIndex: { label: 'Describe Index', description: 'Get index configuration', color: 'bg-grey/10 text-grey', category: 'info' },
+};
+
+// Vector action interface
+interface IVectorAction {
   id: string;
-  name: string;
   tag: string;
+  name: string;
   description?: string;
-  dimensions: number;
-  metric: 'cosine' | 'euclidean' | 'dotproduct';
-  documentCount: number;
-  indexType: string;
+  operation: VectorOperation;
+  query: Record<string, any>;
+  parameters: Array<{
+    name: string;
+    path: string;
+    defaultValue: any;
+    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  }>;
   createdAt: string;
 }
 
-interface VectorDocument {
+// Namespace/Collection interface
+interface VectorNamespace {
+  name: string;
+  vectorCount: number;
+  dimensions?: number;
+  metric?: string;
+  status: 'ready' | 'indexing' | 'error';
+}
+
+// Vector record interface
+interface VectorRecord {
   id: string;
-  collectionId: string;
-  content: string;
-  metadata: Record<string, any>;
-  embedding?: number[];
+  values?: number[];
+  metadata?: Record<string, any>;
   score?: number;
-  createdAt: string;
+  sparseValues?: { indices: number[]; values: number[] };
 }
 
-// Dummy collections data
-const DUMMY_COLLECTIONS: VectorCollection[] = [
+// Index stats interface
+interface IndexStats {
+  totalVectorCount: number;
+  namespaces: Record<string, { vectorCount: number }>;
+  dimension: number;
+  indexFullness: number;
+  totalIndexSize?: string;
+}
+
+// Helper function to generate tag from name
+const generateActionTag = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+// Sample saved actions
+const DUMMY_ACTIONS: IVectorAction[] = [
   {
-    id: 'col_1',
-    name: 'Product Descriptions',
-    tag: 'product-descriptions',
-    description: 'Product catalog embeddings for semantic search',
-    dimensions: 1536,
-    metric: 'cosine',
-    documentCount: 2847,
-    indexType: 'HNSW',
-    createdAt: '2024-02-15T10:00:00Z',
+    id: 'action_1',
+    tag: 'search-products',
+    name: 'Search Products',
+    description: 'Semantic search for products by description',
+    operation: 'query',
+    query: {
+      operation: 'query',
+      options: {
+        namespace: '{{namespace}}',
+        topK: 10,
+        includeMetadata: true,
+        filter: { category: '{{category}}' }
+      }
+    },
+    parameters: [
+      { name: 'namespace', path: 'options.namespace', defaultValue: 'products', type: 'string' },
+      { name: 'category', path: 'options.filter.category', defaultValue: 'electronics', type: 'string' }
+    ],
+    createdAt: '2024-03-15T10:30:00Z'
   },
   {
-    id: 'col_2',
-    name: 'Support Articles',
-    tag: 'support-articles',
-    description: 'Knowledge base articles for customer support',
-    dimensions: 1536,
-    metric: 'cosine',
-    documentCount: 456,
-    indexType: 'HNSW',
-    createdAt: '2024-02-20T14:30:00Z',
-  },
-  {
-    id: 'col_3',
-    name: 'User Preferences',
-    tag: 'user-preferences',
-    description: 'User behavior embeddings for recommendations',
-    dimensions: 768,
-    metric: 'dotproduct',
-    documentCount: 12453,
-    indexType: 'IVF',
-    createdAt: '2024-03-01T09:00:00Z',
-  },
-  {
-    id: 'col_4',
-    name: 'Code Snippets',
-    tag: 'code-snippets',
-    description: 'Code examples and documentation embeddings',
-    dimensions: 1024,
-    metric: 'cosine',
-    documentCount: 891,
-    indexType: 'HNSW',
-    createdAt: '2024-03-10T11:15:00Z',
+    id: 'action_2',
+    tag: 'fetch-user-embeddings',
+    name: 'Fetch User Embeddings',
+    description: 'Fetch embeddings for specific user IDs',
+    operation: 'fetch',
+    query: {
+      operation: 'fetch',
+      options: {
+        namespace: 'users',
+        ids: ['{{userId}}'],
+        includeMetadata: true
+      }
+    },
+    parameters: [
+      { name: 'userId', path: 'options.ids[0]', defaultValue: 'user_001', type: 'string' }
+    ],
+    createdAt: '2024-03-14T15:20:00Z'
   },
 ];
 
-// Dummy documents data
-const DUMMY_DOCUMENTS: VectorDocument[] = [
-  {
-    id: 'doc_1',
-    collectionId: 'col_1',
-    content: 'Premium wireless headphones with noise cancellation and 30-hour battery life',
-    metadata: { productId: 'prod_123', category: 'electronics', price: 299.99 },
-    createdAt: '2024-03-15T10:30:00Z',
-  },
-  {
-    id: 'doc_2',
-    collectionId: 'col_1',
-    content: 'Ergonomic office chair with lumbar support and adjustable armrests',
-    metadata: { productId: 'prod_456', category: 'furniture', price: 449.99 },
-    createdAt: '2024-03-15T11:00:00Z',
-  },
-  {
-    id: 'doc_3',
-    collectionId: 'col_2',
-    content: 'How to reset your password: Go to settings > Security > Change password',
-    metadata: { articleId: 'art_001', topic: 'account', views: 5432 },
-    createdAt: '2024-03-14T09:00:00Z',
-  },
-  {
-    id: 'doc_4',
-    collectionId: 'col_2',
-    content: 'Troubleshooting connection issues: Check your internet, restart the app',
-    metadata: { articleId: 'art_002', topic: 'technical', views: 3211 },
-    createdAt: '2024-03-14T10:30:00Z',
-  },
+// Sample namespaces
+const DUMMY_NAMESPACES: VectorNamespace[] = [
+  { name: 'default', vectorCount: 15432, dimensions: 1536, metric: 'cosine', status: 'ready' },
+  { name: 'products', vectorCount: 8291, dimensions: 1536, metric: 'cosine', status: 'ready' },
+  { name: 'users', vectorCount: 3456, dimensions: 768, metric: 'dotproduct', status: 'ready' },
+  { name: 'documents', vectorCount: 12087, dimensions: 1536, metric: 'cosine', status: 'indexing' },
+  { name: 'images', vectorCount: 5623, dimensions: 512, metric: 'euclidean', status: 'ready' },
 ];
+
+// Sample vectors for display
+const DUMMY_VECTORS: VectorRecord[] = [
+  { id: 'vec_001', metadata: { title: 'Introduction to AI', category: 'tech', author: 'John Doe' }, score: 0.95 },
+  { id: 'vec_002', metadata: { title: 'Machine Learning Basics', category: 'tech', author: 'Jane Smith' }, score: 0.89 },
+  { id: 'vec_003', metadata: { title: 'Neural Networks Deep Dive', category: 'tech', author: 'Bob Wilson' }, score: 0.87 },
+  { id: 'vec_004', metadata: { title: 'Data Science Handbook', category: 'data', author: 'Alice Brown' }, score: 0.82 },
+  { id: 'vec_005', metadata: { title: 'Python for AI', category: 'programming', author: 'Charlie Davis' }, score: 0.79 },
+];
+
+// Sample query results
+const SAMPLE_QUERY_RESULTS = {
+  success: true,
+  executionTime: 42,
+  matches: DUMMY_VECTORS,
+};
+
+// SDK-style query templates
+const getDefaultQuery = () => JSON.stringify({
+  operation: 'query',
+  options: {
+    namespace: 'default',
+    topK: 10,
+    includeMetadata: true,
+    includeValues: false,
+  }
+}, null, 2);
+
+const getNamespaceQuery = (namespace: string) => JSON.stringify({
+  operation: 'list',
+  options: {
+    namespace: namespace,
+    limit: 100,
+    includeMetadata: true,
+  }
+}, null, 2);
+
+const getVectorFetchQuery = (id: string, namespace: string) => JSON.stringify({
+  operation: 'fetchOne',
+  options: {
+    id: id,
+    namespace: namespace,
+    includeMetadata: true,
+    includeValues: true,
+  }
+}, null, 2);
+
+// Helper functions
+const getVectorDBDisplayName = (type?: string) => {
+  if (!type) return 'Vector DB';
+  const map: Record<string, string> = {
+    pinecone: 'Pinecone',
+    weaviate: 'Weaviate',
+    qdrant: 'Qdrant',
+    milvus: 'Milvus',
+    chroma: 'Chroma',
+    memory: 'In-Memory',
+  };
+  return map[type.toLowerCase()] || type;
+};
+
+const getMetricDisplayName = (metric?: string) => {
+  if (!metric) return 'Unknown';
+  const map: Record<string, string> = {
+    cosine: 'Cosine Similarity',
+    euclidean: 'Euclidean Distance',
+    dotproduct: 'Dot Product',
+    manhattan: 'Manhattan Distance',
+  };
+  return map[metric.toLowerCase()] || metric;
+};
+
+const getVectorTypeColor = (type?: string) => {
+  if (!type) return 'bg-grey-100 text-grey-600';
+  const map: Record<string, string> = {
+    pinecone: 'bg-emerald-100 text-emerald-700',
+    weaviate: 'bg-pink-100 text-pink-700',
+    qdrant: 'bg-red-100 text-red-700',
+    milvus: 'bg-blue-100 text-blue-700',
+    chroma: 'bg-orange-100 text-orange-700',
+    memory: 'bg-purple-100 text-purple-700',
+  };
+  return map[type.toLowerCase()] || 'bg-grey-100 text-grey-600';
+};
 
 export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const { setSidebarCollapsed } = useWorkbenchStore();
@@ -168,567 +346,1966 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
-  // State
-  const [sidebarView, setSidebarView] = useState<SidebarView>('collections');
+  // Persistent state key
+  const stateKey = `vector-explorer-state-${vector.tag}-${vector.env?.slug || 'default'}`;
+
+  // Load persisted state from localStorage
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedState = getPersistedState();
+
+  // Main view state
+  const [mainView, setMainView] = useState<MainView>(persistedState?.mainView || 'overview');
+  const [sidebarView, setSidebarView] = useState<SidebarView>(persistedState?.sidebarView || 'namespaces');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState<VectorCollection | null>(null);
-  const [selectedDocument, setSelectedDocument] = useState<VectorDocument | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showAddDocModal, setShowAddDocModal] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
 
-  // Search modal state
-  const [semanticQuery, setSemanticQuery] = useState('');
-  const [topK, setTopK] = useState(5);
-  const [searchResults, setSearchResults] = useState<VectorDocument[]>([]);
+  // Selected items
+  const [selectedNamespace, setSelectedNamespace] = useState<VectorNamespace | null>(() => {
+    if (persistedState?.selectedNamespaceName) {
+      return DUMMY_NAMESPACES.find(n => n.name === persistedState.selectedNamespaceName) || null;
+    }
+    return null;
+  });
+  const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(null);
+  const [selectedAction, setSelectedAction] = useState<IVectorAction | null>(() => {
+    if (persistedState?.selectedActionTag) {
+      return DUMMY_ACTIONS.find(a => a.tag === persistedState.selectedActionTag) || null;
+    }
+    return null;
+  });
 
-  // Add document modal state
-  const [newDocContent, setNewDocContent] = useState('');
-  const [newDocMetadata, setNewDocMetadata] = useState('{}');
-  const [isAddingDoc, setIsAddingDoc] = useState(false);
+  // Query state
+  const [queryInput, setQueryInput] = useState(persistedState?.queryInput || getDefaultQuery());
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
+  const [queryResult, setQueryResult] = useState<any>(persistedState?.queryResult || null);
+  const [queryError, setQueryError] = useState<string | null>(persistedState?.queryError || null);
+  const [resultsView, setResultsView] = useState<'table' | 'json' | 'cards'>(persistedState?.resultsView || 'table');
 
-  // Filter documents based on selected collection
-  const filteredDocuments = selectedCollection
-    ? DUMMY_DOCUMENTS.filter(doc => doc.collectionId === selectedCollection.id)
-    : [];
+  // Modal states
+  const [showSaveActionModal, setShowSaveActionModal] = useState(false);
+  const [showExecuteActionModal, setShowExecuteActionModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
 
-  // Filter collections based on search
-  const filteredCollections = DUMMY_COLLECTIONS.filter(col =>
-    col.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    col.tag.toLowerCase().includes(searchQuery.toLowerCase())
+  // Query Builder state
+  const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
+  const [queryBuilderOperation, setQueryBuilderOperation] = useState<VectorOperation>(persistedState?.queryBuilderOperation || 'query');
+  const [queryBuilderNamespace, setQueryBuilderNamespace] = useState(persistedState?.queryBuilderNamespace || '');
+  const [queryBuilderTopK, setQueryBuilderTopK] = useState(persistedState?.queryBuilderTopK || '10');
+  const [queryBuilderIncludeMetadata, setQueryBuilderIncludeMetadata] = useState(persistedState?.queryBuilderIncludeMetadata ?? true);
+  const [queryBuilderIncludeValues, setQueryBuilderIncludeValues] = useState(persistedState?.queryBuilderIncludeValues ?? false);
+  const [queryBuilderFilters, setQueryBuilderFilters] = useState<Array<{ field: string; operator: string; value: string }>>(
+    persistedState?.queryBuilderFilters || []
   );
+  const [queryBuilderIds, setQueryBuilderIds] = useState(persistedState?.queryBuilderIds || '');
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
-    toast.success('Refreshed vector data');
+  // Actions state
+  const [savedActions, setSavedActions] = useState<IVectorAction[]>(DUMMY_ACTIONS);
+
+  // Save action form state
+  const [actionName, setActionName] = useState('');
+  const [actionDescription, setActionDescription] = useState('');
+  const [extractedValues, setExtractedValues] = useState<Array<{
+    path: string;
+    value: any;
+    type: string;
+    selected: boolean;
+    paramName: string;
+  }>>([]);
+
+  // Execute action form state
+  const [actionParamValues, setActionParamValues] = useState<Record<string, any>>({});
+
+  // Loading states
+  const [isLoadingNamespace, setIsLoadingNamespace] = useState(false);
+  const [isLoadingVector, setIsLoadingVector] = useState(false);
+
+  // Persist state to localStorage
+  useEffect(() => {
+    const stateToSave = {
+      mainView,
+      sidebarView,
+      queryInput,
+      queryResult,
+      queryError,
+      selectedNamespaceName: selectedNamespace?.name,
+      resultsView,
+      selectedActionTag: selectedAction?.tag,
+      showQueryBuilder,
+      queryBuilderOperation,
+      queryBuilderNamespace,
+      queryBuilderTopK,
+      queryBuilderIncludeMetadata,
+      queryBuilderIncludeValues,
+      queryBuilderFilters,
+      queryBuilderIds,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [
+    stateKey,
+    mainView,
+    sidebarView,
+    queryInput,
+    queryResult,
+    queryError,
+    selectedNamespace,
+    resultsView,
+    selectedAction,
+    showQueryBuilder,
+    queryBuilderOperation,
+    queryBuilderNamespace,
+    queryBuilderTopK,
+    queryBuilderIncludeMetadata,
+    queryBuilderIncludeValues,
+    queryBuilderFilters,
+    queryBuilderIds,
+  ]);
+
+  // Filter namespaces based on search
+  const filteredNamespaces = useMemo(() => {
+    return DUMMY_NAMESPACES.filter(ns =>
+      ns.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery]);
+
+  // Filter vectors based on selected namespace
+  const filteredVectors = useMemo(() => {
+    if (!selectedNamespace) return [];
+    return DUMMY_VECTORS.filter(v =>
+      v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.metadata && JSON.stringify(v.metadata).toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [selectedNamespace, searchQuery]);
+
+  // Filter actions based on search
+  const filteredActions = useMemo(() => {
+    return savedActions.filter(a =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.tag.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [savedActions, searchQuery]);
+
+  // Calculate total stats
+  const totalStats = useMemo(() => {
+    const total = DUMMY_NAMESPACES.reduce((acc, ns) => acc + ns.vectorCount, 0);
+    const avgDimensions = Math.round(
+      DUMMY_NAMESPACES.reduce((acc, ns) => acc + (ns.dimensions || 0), 0) / DUMMY_NAMESPACES.length
+    );
+    return { totalVectors: total, avgDimensions, namespaceCount: DUMMY_NAMESPACES.length };
+  }, []);
+
+  // Handle namespace selection
+  const handleSelectNamespace = async (namespace: VectorNamespace) => {
+    setSelectedNamespace(namespace);
+    setSelectedVector(null);
+    setMainView('namespace');
+    setQueryBuilderNamespace(namespace.name);
+
+    // Simulate loading namespace data
+    setIsLoadingNamespace(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsLoadingNamespace(false);
+
+    // Update query to list vectors in this namespace
+    setQueryInput(getNamespaceQuery(namespace.name));
   };
 
-  const handleSemanticSearch = async () => {
-    if (!selectedCollection || !semanticQuery.trim()) return;
+  // Handle vector selection
+  const handleSelectVector = async (vec: VectorRecord) => {
+    setSelectedVector(vec);
+    setMainView('vector');
 
-    setIsSearching(true);
+    // Simulate loading vector data
+    setIsLoadingVector(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setIsLoadingVector(false);
+
+    // Update query to fetch this vector
+    if (selectedNamespace) {
+      setQueryInput(getVectorFetchQuery(vec.id, selectedNamespace.name));
+    }
+  };
+
+  // Handle action selection
+  const handleLoadAction = (action: IVectorAction) => {
+    setSelectedAction(action);
+    setQueryInput(JSON.stringify(action.query, null, 2));
+    setMainView('query');
+    setShowQueryBuilder(false);
+
+    // If action has parameters, open execute modal
+    if (action.parameters.length > 0) {
+      const defaultValues: Record<string, any> = {};
+      action.parameters.forEach(p => {
+        defaultValues[p.name] = p.defaultValue;
+      });
+      setActionParamValues(defaultValues);
+      setShowExecuteActionModal(true);
+    }
+  };
+
+  // Handle refresh sidebar
+  const handleRefreshSidebar = async () => {
+    setIsSidebarRefreshing(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsSidebarRefreshing(false);
+    toast.success('Data refreshed');
+  };
+
+  // Handle execute query
+  const handleExecuteQuery = async () => {
+    if (!queryInput.trim()) {
+      toast.error('Please enter a query');
+      return;
+    }
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Simulate search results with scores
-      const results = filteredDocuments.slice(0, topK).map((doc, idx) => ({
-        ...doc,
-        score: 0.95 - (idx * 0.05),
-      }));
-
-      setSearchResults(results);
-      toast.success(`Found ${results.length} similar documents`);
-    } catch (error) {
-      toast.error('Search failed');
-    } finally {
-      setIsSearching(false);
+      JSON.parse(queryInput);
+    } catch {
+      toast.error('Invalid JSON query format');
+      return;
     }
-  };
 
-  const handleAddDocument = async () => {
-    if (!selectedCollection || !newDocContent.trim()) return;
+    setIsExecuting(true);
+    setQueryError(null);
+    setQueryResult(null);
 
-    setIsAddingDoc(true);
     try {
-      // Validate JSON metadata
-      JSON.parse(newDocMetadata);
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      toast.success('Document added successfully');
-      setShowAddDocModal(false);
-      setNewDocContent('');
-      setNewDocMetadata('{}');
-    } catch (error) {
-      toast.error('Invalid metadata JSON');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setQueryResult(SAMPLE_QUERY_RESULTS);
+      setMainView('results');
+      toast.success(`Query executed in ${SAMPLE_QUERY_RESULTS.executionTime}ms`);
+    } catch (error: any) {
+      setQueryError(error.message || 'Failed to execute query');
+      toast.error('Failed to execute query');
     } finally {
-      setIsAddingDoc(false);
+      setIsExecuting(false);
     }
   };
 
-  const getMetricLabel = (metric: string) => {
-    switch (metric) {
-      case 'cosine':
-        return 'Cosine Similarity';
-      case 'euclidean':
-        return 'Euclidean Distance';
-      case 'dotproduct':
-        return 'Dot Product';
-      default:
-        return metric;
+  // Copy to clipboard
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  // Go back to overview
+  const handleBackToOverview = () => {
+    setMainView('overview');
+    setSelectedNamespace(null);
+    setSelectedVector(null);
+    setSelectedAction(null);
+  };
+
+  // Extract parameterizable values from query
+  const extractParameterizableValues = useCallback((obj: any, path = ''): Array<{
+    path: string;
+    value: any;
+    type: string;
+  }> => {
+    const results: Array<{ path: string; value: any; type: string }> = [];
+
+    const processValue = (key: string, value: any, currentPath: string) => {
+      const fullPath = currentPath ? `${currentPath}.${key}` : key;
+
+      if (value === null || value === undefined) return;
+
+      if (Array.isArray(value)) {
+        if (value.every(v => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) {
+          results.push({ path: fullPath, value, type: 'array' });
+        } else {
+          value.forEach((item, idx) => {
+            if (typeof item === 'object' && item !== null) {
+              results.push(...extractParameterizableValues(item, `${fullPath}[${idx}]`));
+            }
+          });
+        }
+      } else if (typeof value === 'object') {
+        results.push(...extractParameterizableValues(value, fullPath));
+      } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        results.push({ path: fullPath, value, type: typeof value });
+      }
+    };
+
+    Object.entries(obj).forEach(([key, value]) => {
+      if (key === 'operation') return;
+      processValue(key, value, path);
+    });
+
+    return results;
+  }, []);
+
+  // Generate parameter name from path
+  const generateParamName = (path: string): string => {
+    const parts = path.split('.');
+    const lastPart = parts[parts.length - 1];
+    return lastPart.replace(/\[\d+\]/g, '');
+  };
+
+  // Open save action modal
+  const handleOpenSaveActionModal = () => {
+    try {
+      const query = JSON.parse(queryInput);
+      const values = extractParameterizableValues(query);
+      setExtractedValues(values.map(v => ({
+        ...v,
+        selected: false,
+        paramName: generateParamName(v.path),
+      })));
+      setActionName('');
+      setActionDescription('');
+      setShowSaveActionModal(true);
+    } catch {
+      toast.error('Invalid JSON query - cannot extract parameters');
     }
   };
 
-  return (
-    <div className="flex h-full bg-grey-100">
-      {/* Sidebar */}
-      <div className="w-72 border-r border-grey-400 bg-white flex flex-col">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Boxes className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold text-grey">Vector Explorer</h2>
-          </div>
+  // Save action
+  const handleSaveAction = () => {
+    if (!actionName.trim()) {
+      toast.error('Please enter an action name');
+      return;
+    }
 
-          {/* Environment Badge */}
-          <div className="flex items-center gap-2 text-xs text-grey-600 mb-3">
-            <span className="px-2 py-1 rounded bg-primary/10 text-primary font-medium">
-              {vector.env.slug}
-            </span>
-            <span>{vector.productTag}</span>
-          </div>
+    try {
+      const query = JSON.parse(queryInput);
+      const selectedParams = extractedValues.filter(v => v.selected);
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-500" />
-            <Input
-              placeholder="Search collections..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
+      let parameterizedQuery = JSON.parse(JSON.stringify(query));
+
+      const setNestedValue = (obj: any, path: string, value: any) => {
+        const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        let current = obj;
+        for (let i = 0; i < keys.length - 1; i++) {
+          current = current[keys[i]];
+        }
+        current[keys[keys.length - 1]] = value;
+      };
+
+      selectedParams.forEach(param => {
+        setNestedValue(parameterizedQuery, param.path, `{{${param.paramName}}}`);
+      });
+
+      const actionTag = generateActionTag(actionName);
+
+      const newAction: IVectorAction = {
+        id: `action_${Date.now()}`,
+        tag: actionTag,
+        name: actionName,
+        description: actionDescription || undefined,
+        operation: query.operation,
+        query: parameterizedQuery,
+        parameters: selectedParams.map(p => ({
+          name: p.paramName,
+          path: p.path,
+          defaultValue: p.value,
+          type: p.type as any,
+        })),
+        createdAt: new Date().toISOString(),
+      };
+
+      setSavedActions([...savedActions, newAction]);
+      setShowSaveActionModal(false);
+      toast.success(`Action "${actionName}" saved`);
+    } catch {
+      toast.error('Failed to save action');
+    }
+  };
+
+  // Execute action with parameters
+  const handleExecuteAction = async () => {
+    if (!selectedAction) return;
+
+    let queryWithParams = JSON.parse(JSON.stringify(selectedAction.query));
+
+    const replaceParams = (obj: any): any => {
+      if (typeof obj === 'string') {
+        const match = obj.match(/^\{\{(\w+)\}\}$/);
+        if (match && actionParamValues[match[1]] !== undefined) {
+          return actionParamValues[match[1]];
+        }
+        return obj;
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(replaceParams);
+      }
+      if (typeof obj === 'object' && obj !== null) {
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          result[key] = replaceParams(value);
+        }
+        return result;
+      }
+      return obj;
+    };
+
+    queryWithParams = replaceParams(queryWithParams);
+    setQueryInput(JSON.stringify(queryWithParams, null, 2));
+    setShowExecuteActionModal(false);
+
+    // Execute the query
+    await handleExecuteQuery();
+  };
+
+  // Generate code sections for CodeSidebar
+  const generateCodeSections = (language: string, env?: string) => {
+    const productTag = vector.productTag || 'your-product';
+    const envSlug = env || vector.env?.slug || 'prd';
+    const vectorTag = vector.tag;
+    const namespace = selectedNamespace?.name || 'default';
+
+    return [
+      {
+        title: 'Semantic Search',
+        code: `const results = await ductape.vector.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  vector: '${vectorTag}',
+  queryVector: embeddings, // Your query embedding
+  topK: 10,
+  namespace: '${namespace}',
+  includeMetadata: true,
+});`,
+      },
+      {
+        title: 'Upsert Vectors',
+        code: `await ductape.vector.upsert({
+  product: '${productTag}',
+  env: '${envSlug}',
+  vector: '${vectorTag}',
+  vectors: [
+    {
+      id: 'vec_001',
+      values: embeddings, // Your embedding array
+      metadata: { key: 'value' },
+    }
+  ],
+  namespace: '${namespace}',
+});`,
+      },
+      {
+        title: 'Fetch by IDs',
+        code: `const vectors = await ductape.vector.fetch({
+  product: '${productTag}',
+  env: '${envSlug}',
+  vector: '${vectorTag}',
+  ids: ['vec_001', 'vec_002'],
+  namespace: '${namespace}',
+});`,
+      },
+      {
+        title: 'Initialize SDK',
+        code: `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspaceId: 'your-workspace-id',
+  publicKey: 'your-public-key',
+  secretKey: 'your-secret-key',
+});
+
+await ductape.init();`,
+      },
+    ];
+  };
+
+  // Render namespace status badge
+  const renderNamespaceStatus = (status: VectorNamespace['status']) => {
+    switch (status) {
+      case 'ready':
+        return (
+          <span className="flex items-center gap-1 text-xs text-green">
+            <CheckCircle2 className="h-3 w-3" />
+            Ready
+          </span>
+        );
+      case 'indexing':
+        return (
+          <span className="flex items-center gap-1 text-xs text-yellow-600">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Indexing
+          </span>
+        );
+      case 'error':
+        return (
+          <span className="flex items-center gap-1 text-xs text-red">
+            <XCircle className="h-3 w-3" />
+            Error
+          </span>
+        );
+    }
+  };
+
+  // Render overview content
+  const renderOverview = () => (
+    <div className="flex-1 overflow-auto p-6 space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-grey-400 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Database className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-grey">{totalStats.totalVectors.toLocaleString()}</div>
+              <div className="text-xs text-grey-500">Total Vectors</div>
+            </div>
           </div>
         </div>
+        <div className="bg-white rounded-xl border border-grey-400 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
+              <Layers className="h-5 w-5 text-blue" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-grey">{totalStats.namespaceCount}</div>
+              <div className="text-xs text-grey-500">Namespaces</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-grey-400 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+              <Hash className="h-5 w-5 text-green" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-grey">{totalStats.avgDimensions}</div>
+              <div className="text-xs text-grey-500">Avg Dimensions</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-grey-400 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+              <Bookmark className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-grey">{savedActions.length}</div>
+              <div className="text-xs text-grey-500">Saved Actions</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* View Tabs */}
-        <div className="flex border-b border-grey-400">
-          {(['collections', 'documents'] as SidebarView[]).map((view) => (
+      {/* Quick Actions */}
+      <div>
+        <h3 className="text-sm font-semibold text-grey mb-3">Quick Actions</h3>
+        <div className="grid grid-cols-4 gap-3">
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => {
+              setMainView('query');
+              setQueryBuilderOperation('query');
+              setShowQueryBuilder(true);
+            }}
+          >
+            <Search className="h-5 w-5 text-primary" />
+            <span className="text-sm">Semantic Search</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => {
+              setMainView('query');
+              setQueryBuilderOperation('upsert');
+              setShowQueryBuilder(true);
+            }}
+          >
+            <Upload className="h-5 w-5 text-green" />
+            <span className="text-sm">Upsert Vectors</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => {
+              setMainView('query');
+              setQueryBuilderOperation('fetch');
+              setShowQueryBuilder(true);
+            }}
+          >
+            <Download className="h-5 w-5 text-blue" />
+            <span className="text-sm">Fetch Vectors</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => {
+              setMainView('query');
+              setQueryBuilderOperation('getStats');
+              setShowQueryBuilder(true);
+            }}
+          >
+            <BarChart3 className="h-5 w-5 text-orange-500" />
+            <span className="text-sm">Get Stats</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Namespaces Overview */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-grey">Namespaces</h3>
+          <Button variant="ghost" size="sm" onClick={handleRefreshSidebar}>
+            <RefreshCw className={cn('h-4 w-4', isSidebarRefreshing && 'animate-spin')} />
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {DUMMY_NAMESPACES.slice(0, 4).map((ns) => (
             <button
-              key={view}
-              onClick={() => setSidebarView(view)}
-              className={cn(
-                'flex-1 px-4 py-2 text-sm font-medium transition-colors',
-                sidebarView === view
-                  ? 'text-primary border-b-2 border-primary bg-primary/5'
-                  : 'text-grey-600 hover:text-grey hover:bg-grey-100'
-              )}
+              key={ns.name}
+              onClick={() => handleSelectNamespace(ns)}
+              className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
             >
-              {view.charAt(0).toUpperCase() + view.slice(1)}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-grey">{ns.name}</span>
+                </div>
+                {renderNamespaceStatus(ns.status)}
+              </div>
+              <div className="flex items-center gap-4 text-xs text-grey-500">
+                <span className="flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {ns.vectorCount.toLocaleString()} vectors
+                </span>
+                {ns.dimensions && (
+                  <span className="flex items-center gap-1">
+                    <Hash className="h-3 w-3" />
+                    {ns.dimensions}d
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
+        {DUMMY_NAMESPACES.length > 4 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full mt-2"
+            onClick={() => setSidebarView('namespaces')}
+          >
+            View all {DUMMY_NAMESPACES.length} namespaces
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        )}
+      </div>
 
-        {/* Sidebar Content */}
-        <div className="flex-1 overflow-auto p-3">
-          {sidebarView === 'collections' && (
-            <div className="space-y-2">
-              {filteredCollections.map((col) => (
+      {/* Recent Actions */}
+      {savedActions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-grey">Saved Actions</h3>
+            <Button variant="ghost" size="sm" onClick={() => setSidebarView('actions')}>
+              View All
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {savedActions.slice(0, 3).map((action) => (
+              <button
+                key={action.id}
+                onClick={() => handleLoadAction(action)}
+                className="w-full bg-white rounded-lg border border-grey-400 p-3 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-sm text-grey">{action.name}</span>
+                  <span className={cn('text-xs px-2 py-0.5 rounded', VECTOR_OPERATIONS[action.operation].color)}>
+                    {VECTOR_OPERATIONS[action.operation].label}
+                  </span>
+                </div>
+                {action.description && (
+                  <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render namespace detail view
+  const renderNamespaceView = () => {
+    if (!selectedNamespace) return null;
+
+    if (isLoadingNamespace) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-grey-500">Loading namespace data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Namespace Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={handleBackToOverview}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Layers className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-grey">{selectedNamespace.name}</h2>
+                <div className="flex items-center gap-2 text-sm text-grey-500">
+                  {renderNamespaceStatus(selectedNamespace.status)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              setQueryInput(getNamespaceQuery(selectedNamespace.name));
+              setMainView('query');
+            }}>
+              <Code className="h-4 w-4 mr-1" />
+              Query
+            </Button>
+            <Button size="sm" onClick={handleExecuteQuery}>
+              <Play className="h-4 w-4 mr-1" />
+              Execute
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <div className="text-2xl font-bold text-grey">{selectedNamespace.vectorCount.toLocaleString()}</div>
+            <div className="text-xs text-grey-500">Vectors</div>
+          </div>
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <div className="text-2xl font-bold text-grey">{selectedNamespace.dimensions || '-'}</div>
+            <div className="text-xs text-grey-500">Dimensions</div>
+          </div>
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <div className="text-2xl font-bold text-grey capitalize">{selectedNamespace.metric || '-'}</div>
+            <div className="text-xs text-grey-500">Metric</div>
+          </div>
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <div className="text-2xl font-bold text-green capitalize">{selectedNamespace.status}</div>
+            <div className="text-xs text-grey-500">Status</div>
+          </div>
+        </div>
+
+        {/* Vectors List */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-grey">Vectors in {selectedNamespace.name}</h3>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('table')}>
+                <Table2 className={cn('h-4 w-4', resultsView === 'table' && 'text-primary')} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('cards')}>
+                <Grid3X3 className={cn('h-4 w-4', resultsView === 'cards' && 'text-primary')} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('json')}>
+                <Braces className={cn('h-4 w-4', resultsView === 'json' && 'text-primary')} />
+              </Button>
+            </div>
+          </div>
+
+          {resultsView === 'table' && (
+            <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-grey-50">
+                  <tr className="border-b border-grey-400">
+                    <th className="text-left py-3 px-4 font-medium text-grey-600">ID</th>
+                    <th className="text-left py-3 px-4 font-medium text-grey-600">Metadata</th>
+                    <th className="text-right py-3 px-4 font-medium text-grey-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DUMMY_VECTORS.map((vec) => (
+                    <tr
+                      key={vec.id}
+                      className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
+                      onClick={() => handleSelectVector(vec)}
+                    >
+                      <td className="py-3 px-4">
+                        <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                      </td>
+                      <td className="py-3 px-4 text-grey-600 truncate max-w-md">
+                        {vec.metadata ? JSON.stringify(vec.metadata) : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Button variant="ghost" size="sm" onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyToClipboard(vec.id);
+                        }}>
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {resultsView === 'cards' && (
+            <div className="grid grid-cols-2 gap-4">
+              {DUMMY_VECTORS.map((vec) => (
                 <button
-                  key={col.id}
-                  onClick={() => {
-                    setSelectedCollection(col);
-                    setSelectedDocument(null);
-                    setSearchResults([]);
-                  }}
-                  className={cn(
-                    'w-full p-3 rounded-lg border text-left transition-colors',
-                    selectedCollection?.id === col.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
-                  )}
+                  key={vec.id}
+                  onClick={() => handleSelectVector(vec)}
+                  className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
                 >
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <span className="font-medium text-sm text-grey truncate">{col.name}</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                    <Button variant="ghost" size="sm" onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyToClipboard(vec.id);
+                    }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <p className="text-xs text-grey-600 mb-2 line-clamp-1">{col.description}</p>
-                  <div className="flex items-center gap-3 text-xs text-grey-500">
-                    <span className="flex items-center gap-1">
-                      <Hash className="h-3 w-3" />
-                      {col.dimensions}d
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FileText className="h-3 w-3" />
-                      {col.documentCount.toLocaleString()}
-                    </span>
-                  </div>
+                  {vec.metadata && (
+                    <div className="space-y-1">
+                      {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2 text-xs">
+                          <span className="text-grey-500">{key}:</span>
+                          <span className="text-grey truncate">{String(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
           )}
 
-          {sidebarView === 'documents' && (
-            <div className="space-y-2">
-              {selectedCollection ? (
-                filteredDocuments.length > 0 ? (
-                  filteredDocuments.map((doc) => (
-                    <button
-                      key={doc.id}
-                      onClick={() => setSelectedDocument(doc)}
-                      className={cn(
-                        'w-full p-3 rounded-lg border text-left transition-colors',
-                        selectedDocument?.id === doc.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
-                      )}
-                    >
-                      <div className="font-medium text-sm text-grey mb-1 line-clamp-2">{doc.content}</div>
-                      <div className="text-xs text-grey-500">{doc.id}</div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-grey-500">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No documents in this collection</p>
-                  </div>
-                )
-              ) : (
-                <div className="text-center py-8 text-grey-500">
-                  <Database className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Select a collection first</p>
-                </div>
-              )}
+          {resultsView === 'json' && (
+            <div className="relative bg-white rounded-lg border border-grey-400">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2"
+                onClick={() => handleCopyToClipboard(JSON.stringify(DUMMY_VECTORS, null, 2))}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <pre className="p-4 text-sm overflow-auto max-h-[400px]">
+                {JSON.stringify(DUMMY_VECTORS, null, 2)}
+              </pre>
             </div>
           )}
         </div>
+      </div>
+    );
+  };
 
-        {/* Sidebar Footer */}
-        <div className="p-3 border-t border-grey-400">
+  // Render vector detail view
+  const renderVectorView = () => {
+    if (!selectedVector) return null;
+
+    if (isLoadingVector) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-grey-500">Loading vector data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Vector Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => setMainView('namespace')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to {selectedNamespace?.name || 'Namespace'}
+          </Button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-blue" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-grey font-mono">{selectedVector.id}</h2>
+                <div className="text-sm text-grey-500">
+                  Vector in {selectedNamespace?.name || 'namespace'}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedVector.id)}>
+              <Copy className="h-4 w-4 mr-1" />
+              Copy ID
+            </Button>
+            <Button variant="outline" size="sm" className="text-red hover:text-red" onClick={() => setShowDeleteModal(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          </div>
+        </div>
+
+        {/* Vector Info */}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Metadata */}
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <h3 className="text-sm font-semibold text-grey mb-3 flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              Metadata
+            </h3>
+            {selectedVector.metadata ? (
+              <div className="space-y-2">
+                {Object.entries(selectedVector.metadata).map(([key, value]) => (
+                  <div key={key} className="flex items-start gap-2 py-2 border-b border-grey-200 last:border-0">
+                    <span className="text-sm text-grey-500 min-w-[100px]">{key}:</span>
+                    <span className="text-sm text-grey flex-1">{String(value)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleCopyToClipboard(String(value))}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-grey-500">No metadata</p>
+            )}
+          </div>
+
+          {/* Vector Properties */}
+          <div className="bg-white rounded-xl border border-grey-400 p-4">
+            <h3 className="text-sm font-semibold text-grey mb-3 flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Properties
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-2 border-b border-grey-200">
+                <span className="text-sm text-grey-500">ID</span>
+                <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedVector.id}</code>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-grey-200">
+                <span className="text-sm text-grey-500">Namespace</span>
+                <span className="text-sm text-grey">{selectedNamespace?.name || 'default'}</span>
+              </div>
+              {selectedVector.score !== undefined && (
+                <div className="flex items-center justify-between py-2 border-b border-grey-200">
+                  <span className="text-sm text-grey-500">Score</span>
+                  <span className="text-sm text-primary font-medium">{selectedVector.score.toFixed(4)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-grey-500">Has Values</span>
+                <span className="text-sm text-grey">{selectedVector.values ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Raw JSON */}
+        <div className="bg-white rounded-xl border border-grey-400 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
+              <Braces className="h-4 w-4" />
+              Raw Data
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleCopyToClipboard(JSON.stringify(selectedVector, null, 2))}
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
+          </div>
+          <pre className="bg-grey-50 rounded-lg p-4 text-sm overflow-auto max-h-[300px]">
+            {JSON.stringify(selectedVector, null, 2)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  // Render query view
+  const renderQueryView = () => (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Query Header */}
+      <div className="h-14 border-b border-grey-400 bg-white flex items-center justify-between px-4 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={handleBackToOverview}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            {showQueryBuilder ? (
+              <>
+                <Settings2 className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-grey">Query Builder</span>
+              </>
+            ) : selectedAction ? (
+              <>
+                <Bookmark className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-grey">{selectedAction.name}</span>
+                <code className="text-xs bg-grey-100 px-2 py-1 rounded text-grey-600">{selectedAction.tag}</code>
+              </>
+            ) : (
+              <>
+                <Code className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-grey">Query Editor</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           <Button
-            onClick={handleRefresh}
             variant="outline"
             size="sm"
-            className="w-full gap-2"
-            disabled={isRefreshing}
+            onClick={() => setShowCodeSidebar(true)}
+            className="gap-2"
           >
-            {isRefreshing ? (
+            <Code className="h-4 w-4" />
+            Code
+          </Button>
+          <Button
+            variant={showQueryBuilder ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setShowQueryBuilder(!showQueryBuilder);
+              setSelectedAction(null);
+            }}
+            className="gap-2"
+          >
+            <Settings2 className="h-4 w-4" />
+            Builder
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenSaveActionModal}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            Save Action
+          </Button>
+          <Button
+            onClick={handleExecuteQuery}
+            size="sm"
+            disabled={isExecuting}
+            className="gap-2"
+          >
+            {isExecuting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <RefreshCw className="h-4 w-4" />
+              <Play className="h-4 w-4" />
             )}
-            Refresh
+            Execute
           </Button>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Query Content - Vertical Layout */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="h-14 border-b border-grey-400 bg-white flex items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            {selectedCollection ? (
-              <>
-                <Boxes className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-grey">{selectedCollection.name}</span>
-                <span className="px-2 py-0.5 rounded text-xs font-medium bg-grey-100 text-grey-600">
-                  {selectedCollection.documentCount.toLocaleString()} docs
-                </span>
-              </>
-            ) : (
-              <span className="text-grey-600">Select a collection to explore</span>
-            )}
-          </div>
+        {/* Query Panel */}
+        <div className="h-1/2 border-b border-grey-400 flex flex-col">
+          {showQueryBuilder ? (
+            <div className="flex-1 overflow-auto p-4">
+              <div className="space-y-4">
+                {/* Operation Select */}
+                <div>
+                  <Label className="text-xs text-grey-600 mb-2 block">Operation</Label>
+                  <Select value={queryBuilderOperation} onValueChange={(v) => setQueryBuilderOperation(v as VectorOperation)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VECTOR_OPERATIONS).map(([op, config]) => (
+                        <SelectItem key={op} value={op}>
+                          <div className="flex items-center gap-2">
+                            <span className={cn('text-xs px-1.5 py-0.5 rounded', config.color)}>{config.category}</span>
+                            <span>{config.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-500 mt-1">{VECTOR_OPERATIONS[queryBuilderOperation].description}</p>
+                </div>
 
-          {selectedCollection && (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowSearchModal(true)}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Semantic Search
-              </Button>
-              <Button
-                onClick={() => setShowAddDocModal(true)}
-                size="sm"
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Document
-              </Button>
+                {/* Namespace */}
+                <div>
+                  <Label className="text-xs text-grey-600 mb-2 block">Namespace</Label>
+                  <Select value={queryBuilderNamespace} onValueChange={setQueryBuilderNamespace}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select namespace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DUMMY_NAMESPACES.map(ns => (
+                        <SelectItem key={ns.name} value={ns.name}>{ns.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search-specific fields */}
+                {(queryBuilderOperation === 'query' || queryBuilderOperation === 'findSimilar') && (
+                  <>
+                    <div>
+                      <Label className="text-xs text-grey-600 mb-2 block">Top K Results</Label>
+                      <div className="flex items-center gap-4">
+                        <Slider
+                          value={[parseInt(queryBuilderTopK) || 10]}
+                          onValueChange={(v) => setQueryBuilderTopK(String(v[0]))}
+                          min={1}
+                          max={100}
+                          step={1}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          value={queryBuilderTopK}
+                          onChange={(e) => setQueryBuilderTopK(e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={queryBuilderIncludeMetadata}
+                          onCheckedChange={(v) => setQueryBuilderIncludeMetadata(!!v)}
+                        />
+                        <span className="text-sm text-grey">Include Metadata</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={queryBuilderIncludeValues}
+                          onCheckedChange={(v) => setQueryBuilderIncludeValues(!!v)}
+                        />
+                        <span className="text-sm text-grey">Include Values</span>
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                {/* Fetch-specific fields */}
+                {(queryBuilderOperation === 'fetch' || queryBuilderOperation === 'fetchOne' || queryBuilderOperation === 'deleteByIds') && (
+                  <div>
+                    <Label className="text-xs text-grey-600 mb-2 block">Vector IDs</Label>
+                    <Textarea
+                      value={queryBuilderIds}
+                      onChange={(e) => setQueryBuilderIds(e.target.value)}
+                      placeholder="vec_001, vec_002, vec_003"
+                      className="h-20"
+                    />
+                    <p className="text-xs text-grey-500 mt-1">Comma-separated list of vector IDs</p>
+                  </div>
+                )}
+
+                {/* Filters */}
+                {(queryBuilderOperation === 'query' || queryBuilderOperation === 'findSimilar' || queryBuilderOperation === 'deleteByFilter') && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-xs text-grey-600">Metadata Filters</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setQueryBuilderFilters([...queryBuilderFilters, { field: '', operator: '$eq', value: '' }])}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Filter
+                      </Button>
+                    </div>
+                    {queryBuilderFilters.map((filter, idx) => (
+                      <div key={idx} className="flex items-center gap-2 mb-2">
+                        <Input
+                          placeholder="Field"
+                          value={filter.field}
+                          onChange={(e) => {
+                            const updated = [...queryBuilderFilters];
+                            updated[idx].field = e.target.value;
+                            setQueryBuilderFilters(updated);
+                          }}
+                          className="flex-1"
+                        />
+                        <Select
+                          value={filter.operator}
+                          onValueChange={(v) => {
+                            const updated = [...queryBuilderFilters];
+                            updated[idx].operator = v;
+                            setQueryBuilderFilters(updated);
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="$eq">=</SelectItem>
+                            <SelectItem value="$ne">≠</SelectItem>
+                            <SelectItem value="$gt">&gt;</SelectItem>
+                            <SelectItem value="$gte">≥</SelectItem>
+                            <SelectItem value="$lt">&lt;</SelectItem>
+                            <SelectItem value="$lte">≤</SelectItem>
+                            <SelectItem value="$in">in</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          placeholder="Value"
+                          value={filter.value}
+                          onChange={(e) => {
+                            const updated = [...queryBuilderFilters];
+                            updated[idx].value = e.target.value;
+                            setQueryBuilderFilters(updated);
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setQueryBuilderFilters(queryBuilderFilters.filter((_, i) => i !== idx))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Generate Query Button */}
+                <Button
+                  onClick={() => {
+                    const query: any = {
+                      operation: queryBuilderOperation,
+                      options: {
+                        namespace: queryBuilderNamespace || 'default',
+                      }
+                    };
+
+                    if (queryBuilderOperation === 'query' || queryBuilderOperation === 'findSimilar') {
+                      query.options.topK = parseInt(queryBuilderTopK) || 10;
+                      query.options.includeMetadata = queryBuilderIncludeMetadata;
+                      query.options.includeValues = queryBuilderIncludeValues;
+                      if (queryBuilderFilters.length > 0) {
+                        query.options.filter = {};
+                        queryBuilderFilters.forEach(f => {
+                          if (f.field && f.value) {
+                            query.options.filter[f.field] = { [f.operator]: f.value };
+                          }
+                        });
+                      }
+                    }
+
+                    if (queryBuilderIds && (queryBuilderOperation === 'fetch' || queryBuilderOperation === 'fetchOne' || queryBuilderOperation === 'deleteByIds')) {
+                      query.options.ids = queryBuilderIds.split(',').map(id => id.trim());
+                    }
+
+                    setQueryInput(JSON.stringify(query, null, 2));
+                    toast.success('Query generated');
+                  }}
+                  className="w-full"
+                >
+                  Generate Query
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <Textarea
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+                className="flex-1 font-mono text-sm resize-none border-0 rounded-none focus-visible:ring-0"
+                placeholder="Enter your query JSON..."
+              />
             </div>
           )}
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-6">
-          {selectedCollection ? (
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Collection Info Card */}
-              <div className="bg-white rounded-lg border border-grey-400 p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-grey mb-1">{selectedCollection.name}</h3>
-                    <p className="text-sm text-grey-600">{selectedCollection.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-grey-500" />
-                    <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedCollection.tag}</code>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-grey-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-grey">{selectedCollection.dimensions}</div>
-                    <div className="text-sm text-grey-600">Dimensions</div>
-                  </div>
-                  <div className="bg-grey-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-grey">{selectedCollection.documentCount.toLocaleString()}</div>
-                    <div className="text-sm text-grey-600">Documents</div>
-                  </div>
-                  <div className="bg-grey-50 rounded-lg p-4">
-                    <div className="text-lg font-bold text-grey">{getMetricLabel(selectedCollection.metric)}</div>
-                    <div className="text-sm text-grey-600">Distance Metric</div>
-                  </div>
-                  <div className="bg-grey-50 rounded-lg p-4">
-                    <div className="text-lg font-bold text-grey">{selectedCollection.indexType}</div>
-                    <div className="text-sm text-grey-600">Index Type</div>
-                  </div>
+        {/* Results Panel */}
+        <div className="h-1/2 flex flex-col bg-grey-50">
+          <div className="h-10 border-b border-grey-400 bg-white flex items-center justify-between px-4">
+            <span className="text-sm font-medium text-grey">Results</span>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('table')}>
+                <Table2 className={cn('h-4 w-4', resultsView === 'table' && 'text-primary')} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('cards')}>
+                <Grid3X3 className={cn('h-4 w-4', resultsView === 'cards' && 'text-primary')} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('json')}>
+                <Braces className={cn('h-4 w-4', resultsView === 'json' && 'text-primary')} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-4">
+            {isExecuting ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+                  <p className="text-grey-500">Executing query...</p>
                 </div>
               </div>
+            ) : queryError ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <AlertCircle className="h-8 w-8 text-red mx-auto mb-3" />
+                  <p className="text-red font-medium mb-1">Query Failed</p>
+                  <p className="text-sm text-grey-500">{queryError}</p>
+                </div>
+              </div>
+            ) : queryResult ? (
+              <div className="space-y-4">
+                {/* Execution Info */}
+                <div className="flex items-center gap-4 text-sm text-grey-500">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {queryResult.executionTime}ms
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-4 w-4" />
+                    {queryResult.matches?.length || 0} results
+                  </span>
+                </div>
 
-              {/* Search Results or Document Preview */}
-              {searchResults.length > 0 ? (
-                <div className="bg-white rounded-lg border border-grey-400 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-grey">Search Results</h4>
+                {/* Results */}
+                {resultsView === 'json' && (
+                  <div className="relative">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSearchResults([])}
+                      className="absolute top-2 right-2"
+                      onClick={() => handleCopyToClipboard(JSON.stringify(queryResult, null, 2))}
                     >
-                      Clear
+                      <Copy className="h-4 w-4" />
                     </Button>
+                    <pre className="bg-white rounded-lg p-4 text-sm overflow-auto max-h-[400px] border border-grey-400">
+                      {JSON.stringify(queryResult, null, 2)}
+                    </pre>
                   </div>
-                  <div className="space-y-3">
-                    {searchResults.map((doc, idx) => (
-                      <div
-                        key={doc.id}
-                        className="flex items-start gap-4 p-4 rounded-lg border border-grey-400 hover:bg-grey-50"
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-sm font-bold text-primary">{idx + 1}</span>
+                )}
+
+                {resultsView === 'table' && queryResult.matches && (
+                  <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-grey-50">
+                        <tr className="border-b border-grey-400">
+                          <th className="text-left py-3 px-4 font-medium text-grey-600">#</th>
+                          <th className="text-left py-3 px-4 font-medium text-grey-600">ID</th>
+                          <th className="text-left py-3 px-4 font-medium text-grey-600">Score</th>
+                          <th className="text-left py-3 px-4 font-medium text-grey-600">Metadata</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {queryResult.matches.map((vec: VectorRecord, idx: number) => (
+                          <tr key={vec.id} className="border-b border-grey-400 hover:bg-grey-50">
+                            <td className="py-3 px-4 text-grey-500">{idx + 1}</td>
+                            <td className="py-3 px-4">
+                              <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                            </td>
+                            <td className="py-3 px-4">
+                              {vec.score !== undefined && (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-grey-200 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-primary rounded-full"
+                                      style={{ width: `${vec.score * 100}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-grey-600">{vec.score.toFixed(4)}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-grey-600 truncate max-w-xs">
+                              {vec.metadata ? JSON.stringify(vec.metadata) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {resultsView === 'cards' && queryResult.matches && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {queryResult.matches.map((vec: VectorRecord, idx: number) => (
+                      <div key={vec.id} className="bg-white rounded-lg border border-grey-400 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">#{idx + 1}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-grey mb-2">{doc.content}</p>
-                          <div className="flex items-center gap-4 text-xs text-grey-500">
-                            <span className="flex items-center gap-1">
-                              <Target className="h-3 w-3" />
-                              Score: {doc.score?.toFixed(4)}
-                            </span>
-                            <span>{doc.id}</span>
+                        {vec.score !== undefined && (
+                          <div className="flex items-center gap-1 mb-2 text-sm text-grey-600">
+                            <Target className="h-3 w-3" />
+                            Score: {vec.score.toFixed(4)}
                           </div>
-                        </div>
+                        )}
+                        {vec.metadata && (
+                          <div className="space-y-1">
+                            {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
+                              <div key={key} className="flex items-center gap-2 text-xs">
+                                <span className="text-grey-500">{key}:</span>
+                                <span className="text-grey truncate">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Play className="h-12 w-12 text-grey-300 mx-auto mb-3" />
+                  <p className="text-grey-500 mb-1">No results yet</p>
+                  <p className="text-sm text-grey-400">Execute a query to see results</p>
                 </div>
-              ) : selectedDocument ? (
-                <div className="bg-white rounded-lg border border-grey-400 p-6">
-                  <h4 className="font-semibold text-grey mb-4">Document Details</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-xs text-grey-600 mb-2 block">ID</Label>
-                      <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedDocument.id}</code>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-grey-600 mb-2 block">Content</Label>
-                      <p className="text-sm text-grey bg-grey-50 p-4 rounded-lg">{selectedDocument.content}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-grey-600 mb-2 block">Metadata</Label>
-                      <pre className="bg-grey-100 rounded-lg p-4 text-sm overflow-auto">
-                        {JSON.stringify(selectedDocument.metadata, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-lg border border-grey-400 p-6">
-                  <h4 className="font-semibold text-grey mb-4">Recent Documents</h4>
-                  <div className="space-y-3">
-                    {filteredDocuments.slice(0, 5).map((doc) => (
-                      <div
-                        key={doc.id}
-                        onClick={() => setSelectedDocument(doc)}
-                        className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:bg-grey-50 cursor-pointer"
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render results view
+  const renderResultsView = () => (
+    <div className="flex-1 flex flex-col">
+      <div className="h-14 border-b border-grey-400 bg-white flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setMainView('query')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Query
+          </Button>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green" />
+            <span className="font-semibold text-grey">Query Results</span>
+            {queryResult && (
+              <span className="text-sm text-grey-500">
+                {queryResult.executionTime}ms • {queryResult.matches?.length || 0} results
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setResultsView('table')}>
+            <Table2 className={cn('h-4 w-4', resultsView === 'table' && 'text-primary')} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setResultsView('cards')}>
+            <Grid3X3 className={cn('h-4 w-4', resultsView === 'cards' && 'text-primary')} />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setResultsView('json')}>
+            <Braces className={cn('h-4 w-4', resultsView === 'json' && 'text-primary')} />
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-6">
+        {queryResult && queryResult.matches && (
+          <>
+            {resultsView === 'table' && (
+              <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-grey-50">
+                    <tr className="border-b border-grey-400">
+                      <th className="text-left py-3 px-4 font-medium text-grey-600">#</th>
+                      <th className="text-left py-3 px-4 font-medium text-grey-600">ID</th>
+                      <th className="text-left py-3 px-4 font-medium text-grey-600">Score</th>
+                      <th className="text-left py-3 px-4 font-medium text-grey-600">Metadata</th>
+                      <th className="text-right py-3 px-4 font-medium text-grey-600">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queryResult.matches.map((vec: VectorRecord, idx: number) => (
+                      <tr
+                        key={vec.id}
+                        className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
+                        onClick={() => handleSelectVector(vec)}
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-grey truncate">{doc.content}</p>
-                          <p className="text-xs text-grey-500 mt-1">{doc.id}</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-grey-400" />
-                      </div>
+                        <td className="py-3 px-4 text-grey-500">{idx + 1}</td>
+                        <td className="py-3 px-4">
+                          <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                        </td>
+                        <td className="py-3 px-4">
+                          {vec.score !== undefined && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 h-2 bg-grey-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full"
+                                  style={{ width: `${vec.score * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-grey-600">{vec.score.toFixed(4)}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-grey-600">
+                          {vec.metadata ? (
+                            <div className="max-w-md truncate">
+                              {JSON.stringify(vec.metadata)}
+                            </div>
+                          ) : '—'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyToClipboard(vec.id);
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {resultsView === 'cards' && (
+              <div className="grid grid-cols-3 gap-4">
+                {queryResult.matches.map((vec: VectorRecord, idx: number) => (
+                  <button
+                    key={vec.id}
+                    onClick={() => handleSelectVector(vec)}
+                    className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                        {vec.score !== undefined && (
+                          <div className="flex items-center gap-1 mt-2 text-sm text-grey-600">
+                            <Target className="h-3 w-3" />
+                            Score: {vec.score.toFixed(4)}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">#{idx + 1}</span>
+                    </div>
+                    {vec.metadata && (
+                      <div className="space-y-1">
+                        {Object.entries(vec.metadata).slice(0, 4).map(([key, value]) => (
+                          <div key={key} className="flex items-center gap-2 text-sm">
+                            <span className="text-grey-500">{key}:</span>
+                            <span className="text-grey truncate">{String(value)}</span>
+                          </div>
+                        ))}
+                        {Object.keys(vec.metadata).length > 4 && (
+                          <div className="text-xs text-grey-500">+{Object.keys(vec.metadata).length - 4} more fields</div>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {resultsView === 'json' && (
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-2 right-2"
+                  onClick={() => handleCopyToClipboard(JSON.stringify(queryResult, null, 2))}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <pre className="bg-white rounded-lg border border-grey-400 p-4 text-sm overflow-auto">
+                  {JSON.stringify(queryResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+      {/* Sidebar */}
+      <div className="w-72 border-r border-grey-400 bg-white flex flex-col flex-shrink-0">
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-grey-400">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', getVectorTypeColor(vector.type))}>
+              <Boxes className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-grey truncate">{vector.name || 'Vector Explorer'}</h2>
+              <div className="flex items-center gap-2 text-xs text-grey-500">
+                {vector.env?.slug && (
+                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                    {vector.env.slug}
+                  </span>
+                )}
+                {vector.type && (
+                  <span>{getVectorDBDisplayName(vector.type)}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          {(vector.dimensions || vector.metric) && (
+            <div className="flex items-center gap-3 text-xs text-grey-600 mb-3">
+              {vector.dimensions && (
+                <span className="flex items-center gap-1">
+                  <Hash className="h-3 w-3" />
+                  {vector.dimensions}d
+                </span>
+              )}
+              {vector.metric && (
+                <span className="flex items-center gap-1">
+                  <Target className="h-3 w-3" />
+                  {vector.metric}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* View Selector */}
+          <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
+            <button
+              onClick={() => setSidebarView('namespaces')}
+              className={cn(
+                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                sidebarView === 'namespaces'
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-grey-600 hover:text-grey'
+              )}
+            >
+              <Layers className="h-3 w-3 inline mr-1" />
+              Namespaces
+            </button>
+            <button
+              onClick={() => setSidebarView('actions')}
+              className={cn(
+                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                sidebarView === 'actions'
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-grey-600 hover:text-grey'
+              )}
+            >
+              <Zap className="h-3 w-3 inline mr-1" />
+              Actions
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+            <Input
+              placeholder={`Search ${sidebarView}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Sidebar Content Header */}
+        <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+            {sidebarView === 'namespaces' ? 'Namespaces' : 'Saved Actions'}
+          </span>
+          <div className="flex gap-1">
+            <button
+              onClick={handleRefreshSidebar}
+              disabled={isSidebarRefreshing}
+              className="text-grey-600 hover:text-primary transition-colors"
+              title="Refresh list"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+            </button>
+            {sidebarView === 'actions' && (
+              <button
+                onClick={() => {
+                  setMainView('query');
+                  setShowQueryBuilder(true);
+                }}
+                className="text-grey-600 hover:text-primary transition-colors"
+                title="Create new action"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar Content */}
+        <div className="flex-1 overflow-auto px-3 pb-3">
+          {sidebarView === 'namespaces' && (
+            <div className="space-y-2">
+              {filteredNamespaces.map((ns) => (
+                <button
+                  key={ns.name}
+                  onClick={() => handleSelectNamespace(ns)}
+                  className={cn(
+                    'w-full p-3 rounded-lg border text-left transition-colors',
+                    selectedNamespace?.name === ns.name
+                      ? 'border-primary bg-primary/5'
+                      : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-sm text-grey">{ns.name}</span>
+                    </div>
+                    {renderNamespaceStatus(ns.status)}
                   </div>
+                  <div className="flex items-center gap-4 text-xs text-grey-500">
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      {ns.vectorCount.toLocaleString()}
+                    </span>
+                    {ns.dimensions && (
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {ns.dimensions}d
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))}
+              {filteredNamespaces.length === 0 && (
+                <div className="text-center py-8 text-grey-500">
+                  <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No namespaces found</p>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-grey-500">
-              <Boxes className="h-16 w-16 mb-4 opacity-50" />
-              <p className="text-lg font-medium">Select a collection</p>
-              <p className="text-sm">Choose a vector collection from the sidebar to explore documents</p>
+          )}
+
+          {sidebarView === 'actions' && (
+            <div className="space-y-2">
+              {filteredActions.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => handleLoadAction(action)}
+                  className={cn(
+                    'w-full p-3 rounded-lg border text-left transition-colors',
+                    selectedAction?.id === action.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-sm text-grey">{action.name}</span>
+                    <span className={cn('text-xs px-2 py-0.5 rounded', VECTOR_OPERATIONS[action.operation].color)}>
+                      {VECTOR_OPERATIONS[action.operation].label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-grey-500">
+                    <Tag className="h-3 w-3" />
+                    <code>{action.tag}</code>
+                  </div>
+                  {action.parameters.length > 0 && (
+                    <div className="text-xs text-grey-500 mt-1">
+                      {action.parameters.length} parameter{action.parameters.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </button>
+              ))}
+              {filteredActions.length === 0 && (
+                <div className="text-center py-8 text-grey-500">
+                  <Bookmark className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No saved actions</p>
+                </div>
+              )}
             </div>
           )}
         </div>
+
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {mainView === 'overview' && renderOverview()}
+        {mainView === 'namespace' && renderNamespaceView()}
+        {mainView === 'vector' && renderVectorView()}
+        {mainView === 'query' && renderQueryView()}
+        {mainView === 'results' && renderResultsView()}
       </div>
 
       {/* Code Sidebar */}
-      <CodeSidebar
-        title="Vector SDK"
-        language="typescript"
-        code={`// Vector operations using Ductape SDK
-import Ductape from '@ductape/sdk';
+      {showCodeSidebar && (
+        <CodeSidebar
+          title="Vector SDK"
+          subtitle={vector.name}
+          tag={vector.tag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateCodeSections}
+          environments={vector.envs || (vector.env ? [{ slug: vector.env.slug }] : [])}
+        />
+      )}
 
-const ductape = new Ductape({
-  user_id: 'your-user-id',
-  workspace_id: 'your-workspace-id',
-  private_key: 'your-private-key',
-});
-
-// Semantic search
-const results = await ductape.vector.search({
-  product: '${vector.productTag}',
-  env: '${vector.env.slug}',
-  collection: '${selectedCollection?.tag || 'collection-tag'}',
-  query: 'your search query',
-  topK: ${topK},
-});
-
-// Add document
-await ductape.vector.upsert({
-  product: '${vector.productTag}',
-  env: '${vector.env.slug}',
-  collection: '${selectedCollection?.tag || 'collection-tag'}',
-  documents: [{
-    id: 'doc-id',
-    content: 'document content',
-    metadata: { key: 'value' },
-  }],
-});
-
-console.log('Search results:', results);`}
-      />
-
-      {/* Semantic Search Modal */}
-      <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>
-        <DialogContent>
+      {/* Save Action Modal */}
+      <Dialog open={showSaveActionModal} onOpenChange={setShowSaveActionModal}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Semantic Search</DialogTitle>
+            <DialogTitle>Save as Action</DialogTitle>
             <DialogDescription>
-              Search for similar documents using natural language
+              Create a reusable action from your query with configurable parameters
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label>Collection</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <Boxes className="h-4 w-4 text-primary" />
-                <span className="font-medium">{selectedCollection?.name}</span>
-              </div>
+              <Label>Action Name</Label>
+              <Input
+                value={actionName}
+                onChange={(e) => setActionName(e.target.value)}
+                placeholder="e.g., Search Products by Category"
+                className="mt-1"
+              />
             </div>
 
             <div>
-              <Label>Search Query</Label>
+              <Label>Description (optional)</Label>
               <Textarea
-                value={semanticQuery}
-                onChange={(e) => setSemanticQuery(e.target.value)}
-                placeholder="Enter your search query..."
-                className="h-24 mt-1"
+                value={actionDescription}
+                onChange={(e) => setActionDescription(e.target.value)}
+                placeholder="Describe what this action does..."
+                className="mt-1 h-20"
               />
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Number of Results (Top K)</Label>
-                <span className="text-sm text-grey-600">{topK}</span>
+            {extractedValues.length > 0 && (
+              <div>
+                <Label>Select Parameters to Expose</Label>
+                <div className="mt-2 max-h-48 overflow-auto space-y-2">
+                  {extractedValues.map((val, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-grey-50 rounded">
+                      <Checkbox
+                        checked={val.selected}
+                        onCheckedChange={(checked) => {
+                          const updated = [...extractedValues];
+                          updated[idx].selected = !!checked;
+                          setExtractedValues(updated);
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <code className="text-xs text-grey-600">{val.path}</code>
+                        <div className="text-xs text-grey-500 truncate">
+                          Current: {JSON.stringify(val.value)}
+                        </div>
+                      </div>
+                      {val.selected && (
+                        <Input
+                          value={val.paramName}
+                          onChange={(e) => {
+                            const updated = [...extractedValues];
+                            updated[idx].paramName = e.target.value;
+                            setExtractedValues(updated);
+                          }}
+                          className="w-32 h-7 text-xs"
+                          placeholder="Param name"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <Slider
-                value={[topK]}
-                onValueChange={(val) => setTopK(val[0])}
-                min={1}
-                max={20}
-                step={1}
-              />
-            </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSearchModal(false)}>
+            <Button variant="outline" onClick={() => setShowSaveActionModal(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                handleSemanticSearch();
-                setShowSearchModal(false);
-              }}
-              disabled={isSearching || !semanticQuery.trim()}
-              className="gap-2"
-            >
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Search
+            <Button onClick={handleSaveAction}>
+              Save Action
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Document Modal */}
-      <Dialog open={showAddDocModal} onOpenChange={setShowAddDocModal}>
-        <DialogContent>
+      {/* Execute Action Modal */}
+      <Dialog open={showExecuteActionModal} onOpenChange={setShowExecuteActionModal}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Document</DialogTitle>
+            <DialogTitle>Execute {selectedAction?.name}</DialogTitle>
             <DialogDescription>
-              Add a new document to the vector collection
+              Fill in the parameter values to execute this action
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label>Collection</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <Boxes className="h-4 w-4 text-primary" />
-                <span className="font-medium">{selectedCollection?.name}</span>
-              </div>
+          {selectedAction && (
+            <div className="space-y-4">
+              {selectedAction.parameters.map((param) => (
+                <div key={param.name}>
+                  <Label>{param.name}</Label>
+                  <Input
+                    value={actionParamValues[param.name] ?? param.defaultValue}
+                    onChange={(e) => setActionParamValues({
+                      ...actionParamValues,
+                      [param.name]: e.target.value
+                    })}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-grey-500 mt-1">Path: {param.path}</p>
+                </div>
+              ))}
             </div>
-
-            <div>
-              <Label>Content</Label>
-              <Textarea
-                value={newDocContent}
-                onChange={(e) => setNewDocContent(e.target.value)}
-                placeholder="Enter document content..."
-                className="h-32 mt-1"
-              />
-            </div>
-
-            <div>
-              <Label>Metadata (JSON)</Label>
-              <Textarea
-                value={newDocMetadata}
-                onChange={(e) => setNewDocMetadata(e.target.value)}
-                placeholder='{"key": "value"}'
-                className="font-mono text-sm h-24 mt-1"
-              />
-            </div>
-          </div>
+          )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDocModal(false)}>
+            <Button variant="outline" onClick={() => setShowExecuteActionModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExecuteAction}>
+              <Play className="h-4 w-4 mr-1" />
+              Execute
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Vector</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete vector "{selectedVector?.id}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
             <Button
-              onClick={handleAddDocument}
-              disabled={isAddingDoc || !newDocContent.trim()}
-              className="gap-2"
+              variant="destructive"
+              onClick={() => {
+                toast.success(`Vector ${selectedVector?.id} deleted`);
+                setShowDeleteModal(false);
+                setSelectedVector(null);
+                setMainView('namespace');
+              }}
             >
-              {isAddingDoc ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Add Document
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -102,7 +102,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
       schemaSample = { [selector]: 'user_123' };
     }
 
-    const sections = [];
+    const sections: Array<{ title: string; code: string }> = [];
 
     if (language === 'typescript') {
       sections.push({

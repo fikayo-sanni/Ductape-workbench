@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 function WorkbenchContent() {
   const { user, currentWorkspaceId } = useAuth();
-  const { isOnboarding, completeOnboarding, skipOnboarding, startOnboarding } = useOnboarding();
+  const { isOnboarding, hasCompletedOnboarding, completeOnboarding, skipOnboarding, startOnboarding } = useOnboarding();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [hasTriggeredOnboarding, setHasTriggeredOnboarding] = useState(false);
@@ -37,7 +37,7 @@ function WorkbenchContent() {
   } = useWorkbenchStore();
 
   // Fetch workspaces to check if user has any
-  const { data: workspacesData } = useFetchWorkspaces({
+  const { data: workspacesData, isFetched, isLoading } = useFetchWorkspaces({
     user_id: user?._id ?? '',
     public_key: user?.public_key ?? '',
   });
@@ -61,8 +61,19 @@ function WorkbenchContent() {
   }, [user]);
 
   // Trigger onboarding when user logs in/signs up but has no workspace
+  // Only show after workspace fetch has completed and returned no workspaces
   useEffect(() => {
-    const hasNoWorkspace = !currentWorkspaceId || (workspacesData?.data?.length === 0);
+    // Don't show if user has already completed onboarding
+    if (hasCompletedOnboarding) {
+      return;
+    }
+
+    // Wait for the workspace fetch to complete before checking
+    if (isLoading || !isFetched) {
+      return;
+    }
+
+    const hasNoWorkspace = !currentWorkspaceId && workspacesData?.data?.length === 0;
 
     if (user && hasNoWorkspace && !hasTriggeredOnboarding && !showLoginModal && !showCreateAccountModal) {
         // Small delay to ensure DOM is ready
@@ -71,7 +82,7 @@ function WorkbenchContent() {
           setHasTriggeredOnboarding(true);
         }, 500);
     }
-  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding]);
+  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding, isLoading, isFetched, hasCompletedOnboarding]);
 
 
   return (
@@ -107,7 +118,7 @@ function WorkbenchContent() {
           {activeView !== 'dashboard' && (
             <div
               className={`${
-                sidebarCollapsed ? 'w-0' : 'w-full md:w-80'
+                sidebarCollapsed ? 'w-0' : 'w-full md:w-[280px]'
               } transition-all duration-300 ease-in-out border-r border-grey-400 bg-white flex-shrink-0 overflow-hidden shadow-sm
               ${!sidebarCollapsed ? 'fixed md:relative inset-0 md:inset-auto z-30 md:z-0' : ''}`}
             >

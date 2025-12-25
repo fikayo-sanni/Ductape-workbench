@@ -26,6 +26,10 @@ import {
   X,
   Code,
   Tag,
+  BarChart3,
+  Link2,
+  ChevronRight,
+  Hash,
 } from 'lucide-react';
 // Import SDK types for graph operations
 import type {
@@ -528,6 +532,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
   // Query Builder state - initialized from persisted state
   const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
+  const [showQueryEditor, setShowQueryEditor] = useState(persistedState?.showQueryEditor || false);
   const [queryBuilderOperation, setQueryBuilderOperation] = useState<GraphOperation>(persistedState?.queryBuilderOperation || 'findNodes');
   const [queryBuilderLabel, setQueryBuilderLabel] = useState(persistedState?.queryBuilderLabel || '');
   const [queryBuilderRelType, setQueryBuilderRelType] = useState(persistedState?.queryBuilderRelType || '');
@@ -558,6 +563,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       resultsView,
       selectedActionTag: selectedAction?.tag,
       showQueryBuilder,
+      showQueryEditor,
       queryBuilderOperation,
       queryBuilderLabel,
       queryBuilderRelType,
@@ -587,6 +593,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     resultsView,
     selectedAction,
     showQueryBuilder,
+    showQueryEditor,
     queryBuilderOperation,
     queryBuilderLabel,
     queryBuilderRelType,
@@ -1194,7 +1201,7 @@ await ductape.init();`,
     }
   };
 
-  const getIndexStateColor = (state: string) => {
+  const getIndexStateColor = (state?: string) => {
     switch (state) {
       case 'ONLINE': return 'text-green';
       case 'POPULATING': return 'text-yellow-500';
@@ -1889,7 +1896,7 @@ await ductape.init();`,
                         const propType = selectedProp?.type || 'string';
 
                         // Operators based on property type
-                        const getOperatorsForType = (type: PropertyType) => {
+                        const getOperatorsForType = (type: string) => {
                           switch (type) {
                             case 'number':
                               return [
@@ -2428,7 +2435,7 @@ await ductape.init();`,
               </div>
             </div>
           </div>
-        ) : (
+        ) : showQueryEditor ? (
           <>
             {/* Query Editor - Fixed */}
             <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
@@ -2874,61 +2881,174 @@ await ductape.init();`,
               )}
             </div>
           )}
-
-          {!queryResult && !queryError && (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Network className="h-16 w-16 text-grey-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-grey mb-2">Ready to Explore</h3>
-                <p className="text-sm text-grey max-w-md mb-4">
-                  Write a graph adapter query above and click Execute to explore your graph data.
-                  The SDK will translate it to {getQueryLanguageName(graph.type)} for {graph.type}.
-                </p>
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getNodeCountsQuery());
-                      handleExecuteQuery();
-                    }}
-                  >
-                    Show Node Counts
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getRelationshipCountsQuery());
-                      handleExecuteQuery();
-                    }}
-                  >
-                    Show Relationship Counts
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getNeighborhoodQuery());
-                    }}
-                  >
-                    Neighborhood Query
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getTraverseQuery('Person'));
-                    }}
-                  >
-                    Traverse Example
-                  </Button>
+            </div>
+          </>
+        ) : (
+          /* Graph Overview - Default view when no query editor or builder is active */
+          <div className="flex-1 overflow-auto p-6 space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Circle className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{DUMMY_LABELS.length}</div>
+                    <div className="text-xs text-grey-500">Node Labels</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
+                    <ArrowRight className="h-5 w-5 text-blue" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{DUMMY_RELATIONSHIPS.length}</div>
+                    <div className="text-xs text-grey-500">Relationship Types</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <Bookmark className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{savedActions.length}</div>
+                    <div className="text-xs text-grey-500">Saved Actions</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                    <Network className="h-5 w-5 text-green" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey capitalize">{graph.type || 'Neo4j'}</div>
+                    <div className="text-xs text-grey-500">Graph Type</div>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Quick Actions */}
+            <div>
+              <h3 className="text-sm font-semibold text-grey mb-3">Quick Actions</h3>
+              <div className="grid grid-cols-4 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowQueryEditor(true)}
+                >
+                  <Code className="h-5 w-5 text-primary" />
+                  <span className="text-sm">Query Editor</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowQueryBuilder(true)}
+                >
+                  <Settings2 className="h-5 w-5 text-blue" />
+                  <span className="text-sm">Query Builder</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowAddNodeModal(true)}
+                >
+                  <Plus className="h-5 w-5 text-green" />
+                  <span className="text-sm">Create Node</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setSidebarView('actions')}
+                >
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  <span className="text-sm">View Actions</span>
+                </Button>
+              </div>
             </div>
-          </>
+
+            {/* Node Labels Overview */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-grey">Node Labels</h3>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarView('labels')}>
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {DUMMY_LABELS.slice(0, 6).map((label) => (
+                  <button
+                    key={label.name}
+                    onClick={() => {
+                      setSelectedLabel(label);
+                      setQueryInput(getTraverseQuery(label.name));
+                      setShowQueryEditor(true);
+                    }}
+                    className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: label.color }}
+                        />
+                        <span className="font-medium text-grey">{label.name}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                      <span className="flex items-center gap-1">
+                        <Circle className="h-3 w-3" />
+                        {label.count.toLocaleString()} nodes
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {label.properties.length} props
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Saved Actions */}
+            {savedActions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-grey">Saved Actions</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setSidebarView('actions')}>
+                    View All
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {savedActions.slice(0, 3).map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleLoadAction(action)}
+                      className="w-full bg-white rounded-lg border border-grey-400 p-3 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm text-grey">{action.name}</span>
+                        <span className={cn('text-xs px-2 py-0.5 rounded', GRAPH_OPERATIONS[action.operation]?.color || 'bg-grey-100 text-grey')}>
+                          {action.operation}
+                        </span>
+                      </div>
+                      {action.description && (
+                        <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

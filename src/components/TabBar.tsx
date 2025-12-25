@@ -18,11 +18,20 @@ import {
   Heart,
   ListTree,
   LayoutDashboard,
-  Key,
+  KeyRound,
   Store,
   Mail,
   Layers,
   Receipt,
+  Workflow,
+  Bot,
+  Activity,
+  GitBranch,
+  Settings,
+  Briefcase,
+  User,
+  Handshake,
+  Boxes,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -31,27 +40,51 @@ const getTabIcon = (type: Tab['type']) => {
     app: Grid3x3,
     product: Package,
     storage: HardDrive,
-    session: Users,
+    session: KeyRound,
+    'session-activity': KeyRound,
+    'session-dashboard': KeyRound,
+    'session-user': User,
     feature: Zap,
     cache: Layers,
+    'cache-values': Layers,
     healthcheck: Heart,
+    'healthcheck-explorer': Heart,
     database: Database,
+    graph: GitBranch,
+    vector: Boxes,
+    workflow: Workflow,
+    'workflow-run': Workflow,
+    agent: Bot,
+    'agent-run': Bot,
     'message-broker': MessageSquare,
+    'message-broker-events': MessageSquare,
     notification: Bell,
+    'notification-explorer': Bell,
+    'new-notification': Bell,
     notifier: Bell,
     message: Mail,
     'new-message': Mail,
+    'new-topic': Mail,
     fallback: Shield,
+    'fallback-explorer': Shield,
+    'new-fallback': Shield,
     quota: BarChart3,
+    'quota-explorer': BarChart3,
+    'new-quota': BarChart3,
     job: ListTree,
+    'jobs-explorer': ListTree,
+    'new-healthcheck': Heart,
     logs: FileText,
     dashboard: LayoutDashboard,
-    tokens: Key,
+    tokens: KeyRound,
     teams: Users,
     marketplace: Store,
     webhook: MessageSquare,
-    auth: Key,
+    auth: KeyRound,
     pricing: Receipt,
+    partnership: Handshake,
+    brief: Briefcase,
+    settings: Settings,
   };
   return icons[type] || FileText;
 };
@@ -109,7 +142,7 @@ export default function TabBar() {
   }
 
   return (
-    <div className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-center overflow-x-auto shadow-sm scrollbar-thin scrollbar-thumb-grey-400 scrollbar-track-transparent">
+    <div className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-center overflow-x-auto shadow-sm tab-bar-scroll">
       {tabs.map((tab, index) => {
         const Icon = getTabIcon(tab.type);
         const isActive = activeTabId === tab.id;

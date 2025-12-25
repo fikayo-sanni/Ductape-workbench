@@ -1,56 +1,75 @@
-import Ductape from "@ductape/sdk";
-import { IBuilderInit } from "@ductape/sdk/dist/types";
+/**
+ * Ductape SDK Proxy Helpers
+ * These helpers provide a consistent interface for SDK operations through the backend proxy
+ * instead of using the SDK directly (which requires Node.js modules not available in browsers)
+ */
 
-interface DuctapeInit extends IBuilderInit {
+import { SDKProxyService, SDKProxyConfig } from '@/services/sdkProxy';
+import { DatabaseProxyService, DatabaseProxyConfig } from '@/services/databaseProxy';
+
+interface DuctapeInit extends SDKProxyConfig {
   type: 'product' | 'app';
 }
 
+/**
+ * Initialize SDK proxy for product or app operations
+ * Returns the appropriate builder from the proxy service
+ */
 export const connectDuctape = ({
   workspace_id,
   user_id,
   token,
   public_key,
-  env_type,
   type
 }: DuctapeInit) => {
   if (!workspace_id || !user_id || !token || !public_key) {
     throw new Error('Missing required configuration for Ductape initialization');
   }
 
-  console.log(env_type);
-  const ductape = new Ductape({ workspace_id, user_id });
-  ductape.setPublicKey(public_key);
-  ductape.setToken(token);
+  const proxy = new SDKProxyService({ workspace_id, user_id, token, public_key });
 
-  // Initialize based on type
+  // Return based on type
   if (type === 'product') {
-    return ductape.product;
+    return proxy.product;
   } else {
-    return ductape.app;
+    return proxy.app;
   }
 };
 
 /**
- * Initialize Ductape SDK for workspace-level operations (secrets, etc.)
- * Returns the full Ductape instance instead of product/app builders
+ * Initialize SDK proxy for workspace-level operations
+ * Returns the full SDKProxyService instance
  */
-interface DuctapeWorkspaceInit extends Omit<IBuilderInit, 'env_type'> {
-  env_type?: IBuilderInit['env_type'];
-}
-
 export const connectDuctapeWorkspace = ({
   workspace_id,
   user_id,
   token,
   public_key,
-}: DuctapeWorkspaceInit): Ductape => {
+}: SDKProxyConfig): SDKProxyService => {
   if (!workspace_id || !user_id || !token || !public_key) {
     throw new Error('Missing required configuration for Ductape initialization');
   }
 
-  const ductape = new Ductape({ workspace_id, user_id });
-  ductape.setPublicKey(public_key);
-  ductape.setToken(token);
-
-  return ductape;
+  return new SDKProxyService({ workspace_id, user_id, token, public_key });
 };
+
+/**
+ * Initialize Database proxy for database operations
+ * Returns the DatabaseProxyService instance
+ */
+export const connectDuctapeDatabase = ({
+  workspace_id,
+  user_id,
+  token,
+  public_key,
+}: DatabaseProxyConfig): DatabaseProxyService => {
+  if (!workspace_id || !user_id || !token || !public_key) {
+    throw new Error('Missing required configuration for Database proxy initialization');
+  }
+
+  return new DatabaseProxyService({ workspace_id, user_id, token, public_key });
+};
+
+// Re-export types for convenience
+export type { SDKProxyConfig, SDKProxyService };
+export type { DatabaseProxyConfig, DatabaseProxyService };

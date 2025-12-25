@@ -1,9 +1,48 @@
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/types/product';
-import { Database, HardDrive, Layers, MessageSquare, Settings2, Box, Plus, ExternalLink, Loader2, Edit2, Grid3x3, Filter, Workflow, Shield, Timer, Heart, Bell, KeyRound, Share2, Network, Bot, Boxes, Brain, GitBranch } from 'lucide-react';
+import {
+  Database,
+  HardDrive,
+  Layers,
+  MessageSquare,
+  Settings2,
+  Box,
+  Plus,
+  ExternalLink,
+  Loader2,
+  Edit2,
+  Grid3x3,
+  Workflow,
+  Shield,
+  Timer,
+  Heart,
+  Bell,
+  KeyRound,
+  Share2,
+  Bot,
+  Boxes,
+  Brain,
+  GitBranch,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  PanelLeftClose,
+  PanelLeft,
+  BarChart3,
+  Activity,
+  Home,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
@@ -13,19 +52,79 @@ import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
 import appServicesReal from '@/services/appServicesReal';
 import toast from 'react-hot-toast';
+import InlineDatabaseForm from '@/components/forms/InlineDatabaseForm';
+import InlineStorageForm from '@/components/forms/InlineStorageForm';
+import InlineSessionForm from '@/components/forms/InlineSessionForm';
+import InlineCacheForm from '@/components/forms/InlineCacheForm';
+import InlineMessageBrokerForm from '@/components/forms/InlineMessageBrokerForm';
+import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
 
 interface ProductTabContentProps {
   product?: IProduct;
   productId?: string;
 }
 
+// Resource category types for sidebar
+type ResourceCategory =
+  | 'overview'
+  | 'apps'
+  | 'environments'
+  | 'databases'
+  | 'storage'
+  | 'caches'
+  | 'messageBrokers'
+  | 'jobs'
+  | 'workflows'
+  | 'intelligence'
+  | 'resilience'
+  | 'notifications'
+  | 'sessions';
+
+interface ResourceCategoryConfig {
+  id: ResourceCategory;
+  label: string;
+  icon: any;
+  color: string;
+  bgColor: string;
+  dataKey: string;
+  componentType: string;
+  disabled?: boolean;
+}
+
+const resourceCategories: ResourceCategoryConfig[] = [
+  // Enabled categories first
+  { id: 'apps', label: 'Connected Apps', icon: Grid3x3, color: 'text-green', bgColor: 'bg-green/10', dataKey: 'apps', componentType: 'app' },
+  { id: 'databases', label: 'Databases', icon: Database, color: 'text-primary', bgColor: 'bg-primary/10', dataKey: 'databases', componentType: 'database' },
+  { id: 'storage', label: 'Storage', icon: HardDrive, color: 'text-purple-500', bgColor: 'bg-purple-500/10', dataKey: 'storage', componentType: 'storage' },
+  { id: 'sessions', label: 'Sessions', icon: KeyRound, color: 'text-blue-600', bgColor: 'bg-blue-600/10', dataKey: 'sessions', componentType: 'session' },
+  { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
+  { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
+  // Disabled categories (coming soon)
+  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job', disabled: true },
+  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
+  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
+  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
+];
+
 export default function ProductTabContent({ product: initialProduct, productId }: ProductTabContentProps) {
-  const { openTab, updateTab, activeTabId, tabs } = useWorkbenchStore();
+  const { openTab, updateTab, activeTabId } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
 
-  // Get initialization data from active tab if product is undefined (after refresh)
-  const activeTab = tabs.find(t => t.id === activeTabId);
-  const initialActiveSection = (activeTab?.data as any)?.activeSection || 'overview';
+  // Persistent state key based on product identifier
+  const stateKey = `product-tab-state-${initialProduct?.tag || productId || initialProduct?._id}`;
+
+  // Load persisted state from localStorage
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedState = getPersistedState();
 
   const [showAddAppModal, setShowAddAppModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
@@ -33,14 +132,44 @@ export default function ProductTabContent({ product: initialProduct, productId }
   const [selectedEnvironment, setSelectedEnvironment] = useState<any>(null);
   const [loadingAppTag, setLoadingAppTag] = useState<string | null>(null);
 
-  // Content filter state - initialize from persisted data
-  const [activeFilter, setActiveFilter] = useState<string>(initialActiveSection);
+  // Type selection dialogs for combined categories
+  const [showDatabaseTypeDialog, setShowDatabaseTypeDialog] = useState(false);
+  const [showIntelligenceTypeDialog, setShowIntelligenceTypeDialog] = useState(false);
+  const [showResilienceTypeDialog, setShowResilienceTypeDialog] = useState(false);
 
-  // Check if product data is incomplete (missing integrations, envs, name, etc.)
+  // Inline component creation state (null = not creating, string = type being created)
+  const [inlineCreateMode, setInlineCreateMode] = useState<string | null>(null);
+
+  // Sidebar state - initialized from persisted state
+  const [activeCategory, setActiveCategory] = useState<ResourceCategory>(persistedState?.activeCategory || 'overview');
+  const [searchQuery, setSearchQuery] = useState(persistedState?.searchQuery || '');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(persistedState?.isSidebarCollapsed || false);
+  const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
+
+  // Helper to change category and exit inline create mode
+  const handleCategoryChange = (category: ResourceCategory) => {
+    setInlineCreateMode(null);
+    setActiveCategory(category);
+  };
+
+  // Persist sidebar state to localStorage
+  useEffect(() => {
+    // Don't persist if we don't have a valid stateKey
+    if (!stateKey || stateKey === 'product-tab-state-undefined') return;
+
+    const stateToSave = {
+      activeCategory,
+      searchQuery,
+      isSidebarCollapsed,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [stateKey, activeCategory, searchQuery, isSidebarCollapsed]);
+
+  // Check if product data is incomplete
   const isProductDataIncomplete = initialProduct && (!initialProduct.envs || initialProduct.envs.length === 0 || !initialProduct.name);
 
-  // Fetch product data if not provided or incomplete (when restored from localStorage)
-  const { data: fetchedProductData, isLoading: isFetchingProduct } = useQuery({
+  // Fetch product data if not provided or incomplete
+  const { data: fetchedProductData, isLoading: isFetchingProduct, refetch } = useQuery({
     queryKey: ['product', productId],
     queryFn: async () => {
       if (!productId || !user?._id || !user?.public_key || !currentWorkspaceId) return null;
@@ -54,13 +183,15 @@ export default function ProductTabContent({ product: initialProduct, productId }
       return response.data;
     },
     enabled: (!initialProduct || isProductDataIncomplete) && !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data is considered fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
+    refetchOnMount: false, // Don't refetch when component mounts if data is in cache
   });
 
-  // Use fetched data if available (it's more complete), otherwise use initial product
   const product = fetchedProductData || initialProduct;
 
-  // Fetch connected apps (must be before early return)
-  const { data: productAppsRes, status: productAppsStatus } = useQuery({
+  // Fetch connected apps
+  const { data: productAppsRes, status: productAppsStatus, refetch: refetchApps } = useQuery({
     queryKey: ['product-apps', product?._id],
     queryFn: () =>
       productServices.fetchProductApps({
@@ -70,6 +201,9 @@ export default function ProductTabContent({ product: initialProduct, productId }
         product_id: product!._id,
       }),
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false, // Don't refetch when component mounts if data is in cache
   });
 
   const connectedApps = productAppsRes?.data || [];
@@ -81,7 +215,7 @@ export default function ProductTabContent({ product: initialProduct, productId }
     }
   }, [fetchedProductData, activeTabId, initialProduct, updateTab]);
 
-  // Mutation to fetch full app data by tag (MUST be before early return)
+  // Mutation to fetch full app data by tag
   const { mutate: fetchFullApp } = useMutation({
     mutationFn: (params: { tag: string; user_id: string; public_key: string }) =>
       appServicesReal.fetchAppByTag(params),
@@ -103,97 +237,131 @@ export default function ProductTabContent({ product: initialProduct, productId }
     },
   });
 
-  // Debug logging
-  useEffect(() => {
-    console.log('ProductTabContent Debug:', {
-      productId,
-      hasInitialProduct: !!initialProduct,
-      hasFetchedProductData: !!fetchedProductData,
-      hasProduct: !!product,
-      productName: product?.name,
-      isFetchingProduct,
-      isProductDataIncomplete,
-      userId: user?._id,
-      publicKey: user?.public_key,
-      currentWorkspaceId,
-    });
-  }, [productId, initialProduct, fetchedProductData, product, isFetchingProduct, isProductDataIncomplete, user, currentWorkspaceId]);
 
-  // Show skeleton loading state while fetching product data or when data is incomplete (after all hooks)
-  // Only show skeleton if we're loading AND don't have product yet, OR if product exists but name is missing
+  // Get resources for a category
+  const getResources = (category: ResourceCategoryConfig): any[] => {
+    if (category.id === 'apps') return connectedApps;
+    // Combined Databases category (databases + graphs + vectors)
+    if (category.id === 'databases') {
+      const databases = (product as any)?.databases || [];
+      const graphs = (product as any)?.graphs || [];
+      const vectors = (product as any)?.vectors || [];
+      return [
+        ...databases.map((d: any) => ({ ...d, _resourceType: 'database' })),
+        ...graphs.map((g: any) => ({ ...g, _resourceType: 'graph' })),
+        ...vectors.map((v: any) => ({ ...v, _resourceType: 'vector' })),
+      ];
+    }
+    // Combined AI category (agents + models)
+    if (category.id === 'intelligence') {
+      const agents = (product as any)?.agents || [];
+      const models = (product as any)?.models || [];
+      return [
+        ...agents.map((a: any) => ({ ...a, _resourceType: 'agent' })),
+        ...models.map((m: any) => ({ ...m, _resourceType: 'model' })),
+      ];
+    }
+    // Combined Resilience category (fallbacks + quotas + healthchecks)
+    if (category.id === 'resilience') {
+      const fallbacks = (product as any)?.fallback || [];
+      const quotas = (product as any)?.quota || [];
+      const healthchecks = (product as any)?.healthchecks || [];
+      return [
+        ...fallbacks.map((f: any) => ({ ...f, _resourceType: 'fallback' })),
+        ...quotas.map((q: any) => ({ ...q, _resourceType: 'quota' })),
+        ...healthchecks.map((h: any) => ({ ...h, _resourceType: 'healthcheck' })),
+      ];
+    }
+    // Storage
+    if (category.id === 'storage') {
+      return (product as any)?.storage || [];
+    }
+    // Caches
+    if (category.id === 'caches') {
+      return (product as any)?.caches || [];
+    }
+    // Message Brokers
+    if (category.id === 'messageBrokers') {
+      return (product as any)?.messageBrokers || [];
+    }
+    // Jobs
+    if (category.id === 'jobs') {
+      return (product as any)?.jobs || [];
+    }
+    // Workflows
+    if (category.id === 'workflows') {
+      return (product as any)?.workflows || [];
+    }
+    // Notifications
+    if (category.id === 'notifications') {
+      return (product as any)?.notifications || [];
+    }
+    // Sessions
+    if (category.id === 'sessions') {
+      return (product as any)?.sessions || [];
+    }
+    const data = (product as any)?.[category.dataKey];
+    return Array.isArray(data) ? data : [];
+  };
+
+  // Get resource count for a category (including dummy data)
+  const getResourceCount = (category: ResourceCategoryConfig): number => {
+    return getResources(category).length;
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsSidebarRefreshing(true);
+    await Promise.all([refetch(), refetchApps()]);
+    setIsSidebarRefreshing(false);
+  };
+
+  // Show skeleton loading state
   if ((isFetchingProduct && !product) || (product && !product.name)) {
     return (
-      <div className="bg-grey-100">
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
-          {/* Header Skeleton */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 bg-grey-300 rounded-lg animate-pulse" />
-              <div className="flex-1 space-y-3">
-                <div className="h-8 w-56 bg-grey-300 rounded animate-pulse" />
-                <div className="h-4 w-40 bg-grey-300 rounded animate-pulse" />
+      <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-grey-400">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-grey-300 rounded-lg animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-24 bg-grey-300 rounded animate-pulse mb-1" />
+                <div className="h-3 w-16 bg-grey-300 rounded animate-pulse" />
               </div>
             </div>
+            <div className="h-9 bg-grey-300 rounded animate-pulse" />
           </div>
-
-          {/* Filter Navigation Skeleton */}
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 bg-grey-300 rounded animate-pulse" />
-              <div className="h-4 w-24 bg-grey-300 rounded animate-pulse" />
-              <div className="flex gap-2 flex-wrap">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-9 w-32 bg-grey-300 rounded animate-pulse" />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Content Cards Skeleton */}
-          <div className="space-y-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-grey-300 rounded animate-pulse" />
-                    <div className="h-6 w-32 bg-grey-300 rounded animate-pulse" />
-                  </div>
-                  <div className="h-9 w-20 bg-grey-300 rounded animate-pulse" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4].map((j) => (
-                    <div key={j} className="p-4 rounded-lg border border-grey-400">
-                      <div className="h-5 w-3/4 bg-grey-300 rounded animate-pulse mb-2" />
-                      <div className="h-4 w-1/2 bg-grey-300 rounded animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="flex-1 p-2 space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-8 bg-grey-200 rounded animate-pulse" />
             ))}
           </div>
+        </div>
+        <div className="flex-1 p-6">
+          <div className="h-32 bg-grey-200 rounded-lg animate-pulse mb-4" />
+          <div className="h-64 bg-grey-200 rounded-lg animate-pulse" />
         </div>
       </div>
     );
   }
 
-  // Show error state if product couldn't be loaded
+  // Show error state
   if (!product && !isFetchingProduct) {
     return (
       <div className="flex items-center justify-center h-full bg-grey-100">
         <div className="text-center">
           <p className="text-red text-lg mb-2">Failed to load product</p>
           <p className="text-grey-600">The product data could not be retrieved.</p>
-          {productId && (
-            <p className="text-grey-500 text-sm mt-2">Product ID: {productId}</p>
-          )}
+          {productId && <p className="text-grey-500 text-sm mt-2">Product ID: {productId}</p>}
         </div>
       </div>
     );
   }
 
   const getInitials = (name: string) => {
-    return name?.split(' ')
-      .map(word => word[0])
+    return name
+      ?.split(' ')
+      .map((word) => word[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -207,26 +375,66 @@ export default function ProductTabContent({ product: initialProduct, productId }
       itemId: component._id,
       data: {
         ...component,
-        // Explicitly preserve these core properties for localStorage restoration
         name: component.name,
         tag: component.tag,
         componentType: type,
         productName: product?.name,
         productTag: product?.tag,
         productLogo: product?.logo,
-        productEnvironments: product?.envs || []
+        productEnvironments: product?.envs || [],
       },
     });
   };
 
   const handleAddComponent = (type: string) => {
-    // Show modal for environment creation instead of opening a tab
     if (type === 'environment') {
       setShowCreateEnvModal(true);
       return;
     }
+    if (type === 'app') {
+      setShowAddAppModal(true);
+      return;
+    }
+    // Show type selection dialog for combined categories
+    if (type === 'database') {
+      setShowDatabaseTypeDialog(true);
+      return;
+    }
+    if (type === 'intelligence') {
+      setShowIntelligenceTypeDialog(true);
+      return;
+    }
+    if (type === 'resilience') {
+      setShowResilienceTypeDialog(true);
+      return;
+    }
+    // Use inline forms for storage, session, cache, message-broker, and notification
+    if (type === 'storage') {
+      setInlineCreateMode('storage');
+      return;
+    }
+    if (type === 'session') {
+      setInlineCreateMode('session');
+      return;
+    }
+    if (type === 'cache') {
+      setInlineCreateMode('cache');
+      return;
+    }
+    if (type === 'message-broker') {
+      setInlineCreateMode('message-broker');
+      return;
+    }
+    if (type === 'notification') {
+      setInlineCreateMode('notifier');
+      return;
+    }
 
-    // Open a new tab for creating other components
+    openNewComponentTab(type);
+  };
+
+  // Helper to open a new component tab
+  const openNewComponentTab = (type: string) => {
     openTab({
       id: `new-${type}-${Date.now()}`,
       type: type as any,
@@ -239,16 +447,15 @@ export default function ProductTabContent({ product: initialProduct, productId }
         productLogo: product?.logo,
         productEnvs: product?.envs || [],
         workspaceId: currentWorkspaceId,
-        // Additional data for jobs (parent/event selection)
         productApps: connectedApps || [],
         productDatabases: product?.databases || [],
         productMessageBroker: product?.messageBrokers || [],
         productNotifications: product?.notifications || [],
         productStorage: product?.storage || [],
         productSessions: product?.sessions || [],
-        isNew: true
+        isNew: true,
       },
-      isDirty: true, // Mark as dirty to trigger new component forms
+      isDirty: true,
     });
   };
 
@@ -259,8 +466,6 @@ export default function ProductTabContent({ product: initialProduct, productId }
 
   const handleOpenApp = (app: any) => {
     setLoadingAppTag(app.tag || app.app_tag);
-
-    // Fetch full app data by tag
     fetchFullApp({
       tag: app.tag || app.app_tag,
       user_id: user?._id || '',
@@ -268,573 +473,1239 @@ export default function ProductTabContent({ product: initialProduct, productId }
     });
   };
 
+  // Open database explorer for a specific environment
+  const handleOpenDatabaseExplorer = (database: any, env: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    openTab({
+      id: `db-explorer-${database.tag}-${env.slug}`,
+      type: 'database',
+      title: `${database.name} (${env.slug})`,
+      itemId: `${database.tag}-${env.slug}`,
+      data: {
+        database: {
+          name: database.name,
+          tag: database.tag,
+          type: database.type,
+          env: env,
+          productTag: product?.tag,
+          productName: product?.name,
+        },
+        isExplorer: true,
+      },
+    });
+  };
+
+  // Open resource explorer for a specific environment (generic handler for all resource types)
+  const handleOpenResourceExplorer = (resource: any, resourceType: string, env: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+
+    // Map resource types to tab types
+    // Some resource types open directly to their "values/events/files" views
+    const typeMap: Record<string, string> = {
+      'database': 'database',
+      'graph': 'graph',
+      'vector': 'vector',
+      'storage': 'storage',  // Opens StorageExplorerTab (files view)
+      'cache': 'cache-values',  // Opens directly to cache values
+      'message-broker': 'message-broker-events',  // Opens directly to broker events
+      'session': 'session-activity',  // Opens SessionActivityTab
+      'job': 'jobs-explorer',  // Opens JobsExplorerTab
+      'workflow': 'workflow',  // Opens WorkflowExplorerTab
+      'agent': 'agent',  // Opens AgentExplorerTab
+      'fallback': 'fallback-explorer',  // Opens FallbackExplorerTab
+      'quota': 'quota-explorer',  // Opens QuotaExplorerTab
+      'healthcheck': 'healthcheck-explorer',  // Opens HealthcheckExplorerTab
+      'notification': 'notification-explorer',
+    };
+
+    const tabType = typeMap[resourceType] || resourceType;
+
+    // Build resource data object for explorer tabs
+    const resourceData = {
+      name: resource.name,
+      tag: resource.tag,
+      type: resource.type,
+      env: env,
+      productTag: product?.tag,
+      productName: product?.name,
+    };
+
+    // Different resource types expect different data structures
+    // Database, Graph, Storage explorers expect nested objects
+    let data: any = {
+      isExplorer: true,
+      componentType: resourceType,
+      productTag: product?.tag,
+      productName: product?.name,
+      productLogo: product?.logo,
+    };
+
+    if (resourceType === 'database' || resourceType === 'graph' || resourceType === 'vector') {
+      // These use nested object structure (database/graph/vector key)
+      data.database = resourceData;
+      data.graph = resourceData;
+      data.vector = resourceData;
+    } else if (resourceType === 'storage') {
+      // StorageExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        storage: {
+          ...resource,
+          name: resource.name,
+          tag: resource.tag,
+          type: resource.type,
+          env: env,
+          productTag: product?.tag,
+          productName: product?.name,
+        },
+        isExplorer: true,
+      };
+    } else if (resourceType === 'cache') {
+      // CacheValuesTabContent expects cache data with env info
+      data = {
+        ...resource,
+        name: resource.name,
+        tag: resource.tag,
+        env: env,
+        productTag: product?.tag,
+        productName: product?.name,
+      };
+    } else if (resourceType === 'message-broker') {
+      // MessageBrokerEventsTabContent expects broker data with env info
+      data = {
+        ...resource,
+        name: resource.name,
+        tag: resource.tag,
+        env: env,
+        productTag: product?.tag,
+        productName: product?.name,
+      };
+    } else if (resourceType === 'workflow') {
+      // WorkflowExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        workflow: {
+          ...resource,
+          name: resource.name,
+          tag: resource.tag,
+          productTag: product?.tag,
+          env: { slug: env.slug },
+        },
+        isExplorer: true,
+      };
+    } else if (resourceType === 'agent') {
+      // AgentExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        agent: {
+          ...resource,
+          name: resource.name,
+          tag: resource.tag,
+          productTag: product?.tag,
+          env: { slug: env.slug },
+        },
+        isExplorer: true,
+      };
+    } else if (resourceType === 'session') {
+      // SessionActivityTab expects session, sessionTag, productTag, productName
+      data = {
+        session: {
+          ...resource,
+          env: env,
+        },
+        sessionTag: resource.tag,
+        productTag: product?.tag,
+        productName: product?.name,
+      };
+    } else if (resourceType === 'notification') {
+      // NotificationExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        notification: resource,
+        isExplorer: true,
+      };
+    } else if (resourceType === 'fallback') {
+      // FallbackExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        fallback: resource,
+        isExplorer: true,
+      };
+    } else if (resourceType === 'quota') {
+      // QuotaExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        quota: resource,
+        isExplorer: true,
+      };
+    } else if (resourceType === 'healthcheck') {
+      // HealthcheckExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        healthcheck: resource,
+        isExplorer: true,
+      };
+    } else if (resourceType === 'job') {
+      // JobsExplorerTab expects product object with tag, name, and envs
+      data = {
+        product: {
+          tag: product?.tag,
+          name: product?.name,
+          logo: product?.logo,
+          envs: product?.envs || [],
+        },
+        job: resource,
+        isExplorer: true,
+      };
+    } else {
+      // Other resource types use flat structure
+      data = {
+        ...resource,
+        ...data,
+        env: env,
+        selectedEnv: env,
+      };
+    }
+
+    openTab({
+      id: `${tabType}-explorer-${resource.tag}-${env.slug}`,
+      type: tabType as any,
+      title: `${resource.name} (${env.slug})`,
+      itemId: `${resource.tag}-${env.slug}`,
+      data,
+    });
+  };
+
+  // Render resource card (using old design style)
+  const renderResourceCard = (item: any, category: ResourceCategoryConfig) => {
+    const itemName = item.name || item.app_name || item.tag || item.env_name;
+    const isLoadingApp = category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
+    const isActive = item.status === 'active' || item.active;
+
+    // For combined categories, determine the actual resource type
+    const resourceType = item._resourceType || category.componentType;
+
+    // Check if this resource has environments configured
+    // For caches and sessions (product-level resources without their own envs), use product environments
+    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions') && product?.envs?.length;
+    const itemEnvs = Array.isArray(item.envs) && item.envs.length > 0
+      ? item.envs
+      : useProductEnvs
+        ? product.envs.map((env: any) => ({ slug: env.slug }))
+        : [];
+    const hasEnvs = itemEnvs.length > 0;
+
+    // Resource types that should NOT show env explorer buttons (apps and environments don't make sense to have explorer)
+    const excludeEnvButtons = category.id === 'apps' || category.id === 'environments';
+
+    // Get the appropriate icon for combined categories
+    const getItemIcon = () => {
+      // Databases category
+      if (item._resourceType === 'database') return Database;
+      if (item._resourceType === 'graph') return Share2;
+      if (item._resourceType === 'vector') return Boxes;
+      // AI category
+      if (item._resourceType === 'agent') return Bot;
+      if (item._resourceType === 'model') return Brain;
+      // Resilience category
+      if (item._resourceType === 'fallback') return Shield;
+      if (item._resourceType === 'quota') return Timer;
+      if (item._resourceType === 'healthcheck') return Heart;
+      return category.icon;
+    };
+
+    const ItemIcon = getItemIcon();
+
+    // Get database type badge styling
+    const getDatabaseTypeBadge = () => {
+      if (item._resourceType === 'graph') {
+        if (item.type) {
+          const type = item.type.toLowerCase();
+          if (type.includes('neo4j')) {
+            return { label: 'Neo4j', bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+          }
+          if (type.includes('neptune')) {
+            return { label: 'Neptune', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+          }
+          if (type.includes('arango')) {
+            return { label: 'ArangoDB', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+          }
+          if (type.includes('memgraph')) {
+            return { label: 'Memgraph', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+          }
+          // Default for other graph types
+          return { label: item.type, bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+        }
+        return { label: 'Graph', bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+      }
+      if (item._resourceType === 'vector') {
+        if (item.type) {
+          const type = item.type.toLowerCase();
+          if (type.includes('pinecone')) {
+            return { label: 'Pinecone', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+          }
+          if (type.includes('weaviate')) {
+            return { label: 'Weaviate', bgColor: 'bg-pink-100', textColor: 'text-pink-700' };
+          }
+          if (type.includes('qdrant')) {
+            return { label: 'Qdrant', bgColor: 'bg-red-100', textColor: 'text-red-700' };
+          }
+          if (type.includes('milvus')) {
+            return { label: 'Milvus', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+          }
+          if (type.includes('chroma')) {
+            return { label: 'Chroma', bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' };
+          }
+          if (type.includes('memory')) {
+            return { label: 'Memory', bgColor: 'bg-gray-100', textColor: 'text-gray-700' };
+          }
+          // Default for other vector types - show the actual type
+          return { label: item.type, bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+        }
+        return { label: 'Vector', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+      }
+      if (item._resourceType === 'database' && item.type) {
+        const type = item.type.toLowerCase();
+        // SQL databases
+        if (type.includes('postgres') || type === 'postgresql') {
+          return { label: 'PostgreSQL', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+        }
+        if (type.includes('mysql')) {
+          return { label: 'MySQL', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+        }
+        if (type.includes('sqlite')) {
+          return { label: 'SQLite', bgColor: 'bg-sky-100', textColor: 'text-sky-700' };
+        }
+        if (type.includes('mssql') || type.includes('sqlserver')) {
+          return { label: 'SQL Server', bgColor: 'bg-red-100', textColor: 'text-red-700' };
+        }
+        // NoSQL databases
+        if (type.includes('mongo')) {
+          return { label: 'MongoDB', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+        }
+        if (type.includes('redis')) {
+          return { label: 'Redis', bgColor: 'bg-rose-100', textColor: 'text-rose-700' };
+        }
+        if (type.includes('dynamo')) {
+          return { label: 'DynamoDB', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+        }
+        if (type.includes('cassandra')) {
+          return { label: 'Cassandra', bgColor: 'bg-teal-100', textColor: 'text-teal-700' };
+        }
+        if (type.includes('couch')) {
+          return { label: 'CouchDB', bgColor: 'bg-pink-100', textColor: 'text-pink-700' };
+        }
+        if (type.includes('firebase') || type.includes('firestore')) {
+          return { label: 'Firestore', bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' };
+        }
+        // Default for other types
+        return { label: item.type, bgColor: 'bg-grey-100', textColor: 'text-grey-700' };
+      }
+      return null;
+    };
+
+    const databaseTypeBadge = (item._resourceType === 'database' || item._resourceType === 'graph' || item._resourceType === 'vector')
+      ? getDatabaseTypeBadge()
+      : null;
+
+    // Get category-specific detail text
+    const getDetailText = () => {
+      if (category.id === 'caches' && item.expiry) {
+        return `TTL: ${item.expiry} ${item.period}`;
+      }
+      if (category.id === 'sessions' && item.expiry) {
+        return `TTL: ${item.expiry} ${item.period}`;
+      }
+      // Skip database types - handled by badge now
+      if (item._resourceType === 'database' || item._resourceType === 'graph' || item._resourceType === 'vector') {
+        return null;
+      }
+      // AI category - models
+      if (item._resourceType === 'model' && item.provider) {
+        return item.provider;
+      }
+      // AI category - agents
+      if (item._resourceType === 'agent' && item.model) {
+        return typeof item.model === 'string' ? item.model : item.model.model;
+      }
+      if (category.id === 'jobs' && item.schedule) {
+        return item.schedule;
+      }
+      if (category.id === 'workflows' && item.steps?.length) {
+        return `${item.steps.length} steps`;
+      }
+      // Resilience category - show type
+      if (item._resourceType === 'fallback') return 'Fallback';
+      if (item._resourceType === 'quota') return 'Quota';
+      if (item._resourceType === 'healthcheck') return 'Health Check';
+      return null;
+    };
+
+    const detailText = getDetailText();
+
+    return (
+      <div
+        key={item._id}
+        onClick={() => {
+          if (category.id === 'apps') {
+            handleOpenApp(item);
+          } else if (category.id === 'environments') {
+            handleEditEnvironment(item);
+          } else {
+            // For combined categories, use the actual resource type
+            handleOpenComponent(item, resourceType);
+          }
+        }}
+        className={cn(
+          'bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer',
+          isLoadingApp && 'opacity-70 cursor-wait'
+        )}
+      >
+        <div className="flex items-start gap-3">
+          {/* Icon/Logo */}
+          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', category.bgColor)}>
+            {isLoadingApp ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : item.logo ? (
+              <img src={item.logo} alt={itemName} className="w-8 h-8 rounded object-cover" />
+            ) : (
+              <ItemIcon className={cn('h-5 w-5', category.color)} />
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-sm font-medium text-grey truncate">{itemName}</h3>
+              {/* Status badge */}
+              {(item.status || item.active !== undefined) && (
+                <span
+                  className={cn(
+                    'px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0',
+                    isActive
+                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                  )}
+                >
+                  {item.status || (isActive ? 'Active' : 'Inactive')}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-grey-500 truncate">{item.tag || item.slug}</p>
+
+            {/* Database Type Badge */}
+            {databaseTypeBadge && (
+              <span className={cn(
+                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
+                databaseTypeBadge.bgColor,
+                databaseTypeBadge.textColor
+              )}>
+                {databaseTypeBadge.label}
+              </span>
+            )}
+
+            {/* Description */}
+            {item.description && (
+              <p className="text-xs text-grey-600 mt-1.5 line-clamp-2">{item.description}</p>
+            )}
+
+            {/* Category-specific detail */}
+            {detailText && (
+              <p className="text-xs text-grey-500 mt-1.5">{detailText}</p>
+            )}
+
+            {/* Environment Quick Access Buttons */}
+            {hasEnvs && !excludeEnvButtons && (
+              <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                <ItemIcon className="h-3.5 w-3.5 text-grey-400 flex-shrink-0" />
+                {itemEnvs.map((env: any) => (
+                  <button
+                    key={env.slug}
+                    onClick={(e) => handleOpenResourceExplorer(item, resourceType, env, e)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+                    title={`Open ${resourceType} explorer for ${env.slug}`}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {env.slug}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Get category description for empty states
+  const getCategoryDescription = (categoryId: string) => {
+    const descriptions: Record<string, string> = {
+      apps: 'Connect external applications and services to extend your product\'s capabilities.',
+      environments: 'Configure deployment environments for development, staging, and production.',
+      databases: 'Set up databases, graph stores, and vector stores to manage your application data.',
+      storage: 'Configure file storage solutions for documents, images, and media.',
+      caches: 'Add caching layers to improve performance and reduce latency.',
+      messageBrokers: 'Set up message queues for asynchronous communication between services.',
+      jobs: 'Schedule background tasks and automated workflows.',
+      workflows: 'Design multi-step processes and business logic flows.',
+      intelligence: 'Configure AI agents and models for intelligent automation and predictions.',
+      resilience: 'Set up fallbacks, quotas, and health checks for reliable operations.',
+      notifications: 'Set up notification channels and alert rules.',
+      sessions: 'Manage user session configurations.',
+    };
+    return descriptions[categoryId] || 'Get started by adding your first item.';
+  };
+
+  // Render category content (cards view)
+  const renderCategoryContent = (category: ResourceCategoryConfig) => {
+    const resources = getResources(category);
+    const count = getResourceCount(category);
+    const Icon = category.icon;
+
+    // Filter by search if present
+    const filteredResources = searchQuery
+      ? resources.filter(
+          (item) =>
+            item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.app_name?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : resources;
+
+    const singularLabel = category.label.replace(/s$/, '').replace(/ies$/, 'y');
+
+    return (
+      <div className="h-full overflow-auto">
+        {/* Header Section */}
+        <div className="bg-white dark:bg-background border-b border-grey-300 sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  'w-12 h-12 rounded-xl flex items-center justify-center shadow-sm',
+                  category.bgColor
+                )}>
+                  <Icon className={cn('h-6 w-6', category.color)} />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-grey">{category.label}</h1>
+                  <p className="text-sm text-grey-500">
+                    {count} {count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()} configured
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Search bar - always visible when there are items */}
+                {count > 0 && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-400" />
+                    <Input
+                      type="text"
+                      placeholder={`Search...`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 w-64 bg-white-700"
+                    />
+                  </div>
+                )}
+                <Button
+                  onClick={() => handleAddComponent(category.componentType)}
+                  className="gap-2 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          {filteredResources.length > 0 ? (
+            <>
+              {/* Results count when searching */}
+              {searchQuery && (
+                <p className="text-sm text-grey-500 mb-4">
+                  Showing {filteredResources.length} of {count} {count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()}
+                </p>
+              )}
+
+              {/* Resources Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {filteredResources.map((item) => renderResourceCard(item, category))}
+              </div>
+            </>
+          ) : (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center py-20">
+              {/* Decorative background */}
+              <div className="relative mb-8">
+                <div className={cn(
+                  'w-24 h-24 rounded-2xl flex items-center justify-center',
+                  category.bgColor
+                )}>
+                  <Icon className={cn('h-12 w-12', category.color)} />
+                </div>
+                {/* Decorative dots */}
+                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
+                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
+                <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
+              </div>
+
+              {searchQuery ? (
+                <>
+                  <h3 className="text-xl font-semibold text-grey mb-2">No results found</h3>
+                  <p className="text-grey-500 text-center max-w-md mb-6">
+                    We couldn't find any {category.label.toLowerCase()} matching "<span className="font-medium text-grey">{searchQuery}</span>"
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSearchQuery('')}
+                    className="gap-2"
+                  >
+                    Clear search
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-semibold text-grey mb-2">
+                    No {category.label.toLowerCase()} yet
+                  </h3>
+                  <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+                    {getCategoryDescription(category.id)}
+                  </p>
+                  <Button
+                    onClick={() => handleAddComponent(category.componentType)}
+                    className="gap-2 shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render overview dashboard (activity-focused)
+  const renderOverview = () => {
+    // Calculate some mock activity metrics (in real app, these would come from API)
+    const totalResources = resourceCategories.reduce((sum, cat) => sum + getResourceCount(cat), 0);
+    const activeEnvCount = product?.envs?.filter((e: any) => e.active)?.length || 0;
+
+    return (
+      <div className="h-full overflow-auto p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Product Header */}
+          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                {product?.logo ? (
+                  <img src={product.logo} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                ) : (
+                  getInitials(String(product?.name))
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-2xl font-bold text-grey">{product?.name}</h1>
+                  {product?.status && (
+                    <span
+                      className={cn(
+                        'px-3 py-1 rounded-full text-xs font-semibold border',
+                        product.status === 'active'
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                          : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                      )}
+                    >
+                      {product.status}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-grey-600 mb-3">{product?.tag}</p>
+                {product?.description && (
+                  <div className="text-grey-600">
+                    <MarkdownViewer content={product.description} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Dashboard Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Activity Stats */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Key Metrics */}
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-grey mb-4">Overview</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 rounded-lg bg-grey-50">
+                    <p className="text-3xl font-bold text-primary">{totalResources}</p>
+                    <p className="text-sm text-grey-600">Total Resources</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-grey-50">
+                    <p className="text-3xl font-bold text-green">{connectedApps.length}</p>
+                    <p className="text-sm text-grey-600">Connected Apps</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-grey-50">
+                    <p className="text-3xl font-bold text-blue-500">{product?.envs?.length || 0}</p>
+                    <p className="text-sm text-grey-600">Environments</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-grey-50">
+                    <p className="text-3xl font-bold text-purple-500">{activeEnvCount}</p>
+                    <p className="text-sm text-grey-600">Active Envs</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity Placeholder */}
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-grey mb-4">Recent Activity</h2>
+                <div className="space-y-3">
+                  {/* Activity items would be populated from an API in a real implementation */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
+                    <div className="w-8 h-8 rounded-full bg-green/10 flex items-center justify-center">
+                      <Activity className="h-4 w-4 text-green" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-grey">Product initialized</p>
+                      <p className="text-xs text-grey-500">Ready for configuration</p>
+                    </div>
+                  </div>
+                  {connectedApps.length > 0 && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                        <Grid3x3 className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-grey">{connectedApps.length} app{connectedApps.length !== 1 ? 's' : ''} connected</p>
+                        <p className="text-xs text-grey-500">External integrations active</p>
+                      </div>
+                    </div>
+                  )}
+                  {(product?.databases?.length || 0) > 0 && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Database className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-grey">{product?.databases?.length} database{(product?.databases?.length || 0) !== 1 ? 's' : ''} configured</p>
+                        <p className="text-xs text-grey-500">Data layer ready</p>
+                      </div>
+                    </div>
+                  )}
+                  {(product?.features?.length || 0) > 0 && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
+                      <div className="w-8 h-8 rounded-full bg-pink-500/10 flex items-center justify-center">
+                        <Workflow className="h-4 w-4 text-pink-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-grey">{product?.features?.length} feature{(product?.features?.length || 0) !== 1 ? 's' : ''} defined</p>
+                        <p className="text-xs text-grey-500">Business logic configured</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Quick Actions & Health */}
+            <div className="space-y-6">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-grey mb-4">Quick Actions</h2>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setShowAddAppModal(true)}
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                    Connect App
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setShowCreateEnvModal(true)}
+                  >
+                    <Settings2 className="h-4 w-4" />
+                    Add Environment
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => handleAddComponent('database')}
+                  >
+                    <Database className="h-4 w-4" />
+                    Add Database
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => handleAddComponent('feature')}
+                  >
+                    <Workflow className="h-4 w-4" />
+                    Create Workflow
+                  </Button>
+                </div>
+              </div>
+
+              {/* Environments */}
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-grey">Environments</h2>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-grey-100 text-grey-600">
+                      {product?.envs?.length || 0}
+                    </span>
+                  </div>
+                </div>
+                {(product?.envs?.length || 0) > 0 ? (
+                  <div className="space-y-2">
+                    {product?.envs?.slice(0, 4).map((env: any) => {
+                      const envSlug = env.slug?.toLowerCase() || '';
+                      const isProduction = envSlug.includes('prod') || envSlug === 'live';
+                      const isStaging = envSlug.includes('stag') || envSlug.includes('uat');
+
+                      return (
+                        <button
+                          key={env._id}
+                          onClick={() => handleEditEnvironment(env)}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-grey-200 hover:border-primary hover:bg-grey-50 transition-all group"
+                        >
+                          {/* Status dot */}
+                          <div className={cn(
+                            "w-2.5 h-2.5 rounded-full flex-shrink-0",
+                            env.active ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"
+                          )} />
+
+                          {/* Name and slug */}
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-grey group-hover:text-primary transition-colors">
+                                {env.name}
+                              </span>
+                              {isProduction && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red/10 text-red">
+                                  PROD
+                                </span>
+                              )}
+                              {isStaging && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-500/10 text-orange-600">
+                                  STAGING
+                                </span>
+                              )}
+                            </div>
+                            {/* Slug badge */}
+                            <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-grey-100 text-grey-600">
+                              {env.slug}
+                            </span>
+                          </div>
+
+                          {/* Status badge */}
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-semibold border flex-shrink-0",
+                            env.active
+                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+                              : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                          )}>
+                            {env.active ? "Active" : "Inactive"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border-2 border-dashed border-grey-200 rounded-lg">
+                    <Settings2 className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                    <p className="text-sm text-grey-600 mb-1">No environments yet</p>
+                    <p className="text-xs text-grey-500">Configure dev, staging, and production</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Environments config (not a resource, handled separately)
+  const environmentsConfig: ResourceCategoryConfig = {
+    id: 'environments',
+    label: 'Environments',
+    icon: Settings2,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
+    dataKey: 'envs',
+    componentType: 'environment',
+  };
+
+  // Render main content based on active category
+  const renderMainContent = () => {
+    // Show inline forms if in create mode
+    if (inlineCreateMode && product) {
+      const productProps = {
+        _id: product._id,
+        name: product.name,
+        tag: product.tag,
+        logo: product.logo,
+        envs: product.envs || [],
+        workspace_id: currentWorkspaceId || undefined,
+      };
+
+      const formCallbacks = {
+        onCancel: () => setInlineCreateMode(null),
+        onSuccess: () => {
+          setInlineCreateMode(null);
+          refetch();
+        },
+      };
+
+      // Database types (database, graph, vector)
+      if (inlineCreateMode === 'database' || inlineCreateMode === 'graph' || inlineCreateMode === 'vector') {
+        return (
+          <InlineDatabaseForm
+            product={productProps}
+            databaseType={inlineCreateMode as 'database' | 'graph' | 'vector'}
+            {...formCallbacks}
+          />
+        );
+      }
+
+      // Storage
+      if (inlineCreateMode === 'storage') {
+        return <InlineStorageForm product={productProps} {...formCallbacks} />;
+      }
+
+      // Session
+      if (inlineCreateMode === 'session') {
+        return <InlineSessionForm product={productProps} {...formCallbacks} />;
+      }
+
+      // Cache
+      if (inlineCreateMode === 'cache') {
+        return <InlineCacheForm product={productProps} {...formCallbacks} />;
+      }
+
+      // Message Broker
+      if (inlineCreateMode === 'message-broker') {
+        return <InlineMessageBrokerForm product={productProps} {...formCallbacks} />;
+      }
+
+      // Notifier
+      if (inlineCreateMode === 'notifier') {
+        return <InlineNotifierForm product={productProps} {...formCallbacks} />;
+      }
+    }
+
+    if (activeCategory === 'overview') {
+      return renderOverview();
+    }
+
+    // Handle environments separately (not a resource)
+    if (activeCategory === 'environments') {
+      return renderCategoryContent(environmentsConfig);
+    }
+
+    const category = resourceCategories.find((c) => c.id === activeCategory);
+    if (category) {
+      return renderCategoryContent(category);
+    }
+
+    return renderOverview();
+  };
+
   return (
-    <div className="bg-grey-100">
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        {/* Product Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            {/* Logo */}
-            <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+      {/* Sidebar */}
+      <div
+        className={cn(
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300',
+          isSidebarCollapsed ? 'w-14' : 'w-64'
+        )}
+      >
+        {/* Header */}
+        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-3')}>
+          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2')}>
+            {/* Product Logo */}
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                } else {
+                  handleCategoryChange('overview');
+                }
+              }}
+              className={cn(
+                'rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0 transition-all hover:ring-2 hover:ring-primary/50',
+                isSidebarCollapsed ? 'w-8 h-8 text-sm' : 'w-9 h-9 text-sm'
+              )}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Return to overview'}
+            >
               {product?.logo ? (
-                <img
-                  src={product?.logo}
-                  alt={product?.name}
-                  className="w-full h-full rounded-lg object-cover"
-                />
+                <img src={product.logo} alt={product.name} className="w-full h-full rounded-lg object-cover" />
               ) : (
                 getInitials(String(product?.name))
               )}
+            </button>
+            {!isSidebarCollapsed && (
+              <>
+                <button
+                  onClick={() => handleCategoryChange('overview')}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  title="Return to overview"
+                >
+                  <h2 className="font-semibold text-grey text-sm truncate">{product?.name}</h2>
+                  <p className="text-xs text-grey-600 truncate">{product?.tag}</p>
+                </button>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        {!isSidebarCollapsed ? (
+          <div className="flex-1 overflow-y-auto py-2 min-h-0">
+            {/* Overview */}
+            <div className="px-2 mb-1">
+              <button
+                onClick={() => handleCategoryChange('overview')}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                  activeCategory === 'overview'
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-grey hover:bg-grey-100'
+                )}
+              >
+                <Home className="h-4 w-4 flex-shrink-0" />
+                <span>Overview</span>
+              </button>
             </div>
 
-            {/* Product Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-grey">{product?.name}</h1>
-                <span className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium',
-                  product?.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                )}>
-                  {product?.status}
+            {/* Environments - below Overview */}
+            <div className="px-2 mb-1">
+              <button
+                onClick={() => handleCategoryChange('environments')}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                  activeCategory === 'environments'
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-grey hover:bg-grey-100'
+                )}
+              >
+                <Settings2 className={cn('h-4 w-4 flex-shrink-0', activeCategory === 'environments' ? 'text-primary' : 'text-grey-600')} />
+                <span className="flex-1 text-left">Environments</span>
+                <span
+                  className={cn(
+                    'text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center',
+                    activeCategory === 'environments' ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600'
+                  )}
+                >
+                  {product?.envs?.length || 0}
                 </span>
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="px-4 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-grey-500 uppercase tracking-wider">Resources</span>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isSidebarRefreshing}
+                  className="text-grey-500 hover:text-primary transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+                </button>
               </div>
-              <p className="text-sm text-grey-600 mb-3">{product?.tag}</p>
-              {product?.description && (
-                <div className="text-grey-600">
-                  <MarkdownViewer content={product?.description} />
-                </div>
-              )}
+            </div>
+
+            {/* Categories */}
+            <div className="px-2 space-y-0.5">
+              {resourceCategories.map((category) => {
+                const count = getResourceCount(category);
+                const Icon = category.icon;
+                const isActive = activeCategory === category.id;
+                const isDisabled = category.disabled;
+
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => !isDisabled && handleCategoryChange(category.id)}
+                    disabled={isDisabled}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                      isDisabled
+                        ? 'text-grey-400 cursor-not-allowed opacity-50'
+                        : isActive
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-grey hover:bg-grey-100'
+                    )}
+                  >
+                    <Icon className={cn('h-4 w-4 flex-shrink-0', isDisabled ? 'text-grey-400' : isActive ? 'text-primary' : 'text-grey-600')} />
+                    <span className="flex-1 text-left truncate">{category.label}</span>
+                    <span
+                      className={cn(
+                        'text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center',
+                        isDisabled ? 'bg-grey-100 text-grey-400' : isActive ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600'
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
-
-        {/* Content Filter Navigation */}
-        <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-grey-600" />
-            <span className="text-sm font-medium text-grey-600">Quick Access:</span>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={activeFilter === 'overview' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('overview')}
-                className="gap-2"
+        ) : (
+          <div className="flex-1 overflow-y-auto py-2 min-h-0">
+            {/* Collapsed: Overview */}
+            <div className="px-2 mb-1">
+              <button
+                onClick={() => {
+                  handleCategoryChange('overview');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn(
+                  'w-full flex items-center justify-center p-2 rounded-lg transition-colors',
+                  activeCategory === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100'
+                )}
+                title="Overview"
               >
-                <Grid3x3 className="h-4 w-4" />
-                Overview
-              </Button>
-              <Button
-                variant={activeFilter === 'apps' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('apps')}
-                className="gap-2"
-              >
-                <Grid3x3 className="h-4 w-4" />
-                Apps ({connectedApps.length})
-              </Button>
-              <Button
-                variant={activeFilter === 'environments' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('environments')}
-                className="gap-2"
-              >
-                <Settings2 className="h-4 w-4" />
-                Environments ({product?.envs?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'databases' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('databases')}
-                className="gap-2"
-              >
-                <Database className="h-4 w-4" />
-                Databases ({product?.databases?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'graphs' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('graphs')}
-                className="gap-2"
-              >
-                <Share2 className="h-4 w-4" />
-                Graphs ({product?.graphs?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'storage' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('storage')}
-                className="gap-2"
-              >
-                <HardDrive className="h-4 w-4" />
-                Storage ({product?.storage?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'caches' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('caches')}
-                className="gap-2"
-              >
-                <Layers className="h-4 w-4" />
-                Caches ({product?.caches?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'messageBrokers' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('messageBrokers')}
-                className="gap-2"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Message Brokers ({product?.messageBrokers?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'jobs' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('jobs')}
-                className="gap-2"
-              >
-                <Box className="h-4 w-4" />
-                Jobs ({product?.jobs?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'workflows' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('workflows')}
-                className="gap-2"
-              >
-                <GitBranch className="h-4 w-4" />
-                Workflows ({product?.workflows?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'vectors' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('vectors')}
-                className="gap-2"
-              >
-                <Boxes className="h-4 w-4" />
-                Vectors ({product?.vectors?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'agents' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('agents')}
-                className="gap-2"
-              >
-                <Bot className="h-4 w-4" />
-                Agents ({product?.agents?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'models' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('models')}
-                className="gap-2"
-              >
-                <Brain className="h-4 w-4" />
-                Models ({product?.models?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'features' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('features')}
-                className="gap-2"
-              >
-                <Workflow className="h-4 w-4" />
-                Features ({product?.features?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'fallbacks' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('fallbacks')}
-                className="gap-2"
-              >
-                <Shield className="h-4 w-4" />
-                Fallbacks ({product?.fallback?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'quotas' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('quotas')}
-                className="gap-2"
-              >
-                <Timer className="h-4 w-4" />
-                Quotas ({product?.quota?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'healthchecks' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('healthchecks')}
-                className="gap-2"
-              >
-                <Heart className="h-4 w-4" />
-                Health Checks ({product?.healthchecks?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'notifications' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('notifications')}
-                className="gap-2"
-              >
-                <Bell className="h-4 w-4" />
-                Notifiers ({product?.notifications?.length || 0})
-              </Button>
-              <Button
-                variant={activeFilter === 'sessions' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('sessions')}
-                className="gap-2"
-              >
-                <KeyRound className="h-4 w-4" />
-                Sessions ({product?.sessions?.length || 0})
-              </Button>
+                <Home className="h-5 w-5" />
+              </button>
             </div>
-          </div>
-        </div>
 
-        {/* Product Stats Grid */}
-        <div className="overflow-x-auto -mx-6 px-6">
-          <div className="flex gap-4 min-w-max pb-2">
-            {/* Environments */}
-            <button
-              onClick={() => setActiveFilter('environments')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Settings2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.envs?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Environments</p>
-                </div>
-              </div>
-            </button>
+            {/* Collapsed: Environments */}
+            <div className="px-2 mb-1">
+              <button
+                onClick={() => {
+                  handleCategoryChange('environments');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn(
+                  'w-full flex items-center justify-center p-2 rounded-lg transition-colors relative',
+                  activeCategory === 'environments' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100'
+                )}
+                title={`Environments (${product?.envs?.length || 0})`}
+              >
+                <Settings2 className={cn('h-5 w-5', activeCategory === 'environments' ? 'text-primary' : 'text-grey-600')} />
+                {(product?.envs?.length || 0) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
+                    {(product?.envs?.length || 0) > 9 ? '9+' : product?.envs?.length}
+                  </span>
+                )}
+              </button>
+            </div>
 
-            {/* Connected Apps */}
-            <button
-              onClick={() => setActiveFilter('apps')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                  <Grid3x3 className="h-5 w-5 text-green" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{connectedApps.length}</p>
-                  <p className="text-sm text-grey-600">Connected Apps</p>
-                </div>
-              </div>
-            </button>
+            {/* Collapsed: Categories */}
+            <div className="px-2 space-y-0.5">
+              {resourceCategories.map((category) => {
+                const count = getResourceCount(category);
+                const Icon = category.icon;
+                const isActive = activeCategory === category.id;
+                const isDisabled = category.disabled;
 
-            {/* Databases */}
-            <button
-              onClick={() => setActiveFilter('databases')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Database className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.databases?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Databases</p>
-                </div>
-              </div>
-            </button>
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => {
+                      if (!isDisabled) {
+                        handleCategoryChange(category.id);
+                        setIsSidebarCollapsed(false);
+                      }
+                    }}
+                    disabled={isDisabled}
+                    className={cn(
+                      'w-full flex items-center justify-center p-2 rounded-lg transition-colors relative',
+                      isDisabled
+                        ? 'text-grey-400 cursor-not-allowed opacity-50'
+                        : isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-grey hover:bg-grey-100'
+                    )}
+                    title={`${category.label} (${count})`}
+                  >
+                    <Icon className={cn('h-5 w-5', isDisabled ? 'text-grey-400' : isActive ? 'text-primary' : 'text-grey-600')} />
+                    {count > 0 && !isDisabled && (
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
+                        {count > 9 ? '9+' : count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-            {/* Graphs */}
-            <button
-              onClick={() => setActiveFilter('graphs')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Share2 className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.graphs?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Graphs</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Storage */}
-            <button
-              onClick={() => setActiveFilter('storage')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <HardDrive className="h-5 w-5 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.storage?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Storage</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Caches */}
-            <button
-              onClick={() => setActiveFilter('caches')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Layers className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.caches?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Caches</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Message Brokers */}
-            <button
-              onClick={() => setActiveFilter('messageBrokers')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                  <MessageSquare className="h-5 w-5 text-cyan-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.messageBrokers?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Message Brokers</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Jobs */}
-            <button
-              onClick={() => setActiveFilter('jobs')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                  <Box className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.jobs?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Jobs</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Workflows */}
-            <button
-              onClick={() => setActiveFilter('workflows')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                  <GitBranch className="h-5 w-5 text-violet-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.workflows?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Workflows</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Vectors */}
-            <button
-              onClick={() => setActiveFilter('vectors')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <Boxes className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.vectors?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Vectors</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Agents */}
-            <button
-              onClick={() => setActiveFilter('agents')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Bot className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.agents?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Agents</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Models */}
-            <button
-              onClick={() => setActiveFilter('models')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-rose-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.models?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Models</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Features */}
-            <button
-              onClick={() => setActiveFilter('features')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                  <Workflow className="h-5 w-5 text-pink-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.features?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Features</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Fallbacks */}
-            <button
-              onClick={() => setActiveFilter('fallbacks')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Shield className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.fallback?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Fallbacks</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Quotas */}
-            <button
-              onClick={() => setActiveFilter('quotas')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-orange/10 flex items-center justify-center">
-                  <Timer className="h-5 w-5 text-orange" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.quota?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Quotas</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Healthchecks */}
-            <button
-              onClick={() => setActiveFilter('healthchecks')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Heart className="h-5 w-5 text-grey-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.healthchecks?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Health Checks</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Notifiers */}
-            <button
-              onClick={() => setActiveFilter('notifications')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                  <Bell className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.notifications?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Notifiers</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Sessions */}
-            <button
-              onClick={() => setActiveFilter('sessions')}
-              className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:border-primary hover:bg-primary/5 transition-colors text-left flex-shrink-0"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <KeyRound className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-grey">{product?.sessions?.length || 0}</p>
-                  <p className="text-sm text-grey-600">Sessions</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Content Sections with Filtering */}
-        {activeFilter === 'overview' && (
-          <div className="space-y-6">
-            {/* Show all sections in overview mode */}
-            {renderConnectedAppsCard()}
-            {renderEnvironmentsCard()}
-            {renderDatabasesCard()}
-            {renderGraphsCard()}
-            {renderStorageCard()}
-            {renderCachesCard()}
-            {renderMessageBrokersCard()}
-            {renderJobsCard()}
-            {renderWorkflowsCard()}
-            {renderVectorsCard()}
-            {renderAgentsCard()}
-            {renderModelsCard()}
-            {renderFeaturesCard()}
-            {renderFallbacksCard()}
-            {renderQuotasCard()}
-            {renderHealthchecksCard()}
-            {renderNotificationsCard()}
-            {renderSessionsCard()}
+            {/* Expand button */}
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                title="Expand sidebar"
+              >
+                <PanelLeft className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
-
-        {activeFilter === 'apps' && renderConnectedAppsCard()}
-        {activeFilter === 'environments' && renderEnvironmentsCard()}
-        {activeFilter === 'databases' && renderDatabasesCard()}
-        {activeFilter === 'graphs' && renderGraphsCard()}
-        {activeFilter === 'storage' && renderStorageCard()}
-        {activeFilter === 'caches' && renderCachesCard()}
-        {activeFilter === 'messageBrokers' && renderMessageBrokersCard()}
-        {activeFilter === 'jobs' && renderJobsCard()}
-        {activeFilter === 'workflows' && renderWorkflowsCard()}
-        {activeFilter === 'vectors' && renderVectorsCard()}
-        {activeFilter === 'agents' && renderAgentsCard()}
-        {activeFilter === 'models' && renderModelsCard()}
-        {activeFilter === 'features' && renderFeaturesCard()}
-        {activeFilter === 'fallbacks' && renderFallbacksCard()}
-        {activeFilter === 'quotas' && renderQuotasCard()}
-        {activeFilter === 'healthchecks' && renderHealthchecksCard()}
-        {activeFilter === 'notifications' && renderNotificationsCard()}
-        {activeFilter === 'sessions' && renderSessionsCard()}
       </div>
 
-      {/* Add App Modal */}
-      <AddAppModal
-        open={showAddAppModal}
-        onOpenChange={setShowAddAppModal}
-        product={product}
-      />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-grey-50">{renderMainContent()}</div>
 
-      {/* Create Environment Modal */}
+      {/* Modals */}
+      <AddAppModal open={showAddAppModal} onOpenChange={setShowAddAppModal} product={product} />
+
       <CreateEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
@@ -842,7 +1713,6 @@ export default function ProductTabContent({ product: initialProduct, productId }
         productId={String(product?._id)}
       />
 
-      {/* Update Environment Modal */}
       <UpdateProductEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
@@ -853,1104 +1723,159 @@ export default function ProductTabContent({ product: initialProduct, productId }
           setSelectedEnvironment(null);
         }}
       />
+
+      {/* Database Type Selection Dialog */}
+      <Dialog open={showDatabaseTypeDialog} onOpenChange={setShowDatabaseTypeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>What type of database would you like to add?</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <button
+              onClick={() => {
+                setShowDatabaseTypeDialog(false);
+                setInlineCreateMode('database');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Database className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Database</h3>
+                <p className="text-sm text-grey-500">SQL, NoSQL, or other traditional databases</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowDatabaseTypeDialog(false);
+                setInlineCreateMode('graph');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-purple-600/10 flex items-center justify-center">
+                <Share2 className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Graph Database</h3>
+                <p className="text-sm text-grey-500">Neo4j, Neptune, or graph-based stores</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowDatabaseTypeDialog(false);
+                setInlineCreateMode('vector');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-emerald-600/10 flex items-center justify-center">
+                <Boxes className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Vector Store</h3>
+                <p className="text-sm text-grey-500">Pinecone, Weaviate, or embedding stores</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Intelligence Type Selection Dialog */}
+      <Dialog open={showIntelligenceTypeDialog} onOpenChange={setShowIntelligenceTypeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>What would you like to add?</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <button
+              onClick={() => {
+                setShowIntelligenceTypeDialog(false);
+                openNewComponentTab('agent');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-amber-600/10 flex items-center justify-center">
+                <Bot className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Agent</h3>
+                <p className="text-sm text-grey-500">AI agents for automated tasks and workflows</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowIntelligenceTypeDialog(false);
+                openNewComponentTab('model');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center">
+                <Brain className="h-6 w-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Model</h3>
+                <p className="text-sm text-grey-500">ML models for inference and predictions</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resilience Type Selection Dialog */}
+      <Dialog open={showResilienceTypeDialog} onOpenChange={setShowResilienceTypeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>What would you like to configure?</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <button
+              onClick={() => {
+                setShowResilienceTypeDialog(false);
+                openNewComponentTab('fallback');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Fallback</h3>
+                <p className="text-sm text-grey-500">Backup strategies for error handling</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowResilienceTypeDialog(false);
+                openNewComponentTab('quota');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-orange-600/10 flex items-center justify-center">
+                <Timer className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Quota</h3>
+                <p className="text-sm text-grey-500">Rate limits and usage quotas</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowResilienceTypeDialog(false);
+                openNewComponentTab('healthcheck');
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-red-400/10 flex items-center justify-center">
+                <Heart className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-grey">Health Check</h3>
+                <p className="text-sm text-grey-500">Service health monitoring</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-
-  // Render functions for each section
-  function renderConnectedAppsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Grid3x3 className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Connected Apps</h2>
-            <span className="text-sm text-grey-600">({connectedApps.length})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowAddAppModal(true)}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-          
-          {productAppsStatus === 'pending' ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-grey-600">Loading apps...</span>
-            </div>
-          ) : connectedApps.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {connectedApps.map((app: any) => {
-                const isLoadingThisApp = loadingAppTag === (app.tag || app.app_tag);
-                return (
-                <div
-                  key={app._id}
-                  onClick={() => !isLoadingThisApp && handleOpenApp(app)}
-                  className={cn(
-                    "p-4 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer",
-                    isLoadingThisApp && "opacity-70 cursor-wait"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* App Logo */}
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      {isLoadingThisApp ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      ) : app.logo ? (
-                        <img
-                          src={app.logo}
-                          alt={app.app_name}
-                          className="w-8 h-8 rounded object-cover"
-                        />
-                      ) : (
-                        <span className="text-primary font-semibold text-sm">
-                          {app.app_name?.[0]?.toUpperCase() || 'A'}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* App Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-grey truncate">
-                        {app.app_name || app.name}
-                      </h3>
-                      <p className="text-xs text-grey-600 truncate">
-                        {app.tag || app.app_tag}
-                      </p>
-                      {app.description && (
-                        <p className="text-xs text-grey-500 mt-1 line-clamp-2">
-                          {app.description}
-                        </p>
-                      )}
-                      
-                      {/* App Status */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          app.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                        )}>
-                          {app.status || 'Unknown'}
-                        </span>
-                        {app.access_tag && (
-                          <span className="text-xs text-grey-500">
-                            Access: {app.access_tag.split(':')[0]}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* External Link Icon */}
-                    {!isLoadingThisApp && <ExternalLink className="h-4 w-4 text-grey-400 flex-shrink-0" />}
-                  </div>
-                </div>
-              );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Grid3x3 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No apps connected yet</p>
-              <p className="text-xs text-grey-500">
-                Connect apps and start building integrations
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderEnvironmentsCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Environments</h2>
-              <span className="text-sm text-grey-600">({product?.envs?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('environment')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          
-          {product?.envs && product?.envs.length > 0 ? (
-            <div className="space-y-3">
-              {product?.envs.map((env) => (
-                <div
-                  key={env._id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-grey">{env.env_name}</h3>
-                    <p className="text-xs text-grey-600">{env.slug}</p>
-                    {env.description && (
-                      <p className="text-xs text-grey-500 mt-1">{env.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'px-2 py-1 rounded text-xs font-medium',
-                      env.active ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                    )}>
-                      {env.active ? 'Active' : 'Inactive'}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditEnvironment(env)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Settings2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No environments configured yet</p>
-              <p className="text-xs text-grey-500">
-                Add environments to organize your product's different deployment stages
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderDatabasesCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Databases</h2>
-              <span className="text-sm text-grey-600">({product?.databases?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('database')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.databases && product?.databases.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.databases.map((db: any) => (
-                <button
-                  key={db._id}
-                  onClick={() => handleOpenComponent(db, 'database')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {db.name || db.tag}
-                    </p>
-                  </div>
-                  {db.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {db.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No databases added yet</p>
-              <p className="text-xs text-grey-500">
-                Add databases to store your product's data
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderGraphsCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Share2 className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Graph Databases</h2>
-              <span className="text-sm text-grey-600">({product?.graphs?.length || 0})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const firstGraph = product?.graphs?.[0];
-                  const env = firstGraph?.envs?.[0] || { slug: 'development', connection_url: 'neo4j://localhost:7687' };
-                  const graphData = firstGraph ? {
-                    name: firstGraph.name,
-                    tag: firstGraph.tag,
-                    type: firstGraph.type,
-                    env: env,
-                  } : {
-                    name: 'Sample Graph',
-                    tag: 'sample-graph',
-                    type: 'neo4j',
-                    env: {
-                      slug: 'development',
-                      connection_url: 'neo4j://localhost:7687',
-                      database: 'neo4j',
-                    },
-                  };
-                  openTab({
-                    id: `graph-explorer-${graphData.tag}-${graphData.env.slug}`,
-                    type: 'graph',
-                    title: `${graphData.name} (${graphData.env.slug})`,
-                    itemId: `${graphData.tag}-${graphData.env.slug}`,
-                    data: {
-                      graph: graphData,
-                      isExplorer: true,
-                    },
-                  });
-                }}
-                className="h-8 gap-1"
-              >
-                <Network className="h-4 w-4" />
-                <span className="hidden sm:inline">Open</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleAddComponent('graph')}
-                className="h-8 gap-1"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            </div>
-          </div>
-          {product?.graphs && product?.graphs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.graphs.map((graph: any) => (
-                <button
-                  key={graph._id}
-                  onClick={() => handleOpenComponent(graph, 'graph')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Share2 className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {graph.name || graph.tag}
-                    </p>
-                    {graph.type && (
-                      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 uppercase">
-                        {graph.type}
-                      </span>
-                    )}
-                  </div>
-                  {graph.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {graph.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No graph databases added yet</p>
-              <p className="text-xs text-grey-500">
-                Add graph databases for connected data like social networks or knowledge graphs
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderStorageCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <HardDrive className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Storage</h2>
-              <span className="text-sm text-grey-600">({product?.storage?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('storage')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.storage && product?.storage.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.storage.map((storage: any) => (
-                <button
-                  key={storage._id}
-                  onClick={() => handleOpenComponent(storage, 'storage')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {storage.name || storage.tag}
-                    </p>
-                  </div>
-                  {storage.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {storage.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <HardDrive className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No storage added yet</p>
-              <p className="text-xs text-grey-500">
-                Add storage solutions for your product's files and assets
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderCachesCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Caches</h2>
-              <span className="text-sm text-grey-600">({product?.caches?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('cache')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.caches && product?.caches.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.caches.map((cache: any) => (
-                <button
-                  key={cache._id}
-                  onClick={() => handleOpenComponent(cache, 'cache')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {cache.name || cache.tag}
-                    </p>
-                  </div>
-                  <p className="text-xs text-grey-600 mt-1">
-                    Expires in {cache.expiry} {cache.period}
-                  </p>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No caches added yet</p>
-              <p className="text-xs text-grey-500">
-                Add caches to improve your product's performance
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderMessageBrokersCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Message Brokers</h2>
-              <span className="text-sm text-grey-600">({product?.messageBrokers?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('message-broker')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.messageBrokers && product?.messageBrokers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.messageBrokers.map((broker: any) => (
-                <button
-                  key={broker._id}
-                  onClick={() => handleOpenComponent(broker, 'message-broker')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {broker.name || broker.tag}
-                    </p>
-                  </div>
-                  {broker.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {broker.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No message brokers added yet</p>
-              <p className="text-xs text-grey-500">
-                Add message brokers for asynchronous communication
-              </p>
-            </div>
-          )}
-      </div>
-    );
-  }
-
-  function renderJobsCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Box className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Jobs</h2>
-              <span className="text-sm text-grey-600">({product?.jobs?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('job')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.jobs && product?.jobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.jobs.map((job: any) => (
-                <button
-                  key={job._id}
-                  onClick={() => handleOpenComponent(job, 'job')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Box className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {job.name || job.tag}
-                    </p>
-                  </div>
-                  {job.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {job.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Box className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No jobs added yet</p>
-              <p className="text-xs text-grey-500">
-                Add background jobs for your product's processing tasks
-              </p>
-            </div>
-          )}
-        </div>
-    );
-  }
-
-  function renderWorkflowsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Workflows</h2>
-            <span className="text-sm text-grey-600">({product?.workflows?.length || 0})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddComponent('workflow')}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-        {product?.workflows && product?.workflows.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product?.workflows.map((workflow: any) => (
-              <button
-                key={workflow._id}
-                onClick={() => handleOpenComponent(workflow, 'workflow')}
-                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <GitBranch className="h-4 w-4 text-violet-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-grey truncate">
-                    {workflow.name || workflow.tag}
-                  </p>
-                </div>
-                {workflow.description && (
-                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                    {workflow.description}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <GitBranch className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No workflows added yet</p>
-            <p className="text-xs text-grey-500">
-              Create automated workflows for your product
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderVectorsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Boxes className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Vectors</h2>
-            <span className="text-sm text-grey-600">({product?.vectors?.length || 0})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddComponent('vector')}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-        {product?.vectors && product?.vectors.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product?.vectors.map((vector: any) => (
-              <button
-                key={vector._id}
-                onClick={() => handleOpenComponent(vector, 'vector')}
-                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Boxes className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-grey truncate">
-                    {vector.name || vector.tag}
-                  </p>
-                </div>
-                {vector.description && (
-                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                    {vector.description}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No vector stores added yet</p>
-            <p className="text-xs text-grey-500">
-              Add vector stores for semantic search and embeddings
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderAgentsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Agents</h2>
-            <span className="text-sm text-grey-600">({product?.agents?.length || 0})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddComponent('agent')}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-        {product?.agents && product?.agents.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product?.agents.map((agent: any) => (
-              <button
-                key={agent._id}
-                onClick={() => handleOpenComponent(agent, 'agent')}
-                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-grey truncate">
-                    {agent.name || agent.tag}
-                  </p>
-                </div>
-                {agent.description && (
-                  <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                    {agent.description}
-                  </p>
-                )}
-                {agent.model && (
-                  <p className="text-xs text-grey-500 mt-1">
-                    Model: {typeof agent.model === 'string' ? agent.model : agent.model.model}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Bot className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No agents added yet</p>
-            <p className="text-xs text-grey-500">
-              Create AI agents to automate tasks with LLM capabilities
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderModelsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Models</h2>
-            <span className="text-sm text-grey-600">({product?.models?.length || 0})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddComponent('model')}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-        {product?.models && product?.models.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product?.models.map((model: any) => (
-              <button
-                key={model._id}
-                onClick={() => handleOpenComponent(model, 'model')}
-                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-rose-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-grey truncate">
-                    {model.name || model.tag}
-                  </p>
-                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-grey-100 text-grey-600 uppercase">
-                    {model.provider}
-                  </span>
-                </div>
-                <p className="text-xs text-grey-600 mt-1">
-                  {model.model}
-                </p>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Brain className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No models configured yet</p>
-            <p className="text-xs text-grey-500">
-              Configure LLM models for your agents to use
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderFeaturesCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Workflow className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Features</h2>
-              <span className="text-sm text-grey-600">({product?.features?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('feature')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.features && product?.features.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.features.map((feature: any) => (
-                <button
-                  key={feature._id}
-                  onClick={() => handleOpenComponent(feature, 'feature')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {feature.name || feature.tag}
-                    </p>
-                  </div>
-                  {feature.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {feature.description}
-                    </p>
-                  )}
-                  {feature.sequence && (
-                    <p className="text-xs text-grey-500 mt-1">
-                      {feature.sequence.reduce((acc: number, seq: any) => acc + seq.events.length, 0)} Events
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Workflow className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No features added yet</p>
-              <p className="text-xs text-grey-500">
-                Create workflows combining multiple actions and services
-              </p>
-            </div>
-          )}
-        </div>
-    );
-  }
-
-  function renderFallbacksCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Fallbacks</h2>
-              <span className="text-sm text-grey-600">({product?.fallback?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('fallback')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.fallback && product?.fallback.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.fallback.map((fallback: any) => (
-                <button
-                  key={fallback._id}
-                  onClick={() => handleOpenComponent(fallback, 'fallback')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {fallback.name || fallback.tag}
-                    </p>
-                  </div>
-                  {fallback.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {fallback.description}
-                    </p>
-                  )}
-                  {fallback.options && (
-                    <p className="text-xs text-grey-500 mt-1">
-                      {fallback.options.length} Provider{fallback.options.length !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Shield className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No fallbacks added yet</p>
-              <p className="text-xs text-grey-500">
-                Define fallback providers for redundancy and reliability
-              </p>
-            </div>
-          )}
-        </div>
-    );
-  }
-
-  function renderQuotasCard() {
-    return (
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Timer className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Quotas</h2>
-              <span className="text-sm text-grey-600">({product?.quota?.length || 0})</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddComponent('quota')}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          </div>
-          {product?.quota && product?.quota.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product?.quota.map((quota: any) => (
-                <button
-                  key={quota._id}
-                  onClick={() => handleOpenComponent(quota, 'quota')}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {quota.name || quota.tag}
-                    </p>
-                  </div>
-                  {quota.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">
-                      {quota.description}
-                    </p>
-                  )}
-                  {quota.total_quota && (
-                    <p className="text-xs text-grey-500 mt-1">
-                      Limit: {quota.total_quota}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Timer className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No quotas added yet</p>
-              <p className="text-xs text-grey-500">
-                Set usage limits and quota management for API calls
-              </p>
-            </div>
-          )}
-        </div>
-    );
-  }
-
-  function renderHealthchecksCard() {
-    const healthchecksCount = product?.healthchecks?.length || 0;
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Health Checks</h2>
-            <span className="text-sm text-grey-600">({healthchecksCount})</span>
-          </div>
-          <Button
-            size="sm"
-            className="gap-2"
-            variant="outline"
-            onClick={() => handleAddComponent('healthcheck')}
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-
-        {product?.healthchecks && product?.healthchecks.length > 0 ? (
-          <div className="space-y-3">
-            {product?.healthchecks.map((healthcheck: any) => (
-              <button
-                key={healthcheck._id}
-                onClick={() => handleOpenComponent(healthcheck, 'healthcheck')}
-                className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Heart className="h-4 w-4 text-grey-600" />
-                  <h3 className="text-sm font-medium text-grey">{healthcheck.name}</h3>
-                </div>
-                <p className="text-xs text-grey-600">{healthcheck.tag}</p>
-                {healthcheck.description && (
-                  <p className="text-xs text-grey-600 mt-1">{healthcheck.description}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Heart className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No health checks configured yet</p>
-            <p className="text-xs text-grey-500">
-              Add health checks to monitor the status of your endpoints
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderNotificationsCard() {
-    const notificationsCount = product?.notifications?.length || 0;
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
-            <span className="text-sm text-grey-600">({notificationsCount})</span>
-          </div>
-          <Button
-            size="sm"
-            className="gap-2"
-            variant="outline"
-            onClick={() => handleAddComponent('notification')}
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-
-        {product?.notifications && product?.notifications.length > 0 ? (
-          <div className="space-y-3">
-            {product?.notifications.map((notification: any) => (
-              <button
-                key={notification._id}
-                onClick={() => handleOpenComponent(notification, 'notification')}
-                className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Bell className="h-4 w-4 text-blue-500" />
-                  <h3 className="text-sm font-medium text-grey">{notification.name}</h3>
-                </div>
-                <p className="text-xs text-grey-600">{notification.tag}</p>
-                {notification.description && (
-                  <p className="text-xs text-grey-600 mt-1">{notification.description}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No notifiers configured yet</p>
-            <p className="text-xs text-grey-500">
-              Add notifiers to send push notifications, emails, SMS, or webhooks
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderSessionsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Sessions</h2>
-            <span className="text-sm text-grey-600">({product?.sessions?.length || 0})</span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddComponent('session')}
-            className="h-8 gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
-        {product?.sessions && product?.sessions.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {product?.sessions.map((session: any) => (
-              <button
-                key={session._id}
-                onClick={() => handleOpenComponent(session, 'session')}
-                className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  <p className="text-sm font-medium text-grey truncate">
-                    {session.name || session.tag}
-                  </p>
-                </div>
-                {session.expiry && session.period && (
-                  <p className="text-xs text-grey-600 mt-1">
-                    Expires in {session.expiry} {session.period}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <KeyRound className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No sessions added yet</p>
-            <p className="text-xs text-grey-500">
-              Add sessions to manage user authentication and tokens
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
 }

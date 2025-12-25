@@ -42,16 +42,24 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
     type: 'product',
   });
 
+  // Check if this is dummy data (dummy data has _id starting with 'dummy-')
+  const isDummyData = storage?._id?.startsWith('dummy-');
+
   // Fetch storage details from SDK (this will have decrypted credentials)
   const { data: storageData, isLoading } = useQuery({
     queryKey: ['storage', productTag, storage?.tag],
     queryFn: async () => {
       if (!ductape || !productTag || !storage?.tag) return storage;
-      const productBuilder = ductape as any;
-      await productBuilder.init(productTag);
-      return await productBuilder.storage.fetch(storage.tag);
+      try {
+        const productBuilder = ductape as any;
+        await productBuilder.init(productTag);
+        return await productBuilder.storage.fetch(storage.tag);
+      } catch (error) {
+        console.warn('Failed to fetch storage details:', error);
+        return storage;
+      }
     },
-    enabled: !!ductape && !!productTag && !!storage?.tag,
+    enabled: !!ductape && !!productTag && !!storage?.tag && !isDummyData,
   });
 
   const displayData = storageData || storage;
@@ -315,6 +323,10 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
           name: displayData.name,
           tag: displayData.tag,
           type: firstEnv.type,
+          provider: firstEnv.type,
+          productTag: productTag,
+          productName: displayData.productName,
+          productId: displayData.productId,
           env: firstEnv,
         },
         isExplorer: true,

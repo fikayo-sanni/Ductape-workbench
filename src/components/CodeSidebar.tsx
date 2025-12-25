@@ -11,15 +11,20 @@ interface CodeSection {
   code: string;
 }
 
-interface CodeSidebarProps {
+export interface CodeSidebarProps {
   title: string;
   subtitle?: string;
   tag?: string;
-  onClose: () => void;
-  generateCodeSections: (language: string, env?: string) => CodeSection[];
+  onClose?: () => void;
+  // Option 1: Dynamic code generation
+  generateCodeSections?: (language: string, env?: string) => CodeSection[];
   environments?: Array<{ slug: string; env_name?: string }>;
+  // Option 2: Simple static code
+  language?: string;
+  code?: string;
+  // Additional options
   additionalControls?: React.ReactNode;
-  additionalControlsAfterSection?: string; // Section title after which to render additionalControls
+  additionalControlsAfterSection?: string;
   onSectionAction?: (sectionTitle: string) => React.ReactNode;
   sectionFooter?: (sectionTitle: string) => React.ReactNode;
 }
@@ -31,12 +36,14 @@ export default function CodeSidebar({
   onClose,
   generateCodeSections,
   environments = [],
+  language: staticLanguage,
+  code: staticCode,
   additionalControls,
   additionalControlsAfterSection,
   onSectionAction,
   sectionFooter,
 }: CodeSidebarProps) {
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('typescript');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(staticLanguage || 'typescript');
   const [selectedEnv, setSelectedEnv] = useState<string>(
     environments[0]?.slug || 'prd'
   );
@@ -44,12 +51,70 @@ export default function CodeSidebar({
   const [showTransactions, setShowTransactions] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
 
-  const sections = generateCodeSections(selectedLanguage, selectedEnv);
+  // Use static code if provided, otherwise use generateCodeSections
+  const sections: CodeSection[] = staticCode
+    ? [{ title: 'Code', code: staticCode }]
+    : generateCodeSections
+    ? generateCodeSections(selectedLanguage, selectedEnv)
+    : [];
 
   const copySection = (code: string, sectionTitle: string) => {
     navigator.clipboard.writeText(code);
     toast.success(`${sectionTitle} copied to clipboard`);
   };
+
+  // Simple mode - just show code without sidebar chrome
+  const isSimpleMode = staticCode && !generateCodeSections;
+
+  if (isSimpleMode) {
+    return (
+      <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
+            <Code className="w-5 h-5" />
+            {title}
+          </h3>
+          {onClose && (
+            <Button onClick={onClose} variant="ghost" size="sm">
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+
+        <div className="p-4 space-y-4">
+          {subtitle && (
+            <p className="text-sm text-grey-600">{subtitle}</p>
+          )}
+          {tag && (
+            <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded font-mono">
+              {tag}
+            </span>
+          )}
+
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-sm font-semibold text-grey-700">
+              {staticLanguage || 'Code'}
+            </Label>
+            <Button
+              onClick={() => copySection(staticCode, 'Code')}
+              variant="outline"
+              size="sm"
+              className="gap-2 h-7 px-2 text-xs"
+            >
+              <Copy className="h-3 w-3" />
+              Copy
+            </Button>
+          </div>
+          <Textarea
+            value={staticCode}
+            readOnly
+            className="font-mono text-sm bg-grey-50 resize-none"
+            rows={Math.min(staticCode.split('\n').length, 30)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
@@ -58,9 +123,11 @@ export default function CodeSidebar({
           <Code className="w-5 h-5" />
           Code Examples
         </h3>
-        <Button onClick={onClose} variant="ghost" size="sm">
-          <X className="w-4 h-4" />
-        </Button>
+        {onClose && (
+          <Button onClick={onClose} variant="ghost" size="sm">
+            <X className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       <div className="p-4 space-y-6">
@@ -99,28 +166,30 @@ export default function CodeSidebar({
         )}
 
         {/* Language Selector */}
-        <div>
-          <Label className="text-sm font-semibold text-grey-700 mb-2 block">
-            Language
-          </Label>
-          <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="typescript">TypeScript</SelectItem>
-              <SelectItem value="javascript">JavaScript</SelectItem>
-              <SelectItem value="python" disabled>Python</SelectItem>
-              <SelectItem value="java" disabled>Java / Spring Boot</SelectItem>
-              <SelectItem value="ruby" disabled>Ruby on Rails</SelectItem>
-              <SelectItem value="php" disabled>PHP</SelectItem>
-              <SelectItem value="kotlin" disabled>Kotlin</SelectItem>
-              <SelectItem value="go" disabled>Golang</SelectItem>
-              <SelectItem value="csharp" disabled>C# / ASP.NET</SelectItem>
-              <SelectItem value="rust" disabled>Rust</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {generateCodeSections && (
+          <div>
+            <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+              Language
+            </Label>
+            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="typescript">TypeScript</SelectItem>
+                <SelectItem value="javascript">JavaScript</SelectItem>
+                <SelectItem value="python" disabled>Python</SelectItem>
+                <SelectItem value="java" disabled>Java / Spring Boot</SelectItem>
+                <SelectItem value="ruby" disabled>Ruby on Rails</SelectItem>
+                <SelectItem value="php" disabled>PHP</SelectItem>
+                <SelectItem value="kotlin" disabled>Kotlin</SelectItem>
+                <SelectItem value="go" disabled>Golang</SelectItem>
+                <SelectItem value="csharp" disabled>C# / ASP.NET</SelectItem>
+                <SelectItem value="rust" disabled>Rust</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Additional Controls (before sections) */}
         {additionalControls && !additionalControlsAfterSection && (
@@ -140,8 +209,8 @@ export default function CodeSidebar({
             const shouldRenderControlsAfter = additionalControlsAfterSection === section.title;
 
             return (
-              <>
-                <div key={index} className="space-y-2">
+              <div key={index}>
+                <div className="space-y-2">
                   {isCollapsible ? (
                     <button
                       onClick={() => {
@@ -201,7 +270,7 @@ export default function CodeSidebar({
                     {additionalControls}
                   </div>
                 )}
-              </>
+              </div>
             );
           })}
         </div>
