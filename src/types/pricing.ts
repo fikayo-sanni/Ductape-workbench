@@ -55,3 +55,46 @@ export interface PricingApiResponse {
     modeCounts: Record<PricingMode, number>;
   };
 }
+
+export interface TotalIncomeRecord {
+  status: boolean;
+  meta: object;
+  data: {
+    totalRevenue: number;
+    growthRate: number;
+    revenueThisMonth: number;
+    averageRevenuePerMonth: number;
+    currency: string;
+    revenueTrend: any[];
+    monthlyBreakdown: any[];
+  }
+}
+
+
+export interface TotalExpenseRecord {
+    status: boolean;
+    data: {
+        totalSpending: number;
+        paid: number;
+        pending: number;
+        issues: number;
+        currency: string;
+        categoryBreakdown: [
+            {
+                category: string;
+                amount: number;
+                percentage: number;
+            }
+        ],
+        recentExpenses: [
+            {
+                reference: string;
+                vendor: string;
+                category: string;
+                details: string;
+                amount: number;
+                status: string;
+            }
+        ]
+    }
+}

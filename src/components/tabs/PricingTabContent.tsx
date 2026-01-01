@@ -34,6 +34,24 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+
+enum PricingMode {
+  PER_REQUEST = 'per_request',
+  ONE_TIME = 'one_time',
+  UPFRONT = 'upfront',
+  RECURRING = 'recurring',
+}
+
+enum PaymentInterval {
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  BI_WEEKLY = 'bi-weekly',
+  MONTHLY = 'monthly',
+  QUARTERLY = 'quarterly',
+  YEARLY = 'yearly',
+  ONCE = 'one-time',
+}
+
 // Bundle customer subscription interface
 interface BundleCustomer {
   workspace_id: string;
@@ -175,6 +193,65 @@ interface Expenditure {
   usage_count?: number; // For usage-based billing
   created_at: string;
 }
+
+const DUMMY_PRICING_BUNDLES: PricingBundle[] = [
+  {
+    _id: 'price_1',
+    name: 'Starter Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.MONTHLY,
+    unit_price: 29,
+    currency: 'USD',
+    limits: {
+      per_day: 1000,
+      per_month: 30000,
+    },
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_2',
+    name: 'Professional Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.MONTHLY,
+    unit_price: 99,
+    currency: 'USD',
+    limits: {
+      per_day: 5000,
+      per_month: 150000,
+    },
+    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_3',
+    name: 'Enterprise Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.YEARLY,
+    unit_price: 999,
+    currency: 'USD',
+    limits: {
+      per_day: 50000,
+      per_month: 1500000,
+    },
+    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_4',
+    name: 'Pay Per Request',
+    pricing_mode: PricingMode.PER_REQUEST,
+    unit_price: 0.01,
+    currency: 'USD',
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_5',
+    name: 'One-Time Setup Fee',
+    pricing_mode: PricingMode.ONE_TIME,
+    interval: PaymentInterval.ONCE,
+    unit_price: 199,
+    currency: 'USD',
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
 
 const DUMMY_EXPENDITURES: Expenditure[] = [
   // Ductape Platform Subscription
@@ -846,6 +923,30 @@ export default function PricingTabContent() {
     setBundleFormOpen(false);
     setEditingBundle(null);
   };
+
+  const { data: totalIncomeData, status: isLoadingIncome } = useQuery({
+  queryKey: ['incomes', user?._id, currentWorkspaceId],
+  queryFn: () => pricingServices.fetchTotalIncome({
+    user_id: user?._id || '',
+    public_key: user?.public_key || '',
+    workspace_id: currentWorkspaceId || '', // Changed from workspace._id
+  }),
+  enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
+});
+
+ const { data: totalExpenseData, status: isLoadingExpense } = useQuery({
+  queryKey: ['expenses', user?._id, currentWorkspaceId],
+  queryFn: () => pricingServices.fetchTotalExpense({
+    user_id: user?._id || '',
+    public_key: user?.public_key || '',
+    workspace_id: currentWorkspaceId || '', // Changed from workspace._id
+  }),
+  enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
+});
+
+
+console.log("total income", {totalIncomeData, isLoadingIncome});
+console.log("total expense", {totalExpenseData, isLoadingExpense});
 
   const { data: bundleData, isLoading } = useQuery({
   queryKey: ['bundles', user?._id, currentWorkspaceId],
