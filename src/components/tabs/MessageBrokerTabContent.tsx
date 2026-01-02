@@ -28,12 +28,12 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
           <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-          <p className="text-grey-600 mb-2">Incomplete message broker data</p>
+          <p className="text-grey-600 mb-2">Incomplete messaging data</p>
           <p className="text-grey-500 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
           <p className="text-grey-500 text-sm">
-            Please close this tab and reopen the message broker from your product to reload it.
+            Please close this tab and reopen the messaging from your product to reload it.
           </p>
         </div>
       </div>
@@ -1094,7 +1094,7 @@ ${inputMessage}
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-grey-600">Loading message broker details...</p>
+          <p className="text-sm text-grey-600">Loading messaging details...</p>
         </div>
       </div>
     );
@@ -1105,7 +1105,7 @@ ${inputMessage}
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
           <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-          <p className="text-grey-600">Message broker not found</p>
+          <p className="text-grey-600">Messaging not found</p>
         </div>
       </div>
     );
@@ -1160,13 +1160,13 @@ ${inputMessage}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-bold text-grey">Message Broker for {product.name}</h2>
+                  <h2 className="text-xl font-bold text-grey">Messaging for {product.name}</h2>
                   <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
                     {product.tag}
                   </span>
                 </div>
                 <p className="text-sm text-grey-600">
-                  This message broker is connected to your product and configured for its environments
+                  This messaging service is connected to your product and configured for its environments
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-grey-600">
@@ -1180,8 +1180,8 @@ ${inputMessage}
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="h-6 w-6 text-purple-500" />
+            <div className="w-12 h-12 rounded-lg bg-cyan-600/10 flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="h-6 w-6 text-cyan-600" />
             </div>
             <div className="flex-1">
               <div className="flex items-start justify-between gap-4">
@@ -1246,8 +1246,8 @@ ${inputMessage}
           </div>
           <div className="bg-white rounded-lg border border-grey-400 p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <MessageSquare className="h-5 w-5 text-purple-500" />
+              <div className="w-10 h-10 rounded-lg bg-cyan-600/10 flex items-center justify-center">
+                <MessageSquare className="h-5 w-5 text-cyan-600" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -1450,9 +1450,9 @@ ${inputMessage}
 
         {/* Info Box */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-blue-900 mb-2">ℹ️ About Message Brokers</h3>
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">ℹ️ About Messaging</h3>
           <p className="text-xs text-blue-800">
-            Message brokers enable asynchronous communication between services. They support various messaging patterns including pub/sub, queues, and topics for reliable message delivery across distributed systems.
+            Messaging enables asynchronous communication between services. It supports various patterns including pub/sub, queues, and topics for reliable message delivery across distributed systems.
           </p>
         </div>
       </div>
@@ -1460,7 +1460,7 @@ ${inputMessage}
       {/* Code Sidebar */}
       {showCodeSidebar && (
         <CodeSidebar
-          title={selectedTopic ? `${selectedTopic.name || selectedTopic.topic || selectedTopic.queue} - Code Examples` : 'Message Broker - Code Examples'}
+          title={selectedTopic ? `${selectedTopic.name || selectedTopic.topic || selectedTopic.queue} - Code Examples` : 'Messaging - Code Examples'}
           onClose={() => {
             setShowCodeSidebar(false);
             setSelectedTopic(null);

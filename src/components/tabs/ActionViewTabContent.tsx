@@ -4,6 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -12,15 +20,22 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Send, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, BookOpen, X, List, Zap } from 'lucide-react';
+import { Send, Plus, Trash2, Code, Globe, Hash, FileCode, Server, RotateCcw, BookOpen, X, List, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
 import CodeSidebar from '@/components/CodeSidebar';
+import { useSDKProxy } from '@/hooks/useSDKProxy';
 
 interface ActionViewTabContentProps {
   action: any;
+  /** Product tag - required for running action via SDK */
+  productTag?: string;
+  /** App tag - required for running action via SDK */
+  appTag?: string;
+  /** Selected environment slug for running action */
+  envSlug?: string;
 }
 
 interface KeyValue {
@@ -66,21 +81,34 @@ const syntaxHighlightJSON = (jsonString: any) => {
   }
 };
 
-export default function ActionViewTabContent({ action }: ActionViewTabContentProps) {
+export default function ActionViewTabContent({ action, productTag, appTag, envSlug }: ActionViewTabContentProps) {
   const { user } = useAuth();
+  const sdkProxy = useSDKProxy();
 
-  // Debug logging
-  console.log('ActionViewTabContent - action data:', action);
-  console.log('ActionViewTabContent - environments from action:', action.envs);
-  console.log('ActionViewTabContent - action.appName:', action.appName);
-  console.log('ActionViewTabContent - action.appTag:', action.appTag);
+  // Persistent state key based on action identifier
+  const stateKey = `action-view-state-${action?.appTag}-${action?.tag}`;
 
+  // Load persisted state from localStorage - use a ref to ensure it's only loaded once
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Use useState with initializer to ensure persisted state is only loaded once on mount
+  const [initialPersistedState] = useState(() => getPersistedState());
+  const persistedState = initialPersistedState;
+
+  // ALL hooks must be called before any conditional returns
   // Form state matching the action data
   const [formData, setFormData] = useState({
-    name: action.name || action.tag || '',
-    tag: action.tag || '',
-    description: action.description || '',
-    method: action.method || 'GET',
+    name: action?.name || action?.tag || '',
+    tag: action?.tag || '',
+    description: action?.description || '',
+    method: action?.method || 'GET',
     request_type: 'JSON',
   });
 
@@ -100,23 +128,28 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   };
 
   const [fullUrl, setFullUrl] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [resource, setResource] = useState(action.resource || '');
-  const [params, setParams] = useState<KeyValue[]>([]);
-  const [query, setQuery] = useState<KeyValue[]>([]);
-  const [headers, setHeaders] = useState<KeyValue[]>([
-    { key: 'Content-Type', value: 'application/json', enabled: true }
-  ]);
-  const [body, setBody] = useState('');
-  const [response, setResponse] = useState<any>(null);
+  const [baseUrl, setBaseUrl] = useState(persistedState?.baseUrl || '');
+  const [resource, setResource] = useState(action?.resource || '');
+  const [params, setParams] = useState<KeyValue[]>(persistedState?.params || []);
+  const [query, setQuery] = useState<KeyValue[]>(persistedState?.query || []);
+  const [headers, setHeaders] = useState<KeyValue[]>(
+    persistedState?.headers || [{ key: 'Content-Type', value: 'application/json', enabled: true }]
+  );
+  const [body, setBody] = useState(persistedState?.body || '');
+  const [response, setResponse] = useState<any>(persistedState?.response || null);
   const [isLoadingRequest, setIsLoadingRequest] = useState(false);
-  const [activeTab, setActiveTab] = useState('params');
+  const [activeTab, setActiveTab] = useState(persistedState?.activeTab || 'params');
 
   // Custom envs that will be saved with the action (ICustomEnv[])
-  const [customEnvs, setCustomEnvs] = useState<ICustomEnv[]>([]);
+  const [customEnvs, setCustomEnvs] = useState<ICustomEnv[]>(persistedState?.customEnvs || []);
 
   // State to track which CustomEnv is being updated for highlighting
   const [updatingEnvSlugs, setUpdatingEnvSlugs] = useState<Set<string>>(new Set());
+
+  // Environment modal state
+  const [showEnvModal, setShowEnvModal] = useState(false);
+  const [selectedEnvForModal, setSelectedEnvForModal] = useState<ICustomEnv | null>(null);
+  const [editedEnvBaseUrl, setEditedEnvBaseUrl] = useState('');
 
   // Documentation sidebar state
   const [showDocsSidebar, setShowDocsSidebar] = useState<boolean>(false);
@@ -129,20 +162,19 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   const [showDefaultValuesForm, setShowDefaultValuesForm] = useState<boolean>(false);
   const [defaultValues, setDefaultValues] = useState<Array<{ variable: string; valueSource: string; value: string }>>([]);
 
+  // Collapsible details section state (collapsed by default)
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState<boolean>(false);
+
   // Use app data passed from parent component
   const app = {
-    app_name: action.appName,
-    tag: action.appTag,
-    logo: action.appLogo,
-    status: action.appStatus,
+    app_name: action?.appName,
+    tag: action?.appTag,
+    logo: action?.appLogo,
+    status: action?.appStatus,
   };
-  
+
   // Use environments passed from parent component
-  const environments = action.envs || [];
-  
-  // Debug logging
-  console.log('ActionViewTabContent - app data:', app);
-  console.log('ActionViewTabContent - environments:', environments);
+  const environments = action?.envs || [];
 
   // Initialize form data from action
   useEffect(() => {
@@ -158,26 +190,36 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
     }
   }, [action]);
 
-  // Initialize customEnvs from app environments
+  // Initialize customEnvs from app environments (only if no persisted state)
   useEffect(() => {
+    // Skip if we have persisted state
+    if (persistedState) return;
+
     if (environments.length > 0 && customEnvs.length === 0) {
-      const envs = environments.map((env: any) => ({
+      // Find if any env is marked as active, otherwise default to first one
+      const activeEnvIndex = environments.findIndex((env: any) => env.active);
+      const defaultActiveIndex = activeEnvIndex >= 0 ? activeEnvIndex : 0;
+
+      const envs = environments.map((env: any, index: number) => ({
         slug: env.slug,
         base_url: env.base_url || '',
-        active: env.active || false,
+        active: index === defaultActiveIndex,
       }));
       setCustomEnvs(envs);
-      
+
       // Set the active environment's base URL
-      const activeEnv = environments.find((env: any) => env.active) || environments[0];
+      const activeEnv = environments[defaultActiveIndex];
       if (activeEnv?.base_url) {
         setBaseUrl(activeEnv.base_url);
       }
     }
   }, [environments]);
 
-  // Initialize params, query, headers from action data
+  // Initialize params, query, headers from action data (only if no persisted state)
   useEffect(() => {
+    // Skip initialization if we have persisted state
+    if (persistedState) return;
+
     if (action) {
       // Initialize params (only simple types, arrays/objects are handled via reconstruction)
       if (action.params?.data) {
@@ -284,16 +326,11 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   // Build full URL from base URL and resource
   useEffect(() => {
     if (baseUrl && resource) {
-      try {
-        // Ensure resource starts with / if it doesn't already
-        const normalizedResource = resource.startsWith('/') ? resource : `/${resource}`;
-        const url = new URL(normalizedResource, baseUrl);
-        setFullUrl(url.toString());
-      } catch (e) {
-        // If URL construction fails, try simple concatenation
-        const normalizedResource = resource.startsWith('/') ? resource : `/${resource}`;
-        setFullUrl(`${baseUrl}${normalizedResource}`);
-      }
+      // Use simple string concatenation to preserve template variables like {{baseVersion}}
+      // The URL constructor would encode curly braces as %7B%7D
+      const normalizedResource = resource.startsWith('/') ? resource : `/${resource}`;
+      const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      setFullUrl(`${normalizedBaseUrl}${normalizedResource}`);
     } else if (baseUrl) {
       // If only base URL is available, show it
       setFullUrl(baseUrl);
@@ -327,10 +364,25 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
     }
   }, [baseUrl]);
 
+  // Persist state to localStorage whenever relevant state changes
+  useEffect(() => {
+    const stateToSave = {
+      activeTab,
+      baseUrl,
+      params,
+      query,
+      headers,
+      body,
+      response,
+      customEnvs,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [stateKey, activeTab, baseUrl, params, query, headers, body, response, customEnvs]);
+
   const handleEnvSelect = (slug: string) => {
     // Highlight the env being updated
     setUpdatingEnvSlugs(prev => new Set(prev).add(slug));
-    
+
     const env = customEnvs.find(e => e.slug === slug);
     if (env?.base_url) {
       setBaseUrl(env.base_url);
@@ -340,7 +392,7 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       ...e,
       active: e.slug === slug
     })));
-    
+
     // Remove highlighting after a short delay
     setTimeout(() => {
       setUpdatingEnvSlugs(prev => {
@@ -349,6 +401,45 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
         return newSet;
       });
     }, 1000);
+  };
+
+  const handleOpenEnvModal = (env: ICustomEnv) => {
+    setSelectedEnvForModal(env);
+    setEditedEnvBaseUrl(env.base_url);
+    setShowEnvModal(true);
+  };
+
+  const handleSaveEnvChanges = () => {
+    if (!selectedEnvForModal) return;
+
+    const slug = selectedEnvForModal.slug;
+
+    // Update the env base URL
+    setCustomEnvs(prev => prev.map(e => {
+      if (e.slug === slug) {
+        return { ...e, base_url: editedEnvBaseUrl };
+      }
+      return e;
+    }));
+
+    // If this is the active env, update the main base URL too
+    if (selectedEnvForModal.active) {
+      setBaseUrl(editedEnvBaseUrl);
+    }
+
+    toast.success('Environment updated');
+    setShowEnvModal(false);
+    setSelectedEnvForModal(null);
+  };
+
+  const handleSelectEnvFromModal = () => {
+    if (!selectedEnvForModal) return;
+
+    // Save changes first
+    handleSaveEnvChanges();
+
+    // Then select this env
+    handleEnvSelect(selectedEnvForModal.slug);
   };
 
   const handleResetEnv = (slug: string) => {
@@ -413,12 +504,15 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   };
 
   const handleTest = async () => {
-    if (!fullUrl) {
-      toast.error('Please enter a valid URL');
-      return;
-    }
+    // Determine if we should use SDK actions.run or fallback to test endpoint
+    const effectiveAppTag = appTag || action?.appTag;
+    const activeCustomEnv = customEnvs.find(e => e.active);
+    const effectiveEnvSlug = envSlug || activeCustomEnv?.slug;
+    const canUseSDK = productTag && effectiveAppTag && effectiveEnvSlug && action?.tag;
 
     setIsLoadingRequest(true);
+    const startTime = Date.now();
+
     try {
       // Collect simple user inputs from UI
       const userQueryParams: Record<string, string> = {};
@@ -474,55 +568,110 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       const pathParams = reconstructed.params || userPathParams;
       const parsedBody = reconstructed.body || userBodyData;
 
-      // Call backend proxy
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
-      const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
+      // Use SDK actions.run when in product context
+      if (canUseSDK) {
+        // Build input object combining all parts
+        const input: Record<string, any> = {};
 
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.auth_token}`,
-          'x-user-id': user?._id || '',
-          'x-workspace-id': '',
-        },
-        body: JSON.stringify({
-          url: fullUrl,
-          method: formData.method,
-          headers: requestHeaders,
-          query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
-          params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
-          body: parsedBody,
-        }),
-      });
+        // Add path params
+        if (Object.keys(pathParams).length > 0) {
+          Object.assign(input, pathParams);
+        }
 
-      const responseData = await res.json();
+        // Add query params
+        if (Object.keys(queryParams).length > 0) {
+          Object.assign(input, queryParams);
+        }
 
-      // Extract metadata and actual response data
-      const { _meta, data: actualData } = responseData;
+        // Add headers (as a nested object if needed by the action)
+        if (Object.keys(requestHeaders).length > 0) {
+          input._headers = requestHeaders;
+        }
 
-      if (res.ok) {
-        setResponse({
-          status: _meta?.status || res.status,
-          statusText: _meta?.statusText || res.statusText,
-          headers: _meta?.headers || {},
-          data: actualData, // The actual API response (can be array or object)
-          time: _meta?.time,
-          size: _meta?.size,
+        // Add body data
+        if (parsedBody && typeof parsedBody === 'object') {
+          Object.assign(input, parsedBody);
+        } else if (parsedBody) {
+          input._body = parsedBody;
+        }
+
+        // Call SDK actions.run
+        const result = await sdkProxy.actions.run({
+          product: productTag,
+          env: effectiveEnvSlug,
+          app: effectiveAppTag,
+          action: action.tag,
+          input,
         });
-        toast.success('Request completed');
+
+        const executionTime = Date.now() - startTime;
+
+        // Format response from SDK
+        setResponse({
+          status: result?.statusCode || result?.status || 200,
+          statusText: result?.statusText || 'OK',
+          headers: result?.headers || {},
+          data: result?.data || result,
+          time: executionTime,
+          size: JSON.stringify(result).length,
+        });
+        toast.success('Action executed successfully');
       } else {
-        // Handle error response
-        setResponse({
-          status: _meta?.status || res.status,
-          statusText: _meta?.statusText || res.statusText,
-          headers: _meta?.headers || {},
-          data: actualData, // The actual API error response
-          error: _meta?.error || 'Request failed',
-          time: _meta?.time,
-          size: _meta?.size,
+        // Fallback to test endpoint when not in product context
+        if (!fullUrl) {
+          toast.error('Please enter a valid URL');
+          setIsLoadingRequest(false);
+          return;
+        }
+
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
+        const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
+
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user?.auth_token}`,
+            'x-user-id': user?._id || '',
+            'x-workspace-id': '',
+          },
+          body: JSON.stringify({
+            url: fullUrl,
+            method: formData.method,
+            headers: requestHeaders,
+            query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+            params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
+            body: parsedBody,
+          }),
         });
-        toast.error(_meta?.error || 'Request failed');
+
+        const responseData = await res.json();
+
+        // Extract metadata and actual response data
+        const { _meta, data: actualData } = responseData;
+
+        if (res.ok) {
+          setResponse({
+            status: _meta?.status || res.status,
+            statusText: _meta?.statusText || res.statusText,
+            headers: _meta?.headers || {},
+            data: actualData,
+            time: _meta?.time,
+            size: _meta?.size,
+          });
+          toast.success('Request completed');
+        } else {
+          setResponse({
+            status: _meta?.status || res.status,
+            statusText: _meta?.statusText || res.statusText,
+            headers: _meta?.headers || {},
+            data: actualData,
+            error: _meta?.error || 'Request failed',
+            time: _meta?.time,
+            size: _meta?.size,
+          });
+          toast.error(_meta?.error || 'Request failed');
+        }
       }
 
       setActiveTab('response'); // Auto-switch to response tab
@@ -605,16 +754,68 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
     { label: 'Input', value: 'input' }
   ];
 
+  // Auth-related headers that should be included in code generation
+  const AUTH_RELATED_HEADERS: string[] = [
+    'authorization', 'proxy-authorization', 'www-authenticate', 'proxy-authenticate',
+    'x-api-key', 'api-key', 'apikey', 'x-auth-key', 'x-app-key', 'x-application-key',
+    'app-key', 'application-key', 'x-service-key', 'service-key',
+    'x-auth-token', 'x-access-token', 'x-bearer-token', 'x-refresh-token', 'x-id-token',
+    'x-jwt', 'x-jwt-token', 'bearer', 'token', 'access-token', 'refresh-token',
+    'id-token', 'jwt', 'jwt-token',
+    'x-secret-key', 'x-client-secret', 'x-private-key', 'x-secret', 'x-app-secret',
+    'x-application-secret', 'client-secret', 'secret-key', 'private-key', 'secret',
+    'app-secret', 'application-secret',
+    'cookie', 'set-cookie', 'x-session-id', 'x-session-token', 'session-id',
+    'session-token', 'sessionid', 'sid',
+    'x-csrf-token', 'x-xsrf-token', 'csrf-token', 'xsrf-token', 'x-csrf', 'x-xsrf', 'csrf', 'xsrf',
+    'x-oauth-token', 'x-oauth-signature', 'x-client-id', 'client-id', 'clientid',
+    'x-consumer-key', 'consumer-key', 'x-consumer-secret', 'consumer-secret',
+    'oauth-token', 'oauth-signature', 'x-oauth-consumer-key', 'x-oauth-consumer-secret',
+    'x-signature', 'x-hmac-signature', 'x-request-signature', 'x-hub-signature',
+    'x-hub-signature-256', 'signature', 'hmac-signature', 'request-signature',
+    'stripe-signature', 'x-stripe-signature',
+    'x-amz-security-token', 'x-amz-date', 'x-amz-content-sha256',
+    'x-ms-authorization-auxiliary', 'x-ms-identity-principal-id',
+    'x-goog-api-key', 'x-goog-authenticated-user-id',
+    'x-firebase-appcheck',
+    'x-credential', 'x-credentials', 'x-user-token', 'x-account-token',
+    'x-tenant-id', 'x-tenant-token', 'x-workspace-key', 'x-workspace-secret',
+    'x-project-key', 'x-project-secret',
+    'x-username', 'x-password', 'x-user', 'x-pass', 'username', 'password',
+    'x-license-key', 'license-key', 'x-subscription-key', 'subscription-key',
+    'idempotency-key', 'x-idempotency-key', 'x-request-id',
+  ];
+
+  // Helper function to flatten body object for flatInput format using ':' notation
+  const flattenObject = (obj: any, prefix: string = ''): Array<{ key: string; value: string }> => {
+    const result: Array<{ key: string; value: string }> = [];
+
+    for (const [key, value] of Object.entries(obj)) {
+      const newKey = prefix ? `${prefix}:${key}` : key;
+
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result.push(...flattenObject(value, newKey));
+      } else {
+        result.push({ key: newKey, value: typeof value === 'string' ? value : JSON.stringify(value) });
+      }
+    }
+
+    return result;
+  };
+
   // Generate SDK code sections for CodeSidebar component
   const generateCodeSections = (language: string, env?: string) => {
-    const appTag = action.appTag || 'your-app-tag';
-    const actionTag = formData.tag || action.tag || 'action-tag';
+    const appTag = action?.appTag || 'your-app-tag';
+    const actionTag = formData.tag || action?.tag || 'action-tag';
     const envSlug = env || customEnvs.find(e => e.active)?.slug || 'production';
 
-    // Prepare enabled params, query, headers for code examples
+    // Prepare enabled params, query for code examples
     const enabledParams = params.filter(p => p.enabled && p.key);
     const enabledQuery = query.filter(q => q.enabled && q.key);
-    const enabledHeaders = headers.filter(h => h.enabled && h.key);
+    // Only include auth-related headers, filter out non-critical ones like Content-Type, Accept, etc.
+    const enabledHeaders = headers.filter(h =>
+      h.enabled && h.key && AUTH_RELATED_HEADERS.includes(h.key.toLowerCase())
+    );
 
     // Parse body if available
     let bodyObj: any = null;
@@ -636,6 +837,63 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       return value || `{{${key}}}`;
     };
 
+    // Generate flatInput format - only add prefix when there's a key conflict
+    const generateFlatInput = (indent: string = '    ') => {
+      const flatEntries: string[] = [];
+
+      // Collect all keys to detect conflicts
+      const paramKeys = enabledParams.map(p => p.key);
+      const queryKeys = enabledQuery.map(q => q.key);
+      const headerKeys = enabledHeaders.map(h => h.key);
+      const bodyKeys = bodyObj && typeof bodyObj === 'object'
+        ? flattenObject(bodyObj, '').map(({ key }) => key.split(':')[0])
+        : [];
+
+      // Check if a key exists in multiple parts of the request
+      const hasConflict = (key: string, source: 'params' | 'query' | 'headers' | 'body') => {
+        const otherSources = {
+          params: [...queryKeys, ...headerKeys, ...bodyKeys],
+          query: [...paramKeys, ...headerKeys, ...bodyKeys],
+          headers: [...paramKeys, ...queryKeys, ...bodyKeys],
+          body: [...paramKeys, ...queryKeys, ...headerKeys],
+        };
+        return otherSources[source].includes(key);
+      };
+
+      // Flatten params - add 'params:' prefix only if key conflicts
+      enabledParams.forEach(p => {
+        const keyWithPrefix = hasConflict(p.key, 'params') ? `params:${p.key}` : p.key;
+        flatEntries.push(`${indent}'${keyWithPrefix}': '${getParamValue(p.key, p.value)}'`);
+      });
+
+      // Flatten query - add 'query:' prefix only if key conflicts
+      enabledQuery.forEach(q => {
+        const keyWithPrefix = hasConflict(q.key, 'query') ? `query:${q.key}` : q.key;
+        flatEntries.push(`${indent}'${keyWithPrefix}': '${getParamValue(q.key, q.value)}'`);
+      });
+
+      // Flatten headers - add 'headers:' prefix only if key conflicts
+      enabledHeaders.forEach(h => {
+        const keyWithPrefix = hasConflict(h.key, 'headers') ? `headers:${h.key}` : h.key;
+        flatEntries.push(`${indent}'${keyWithPrefix}': '${getParamValue(h.key, h.value)}'`);
+      });
+
+      // Flatten body - add 'body:' prefix only if key conflicts
+      if (bodyObj && typeof bodyObj === 'object') {
+        const flatBody = flattenObject(bodyObj, '');
+        flatBody.forEach(({ key, value }) => {
+          const rootKey = key.split(':')[0];
+          const keyWithPrefix = hasConflict(rootKey, 'body') ? `body:${key}` : key;
+          flatEntries.push(`${indent}'${keyWithPrefix}': '${value}'`);
+        });
+      } else if (bodyObj) {
+        const keyWithPrefix = hasConflict('body', 'body') ? 'body:body' : 'body';
+        flatEntries.push(`${indent}'${keyWithPrefix}': '${bodyObj}'`);
+      }
+
+      return flatEntries.join(',\n');
+    };
+
     switch (language) {
       case 'javascript':
         return [
@@ -654,18 +912,9 @@ const ductape = new Ductape({
             code: `const payload = {
   env: '${envSlug}',
   app: '${appTag}',
-  event: '${actionTag}',
-  input: {${enabledParams.length > 0 ? `
-    params: {
-${enabledParams.map(p => `      ${p.key}: '${getParamValue(p.key, p.value)}'`).join(',\n')}
-    },` : ''}${enabledQuery.length > 0 ? `
-    query: {
-${enabledQuery.map(q => `      ${q.key}: '${getParamValue(q.key, q.value)}'`).join(',\n')}
-    },` : ''}${enabledHeaders.length > 0 ? `
-    headers: {
-${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
-    },` : ''}${bodyObj ? `
-    body: ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 2).split('\n').map((line, i) => i === 0 ? line : `    ${line}`).join('\n')},` : ''}
+  action: '${actionTag}',
+  input: {
+${generateFlatInput('    ')}
   },
   retries: 3
 };`
@@ -694,18 +943,9 @@ const ductape = new Ductape({
             code: `const payload = {
   env: '${envSlug}',
   app: '${appTag}',
-  event: '${actionTag}',
-  input: {${enabledParams.length > 0 ? `
-    params: {
-${enabledParams.map(p => `      ${p.key}: '${getParamValue(p.key, p.value)}'`).join(',\n')}
-    },` : ''}${enabledQuery.length > 0 ? `
-    query: {
-${enabledQuery.map(q => `      ${q.key}: '${getParamValue(q.key, q.value)}'`).join(',\n')}
-    },` : ''}${enabledHeaders.length > 0 ? `
-    headers: {
-${enabledHeaders.map(h => `      '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
-    },` : ''}${bodyObj ? `
-    body: ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 2).split('\n').map((line, i) => i === 0 ? line : `    ${line}`).join('\n')},` : ''}
+  action: '${actionTag}',
+  input: {
+${generateFlatInput('    ')}
   },
   retries: 3
 };`
@@ -734,18 +974,9 @@ ductape = Ductape(
             code: `payload_data = {
     'env': '${envSlug}',
     'app': '${appTag}',
-    'event': '${actionTag}',
-    'input': {${enabledParams.length > 0 ? `
-        'params': {
-${enabledParams.map(p => `            '${p.key}': '${getParamValue(p.key, p.value)}'`).join(',\n')}
-        },` : ''}${enabledQuery.length > 0 ? `
-        'query': {
-${enabledQuery.map(q => `            '${q.key}': '${getParamValue(q.key, q.value)}'`).join(',\n')}
-        },` : ''}${enabledHeaders.length > 0 ? `
-        'headers': {
-${enabledHeaders.map(h => `            '${h.key}': '${getParamValue(h.key, h.value)}'`).join(',\n')}
-        },` : ''}${bodyObj ? `
-        'body': ${typeof bodyObj === 'string' ? `'${bodyObj}'` : JSON.stringify(bodyObj, null, 4).replace(/"/g, "'").split('\n').map((line, i) => i === 0 ? line : `        ${line}`).join('\n')},` : ''}
+    'action': '${actionTag}',
+    'input': {
+${generateFlatInput('        ')}
     },
     'retries': 3
 }`
@@ -1096,133 +1327,157 @@ println!("Action result: {:?}", result);`
   }
 
   return (
-    <div className="h-full overflow-hidden bg-grey-100 flex flex-col lg:flex-row relative">
-      {/* Left Panel - URL & Environments */}
-      <div className="w-full lg:w-2/5 border-b lg:border-b-0 lg:border-r border-grey-400 bg-white overflow-auto">
-        <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
-          {/* Header */}
-          <div className="space-y-3 lg:space-y-4">
-            <div className="flex items-center gap-2 lg:gap-3">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
-                <Globe className="h-5 w-5 lg:h-6 lg:w-6 text-blue" />
-              </div>
-              <div className="flex-1">
+    <div className="h-full overflow-hidden bg-grey-100 flex flex-col relative">
+      {/* Top Section - Collapsible Action Details */}
+      <div className="bg-white border-b border-grey-400 flex-shrink-0">
+        {/* Header Bar - Always Visible */}
+        <div className="px-4 py-3 flex items-center gap-3">
+          {/* Collapse Toggle */}
+          <button
+            onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+            className="p-1 hover:bg-grey-100 rounded transition-colors"
+          >
+            {isDetailsExpanded ? (
+              <ChevronDown className="h-4 w-4 text-grey-600" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-grey-600" />
+            )}
+          </button>
+
+          {/* Method Badge */}
+          <span className={cn('px-2 py-1 rounded text-xs font-bold', getMethodColor(formData.method))}>
+            {formData.method}
+          </span>
+
+          {/* Action Name */}
+          <h2 className="text-lg font-semibold text-grey truncate flex-1">
+            {formData.name || formData.tag || 'Unnamed Action'}
+          </h2>
+
+          {/* Tag Badge */}
+          <span className="text-xs text-grey-600 bg-grey-100 px-2 py-1 rounded font-mono hidden sm:inline">
+            {formData.tag}
+          </span>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                setSelectedActionForDocs(action);
+                setShowDocsSidebar(true);
+                setShowCodeSidebar(false);
+              }}
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+            >
+              <BookOpen className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline">Docs</span>
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCodeSidebar(true);
+                setShowDocsSidebar(false);
+              }}
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+            >
+              <Code className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline">Code</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible Details Section */}
+        {isDetailsExpanded && (
+          <div className="px-4 pb-4 space-y-4 border-t border-grey-200 pt-4">
+            {/* Name and Description */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Action Name</Label>
                 <Input
                   placeholder="Action Name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="text-lg lg:text-xl font-bold border-none p-0 h-auto focus-visible:ring-0"
+                  className="h-9"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setSelectedActionForDocs(action);
-                    setShowDocsSidebar(true);
-                    setShowCodeSidebar(false);
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs"
-                >
-                  <BookOpen className="w-3 h-3 mr-1" />
-                  View Docs
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowCodeSidebar(true);
-                    setShowDocsSidebar(false);
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs"
-                >
-                  <Code className="w-3 h-3 mr-1" />
-                  Code
-                </Button>
+              <div>
+                <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Tag</Label>
+                <Input
+                  value={formData.tag}
+                  readOnly
+                  className="h-9 bg-grey-50 font-mono text-sm"
+                />
               </div>
             </div>
 
-            <div className="text-xs text-grey-600 bg-grey-100 px-3 py-1.5 rounded inline-block">
-              Tag: <span className="font-mono">{formData.tag || 'auto-generated'}</span>
+            <div>
+              <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Description</Label>
+              <Textarea
+                placeholder="Description (optional)"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="text-sm resize-none"
+                rows={2}
+              />
             </div>
 
-            <Textarea
-              placeholder="Description (optional)"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="text-sm resize-none"
-              rows={2}
-            />
-          </div>
-
-          {/* App Information */}
-          {app && (
-            <div className="pt-4 border-t border-grey-400">
-              <Label className="text-sm font-semibold text-grey flex items-center gap-2 mb-3">
-                <Server className="h-4 w-4 text-primary" />
-                App Context
-              </Label>
-              
-              <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">
-                <div className="flex items-center gap-3">
-                  {/* App Logo */}
-                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center text-green text-sm font-semibold flex-shrink-0">
-                    {app?.logo ? (
-                      <img
-                        src={app?.logo}
-                        alt={app?.app_name}
-                        className="w-full h-full rounded-lg object-cover"
-                      />
-                    ) : (
-                      app?.app_name?.split(' ')
-                        .map((word: string) => word[0])
-                        .join('')
-                        .toUpperCase()
-                        .slice(0, 2)
-                    )}
-                  </div>
-                  
-                  {/* App Info */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-grey truncate">
-                      {app?.app_name}
-                    </h4>
-                    <p className="text-xs text-grey-600 truncate">
-                      {app?.tag}
-                    </p>
-                    {app?.status && (
-                      <span className={cn(
-                        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1',
-                        app?.status === 'active' 
-                          ? 'bg-green/10 text-green' 
-                          : 'bg-grey-400 text-grey-600'
-                      )}>
-                        {app?.status}
-                      </span>
-                    )}
-                  </div>
+            {/* App Context - Compact */}
+            {app?.app_name && (
+              <div className="flex items-center gap-3 p-3 bg-grey-50 rounded-lg border border-grey-200">
+                <div className="w-8 h-8 rounded-lg bg-green/10 flex items-center justify-center text-green text-xs font-semibold flex-shrink-0">
+                  {app?.logo ? (
+                    <img
+                      src={app?.logo}
+                      alt={app?.app_name}
+                      className="w-full h-full rounded-lg object-cover"
+                    />
+                  ) : (
+                    app?.app_name?.split(' ')
+                      .map((word: string) => word[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)
+                  )}
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-grey truncate">{app?.app_name}</p>
+                  <p className="text-xs text-grey-500 truncate">{app?.tag}</p>
+                </div>
+                {app?.status && (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded text-xs font-medium',
+                    app?.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-200 text-grey-600'
+                  )}>
+                    {app?.status}
+                  </span>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
 
-          {/* URL Builder */}
-          <div className="space-y-3 pt-4 border-t border-grey-400">
-            <Label className="text-sm font-semibold text-grey">Request URL</Label>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      {/* Main Content Area - Vertical Layout */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* URL & Environment Bar */}
+        <div className="bg-white border-b border-grey-400 p-4 flex-shrink-0">
+          <div className="flex flex-col lg:flex-row gap-3">
+            {/* Method + Send Button */}
+            <div className="flex items-center gap-2">
               <Select
                 value={formData.method}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, method: value }))}
               >
-                <SelectTrigger className="w-full sm:w-28">
+                <SelectTrigger className="w-24">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(method => (
                     <SelectItem key={method} value={method}>
-                      <span className={cn('px-2 py-1 rounded text-xs font-bold', getMethodColor(method))}>
+                      <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(method))}>
                         {method}
                       </span>
                     </SelectItem>
@@ -1233,7 +1488,7 @@ println!("Action result: {:?}", result);`
               <Button
                 onClick={handleTest}
                 disabled={isLoadingRequest || !fullUrl || !baseUrl}
-                className="bg-primary text-white hover:bg-primary/90 w-full sm:w-auto"
+                className="bg-primary text-white hover:bg-primary/90"
                 size="sm"
               >
                 <Send className="h-4 w-4 mr-1" />
@@ -1241,329 +1496,355 @@ println!("Action result: {:?}", result);`
               </Button>
             </div>
 
-            <Input
-              placeholder={baseUrl ? "Select an environment to see full URL" : "No environment selected"}
-              value={fullUrl}
-              readOnly
-              className="font-mono text-sm bg-grey-50"
-            />
-            
-            {!baseUrl && (
-              <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                ⚠️ Please select an environment above to enable the Send button
-              </div>
-            )}
-            
-            <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">
-              <Label className="text-xs font-medium text-grey-600 mb-2 flex items-center gap-2">
-                <Hash className="h-3 w-3" />
-                Resource Path
-              </Label>
+            {/* URL Display */}
+            <div className="flex-1">
               <Input
-                placeholder="/api/v1/endpoint"
-                value={resource}
-                onChange={(e) => setResource(e.target.value)}
-                className="font-mono text-xs h-8"
+                placeholder={baseUrl ? "Full URL" : "Select an environment to see full URL"}
+                value={fullUrl}
+                readOnly
+                className="font-mono text-sm bg-grey-50 dark:bg-transparent h-9"
               />
-              <p className="text-xs text-grey-500 mt-1">
-                {baseUrl ? `Full URL: ${baseUrl}${resource.startsWith('/') ? resource : `/${resource}`}` : 'Select an environment to see full URL'}
-              </p>
             </div>
 
+            {/* Environment Selector */}
+            {environments.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-grey-600 whitespace-nowrap">Env:</Label>
+                <div className="flex gap-1">
+                  {customEnvs.map((env) => {
+                    const originalEnv = environments.find((e: any) => e.slug === env.slug);
+                    const isUpdating = updatingEnvSlugs.has(env.slug);
+
+                    return (
+                      <button
+                        key={env.slug}
+                        onClick={() => handleEnvSelect(env.slug)}
+                        className={cn(
+                          'px-3 py-1.5 rounded text-xs font-medium transition-all border',
+                          isUpdating && 'animate-pulse',
+                          env.active
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-transparent text-grey-700 border-grey-300 hover:border-primary hover:text-primary'
+                        )}
+                      >
+                        {originalEnv?.env_name || env.slug}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Environments */}
-          {environments.length > 0 && (
-            <div className="pt-4 border-t border-grey-400">
-              <Label className="text-sm font-semibold text-grey flex items-center gap-2 mb-3">
-                <Server className="h-4 w-4 text-primary" />
-                Environments
-              </Label>
+          {/* Resource Path - Compact */}
+          <div className="mt-3 flex items-center gap-2">
+            <Label className="text-xs text-grey-600 flex items-center gap-1 whitespace-nowrap">
+              <Hash className="h-3 w-3" />
+              Resource:
+            </Label>
+            <Input
+              placeholder="/api/v1/endpoint"
+              value={resource}
+              onChange={(e) => setResource(e.target.value)}
+              className="font-mono text-xs h-8 flex-1"
+            />
+          </div>
 
-              <div className="space-y-2">
-                {customEnvs.map((env) => {
-                  const originalEnv = environments.find((e: any) => e.slug === env.slug);
-                  const isModified = env.base_url !== originalEnv?.base_url;
-                  const isUpdating = updatingEnvSlugs.has(env.slug);
-
-                  return (
-                    <div key={env.slug} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => handleEnvSelect(env.slug)}
-                          className={cn(
-                            'flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-all duration-300 flex-1',
-                            isUpdating && 'animate-pulse ring-4 ring-yellow-400 ring-opacity-75 shadow-lg',
-                            env.active
-                              ? isUpdating 
-                                ? 'bg-yellow-400 text-yellow-900 shadow-xl transform scale-105'
-                                : 'bg-primary text-white'
-                              : isUpdating
-                                ? 'bg-yellow-200 text-yellow-900 shadow-xl transform scale-105'
-                                : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
-                          )}
-                        >
-                          <span>{originalEnv?.env_name || env.slug}</span>
-                          {isModified && !isUpdating && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" title="Modified" />
-                          )}
-                          {isUpdating && (
-                            <span className="w-2 h-2 rounded-full bg-yellow-600 animate-ping" title="Updating..." />
-                          )}
-                        </button>
-
-                        {isModified && !isUpdating && (
-                          <Button
-                            onClick={() => handleResetEnv(env.slug)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            title="Reset to default"
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {env.active && (
-                        <div className="pl-3 text-xs text-grey-600">
-                          <code className={cn(
-                            "px-2 py-1 rounded border block transition-all duration-300",
-                            isUpdating 
-                              ? "bg-yellow-100 border-yellow-400 text-yellow-800 shadow-md"
-                              : "bg-grey-100 border-grey-400"
-                          )}>
-                            {env.base_url || 'Not set'}
-                          </code>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+          {!baseUrl && (
+            <div className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">
+              Select an environment to enable the Send button
             </div>
           )}
         </div>
-      </div>
 
-      {/* Right Panel - Request/Response */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="border-b border-grey-400 bg-white px-4 lg:px-6">
+        {/* Request/Response Tabs */}
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <div className="border-b border-grey-400 bg-white px-4 lg:px-6 flex-shrink-0">
             <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto overflow-x-auto">
               <TabsTrigger
                 value="params"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2.5 lg:px-3.5 py-2.5 text-xs lg:text-sm whitespace-nowrap gap-1.5"
               >
                 Params
+                {(params.length > 0 || query.length > 0) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                    {params.length + query.length}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="headers"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2.5 lg:px-3.5 py-2.5 text-xs lg:text-sm whitespace-nowrap gap-1.5"
               >
                 Headers
+                {headers.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                    {headers.length}
+                  </span>
+                )}
               </TabsTrigger>
               {['POST', 'PUT', 'PATCH'].includes(formData.method) && (
                 <TabsTrigger
                   value="body"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2.5 lg:px-3.5 py-2.5 text-xs lg:text-sm whitespace-nowrap gap-1.5"
                 >
                   Body
+                  {body && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-green" />
+                  )}
                 </TabsTrigger>
               )}
               <TabsTrigger
                 value="response"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2.5 lg:px-3.5 py-2.5 text-xs lg:text-sm whitespace-nowrap gap-1.5"
                 disabled={!response}
               >
                 Response
+                {response?.status && (
+                  <span className={cn(
+                    'text-[10px] px-1.5 py-0.5 rounded-full',
+                    response.status >= 200 && response.status < 300
+                      ? 'bg-green/10 text-green'
+                      : 'bg-red/10 text-red'
+                  )}>
+                    {response.status}
+                  </span>
+                )}
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <TabsContent value="params" className="p-4 lg:p-6 space-y-6 m-0">
               {/* Query Parameters Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold text-grey flex items-center gap-2">
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 flex items-center justify-between border-b border-grey-400">
+                  <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
                     <Hash className="h-4 w-4 text-primary" />
                     Query Parameters
-                  </Label>
-                  <Button onClick={() => addKeyValue(setQuery)} variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Query
+                  </h3>
+                  <Button
+                    onClick={() => addKeyValue(setQuery)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add
                   </Button>
                 </div>
-                <div className="space-y-2">
+                <div className="p-4">
                   {query.length === 0 ? (
-                    <p className="text-sm text-grey-600 text-center py-8 bg-grey-100 rounded-lg border border-grey-400">
-                      No query parameters
-                    </p>
-                  ) : (
-                    query.map((item, index) => (
-                      <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={item.enabled}
-                            onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
-                            className="w-4 h-4 rounded border-grey-400"
-                          />
-                          <Button
-                            onClick={() => removeKeyValue(index, setQuery)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Input
-                          placeholder="Key"
-                          value={item.key}
-                          onChange={(e) => updateKeyValue(index, 'key', e.target.value, setQuery)}
-                          className="flex-1 h-9"
-                        />
-                        <Input
-                          placeholder="Value"
-                          value={item.value}
-                          onChange={(e) => updateKeyValue(index, 'value', e.target.value, setQuery)}
-                          className="flex-1 h-9"
-                        />
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
+                        <Hash className="h-6 w-6 text-grey-400" />
                       </div>
-                    ))
+                      <p className="text-grey-600 font-medium mb-1">No query parameters</p>
+                      <p className="text-sm text-grey-500">Add query parameters to your request</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {query.map((item, index) => (
+                        <div
+                          key={index}
+                          className="p-3 rounded-lg border border-grey-400 hover:border-primary transition-colors"
+                        >
+                          <div className="flex gap-3 items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setQuery)}
+                              className="w-4 h-4 rounded border-grey-400"
+                            />
+                            <Input
+                              placeholder="Key"
+                              value={item.key}
+                              onChange={(e) => updateKeyValue(index, 'key', e.target.value, setQuery)}
+                              className="flex-1 h-9"
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={item.value}
+                              onChange={(e) => updateKeyValue(index, 'value', e.target.value, setQuery)}
+                              className="flex-1 h-9"
+                            />
+                            <Button
+                              onClick={() => removeKeyValue(index, setQuery)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-grey-400"></div>
-
               {/* Path Parameters Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold text-grey flex items-center gap-2">
-                    <Hash className="h-4 w-4 text-primary" />
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 flex items-center justify-between border-b border-grey-400">
+                  <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
+                    <Server className="h-4 w-4 text-primary" />
                     Path Parameters
-                  </Label>
-                  <Button onClick={() => addKeyValue(setParams)} variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Path
+                  </h3>
+                  <Button
+                    onClick={() => addKeyValue(setParams)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add
                   </Button>
                 </div>
-                <div className="space-y-2">
+                <div className="p-4">
                   {params.length === 0 ? (
-                    <p className="text-sm text-grey-600 text-center py-8 bg-grey-100 rounded-lg border border-grey-400">
-                      No path parameters
-                    </p>
-                  ) : (
-                    params.map((item, index) => (
-                      <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={item.enabled}
-                            onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
-                            className="w-4 h-4 rounded border-grey-400"
-                          />
-                          <Button
-                            onClick={() => removeKeyValue(index, setParams)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Input
-                          placeholder="Key"
-                          value={item.key}
-                          onChange={(e) => updateKeyValue(index, 'key', e.target.value, setParams)}
-                          className="flex-1 h-9"
-                        />
-                        <Input
-                          placeholder="Value"
-                          value={item.value}
-                          onChange={(e) => updateKeyValue(index, 'value', e.target.value, setParams)}
-                          className="flex-1 h-9"
-                        />
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
+                        <Server className="h-6 w-6 text-grey-400" />
                       </div>
-                    ))
+                      <p className="text-grey-600 font-medium mb-1">No path parameters</p>
+                      <p className="text-sm text-grey-500">Add path parameters like :id or :slug</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {params.map((item, index) => (
+                        <div
+                          key={index}
+                          className="p-3 rounded-lg border border-grey-400 hover:border-primary transition-colors"
+                        >
+                          <div className="flex gap-3 items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setParams)}
+                              className="w-4 h-4 rounded border-grey-400"
+                            />
+                            <Input
+                              placeholder="Key"
+                              value={item.key}
+                              onChange={(e) => updateKeyValue(index, 'key', e.target.value, setParams)}
+                              className="flex-1 h-9"
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={item.value}
+                              onChange={(e) => updateKeyValue(index, 'value', e.target.value, setParams)}
+                              className="flex-1 h-9"
+                            />
+                            <Button
+                              onClick={() => removeKeyValue(index, setParams)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="headers" className="p-4 lg:p-6 space-y-4 m-0">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold text-grey flex items-center gap-2">
-                  <Code className="h-4 w-4 text-primary" />
-                  Headers
-                </Label>
-                <Button onClick={() => addKeyValue(setHeaders)} variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {headers.length === 0 ? (
-                  <p className="text-sm text-grey-600 text-center py-8 bg-grey-100 rounded-lg">
-                    No headers
-                  </p>
-                ) : (
-                  headers.map((item, index) => (
-                    <div key={index} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-2 bg-grey-100 rounded border border-grey-400">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={item.enabled}
-                          onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
-                          className="w-4 h-4 rounded border-grey-400"
-                        />
-                        <Button
-                          onClick={() => removeKeyValue(index, setHeaders)}
-                          variant="ghost"
-                          size="sm"
-                          className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+            <TabsContent value="headers" className="p-4 lg:p-6 m-0">
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 flex items-center justify-between border-b border-grey-400">
+                  <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary" />
+                    Request Headers
+                  </h3>
+                  <Button
+                    onClick={() => addKeyValue(setHeaders)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add
+                  </Button>
+                </div>
+                <div className="p-4">
+                  {headers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
+                        <Globe className="h-6 w-6 text-grey-400" />
                       </div>
-                      <Input
-                        placeholder="Key"
-                        value={item.key}
-                        onChange={(e) => updateKeyValue(index, 'key', e.target.value, setHeaders)}
-                        className="flex-1 h-9"
-                      />
-                      <Input
-                        placeholder="Value"
-                        value={item.value}
-                        onChange={(e) => updateKeyValue(index, 'value', e.target.value, setHeaders)}
-                        className="flex-1 h-9"
-                      />
+                      <p className="text-grey-600 font-medium mb-1">No headers defined</p>
+                      <p className="text-sm text-grey-500">Add custom headers to your request</p>
                     </div>
-                  ))
-                )}
+                  ) : (
+                    <div className="space-y-2">
+                      {headers.map((item, index) => (
+                        <div
+                          key={index}
+                          className="p-3 rounded-lg border border-grey-400 hover:border-primary transition-colors"
+                        >
+                          <div className="flex gap-3 items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => updateKeyValue(index, 'enabled', e.target.checked, setHeaders)}
+                              className="w-4 h-4 rounded border-grey-400"
+                            />
+                            <Input
+                              placeholder="Header-Name"
+                              value={item.key}
+                              onChange={(e) => updateKeyValue(index, 'key', e.target.value, setHeaders)}
+                              className="flex-1 h-9"
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={item.value}
+                              onChange={(e) => updateKeyValue(index, 'value', e.target.value, setHeaders)}
+                              className="flex-1 h-9"
+                            />
+                            <Button
+                              onClick={() => removeKeyValue(index, setHeaders)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </TabsContent>
 
             {['POST', 'PUT', 'PATCH'].includes(formData.method) && (
-              <TabsContent value="body" className="p-4 lg:p-6 space-y-4 m-0">
-                <Label className="text-base font-semibold text-grey flex items-center gap-2">
-                  <FileCode className="h-4 w-4 text-primary" />
-                  Request Body
-                </Label>
-                <Textarea
-                  placeholder='{\n  "key": "value"\n}'
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="font-mono text-sm min-h-[600px]"
-                />
+              <TabsContent value="body" className="p-4 lg:p-6 m-0 flex-1 flex flex-col min-h-0">
+                <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+                  <div className="px-4 py-3 flex items-center justify-between border-b border-grey-400 flex-shrink-0">
+                    <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
+                      <FileCode className="h-4 w-4 text-primary" />
+                      Request Body
+                    </h3>
+                  </div>
+                  <div className="p-4 flex-1 min-h-0 h-full">
+                    <Textarea
+                      placeholder='{\n  "key": "value"\n}'
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      className="font-mono text-sm border-grey-400 resize-none min-h-[250px] w-full"
+                    />
+                  </div>
+                </div>
               </TabsContent>
             )}
 
-            <TabsContent value="response" className="m-0 h-full flex flex-col overflow-hidden">
+            <TabsContent value="response" className="m-0 flex flex-col">
               {!response ? (
                 <div className="flex items-center justify-center h-full text-grey-600">
                   <div className="text-center">
@@ -1623,7 +1904,7 @@ println!("Action result: {:?}", result);`
                         Copy
                       </Button>
                     </div>
-                    <div className="flex-1 bg-white rounded-lg border border-grey-400 p-4 overflow-auto font-mono text-sm min-h-0 max-h-[700px]">
+                    <div className="flex-1 bg-white rounded-lg border border-grey-400 p-4 overflow-auto font-mono text-sm">
                       <pre
                         className="text-grey-800"
                         style={{
@@ -1641,6 +1922,7 @@ println!("Action result: {:?}", result);`
             </TabsContent>
           </div>
         </Tabs>
+        </div>
       </div>
 
       {/* Documentation Sidebar */}
@@ -1677,7 +1959,7 @@ println!("Action result: {:?}", result);`
             {/* Method */}
             {selectedActionForDocs.method && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-1 block">Method</Label>
+                <Label className="text-sm font-semibold text-grey mb-1 block">Method</Label>
                 <span className={cn(
                   'px-3 py-1 rounded text-xs font-bold inline-block',
                   selectedActionForDocs.method === 'GET' && 'bg-green/10 text-green',
@@ -1694,16 +1976,16 @@ println!("Action result: {:?}", result);`
             {/* Description */}
             {selectedActionForDocs.description && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-1 block">Description</Label>
-                <p className="text-sm text-grey-600">{selectedActionForDocs.description}</p>
+                <Label className="text-sm font-semibold text-grey mb-1 block">Description</Label>
+                <p className="text-sm text-grey">{selectedActionForDocs.description}</p>
               </div>
             )}
 
             {/* Endpoint/Resource */}
             {selectedActionForDocs.resource && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-1 block">Endpoint</Label>
-                <code className="text-xs bg-grey-100 px-2 py-1 rounded border border-grey-300 font-mono block overflow-x-auto">
+                <Label className="text-sm font-semibold text-grey mb-1 block">Endpoint</Label>
+                <code className="text-xs bg-grey-100 text-grey px-2 py-1 rounded border border-grey-400 font-mono block overflow-x-auto">
                   {selectedActionForDocs.resource}
                 </code>
               </div>
@@ -1712,8 +1994,8 @@ println!("Action result: {:?}", result);`
             {/* Request Type */}
             {selectedActionForDocs.request_type && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-1 block">Request Type</Label>
-                <span className="text-xs px-2 py-1 bg-grey-100 text-grey-700 rounded border border-grey-300">
+                <Label className="text-sm font-semibold text-grey mb-1 block">Request Type</Label>
+                <span className="text-xs px-2 py-1 bg-grey-100 text-grey rounded border border-grey-400">
                   {selectedActionForDocs.request_type}
                 </span>
               </div>
@@ -1722,31 +2004,31 @@ println!("Action result: {:?}", result);`
             {/* Path Parameters */}
             {selectedActionForDocs.params?.data && selectedActionForDocs.params.data.length > 0 && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Path Parameters</Label>
-                <div className="border border-grey-300 rounded overflow-hidden">
+                <Label className="text-sm font-semibold text-grey mb-2 block">Path Parameters</Label>
+                <div className="border border-grey-400 rounded overflow-hidden">
                   <Table className="text-xs">
                     <TableHeader>
                       <TableRow className="bg-grey-100">
-                        <TableHead className="font-semibold">Key</TableHead>
-                        <TableHead className="font-semibold">Type</TableHead>
-                        <TableHead className="font-semibold">Description</TableHead>
-                        <TableHead className="font-semibold">Required</TableHead>
+                        <TableHead className="font-semibold text-grey">Key</TableHead>
+                        <TableHead className="font-semibold text-grey">Type</TableHead>
+                        <TableHead className="font-semibold text-grey">Description</TableHead>
+                        <TableHead className="font-semibold text-grey">Required</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedActionForDocs.params.data.map((param: any, index: number) => (
                         <TableRow key={index}>
-                          <TableCell className="font-mono">{param.key}</TableCell>
+                          <TableCell className="font-mono text-grey">{param.key}</TableCell>
                           <TableCell>
                             <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
                               {param.type || 'string'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-grey-600">{param.description || '-'}</TableCell>
+                          <TableCell className="text-grey">{param.description || '-'}</TableCell>
                           <TableCell>
                             <span className={cn(
                               'px-2 py-0.5 rounded text-xs font-medium',
-                              param.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600'
+                              param.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey'
                             )}>
                               {param.required ? 'Yes' : 'No'}
                             </span>
@@ -1762,31 +2044,31 @@ println!("Action result: {:?}", result);`
             {/* Query Parameters */}
             {selectedActionForDocs.query?.data && selectedActionForDocs.query.data.length > 0 && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Query Parameters</Label>
-                <div className="border border-grey-300 rounded overflow-hidden">
+                <Label className="text-sm font-semibold text-grey mb-2 block">Query Parameters</Label>
+                <div className="border border-grey-400 rounded overflow-hidden">
                   <Table className="text-xs">
                     <TableHeader>
                       <TableRow className="bg-grey-100">
-                        <TableHead className="font-semibold">Key</TableHead>
-                        <TableHead className="font-semibold">Type</TableHead>
-                        <TableHead className="font-semibold">Description</TableHead>
-                        <TableHead className="font-semibold">Required</TableHead>
+                        <TableHead className="font-semibold text-grey">Key</TableHead>
+                        <TableHead className="font-semibold text-grey">Type</TableHead>
+                        <TableHead className="font-semibold text-grey">Description</TableHead>
+                        <TableHead className="font-semibold text-grey">Required</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedActionForDocs.query.data.map((param: any, index: number) => (
                         <TableRow key={index}>
-                          <TableCell className="font-mono">{param.key}</TableCell>
+                          <TableCell className="font-mono text-grey">{param.key}</TableCell>
                           <TableCell>
                             <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
                               {param.type || 'string'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-grey-600">{param.description || '-'}</TableCell>
+                          <TableCell className="text-grey">{param.description || '-'}</TableCell>
                           <TableCell>
                             <span className={cn(
                               'px-2 py-0.5 rounded text-xs font-medium',
-                              param.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600'
+                              param.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey'
                             )}>
                               {param.required ? 'Yes' : 'No'}
                             </span>
@@ -1802,25 +2084,25 @@ println!("Action result: {:?}", result);`
             {/* Headers */}
             {selectedActionForDocs.headers?.data && selectedActionForDocs.headers.data.length > 0 && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Headers</Label>
-                <div className="border border-grey-300 rounded overflow-hidden">
+                <Label className="text-sm font-semibold text-grey mb-2 block">Headers</Label>
+                <div className="border border-grey-400 rounded overflow-hidden">
                   <Table className="text-xs">
                     <TableHeader>
                       <TableRow className="bg-grey-100">
-                        <TableHead className="font-semibold">Key</TableHead>
-                        <TableHead className="font-semibold">Description</TableHead>
-                        <TableHead className="font-semibold">Required</TableHead>
+                        <TableHead className="font-semibold text-grey">Key</TableHead>
+                        <TableHead className="font-semibold text-grey">Description</TableHead>
+                        <TableHead className="font-semibold text-grey">Required</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedActionForDocs.headers.data.map((header: any, index: number) => (
                         <TableRow key={index}>
-                          <TableCell className="font-mono">{header.key}</TableCell>
-                          <TableCell className="text-grey-600">{header.description || '-'}</TableCell>
+                          <TableCell className="font-mono text-grey">{header.key}</TableCell>
+                          <TableCell className="text-grey">{header.description || '-'}</TableCell>
                           <TableCell>
                             <span className={cn(
                               'px-2 py-0.5 rounded text-xs font-medium',
-                              header.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600'
+                              header.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey'
                             )}>
                               {header.required ? 'Yes' : 'No'}
                             </span>
@@ -1837,7 +2119,7 @@ println!("Action result: {:?}", result);`
             {selectedActionForDocs.body?.sample && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-semibold text-grey-700">Request Body</Label>
+                  <Label className="text-sm font-semibold text-grey">Request Body</Label>
                   {selectedActionForDocs.body?.data && selectedActionForDocs.body.data.length > 0 && (
                     <Button
                       onClick={() => setShowBodyDataTable(!showBodyDataTable)}
@@ -1851,8 +2133,8 @@ println!("Action result: {:?}", result);`
                   )}
                 </div>
                 {!showBodyDataTable ? (
-                  <div className="bg-grey-50 rounded border border-grey-300 p-3">
-                    <pre className="text-xs font-mono overflow-x-auto">
+                  <div className="bg-grey-100 rounded border border-grey-400 p-3">
+                    <pre className="text-xs font-mono overflow-x-auto text-grey">
                       {(() => {
                         try {
                           const sample = selectedActionForDocs.body.sample;
@@ -1872,28 +2154,28 @@ println!("Action result: {:?}", result);`
                     </pre>
                   </div>
                 ) : (
-                  <div className="border border-grey-300 rounded overflow-hidden">
+                  <div className="border border-grey-400 rounded overflow-hidden">
                     <Table className="text-xs">
                       <TableHeader>
                         <TableRow className="bg-grey-100">
-                          <TableHead className="font-semibold">Key</TableHead>
-                          <TableHead className="font-semibold">Type</TableHead>
-                          <TableHead className="font-semibold">Description</TableHead>
-                          <TableHead className="font-semibold">Length</TableHead>
-                          <TableHead className="font-semibold">Required</TableHead>
+                          <TableHead className="font-semibold text-grey">Key</TableHead>
+                          <TableHead className="font-semibold text-grey">Type</TableHead>
+                          <TableHead className="font-semibold text-grey">Description</TableHead>
+                          <TableHead className="font-semibold text-grey">Length</TableHead>
+                          <TableHead className="font-semibold text-grey">Required</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedActionForDocs.body.data.map((field: any, index: number) => (
                           <TableRow key={index}>
-                            <TableCell className="font-mono">{field.key}</TableCell>
+                            <TableCell className="font-mono text-grey">{field.key}</TableCell>
                             <TableCell>
                               <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
                                 {field.type || 'string'}
                               </span>
                             </TableCell>
-                            <TableCell className="text-grey-600">{field.description || '-'}</TableCell>
-                            <TableCell className="text-grey-600 text-xs">
+                            <TableCell className="text-grey">{field.description || '-'}</TableCell>
+                            <TableCell className="text-grey text-xs">
                               {field.minLength || field.maxLength ? (
                                 <span>
                                   {field.minLength && `min: ${field.minLength}`}
@@ -1905,7 +2187,7 @@ println!("Action result: {:?}", result);`
                             <TableCell>
                               <span className={cn(
                                 'px-2 py-0.5 rounded text-xs font-medium',
-                                field.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600'
+                                field.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey'
                               )}>
                                 {field.required ? 'Yes' : 'No'}
                               </span>
@@ -1922,19 +2204,19 @@ println!("Action result: {:?}", result);`
             {/* Responses */}
             {selectedActionForDocs.responses && selectedActionForDocs.responses.filter((r: any) => r.success === true).length > 0 && (
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">Responses</Label>
+                <Label className="text-sm font-semibold text-grey mb-2 block">Responses</Label>
                 <div className="space-y-3">
                   {selectedActionForDocs.responses.filter((r: any) => r.success === true).map((response: any, index: number) => (
-                    <div key={index} className="border border-grey-300 rounded-lg overflow-hidden">
+                    <div key={index} className="border border-grey-400 rounded-lg overflow-hidden">
                       <div className="bg-grey-100 px-3 py-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className={cn(
                             'px-2 py-1 rounded text-xs font-medium',
-                            response.status >= 200 && response.status < 300 ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey-600'
+                            response.status >= 200 && response.status < 300 ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
                           )}>
                             {response.status}
                           </span>
-                          <span className="text-xs text-grey-600">{response.message || 'Success'}</span>
+                          <span className="text-xs text-grey">{response.message || 'Success'}</span>
                         </div>
                         {response.body?.data && response.body.data.length > 0 && (
                           <Button
@@ -1949,8 +2231,8 @@ println!("Action result: {:?}", result);`
                         )}
                       </div>
                       {!showResponseDataTables[index] ? (
-                        <div className="p-3 bg-grey-50">
-                          <pre className="text-xs font-mono overflow-x-auto">
+                        <div className="p-3 bg-grey-100">
+                          <pre className="text-xs font-mono overflow-x-auto text-grey">
                             {(() => {
                               try {
                                 const sample = response.body?.sample || response.body;
@@ -1974,24 +2256,24 @@ println!("Action result: {:?}", result);`
                           <Table className="text-xs">
                             <TableHeader>
                               <TableRow className="bg-grey-100">
-                                <TableHead className="font-semibold">Key</TableHead>
-                                <TableHead className="font-semibold">Type</TableHead>
-                                <TableHead className="font-semibold">Description</TableHead>
-                                <TableHead className="font-semibold">Length</TableHead>
-                                <TableHead className="font-semibold">Required</TableHead>
+                                <TableHead className="font-semibold text-grey">Key</TableHead>
+                                <TableHead className="font-semibold text-grey">Type</TableHead>
+                                <TableHead className="font-semibold text-grey">Description</TableHead>
+                                <TableHead className="font-semibold text-grey">Length</TableHead>
+                                <TableHead className="font-semibold text-grey">Required</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {response.body.data.map((field: any, fieldIndex: number) => (
                                 <TableRow key={fieldIndex}>
-                                  <TableCell className="font-mono">{field.key}</TableCell>
+                                  <TableCell className="font-mono text-grey">{field.key}</TableCell>
                                   <TableCell>
                                     <span className="px-2 py-0.5 bg-blue/10 text-blue rounded text-xs">
                                       {field.type || 'string'}
                                     </span>
                                   </TableCell>
-                                  <TableCell className="text-grey-600">{field.description || '-'}</TableCell>
-                                  <TableCell className="text-grey-600 text-xs">
+                                  <TableCell className="text-grey">{field.description || '-'}</TableCell>
+                                  <TableCell className="text-grey text-xs">
                                     {field.minLength || field.maxLength ? (
                                       <span>
                                         {field.minLength && `min: ${field.minLength}`}
@@ -2003,7 +2285,7 @@ println!("Action result: {:?}", result);`
                                   <TableCell>
                                     <span className={cn(
                                       'px-2 py-0.5 rounded text-xs font-medium',
-                                      field.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600'
+                                      field.required ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey'
                                     )}>
                                       {field.required ? 'Yes' : 'No'}
                                     </span>
@@ -2140,6 +2422,72 @@ println!("Action result: {:?}", result);`
           }}
         />
       )}
+
+      {/* Environment Modal */}
+      <Dialog open={showEnvModal} onOpenChange={setShowEnvModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-grey flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              {environments.find((e: any) => e.slug === selectedEnvForModal?.slug)?.env_name || selectedEnvForModal?.slug}
+            </DialogTitle>
+            <DialogDescription>
+              Configure the base URL for this environment
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="env-base-url">Base URL</Label>
+              <Input
+                id="env-base-url"
+                placeholder="https://api.example.com"
+                value={editedEnvBaseUrl}
+                onChange={(e) => setEditedEnvBaseUrl(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+
+            {selectedEnvForModal && (
+              <div className="flex items-center gap-2 text-sm text-grey-600">
+                <span>Status:</span>
+                <span className={cn(
+                  'px-2 py-0.5 rounded text-xs font-medium',
+                  selectedEnvForModal.active
+                    ? 'bg-green/10 text-green'
+                    : 'bg-grey-100 text-grey-600'
+                )}>
+                  {selectedEnvForModal.active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEnvModal(false);
+                setSelectedEnvForModal(null);
+              }}
+            >
+              Cancel
+            </Button>
+            {selectedEnvForModal && !selectedEnvForModal.active && (
+              <Button
+                variant="outline"
+                onClick={handleSelectEnvFromModal}
+                className="text-primary border-primary hover:bg-primary/10"
+              >
+                Use This Environment
+              </Button>
+            )}
+            <Button onClick={handleSaveEnvChanges}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

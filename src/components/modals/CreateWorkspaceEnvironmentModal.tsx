@@ -38,6 +38,7 @@ export default function CreateWorkspaceEnvironmentModal({
     slug: '',
     description: '',
   });
+  const [isDescriptionManuallyEdited, setIsDescriptionManuallyEdited] = useState(false);
 
   useEffect(() => {
     if (editingEnv) {
@@ -46,17 +47,75 @@ export default function CreateWorkspaceEnvironmentModal({
         slug: editingEnv.slug,
         description: editingEnv.description || '',
       });
+      setIsDescriptionManuallyEdited(true); // Don't auto-generate when editing
     } else {
       setFormData({
         env_name: '',
         slug: '',
         description: '',
       });
+      setIsDescriptionManuallyEdited(false); // Allow auto-generation for new environments
     }
   }, [editingEnv, open]);
 
+  const generateDescription = (name: string): string => {
+    const lowerName = name.toLowerCase().trim();
+
+    // Common environment name patterns and their descriptions
+    if (lowerName.includes('prod') || lowerName === 'live') {
+      return 'Production environment for live applications and services';
+    }
+    if (lowerName.includes('stag') || lowerName === 'stg') {
+      return 'Staging environment for pre-production testing and validation';
+    }
+    if (lowerName.includes('dev') || lowerName === 'development') {
+      return 'Development environment for building and testing new features';
+    }
+    if (lowerName.includes('test') || lowerName === 'qa') {
+      return 'Testing environment for quality assurance and automated tests';
+    }
+    if (lowerName.includes('sandbox') || lowerName === 'sbx') {
+      return 'Sandbox environment for experimentation and isolated testing';
+    }
+    if (lowerName.includes('demo')) {
+      return 'Demo environment for showcasing features and demonstrations';
+    }
+    if (lowerName.includes('local')) {
+      return 'Local development environment for individual developer use';
+    }
+    if (lowerName.includes('uat')) {
+      return 'User Acceptance Testing environment for client validation';
+    }
+    if (lowerName.includes('preview')) {
+      return 'Preview environment for reviewing changes before deployment';
+    }
+    if (lowerName.includes('integration') || lowerName === 'int') {
+      return 'Integration environment for testing system integrations';
+    }
+
+    // Default description if no pattern matches
+    if (name.trim()) {
+      return `${name.trim()} environment for your applications and services`;
+    }
+    return '';
+  };
+
   const handleNameChange = (value: string) => {
-    setFormData({ ...formData, env_name: value });
+    // Only auto-generate description if user hasn't manually edited it
+    const newDescription = !isDescriptionManuallyEdited
+      ? generateDescription(value)
+      : formData.description;
+
+    setFormData({
+      ...formData,
+      env_name: value,
+      description: newDescription,
+    });
+  };
+
+  const handleDescriptionChange = (value: string) => {
+    setIsDescriptionManuallyEdited(true);
+    setFormData({ ...formData, description: value });
   };
 
   const handleSlugChange = (value: string) => {
@@ -235,7 +294,7 @@ export default function CreateWorkspaceEnvironmentModal({
               id="description"
               placeholder="Describe this environment..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => handleDescriptionChange(e.target.value)}
               rows={3}
               className="mt-2"
             />

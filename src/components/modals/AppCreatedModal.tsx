@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportDocsTypes } from '@ductape/sdk/dist/imports/imports.types';
-import { useDuctape } from '@/hooks/useDuctape';
+import { connectDuctapeWorkspace } from '@/helpers/ductape';
 import { useAuth } from '@/store/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -41,15 +41,6 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
   const [importType, setImportType] = useState<'postman' | 'openapi'>('postman');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: app?.workspace_id || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'app'
-  }) as any;
 
   const handleImportContent = () => {
     setShowImportView(true);
@@ -94,8 +85,8 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
       return;
     }
 
-    if (!ductape) {
-      toast.error('SDK not initialized. Please check your configuration.');
+    if (!app?.workspace_id || !user?._id || !user?.auth_token || !user?.public_key) {
+      toast.error('Missing required configuration. Please try again.');
       return;
     }
 
@@ -105,8 +96,13 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
       const content = await file.text();
       const blob = new Blob([content], { type: 'application/json' });
 
-      // Get the importer from SDK
-      const importer = await ductape.actions;
+      // Initialize the full Ductape SDK instance for import operations
+      const ductape = connectDuctapeWorkspace({
+        workspace_id: app.workspace_id,
+        user_id: user._id,
+        token: user.auth_token,
+        public_key: user.public_key,
+      });
 
       // Get the latest version or default to 0.0.1
       let version = '0.0.1';
@@ -117,8 +113,8 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
         }
       }
 
-      // Import using SDK
-      await importer.import({
+      // Import using SDK actions.import
+      await ductape.actions.import({
         file: blob as unknown as Buffer,
         type: importType === 'postman' ? ImportDocsTypes.postmanV21 : ImportDocsTypes.openApiV30,
         version: version,
@@ -126,8 +122,12 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
         updateIfExists: true,
       });
 
-      // Invalidate the apps list query
-      await queryClient.invalidateQueries({ queryKey: ['apps', 'internal', app.workspace_id] });
+      // Invalidate relevant queries to ensure fresh data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['apps', 'internal', app.workspace_id] }),
+        queryClient.invalidateQueries({ queryKey: ['app', app._id] }),
+        queryClient.invalidateQueries({ queryKey: ['app', app.tag] }),
+      ]);
 
       // Close the modal first
       onOpenChange(false);
@@ -148,9 +148,9 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
           // Close the current tab
           closeTab(activeTabId);
 
-          // Reopen with fresh data
+          // Reopen with fresh data - use timestamp to force complete remount
           openTab({
-            id: `app-${updatedApp._id}`,
+            id: `app-${updatedApp._id}-${Date.now()}`,
             type: 'app',
             title: updatedApp.app_name,
             data: updatedApp,
@@ -270,7 +270,7 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                 <div>
                   <DialogTitle className='text-grey'>Import to App</DialogTitle>
                   <DialogDescription>
-                    Import Postman collections to create an app with actions, environments, and variables
+                    Import Postman collections or OpenAPI specifications to populate your app with actions and configurations
                   </DialogDescription>
                 </div>
               </div>
@@ -305,21 +305,23 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
 
                 <label
                   className={cn(
-                    'flex items-center gap-3 p-4 border rounded-lg transition-colors opacity-50 cursor-not-allowed',
-                    'border-grey-300'
+                    'flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors',
+                    importType === 'openapi' ? 'border-primary bg-primary/5' : 'border-grey-300 hover:border-grey-400'
                   )}
                 >
                   <input
                     type="radio"
                     name="importType"
                     value="openapi"
-                    disabled
+                    checked={importType === 'openapi'}
+                    onChange={(e) => setImportType(e.target.value as 'postman' | 'openapi')}
+                    disabled={isImporting}
                     className="w-4 h-4 text-primary"
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-grey">OpenAPI Specification</div>
                     <div className="text-sm text-grey-600">
-                      Coming soon - OpenAPI v3.0 or v3.1
+                      Import OpenAPI v3.0 specifications
                     </div>
                   </div>
                 </label>

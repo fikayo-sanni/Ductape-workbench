@@ -82,3 +82,14 @@ export interface CodeGenerationOptions {
   includeSdk: boolean;
   includeErrorHandling: boolean;
 }
+
+// SDK enums that need to be defined locally due to Vite bundler issues with symlinked packages
+export enum TokenPeriods {
+  HOURS = 'hours',
+  MINUTES = 'mins',
+  SECONDS = 'secs',
+  DAYS = 'days',
+  WEEKS = 'weeks',
+  MONTHS = 'months',
+  YEARS = 'years'
+}

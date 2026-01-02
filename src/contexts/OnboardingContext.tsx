@@ -32,13 +32,9 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     }
   }, []);
 
-  // Check if user is new and should see onboarding
-  useEffect(() => {
-    const isNewUser = localStorage.getItem('ductape-is-new-user');
-    if (isNewUser === 'true' && !hasCompletedOnboarding) {
-      setIsOnboarding(true);
-    }
-  }, [hasCompletedOnboarding]);
+  // Note: Removed automatic onboarding trigger based on 'ductape-is-new-user' flag.
+  // Onboarding is now triggered from WorkbenchLayout.tsx only after workspace fetch
+  // completes and confirms the user has no workspaces.
 
   const startOnboarding = () => {
     setIsOnboarding(true);

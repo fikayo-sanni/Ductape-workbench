@@ -66,6 +66,18 @@ function createWindow() {
   // Load the built web app
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
 
+  // Open DevTools for debugging (remove in production)
+  mainWindow.webContents.openDevTools();
+
+  // Log any load failures
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer] ${message}`);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
