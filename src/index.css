@@ -97,3 +97,27 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Tab bar thin scrollbar */
+.tab-bar-scroll::-webkit-scrollbar {
+  height: 2px;
+}
+
+.tab-bar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-bar-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--grey400));
+  border-radius: 1px;
+}
+
+.tab-bar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--grey700));
+}
+
+/* Firefox scrollbar */
+.tab-bar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--grey400)) transparent;
+}

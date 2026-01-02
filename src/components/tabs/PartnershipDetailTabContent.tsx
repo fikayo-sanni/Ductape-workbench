@@ -49,8 +49,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { connectDuctapeWorkspace } from '@/helpers/ductape';
-import Ductape from '@ductape/sdk';
+import { connectDuctapeWorkspace, SDKProxyService } from '@/helpers/ductape';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
 // Issue types
@@ -234,7 +233,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
   // Initialize Ductape SDK for saving tokens
   const { currentWorkspaceId } = useAuth();
-  const ductape = useMemo<Ductape | null>(() => {
+  const ductape = useMemo<SDKProxyService | null>(() => {
     if (!currentWorkspaceId || !user?._id || !user?.public_key || !user?.auth_token) {
       return null;
     }
@@ -449,7 +448,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
         setSavedDeliverables(newSaved);
       }
 
-      toast.success(`Token saved as $Token{${saveTokenKey}}`);
+      toast.success(`Token saved as $Secret{${saveTokenKey}}`);
       setSaveTokenDialogOpen(false);
       resetSaveTokenState();
     } catch (error: any) {
@@ -1113,7 +1112,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                   Save as Workspace Token
                 </DialogTitle>
                 <DialogDescription>
-                  Save this deliverable as a workspace token so you can reference it in your integrations using the <code className="bg-grey-100 px-1.5 py-0.5 rounded text-xs font-mono">$Token{'{key}'}</code> syntax.
+                  Save this deliverable as a workspace token so you can reference it in your integrations using the <code className="bg-grey-100 px-1.5 py-0.5 rounded text-xs font-mono">$Secret{'{key}'}</code> syntax.
                 </DialogDescription>
               </DialogHeader>
 
@@ -1150,7 +1149,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                     disabled={isSavingToken}
                   />
                   <p className="text-xs text-grey-600">
-                    Only letters, numbers, and underscores allowed. This will be used as <code className="bg-grey-100 px-1 rounded">$Token{'{' + (saveTokenKey || 'key') + '}'}</code>
+                    Only letters, numbers, and underscores allowed. This will be used as <code className="bg-grey-100 px-1 rounded">$Secret{'{' + (saveTokenKey || 'key') + '}'}</code>
                   </p>
                 </div>
 

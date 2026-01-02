@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 
 export default function AppsSidebar() {
   const { user, currentWorkspaceId } = useAuth();
-  const { openTab } = useWorkbenchStore();
+  const { openTab, setSidebarCollapsed } = useWorkbenchStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [loadingAppTag, setLoadingAppTag] = useState<string | null>(null);
@@ -31,6 +31,8 @@ export default function AppsSidebar() {
         data: fullApp,
       });
       setLoadingAppTag(null);
+      // Automatically collapse the main sidebar after opening an app
+      setSidebarCollapsed(true);
     },
     onError: (error: any) => {
       toast.error('Failed to load app details');

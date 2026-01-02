@@ -19,7 +19,7 @@ import workspaceServices from '@/services/workspaceServices';
 import appServices from '@/services/appServices';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
-// Dynamic import for SDK to avoid build issues
+import { SDKProxyService } from '@/services/sdkProxy';
 
 interface NewAppTabContentProps {
   tabId: string;
@@ -224,21 +224,20 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
 
       const newApp = appResponse.data;
 
-      // Initialize Ductape SDK dynamically (optional)
-      let ductape = null;
+      // Initialize Ductape SDK Proxy for workspace operations
+      let ductape: SDKProxyService | null = null;
       try {
-        // Try to load SDK from CDN or external source
-        const sdkModule = await import('@ductape/sdk');
-        const Ductape = sdkModule.default || sdkModule;
-        ductape = new Ductape({
-          workspace_id: currentWorkspaceId || '',
-          private_key: user?.public_key || '',
-          user_id: user?._id || '',
-        });
-        console.log('Ductape SDK loaded successfully');
+        if (currentWorkspaceId && user?._id && user?.auth_token && user?.public_key) {
+          ductape = new SDKProxyService({
+            workspace_id: currentWorkspaceId,
+            user_id: user._id,
+            token: user.auth_token,
+            public_key: user.public_key,
+          });
+          console.log('Ductape SDK Proxy initialized successfully');
+        }
       } catch (sdkError) {
-        console.warn('Ductape SDK not available:', sdkError);
-        // Continue without SDK - the app will still be created
+        console.warn('Ductape SDK Proxy initialization failed:', sdkError);
         ductape = null;
       }
 
@@ -267,7 +266,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
           await ductape.product.init(product.tag);
 
           // Connect app to product
-          const appAccess = await ductape.product.apps.connect(newApp.tag);
+          const appAccess = await ductape.product.apps.connect(product.tag, newApp.tag);
           
           // Prepare environment mappings for SDK
           const envMappings = activeEnvs.map((env: any) => ({
@@ -278,7 +277,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
           }));
 
           // Add app to product with environment mappings
-          await ductape.product.apps.add({
+          await ductape.product.apps.add(product.tag, {
             access_tag: appAccess.access_tag,
             envs: envMappings
           });
@@ -347,10 +346,68 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
     }
   };
 
+  const generateEnvDescription = (name: string): string => {
+    const lowerName = name.toLowerCase().trim();
+
+    // Common environment name patterns and their descriptions
+    if (lowerName.includes('prod') || lowerName === 'live') {
+      return 'Production environment for live applications and services';
+    }
+    if (lowerName.includes('stag') || lowerName === 'stg') {
+      return 'Staging environment for pre-production testing and validation';
+    }
+    if (lowerName.includes('dev') || lowerName === 'development') {
+      return 'Development environment for building and testing new features';
+    }
+    if (lowerName.includes('test') || lowerName === 'qa') {
+      return 'Testing environment for quality assurance and automated tests';
+    }
+    if (lowerName.includes('sandbox') || lowerName === 'sbx') {
+      return 'Sandbox environment for experimentation and isolated testing';
+    }
+    if (lowerName.includes('demo')) {
+      return 'Demo environment for showcasing features and demonstrations';
+    }
+    if (lowerName.includes('local')) {
+      return 'Local development environment for individual developer use';
+    }
+    if (lowerName.includes('uat')) {
+      return 'User Acceptance Testing environment for client validation';
+    }
+    if (lowerName.includes('preview')) {
+      return 'Preview environment for reviewing changes before deployment';
+    }
+    if (lowerName.includes('integration') || lowerName === 'int') {
+      return 'Integration environment for testing system integrations';
+    }
+
+    // Default description if no pattern matches
+    if (name.trim()) {
+      return `${name.trim()} environment for your applications and services`;
+    }
+    return '';
+  };
+
   const updateEnvironment = (index: number, field: string, value: any) => {
-    setEnvironments((prev: any) => prev.map((env: any, i: number) => 
-      i === index ? { ...env, [field]: value } : env
-    ));
+    setEnvironments((prev: any) => prev.map((env: any, i: number) => {
+      if (i !== index) return env;
+
+      // If updating env_name, also auto-generate description if it's empty or was auto-generated
+      if (field === 'env_name') {
+        const currentDesc = env.description || '';
+        const wasAutoGenerated = !currentDesc ||
+          currentDesc === generateEnvDescription(env.env_name) ||
+          currentDesc.endsWith('environment for your applications and services');
+
+        return {
+          ...env,
+          env_name: value,
+          description: wasAutoGenerated ? generateEnvDescription(value) : currentDesc
+        };
+      }
+
+      return { ...env, [field]: value };
+    }));
   };
 
   const addEnvironment = () => {

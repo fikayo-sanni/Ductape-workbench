@@ -1,12 +1,12 @@
 import { Database, Server, Link, Copy, Check, Eye, EyeOff, Table as TableIcon, GitBranch, Zap, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { useDuctape } from '@/hooks/useDuctape';
+import { connectDuctapeWorkspace } from '@/helpers/ductape';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -19,29 +19,32 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
   const [showConnections, setShowConnections] = useState<Record<number, boolean>>({});
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
-  
-  // Initialize SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product',
-  });
+
+  // Initialize SDK using memoized value
+  const ductape = useMemo(() => {
+    if (!currentWorkspaceId || !user?._id || !user?.auth_token || !user?.public_key) {
+      return null;
+    }
+    return connectDuctapeWorkspace({
+      workspace_id: currentWorkspaceId,
+      user_id: user._id,
+      token: user.auth_token,
+      public_key: user.public_key,
+    });
+  }, [currentWorkspaceId, user?._id, user?.auth_token, user?.public_key]);
 
   // Fetch database details from SDK
   const { data: databaseData, isLoading } = useQuery({
     queryKey: ['database', database?.tag],
     queryFn: async () => {
-      if (!ductape || !database?.tag) {
+      if (!ductape || !database?.tag || !database?.productTag) {
         return database;
       }
 
-      const sdk = ductape as any;
-      const result = await sdk.databases.fetch(database.tag);
+      const result = await ductape.databases.fetch(database.productTag, database.tag);
       return result;
     },
-    enabled: !!ductape && !!database?.tag,
+    enabled: !!ductape && !!database?.tag && !!database?.productTag,
   });
 
   const displayData = databaseData || database;
@@ -122,6 +125,7 @@ export default function DatabaseTabContent({ database }: DatabaseTabContentProps
           env: env,
           productTag: database?.productTag,
           productName: database?.productName,
+          productPublicKey: database?.productPublicKey,
         },
         isExplorer: true,
       },

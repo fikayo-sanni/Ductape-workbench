@@ -83,7 +83,7 @@ const componentConfig: Record<string, {
   },
   'message-broker': {
     icon: MessageSquare,
-    title: 'Message Broker',
+    title: 'Messaging',
     color: 'bg-purple-500/10 text-purple-500',
     fields: [
       { key: 'type', label: 'Broker Type', copyable: false },

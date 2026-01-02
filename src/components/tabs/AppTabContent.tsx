@@ -1,6 +1,39 @@
 import { useState, useMemo, useEffect } from 'react';
 import { IApp } from '@/types/app';
-import { Zap, Settings2, Key, FileCode, Globe, Pencil, Search, Folder, Plus, ExternalLink, Building2, Grid3x3, Webhook, Filter, Download, ChevronDown } from 'lucide-react';
+import {
+  Zap,
+  Settings2,
+  Globe,
+  Search,
+  Folder,
+  Plus,
+  ExternalLink,
+  Building2,
+  Webhook,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  MoreVertical,
+  FolderOpen,
+  Trash2,
+  FolderPlus,
+  Radio,
+  PanelLeftClose,
+  PanelLeft,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Clock,
+  BarChart3,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Plug,
+  Home,
+  Rocket,
+  Loader2,
+  Box,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
@@ -28,25 +61,59 @@ import UpdateAppEnvironmentModal from '@/components/modals/UpdateAppEnvironmentM
 import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useDuctape } from '@/hooks/useDuctape';
+import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
+import ActionViewTabContent from './ActionViewTabContent';
+import WebhookTabContent from './WebhookTabContent';
+import RequestBuilder from './RequestBuilder';
+import InlineWebhookForm from '@/components/forms/InlineWebhookForm';
 
 interface AppTabContentProps {
   app?: IApp;
   appId?: string;
 }
 
+// Sidebar view types - Overview is the main dashboard, others are resource categories
+type SidebarView = 'overview' | 'environments' | 'actions' | 'webhooks';
+
+// Folder tree node interface
+interface FolderTreeNode {
+  _id: string;
+  name: string;
+  parent_id: string | null | undefined;
+  level: number;
+  children: FolderTreeNode[];
+  actions: any[];
+}
+
 export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const { openTab, tabs, activeTabId } = useWorkbenchStore();
   const { currentWorkspaceId, user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Get itemId and initialization data from active tab if app is undefined (after refresh)
   const activeTab = tabs.find(t => t.id === activeTabId);
   const effectiveAppId = app?._id || appId || activeTab?.itemId;
-  const initialActiveSection = (activeTab?.data as any)?.activeSection || 'overview';
+
+  // Persistent state key based on app identifier
+  const stateKey = `app-tab-state-${app?.tag || effectiveAppId}`;
+
+  // Load persisted state from localStorage
+  const getPersistedState = () => {
+    try {
+      const saved = localStorage.getItem(stateKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedState = getPersistedState();
 
   const [selectedVersionTag, setSelectedVersionTag] = useState<string>(
-    app?.versions?.find(v => v.latest)?.tag || app?.versions?.[0]?.tag || ''
+    persistedState?.selectedVersionTag || app?.versions?.find(v => v.latest)?.tag || app?.versions?.[0]?.tag || ''
   );
   const [editingEnv, setEditingEnv] = useState<any | null>(null);
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
@@ -59,21 +126,45 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
   const [showCreateSharedVariableModal, setShowCreateSharedVariableModal] = useState(false);
 
-  // Actions search and filter state
-  const [actionsSearch, setActionsSearch] = useState('');
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  // Sidebar state - initialize from persisted values
+  const [sidebarView, setSidebarView] = useState<SidebarView>(persistedState?.sidebarView || 'overview');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(persistedState?.expandedFolders || [])
+  );
+  const [selectedAction, setSelectedAction] = useState<any | null>(() => {
+    if (persistedState?.selectedActionTag) {
+      // Will be resolved after actions are loaded
+      return { tag: persistedState.selectedActionTag, _pendingRestore: true };
+    }
+    return null;
+  });
+  const [selectedWebhook, setSelectedWebhook] = useState<any | null>(() => {
+    if (persistedState?.selectedWebhookTag) {
+      // Will be resolved after webhooks are loaded
+      return { tag: persistedState.selectedWebhookTag, _pendingRestore: true };
+    }
+    return null;
+  });
+  const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(persistedState?.isSidebarCollapsed || false);
 
-  // Content filter state - initialize from persisted data
-  const [activeFilter, setActiveFilter] = useState<string>(initialActiveSection);
+  // State for creating a new action inline (instead of opening a new tab)
+  const [isCreatingAction, setIsCreatingAction] = useState(false);
+  const [newActionFolderId, setNewActionFolderId] = useState<string | null>(null);
+  const [inlineActionTabId, setInlineActionTabId] = useState<string>('');
 
-  // Determine if app is internal or third-party
-  const isInternalApp = app?.workspace_id === currentWorkspaceId;
+  // State for creating a new webhook inline
+  const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+
+  // Note: State reset when switching apps is handled by the key prop in TabContent.tsx
+  // which forces a complete remount of this component
 
   // Check if app data is incomplete (missing versions, actions, app_name, etc.)
   const isAppDataIncomplete = app && (!app.versions || app.versions.length === 0 || !app.app_name);
 
   // Fetch app details if app data is missing or incomplete
-  const { data: appDetails, isLoading, error } = useQuery({
+  const { data: appDetails, isLoading, error, refetch } = useQuery({
     queryKey: ['app', effectiveAppId],
     queryFn: () => appServices.fetchApp({
       app_id: effectiveAppId || '',
@@ -88,19 +179,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   // Use fetched app details if available, otherwise use the passed app
   const currentApp = appDetails?.data || app;
 
-  // Debug logging
-  useEffect(() => {
-    console.log('AppTabContent Debug:', {
-      effectiveAppId,
-      hasApp: !!app,
-      hasAppDetails: !!appDetails?.data,
-      hasCurrentApp: !!currentApp,
-      isLoading,
-      error,
-      userId: user?._id,
-      publicKey: user?.public_key,
-    });
-  }, [effectiveAppId, app, appDetails, currentApp, isLoading, error, user]);
+  // Determine if app is internal or third-party
+  // Use currentApp to ensure we have workspace_id after data is fetched (e.g., after page refresh)
+  const isInternalApp = currentApp?.workspace_id === currentWorkspaceId;
 
   // Update tab with fetched data
   useEffect(() => {
@@ -109,8 +190,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       updateTab(activeTabId, { data: appDetails.data });
     }
   }, [appDetails, activeTabId, app]);
-
-  // ALL HOOKS AND COMPUTED VALUES MUST BE BEFORE EARLY RETURNS!
 
   // Calculate selected version
   const selectedVersion = currentApp?.versions?.find(v => v.tag === selectedVersionTag) ||
@@ -122,76 +201,128 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const envsCount = selectedVersion?.envs?.length || currentApp?.envs_count || 0;
   const authsCount = selectedVersion?.auths?.length || 0;
   const variablesCount = selectedVersion?.variables?.length || 0;
-  const constantsCount = selectedVersion?.constants?.length|| 0;
+  const constantsCount = selectedVersion?.constants?.length || 0;
   const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any)?.webhooks_count || 0;
 
-  // Build folder tree structure
-  const folderTree = useMemo(() => {
-    if (!selectedVersion?.folders) return [];
+  // Check if the selected version is unpublished (draft or private)
+  const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private' || !selectedVersion?.status;
 
-    const buildTree = (parentId: string | null = null): any[] => {
-      return selectedVersion.folders
-        ?.filter(f => f.parent_id === parentId)
+  // Initialize Ductape SDK for publishing
+  const ductape = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'app',
+  }) as any;
+
+  // Publish app mutation
+  const { mutate: publishApp, isPending: isPublishing } = useMutation({
+    mutationFn: async () => {
+      if (!ductape || !currentApp?.tag) throw new Error('Unable to publish');
+      await ductape.init(currentApp.tag);
+      await ductape.update(currentApp.tag, {
+        status: 'public',
+        version: selectedVersion?.tag,
+      });
+    },
+    onSuccess: () => {
+      toast.success('App version published successfully');
+      queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to publish app');
+    },
+  });
+
+  // Build folder tree structure with actions
+  const folderTree = useMemo((): FolderTreeNode[] => {
+    if (!selectedVersion?.folders && !selectedVersion?.actions) return [];
+
+    const folders = selectedVersion?.folders || [];
+    const actions = selectedVersion?.actions || [];
+
+    const buildTree = (parentId: string | null = null): FolderTreeNode[] => {
+      return folders
+        .filter(f => (f.parent_id ?? null) === parentId)
         .map(folder => ({
-          ...folder,
+          _id: folder._id,
+          name: folder.name,
+          parent_id: folder.parent_id ?? null,
+          level: folder.level,
           children: buildTree(folder._id),
-        })) || [];
+          actions: actions.filter(a => a.folder_id === folder._id),
+        }));
     };
 
     return buildTree(null);
-  }, [selectedVersion?.folders]);
+  }, [selectedVersion?.folders, selectedVersion?.actions]);
 
-  // Filter actions by search and folder
-  const filteredActions = useMemo(() => {
+  // Helper function to recursively count all actions in a folder and its descendants
+  const getTotalActionsCount = (folder: FolderTreeNode): number => {
+    const directActions = folder.actions.length;
+    const childrenActions = folder.children.reduce(
+      (sum, child) => sum + getTotalActionsCount(child),
+      0
+    );
+    return directActions + childrenActions;
+  };
+
+  // Get root-level actions (actions without a folder)
+  const rootActions = useMemo(() => {
     if (!selectedVersion?.actions) return [];
+    return selectedVersion.actions.filter(a => !a.folder_id);
+  }, [selectedVersion?.actions]);
 
-    let filtered = selectedVersion.actions;
+  // Filter actions/folders by search
+  const filteredRootActions = useMemo(() => {
+    if (!searchQuery) return rootActions;
+    return rootActions.filter(action =>
+      action.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      action.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      action.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [rootActions, searchQuery]);
 
-    // Filter by search
-    if (actionsSearch) {
-      filtered = filtered.filter(action =>
-        action.name?.toLowerCase().includes(actionsSearch.toLowerCase()) ||
-        action.tag?.toLowerCase().includes(actionsSearch.toLowerCase()) ||
-        action.description?.toLowerCase().includes(actionsSearch.toLowerCase())
-      );
-    }
+  // Check if folder contains matching actions
+  const folderContainsMatch = (folder: FolderTreeNode, query: string): boolean => {
+    if (!query) return true;
+    const queryLower = query.toLowerCase();
 
-    // Filter by folder
-    if (selectedFolderId !== null) {
-      filtered = filtered.filter(action => action.folder_id === selectedFolderId);
-    }
+    // Check folder name
+    if (folder.name?.toLowerCase().includes(queryLower)) return true;
 
-    return filtered;
-  }, [selectedVersion?.actions, actionsSearch, selectedFolderId]);
+    // Check actions in this folder
+    if (folder.actions.some(a =>
+      a.name?.toLowerCase().includes(queryLower) ||
+      a.tag?.toLowerCase().includes(queryLower) ||
+      a.description?.toLowerCase().includes(queryLower)
+    )) return true;
 
-  // Flatten folder tree for dropdown with indentation
-  const flattenedFolders = useMemo(() => {
-    const flattened: Array<{ folder: any; level: number }> = [];
+    // Check children folders recursively
+    return folder.children.some(child => folderContainsMatch(child, query));
+  };
 
-    const flatten = (folders: any[], level: number = 0) => {
-      folders.forEach(folder => {
-        flattened.push({ folder, level });
-        if (folder.children && folder.children.length > 0) {
-          flatten(folder.children, level + 1);
-        }
-      });
-    };
+  // Filter folders based on search
+  const filteredFolderTree = useMemo(() => {
+    if (!searchQuery) return folderTree;
+    return folderTree.filter(folder => folderContainsMatch(folder, searchQuery));
+  }, [folderTree, searchQuery]);
 
-    flatten(folderTree);
-    return flattened;
-  }, [folderTree]);
-
-  // Get selected folder name for display
-  const selectedFolderName = useMemo(() => {
-    if (!selectedFolderId) return 'All Actions';
-    const found = flattenedFolders.find(f => f.folder._id === selectedFolderId);
-    return found?.folder.name || 'All Actions';
-  }, [selectedFolderId, flattenedFolders]);
+  // Filter webhooks based on search (must be before early returns to follow hooks rules)
+  const filteredWebhooks = useMemo(() => {
+    if (!selectedVersion?.webhooks) return [];
+    if (!searchQuery) return selectedVersion.webhooks;
+    return selectedVersion.webhooks.filter((webhook: any) =>
+      webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [selectedVersion?.webhooks, searchQuery]);
 
   // Auto-select latest version when app data changes
   useEffect(() => {
     if (currentApp?.versions && currentApp?.versions.length > 0) {
-      // Find the latest version
       const latestVersion = currentApp?.versions.find(v => v.latest) || currentApp?.versions[0];
       if (latestVersion && latestVersion.tag !== selectedVersionTag) {
         setSelectedVersionTag(latestVersion.tag);
@@ -209,61 +340,112 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     }
   }, [isInternalApp, selectedVersion, currentApp?.actions_count]);
 
-  // NOW WE CAN HAVE EARLY RETURNS - ALL HOOKS HAVE BEEN CALLED!
+  // Expand folders that contain matching actions when searching
+  useEffect(() => {
+    if (searchQuery) {
+      const expandMatchingFolders = (folders: FolderTreeNode[]): string[] => {
+        const idsToExpand: string[] = [];
+        folders.forEach(folder => {
+          if (folderContainsMatch(folder, searchQuery)) {
+            idsToExpand.push(folder._id);
+            idsToExpand.push(...expandMatchingFolders(folder.children));
+          }
+        });
+        return idsToExpand;
+      };
+      setExpandedFolders(new Set(expandMatchingFolders(folderTree)));
+    }
+  }, [searchQuery, folderTree]);
+
+  // Resolve pending action restoration after data loads
+  useEffect(() => {
+    if (selectedAction?._pendingRestore && selectedVersion?.actions) {
+      const foundAction = selectedVersion.actions.find(
+        (a: any) => a.tag === selectedAction.tag
+      );
+      if (foundAction) {
+        setSelectedAction({
+          ...foundAction,
+          componentType: 'action',
+          appName: currentApp?.app_name,
+          appTag: currentApp?.tag,
+          version: selectedVersionTag,
+          envs: selectedVersion?.envs || [],
+          variables: selectedVersion?.variables || [],
+          constants: selectedVersion?.constants || [],
+          auths: selectedVersion?.auths || [],
+        });
+      } else {
+        // Action not found, clear the pending restore
+        setSelectedAction(null);
+      }
+    }
+  }, [selectedVersion?.actions, selectedAction?._pendingRestore, selectedAction?.tag, currentApp, selectedVersionTag, selectedVersion]);
+
+  // Resolve pending webhook restoration after data loads
+  useEffect(() => {
+    if (selectedWebhook?._pendingRestore && selectedVersion?.webhooks) {
+      const foundWebhook = selectedVersion.webhooks.find(
+        (w: any) => w.tag === selectedWebhook.tag
+      );
+      if (foundWebhook) {
+        setSelectedWebhook({
+          ...foundWebhook,
+          appName: currentApp?.app_name,
+          appTag: currentApp?.tag,
+          appLogo: currentApp?.logo,
+          version: selectedVersionTag,
+          app: currentApp,
+        });
+      } else {
+        // Webhook not found, clear the pending restore
+        setSelectedWebhook(null);
+      }
+    }
+  }, [selectedVersion?.webhooks, selectedWebhook?._pendingRestore, selectedWebhook?.tag, currentApp, selectedVersionTag]);
+
+  // Persist sidebar state to localStorage
+  useEffect(() => {
+    // Don't persist if we don't have a valid stateKey
+    if (!stateKey || stateKey === 'app-tab-state-undefined') return;
+
+    const stateToSave = {
+      selectedVersionTag,
+      sidebarView,
+      expandedFolders: Array.from(expandedFolders),
+      selectedActionTag: selectedAction?.tag || null,
+      selectedWebhookTag: selectedWebhook?.tag || null,
+      isSidebarCollapsed,
+    };
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
+  }, [stateKey, selectedVersionTag, sidebarView, expandedFolders, selectedAction?.tag, selectedWebhook?.tag, isSidebarCollapsed]);
 
   // Show skeleton loading state while fetching or when data is incomplete
   if ((isLoading && !currentApp) || (currentApp && !currentApp.app_name)) {
     return (
-      <div className="bg-grey-100 p-6">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* Header Skeleton */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 bg-grey-300 rounded-lg animate-pulse" />
-              <div className="flex-1 space-y-3">
-                <div className="h-8 w-48 bg-grey-300 rounded animate-pulse" />
-                <div className="h-4 w-32 bg-grey-300 rounded animate-pulse" />
+      <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+        {/* Sidebar Skeleton */}
+        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-grey-400">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-grey-300 rounded-lg animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-24 bg-grey-300 rounded animate-pulse mb-1" />
+                <div className="h-3 w-16 bg-grey-300 rounded animate-pulse" />
               </div>
             </div>
+            <div className="h-9 bg-grey-300 rounded animate-pulse" />
           </div>
-
-          {/* Stats Grid Skeleton */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-grey-300 rounded-lg animate-pulse" />
-                  <div className="space-y-2">
-                    <div className="h-6 w-12 bg-grey-300 rounded animate-pulse" />
-                    <div className="h-4 w-16 bg-grey-300 rounded animate-pulse" />
-                  </div>
-                </div>
-              </div>
+          <div className="flex-1 p-2 space-y-2">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-8 bg-grey-200 rounded animate-pulse" />
             ))}
           </div>
-
-          {/* Content Cards Skeleton */}
-          <div className="space-y-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-grey-300 rounded animate-pulse" />
-                    <div className="h-6 w-32 bg-grey-300 rounded animate-pulse" />
-                  </div>
-                  <div className="h-9 w-20 bg-grey-300 rounded animate-pulse" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((j) => (
-                    <div key={j} className="p-3 rounded-lg border border-grey-400">
-                      <div className="h-5 w-3/4 bg-grey-300 rounded animate-pulse mb-2" />
-                      <div className="h-4 w-1/2 bg-grey-300 rounded animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+        </div>
+        {/* Main Content Skeleton */}
+        <div className="flex-1 p-6">
+          <div className="h-32 bg-grey-200 rounded-lg animate-pulse mb-4" />
+          <div className="h-64 bg-grey-200 rounded-lg animate-pulse" />
         </div>
       </div>
     );
@@ -286,7 +468,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     );
   }
 
-  // Helper functions (not hooks, can be after early returns)
+  // Helper functions
   const getInitials = (name: string) => {
     return name?.split(' ')
       .map(word => word[0])
@@ -295,120 +477,766 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       .slice(0, 2);
   };
 
-  const handleOpenAuth = (auth: any) => {
-    openTab({
-      id: `auth-${auth._id}-${Date.now()}`,
-      type: 'feature',
-      title: auth.name,
-      itemId: auth._id,
-      data: { ...auth, componentType: 'auth', appName: currentApp?.app_name, version: selectedVersionTag },
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
     });
   };
 
-  const handleOpenVariable = (variable: any, constant: boolean = false) => {
-    if (constant) {
-      setEditingConstant(variable);
-      setShowCreateConstantModal(true);
-    } else {
-      setEditingVariable(variable);
-      setShowCreateVariableModal(true);
-    }
+  const handleSelectAction = (action: any) => {
+    // Clear creating action state if active
+    setIsCreatingAction(false);
+    setNewActionFolderId(null);
+    setSelectedWebhook(null);
+    setSelectedAction({
+      ...action,
+      componentType: 'action',
+      appName: currentApp?.app_name,
+      appTag: currentApp?.tag,
+      version: selectedVersionTag,
+      envs: selectedVersion?.envs || [],
+      variables: selectedVersion?.variables || [],
+      constants: selectedVersion?.constants || [],
+      auths: selectedVersion?.auths || [],
+    });
   };
 
-  const handleOpenAction = (action: any) => {
-    openTab({
-      id: `action-${action.tag}-${Date.now()}`,
-      type: 'request',
-      title: action.name || action.tag,
-      itemId: action.tag,
-      data: {
-        ...action,
-        componentType: 'action',
-        appName: currentApp?.app_name,
-        appTag: currentApp?.tag,
-        version: selectedVersionTag,
-        envs: selectedVersion?.envs || [],
-        variables: selectedVersion?.variables || [],
-        constants: selectedVersion?.constants || [],
-        auths: selectedVersion?.auths || [],
-      },
-    });
+  const handleRefresh = async () => {
+    setIsSidebarRefreshing(true);
+    await refetch();
+    setIsSidebarRefreshing(false);
   };
 
   const handleIntegrateApp = () => {
     setShowIntegrationModal(true);
   };
 
-  return (
-    <div className="bg-grey-100 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* App Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            {/* Logo */}
-            <div className="w-16 h-16 rounded-lg bg-green/10 flex items-center justify-center text-green text-xl font-semibold flex-shrink-0">
-              {currentApp?.logo ? (
-                <img
-                  src={currentApp?.logo}
-                  alt={currentApp?.app_name}
-                  className="w-full h-full rounded-lg object-cover"
-                />
-              ) : (
-                getInitials(String(currentApp?.app_name))
-              )}
-            </div>
+  // Start creating a new action inline (instead of opening a new tab)
+  const handleCreateAction = (folderId: string | null = null) => {
+    setSelectedAction(null);
+    setSelectedWebhook(null);
+    setIsCreatingAction(true);
+    setNewActionFolderId(folderId);
+    // Generate a stable ID for the inline action tab
+    setInlineActionTabId(`inline-action-${currentApp?._id}-${Date.now()}`);
+  };
 
-            {/* App Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-grey">{currentApp?.app_name}</h1>
-                {currentApp?.status && (
-                  <span className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium',
-                    currentApp?.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                  )}>
-                    {currentApp?.status}
-                  </span>
-                )}
-                {/* App Type Badge */}
-                <span className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
-                  isInternalApp
-                    ? 'bg-blue-500/10 text-blue-600'
-                    : 'bg-orange-500/10 text-orange-600'
-                )}>
-                  {isInternalApp ? (
-                    <>
-                      <Building2 className="h-3 w-3" />
-                      Internal
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="h-3 w-3" />
-                      Third-party
-                    </>
+  // Render folder tree item
+  const renderFolderTree = (folders: FolderTreeNode[], level: number = 0) => {
+    return folders.map(folder => {
+      const isExpanded = expandedFolders.has(folder._id);
+      const hasChildren = folder.children.length > 0 || folder.actions.length > 0;
+      const matchingActions = searchQuery
+        ? folder.actions.filter(a =>
+            a.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            a.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        : folder.actions;
+
+      return (
+        <div key={folder._id}>
+          <div className="group flex items-center">
+            <button
+              onClick={() => toggleFolder(folder._id)}
+              className={cn(
+                'flex-1 flex items-center gap-1 px-2 py-1.5 rounded text-sm transition-colors hover:bg-grey-100',
+                'text-grey'
+              )}
+              style={{ paddingLeft: `${8 + level * 12}px` }}
+            >
+              {hasChildren ? (
+                isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-grey-600 flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-grey-600 flex-shrink-0" />
+                )
+              ) : (
+                <span className="w-3.5" />
+              )}
+              {isExpanded ? (
+                <FolderOpen className="h-4 w-4 text-primary flex-shrink-0" />
+              ) : (
+                <Folder className="h-4 w-4 text-primary flex-shrink-0" />
+              )}
+              <span className="truncate flex-1 text-left">{folder.name}</span>
+              <span className="text-xs text-grey-500">{getTotalActionsCount(folder)}</span>
+            </button>
+
+            {/* Folder context menu - only for internal apps */}
+            {isInternalApp && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-grey-200 transition-all mr-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-3.5 w-3.5 text-grey-600" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={() => handleCreateAction(folder._id)}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Add Action
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      openTab({
+                        id: `new-folder-${Date.now()}`,
+                        type: 'feature',
+                        title: 'New Subfolder',
+                        data: {
+                          componentType: 'folder',
+                          isNew: true,
+                          app: currentApp,
+                          appId: currentApp?._id,
+                          appTag: currentApp?.tag,
+                          version: selectedVersionTag,
+                          parentFolderId: folder._id,
+                          parentFolderName: folder.name,
+                        },
+                        isDirty: true,
+                      });
+                    }}
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    Add Subfolder
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red focus:text-red"
+                    onClick={() => {
+                      // TODO: Implement folder deletion confirmation and API call
+                      if (window.confirm(`Are you sure you want to delete "${folder.name}"? This will also delete all actions inside it.`)) {
+                        console.log('Delete folder:', folder._id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Folder
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          {isExpanded && (
+            <div>
+              {/* Nested folders */}
+              {renderFolderTree(folder.children, level + 1)}
+
+              {/* Actions in this folder */}
+              {matchingActions.map(action => (
+                <button
+                  key={action.tag || action._id}
+                  onClick={() => handleSelectAction(action)}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors',
+                    selectedAction?.tag === action.tag
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-grey hover:bg-grey-100'
                   )}
-                </span>
-                {currentApp?.access_tag && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-primary">
-                    {currentApp?.access_tag}
-                  </span>
+                  style={{ paddingLeft: `${20 + (level + 1) * 12}px` }}
+                >
+                  {action.method && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0',
+                      action.method === 'GET' && 'bg-green/10 text-green',
+                      action.method === 'POST' && 'bg-blue/10 text-blue',
+                      action.method === 'PUT' && 'bg-blue/10 text-blue',
+                      action.method === 'DELETE' && 'bg-red/10 text-red',
+                      action.method === 'PATCH' && 'bg-purple-500/10 text-purple-500'
+                    )}>
+                      {action.method}
+                    </span>
+                  )}
+                  <span className="truncate flex-1 text-left">{action.name || action.tag}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  // Handle selecting a webhook
+  const handleSelectWebhook = (webhook: any) => {
+    // Clear creating action state if active
+    setIsCreatingAction(false);
+    setNewActionFolderId(null);
+    setSelectedAction(null);
+    setSelectedWebhook({
+      ...webhook,
+      appName: currentApp?.app_name,
+      appTag: currentApp?.tag,
+      appLogo: currentApp?.logo,
+      version: selectedVersionTag,
+      app: currentApp,
+    });
+  };
+
+  // Render actions list for the sidebar
+  const renderActionsListContent = () => {
+    return (
+      <div className="space-y-1">
+        {/* Root-level actions (no folder) */}
+        {filteredRootActions.map(action => (
+          <button
+            key={action.tag || action._id}
+            onClick={() => { handleSelectAction(action); setSelectedWebhook(null); }}
+            className={cn(
+              'w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors',
+              selectedAction?.tag === action.tag
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-grey hover:bg-grey-100'
+            )}
+          >
+            {action.method && (
+              <span className={cn(
+                'px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0',
+                action.method === 'GET' && 'bg-green/10 text-green',
+                action.method === 'POST' && 'bg-blue/10 text-blue',
+                action.method === 'PUT' && 'bg-blue/10 text-blue',
+                action.method === 'DELETE' && 'bg-red/10 text-red',
+                action.method === 'PATCH' && 'bg-purple-500/10 text-purple-500'
+              )}>
+                {action.method}
+              </span>
+            )}
+            <span className="truncate flex-1 text-left">{action.name || action.tag}</span>
+          </button>
+        ))}
+
+        {/* Folder tree with nested actions */}
+        {renderFolderTree(filteredFolderTree)}
+
+        {filteredRootActions.length === 0 && filteredFolderTree.length === 0 && (
+          <div className="text-center py-4">
+            <Zap className="h-6 w-6 text-grey-400 mx-auto mb-2" />
+            <p className="text-xs text-grey-600">
+              {searchQuery ? 'No matching actions' : 'No actions yet'}
+            </p>
+            {isInternalApp && !searchQuery && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 h-7 text-xs"
+                onClick={() => handleCreateAction()}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Create Action
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render environments content for the Environments view (matching ProductTabContent design)
+  const renderEnvironmentsContent = () => {
+    const envs = selectedVersion?.envs || [];
+    const envsLength = envs.length;
+
+    return (
+      <div className="h-full overflow-auto bg-grey-50">
+        {/* Header Section */}
+        <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
+                  <Globe className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-grey">Environments</h1>
+                  <p className="text-sm text-grey-500">
+                    {envsLength} {envsLength === 1 ? 'environment' : 'environments'} configured
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {isInternalApp && (
+                  <Button
+                    onClick={() => setShowCreateEnvModal(true)}
+                    className="gap-2 shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Environment
+                  </Button>
                 )}
               </div>
-              <p className="text-sm text-grey-600 mb-3">{currentApp?.tag}</p>
-              {currentApp?.description && (
-                <div className="text-grey-600 mb-4">
-                  <MarkdownViewer content={currentApp?.description} />
+            </div>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          {envsLength > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {envs.map((env: any) => {
+                const isActive = env.active;
+                const envName = env.env_name || env.name || env.slug;
+
+                return (
+                  <div
+                    key={env._id || env.slug}
+                    onClick={() => {
+                      setEditingEnv(env);
+                      setShowUpdateEnvModal(true);
+                    }}
+                    className="bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Icon */}
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-500/10">
+                        <Globe className="h-5 w-5 text-blue-500" />
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-medium text-grey truncate">{envName}</h3>
+                          {/* Status badge */}
+                          <span
+                            className={cn(
+                              'px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0',
+                              isActive
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                                : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                            )}
+                          >
+                            {isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-grey-500 truncate">{env.slug}</p>
+
+                        {/* Base URL */}
+                        {env.base_url && (
+                          <p className="text-xs text-grey-600 mt-1.5 truncate">{env.base_url}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center py-20">
+              {/* Decorative background */}
+              <div className="relative mb-8">
+                <div className="w-24 h-24 rounded-2xl flex items-center justify-center bg-blue-500/10">
+                  <Globe className="h-12 w-12 text-blue-500" />
                 </div>
+                {/* Decorative dots */}
+                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
+                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
+                <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
+              </div>
+
+              <h3 className="text-xl font-semibold text-grey mb-2">
+                No environments yet
+              </h3>
+              <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+                Configure deployment environments for development, staging, and production.
+              </p>
+              {isInternalApp && (
+                <Button
+                  onClick={() => setShowCreateEnvModal(true)}
+                  className="gap-2 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create your first environment
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render webhooks content for the Webhooks view (matching ProductTabContent design)
+  const renderWebhooksContent = () => {
+    // Show inline form if creating webhook
+    if (isCreatingWebhook && currentApp) {
+      return (
+        <InlineWebhookForm
+          app={{
+            _id: currentApp._id || '',
+            app_name: currentApp.app_name || '',
+            tag: currentApp.tag || '',
+            logo: currentApp.logo,
+            versions: currentApp.versions,
+            envs: selectedVersion?.envs,
+            workspace_id: currentApp.workspace_id,
+          }}
+          onCancel={() => setIsCreatingWebhook(false)}
+          onSuccess={() => {
+            setIsCreatingWebhook(false);
+            // Refresh app data to show new webhook
+            queryClient.invalidateQueries({ queryKey: ['app', currentApp._id] });
+          }}
+        />
+      );
+    }
+
+    const webhooks = selectedVersion?.webhooks || [];
+    const webhooksLength = webhooks.length;
+
+    // Filter webhooks based on search query
+    const displayedWebhooks = searchQuery
+      ? webhooks.filter((webhook: any) =>
+          webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : webhooks;
+
+    return (
+      <div className="h-full overflow-auto bg-grey-50">
+        {/* Header Section */}
+        <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue/10">
+                  <Webhook className="h-6 w-6 text-blue" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-grey">Webhooks</h1>
+                  <p className="text-sm text-grey-500">
+                    {webhooksLength} {webhooksLength === 1 ? 'webhook' : 'webhooks'} configured
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Search bar */}
+                {webhooksLength > 0 && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search webhooks..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 w-64 bg-grey-50 border-grey-300 focus:bg-white"
+                    />
+                  </div>
+                )}
+                {isInternalApp && (
+                  <Button
+                    onClick={() => setIsCreatingWebhook(true)}
+                    className="gap-2 shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Webhook
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          {displayedWebhooks.length > 0 ? (
+            <>
+              {/* Results count when searching */}
+              {searchQuery && (
+                <p className="text-sm text-grey-500 mb-4">
+                  Showing {displayedWebhooks.length} of {webhooksLength} {webhooksLength === 1 ? 'webhook' : 'webhooks'}
+                </p>
               )}
 
-              {/* Version Selector */}
-              {currentApp?.versions && currentApp?.versions.length > 0 && (
-                <div className="flex items-center gap-3 mt-4">
-                  <label className="text-sm font-medium text-grey-600">Version:</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {displayedWebhooks.map((webhook: any) => {
+                  const eventsCount = webhook.events?.length || 0;
+
+                  return (
+                    <div
+                      key={webhook._id || webhook.tag}
+                      onClick={() => handleSelectWebhook(webhook)}
+                      className="bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Icon */}
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue/10">
+                          <Webhook className="h-5 w-5 text-blue" />
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-medium text-grey truncate">{webhook.name || webhook.tag}</h3>
+                            {/* Events count badge */}
+                            {eventsCount > 0 && (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 bg-blue/10 text-blue">
+                                {eventsCount} {eventsCount === 1 ? 'event' : 'events'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-grey-500 truncate">{webhook.tag}</p>
+
+                          {/* Description */}
+                          {webhook.description && (
+                            <p className="text-xs text-grey-600 mt-1.5 line-clamp-2">{webhook.description}</p>
+                          )}
+
+                          {/* Events preview */}
+                          {eventsCount > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {webhook.events.slice(0, 3).map((event: any, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600"
+                                >
+                                  {event.name || event.tag || `Event ${idx + 1}`}
+                                </span>
+                              ))}
+                              {eventsCount > 3 && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600">
+                                  +{eventsCount - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* Empty State */
+            <div className="flex flex-col items-center justify-center py-20">
+              {/* Decorative background */}
+              <div className="relative mb-8">
+                <div className="w-24 h-24 rounded-2xl flex items-center justify-center bg-blue/10">
+                  <Webhook className="h-12 w-12 text-blue" />
+                </div>
+                {/* Decorative dots */}
+                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
+                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
+                <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
+              </div>
+
+              {searchQuery ? (
+                <>
+                  <h3 className="text-xl font-semibold text-grey mb-2">No results found</h3>
+                  <p className="text-grey-500 text-center max-w-md mb-6">
+                    We couldn't find any webhooks matching "<span className="font-medium text-grey">{searchQuery}</span>"
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSearchQuery('')}
+                    className="gap-2"
+                  >
+                    Clear search
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-semibold text-grey mb-2">
+                    No webhooks yet
+                  </h3>
+                  <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+                    Set up webhooks to receive real-time notifications when events occur in your application.
+                  </p>
+                  {isInternalApp && (
+                    <Button
+                      onClick={() => setIsCreatingWebhook(true)}
+                      className="gap-2 shadow-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create your first webhook
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render main content area (excluding RequestBuilder which is rendered separately)
+  // Using unique keys ensures React completely unmounts/remounts when switching between content types
+  const renderMainContent = () => {
+    if (selectedAction) {
+      // Use unique key combining type prefix + id to force remount when switching between different actions
+      // Pass product context from app data (if app was opened from ProductTabContent's Connected Apps)
+      return (
+        <ActionViewTabContent
+          key={`action-${selectedAction.tag || selectedAction._id}`}
+          action={selectedAction}
+          appTag={currentApp?.tag}
+          productTag={(currentApp as any)?.productTag}
+          envSlug={selectedVersion?.envs?.find((e: any) => e.active)?.slug}
+        />
+      );
+    }
+
+    if (selectedWebhook) {
+      // Use unique key combining type prefix + id to force remount when switching between different webhooks
+      return <WebhookTabContent key={`webhook-${selectedWebhook.tag || selectedWebhook._id}`} webhook={selectedWebhook} />;
+    }
+
+    // Show environments view
+    if (sidebarView === 'environments') {
+      return renderEnvironmentsContent();
+    }
+
+    // Show webhooks view
+    if (sidebarView === 'webhooks') {
+      return renderWebhooksContent();
+    }
+
+    // Default view - API Dashboard (Overview)
+    // Dummy API analytics data (replace with real data from API)
+    const apiAnalytics = {
+      totalRequests: { current: 45678, previous: 42134, change: 8.4 },
+      successRate: { current: 98.7, previous: 97.2, change: 1.5 },
+      avgLatency: { current: '142ms', previous: '168ms', change: -15.5 },
+      errorRate: { current: 1.3, previous: 2.8, change: -53.6 },
+      activeEndpoints: { current: actionsCount, previous: actionsCount - 2, change: actionsCount > 0 ? ((2 / (actionsCount - 2)) * 100) : 0 },
+      webhookEvents: { current: 1234, previous: 1089, change: 13.3 },
+    };
+
+    const requestsByMethod = [
+      { method: 'GET', count: 23456, percentage: 51 },
+      { method: 'POST', count: 15678, percentage: 34 },
+      { method: 'PUT', count: 4567, percentage: 10 },
+      { method: 'DELETE', count: 1977, percentage: 5 },
+    ];
+
+    const recentActivity = [
+      { date: 'Mon', requests: 6234 },
+      { date: 'Tue', requests: 7123 },
+      { date: 'Wed', requests: 6892 },
+      { date: 'Thu', requests: 7456 },
+      { date: 'Fri', requests: 8234 },
+      { date: 'Sat', requests: 4567 },
+      { date: 'Sun', requests: 5172 },
+    ];
+
+    const topEndpoints = (selectedVersion?.actions || []).slice(0, 5).map((action: any, index: number) => ({
+      name: action.name || action.tag,
+      method: action.method || 'GET',
+      calls: Math.floor(Math.random() * 5000) + 1000,
+      avgLatency: `${Math.floor(Math.random() * 200) + 50}ms`,
+    }));
+
+    const renderMetricCard = (
+      title: string,
+      value: string | number,
+      change: number,
+      icon: React.ReactNode,
+      iconBg: string,
+      suffix?: string
+    ) => (
+      <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center`}>
+            {icon}
+          </div>
+          <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-green' : 'text-red-500'}`}>
+            {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {Math.abs(change).toFixed(1)}%
+          </div>
+        </div>
+        <div className="text-2xl font-bold text-grey mb-1">{value}{suffix}</div>
+        <div className="text-xs text-grey-600 font-medium">{title}</div>
+      </div>
+    );
+
+    const getMethodColor = (method: string) => {
+      switch (method) {
+        case 'GET': return 'bg-green text-white';
+        case 'POST': return 'bg-blue-700 text-white';
+        case 'PUT': return 'bg-orange-500 text-white';
+        case 'DELETE': return 'bg-red text-white';
+        case 'PATCH': return 'bg-purple-500 text-white';
+        default: return 'bg-grey-500 text-white';
+      }
+    };
+
+    return (
+      <div key="overview-content" className="h-full overflow-auto bg-white dark:bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Dashboard Header */}
+          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+                  {currentApp?.logo ? (
+                    <img
+                      src={currentApp?.logo}
+                      alt={currentApp?.app_name}
+                      className="w-full h-full rounded-xl object-cover"
+                    />
+                  ) : (
+                    <BarChart3 className="h-6 w-6 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-grey mb-2">{currentApp?.app_name} Dashboard</h1>
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-grey-100 dark:bg-grey-700 text-grey-700 dark:text-grey font-mono font-medium">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                      {currentApp?.tag}
+                    </span>
+                    <span className="text-grey-400">•</span>
+                    <span className="text-grey-600 dark:text-grey-400 font-medium">{selectedVersionTag}</span>
+                    {currentApp?.status && (
+                      <>
+                        <span className="text-grey-400">•</span>
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-semibold border',
+                          currentApp?.status === 'active'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                            : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                        )}>
+                          {currentApp?.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      </>
+                    )}
+                    <span className={cn(
+                      'px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1',
+                      isInternalApp ? 'bg-blue-500/10 text-blue-600' : 'bg-orange-500/10 text-orange-600'
+                    )}>
+                      {isInternalApp ? <Building2 className="h-3 w-3" /> : <ExternalLink className="h-3 w-3" />}
+                      {isInternalApp ? 'Internal' : 'Third-party'}
+                    </span>
+                    {/* Product Context - shown when app was opened from ProductTabContent */}
+                    {(currentApp as any)?.productTag && (
+                      <>
+                        <span className="text-grey-400">•</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-purple-500/10 text-purple-600">
+                          <Box className="h-3 w-3" />
+                          {(currentApp as any)?.productName || (currentApp as any)?.productTag}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                {/* Version Selector */}
+                {currentApp?.versions && currentApp?.versions.length > 0 && (
                   <Select value={selectedVersionTag} onValueChange={setSelectedVersionTag}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Select version" />
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Version" />
                     </SelectTrigger>
                     <SelectContent>
                       {currentApp?.versions.map((version) => (
@@ -418,209 +1246,557 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              )}
-
-              {/* Integration Actions */}
-              {selectedVersion?.active && (
-                <div className="flex items-center gap-3 mt-4">
+                )}
+                {selectedVersion && isInternalApp && isVersionUnpublished && (
                   <Button
-                    onClick={handleIntegrateApp}
-                    className="gap-2"
+                    onClick={() => publishApp()}
                     size="sm"
-                    variant="outline"
+                    className="w-36"
+                    disabled={isPublishing}
                   >
-                    <Download className="h-4 w-4 mr-1" />
+                    {isPublishing ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Rocket className="h-4 w-4 mr-1" />
+                    )}
+                    {isPublishing ? 'Publishing...' : 'Publish'}
+                  </Button>
+                )}
+                {selectedVersion && (
+                  <Button onClick={handleIntegrateApp} size="sm" variant="outline" className="w-36">
+                    <Plug className="h-4 w-4 mr-1" />
                     Integrate
                   </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {renderMetricCard(
+              'Total Requests',
+              apiAnalytics.totalRequests.current.toLocaleString(),
+              apiAnalytics.totalRequests.change,
+              <Activity className="h-5 w-5 text-blue-600" />,
+              'bg-blue-500/10'
+            )}
+            {renderMetricCard(
+              'Success Rate',
+              apiAnalytics.successRate.current.toFixed(1),
+              apiAnalytics.successRate.change,
+              <CheckCircle className="h-5 w-5 text-green" />,
+              'bg-green/10',
+              '%'
+            )}
+            {renderMetricCard(
+              'Avg Latency',
+              apiAnalytics.avgLatency.current,
+              apiAnalytics.avgLatency.change,
+              <Clock className="h-5 w-5 text-orange-600" />,
+              'bg-orange-500/10'
+            )}
+            {renderMetricCard(
+              'Error Rate',
+              apiAnalytics.errorRate.current.toFixed(1),
+              apiAnalytics.errorRate.change,
+              <XCircle className="h-5 w-5 text-red-500" />,
+              'bg-red-500/10',
+              '%'
+            )}
+            {renderMetricCard(
+              'Active Endpoints',
+              actionsCount,
+              0,
+              <Zap className="h-5 w-5 text-primary" />,
+              'bg-primary/10'
+            )}
+            {renderMetricCard(
+              'Webhook Events',
+              apiAnalytics.webhookEvents.current.toLocaleString(),
+              apiAnalytics.webhookEvents.change,
+              <Webhook className="h-5 w-5 text-purple-600" />,
+              'bg-purple-500/10'
+            )}
+          </div>
+
+          {/* Request Activity Timeline */}
+          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <h2 className="text-lg font-semibold text-grey mb-4">Request Activity (Last 7 Days)</h2>
+            <div className="space-y-3">
+              {recentActivity.map((day) => {
+                const maxRequests = Math.max(...recentActivity.map(d => d.requests));
+                const percentage = (day.requests / maxRequests) * 100;
+
+                return (
+                  <div key={day.date} className="flex items-center gap-3">
+                    <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                    <div className="flex-1 h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                      <div className="absolute inset-0 flex items-center px-3">
+                        <span className="text-xs font-semibold text-white dark:text-grey">
+                          {day.requests.toLocaleString()} requests
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Requests by Method */}
+            <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+              <h2 className="text-lg font-semibold text-grey mb-4">Requests by Method</h2>
+              <div className="space-y-4">
+                {requestsByMethod.map((item) => (
+                  <div key={item.method} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(item.method))}>
+                        {item.method}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-grey-600 font-medium">{item.count.toLocaleString()}</span>
+                        <span className="text-grey-700 dark:text-grey font-bold min-w-[3rem] text-right">{item.percentage}%</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-grey-200 dark:bg-grey-700 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          item.method === 'GET' ? 'bg-green' :
+                          item.method === 'POST' ? 'bg-blue' :
+                          item.method === 'PUT' ? 'bg-orange-500' : 'bg-red'
+                        )}
+                        style={{ width: `${item.percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Endpoints */}
+            <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+              <h2 className="text-lg font-semibold text-grey mb-4">Top Endpoints</h2>
+              {topEndpoints.length > 0 ? (
+                <div className="space-y-3">
+                  {topEndpoints.map((endpoint: any, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-grey-100 dark:bg-grey-500 rounded-lg hover:bg-grey-200 transition-colors cursor-pointer"
+                      onClick={() => {
+                        const action = selectedVersion?.actions?.find((a: any) => (a.name || a.tag) === endpoint.name);
+                        if (action) handleSelectAction(action);
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold', getMethodColor(endpoint.method))}>
+                          {endpoint.method}
+                        </span>
+                        <span className="text-sm dark:hover:text-grey-600 font-medium text-grey truncate max-w-[200px]">{endpoint.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-grey-600">
+                        <span>{endpoint.calls.toLocaleString()} calls</span>
+                        <span className="text-grey-400">|</span>
+                        <span>{endpoint.avgLatency}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Zap className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <p className="text-sm text-grey-600">No actions configured yet</p>
+                  {isInternalApp && (
+                    <Button variant="outline" size="sm" className="mt-3" onClick={() => handleCreateAction()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Action
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {showAppCreatedModal ? <AppCreatedModal
-          app={currentApp}
-          open={showAppCreatedModal}
-          onOpenChange={setShowAppCreatedModal}
-        /> : <></>}
+          {/* Environment Status */}
+          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <h2 className="text-lg font-semibold text-grey mb-4">Environment Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(selectedVersion?.envs || []).map((env: any) => (
+                <div
+                  key={env.slug}
+                  className="p-4 bg-grey-100 dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setEditingEnv(env);
+                    setShowUpdateEnvModal(true);
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn(
+                      'px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide border',
+                      env.slug === 'production' ? 'bg-green/10 text-green border-green/20' :
+                      env.slug === 'staging' ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' :
+                      'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                    )}>
+                      {env.env_name || env.slug}
+                    </span>
+                    {env.active && (
+                      <span className="flex items-center gap-1 text-xs text-green font-medium">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green animate-pulse"></div>
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-grey-600 truncate">{env.base_url || 'No base URL configured'}</p>
+                </div>
+              ))}
+              {(!selectedVersion?.envs || selectedVersion.envs.length === 0) && (
+                <div className="col-span-3 text-center py-8">
+                  <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <p className="text-sm text-grey-600">No environments configured</p>
+                  {isInternalApp && (
+                    <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowCreateEnvModal(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Environment
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
-        {/* Content Filter Navigation */}
-        <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-grey-600" />
-            <span className="text-sm font-medium text-grey-600">Quick Access:</span>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={activeFilter === 'overview' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('overview')}
-                className="gap-2"
-              >
-                <Grid3x3 className="h-4 w-4" />
-                Overview
-              </Button>
-              <Button
-                variant={activeFilter === 'actions' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('actions')}
-                className="gap-2"
-              >
-                <Zap className="h-4 w-4" />
-                Actions ({actionsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'environments' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('environments')}
-                className="gap-2"
-              >
-                <Settings2 className="h-4 w-4" />
-                Environments ({envsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'webhooks' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('webhooks')}
-                className="gap-2"
-              >
-                <Webhook className="h-4 w-4" />
-                Webhook Channels ({webhooksCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'auths' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('auths')}
-                className="gap-2"
-              >
-                <Key className="h-4 w-4" />
-                Auth ({authsCount})
-              </Button>
-              <Button
-                variant={activeFilter === 'variables' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveFilter('variables')}
-                className="gap-2"
-              >
-                <FileCode className="h-4 w-4" />
-                Variables ({variablesCount + constantsCount})
-              </Button>
+          {/* Quick Actions Info */}
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-grey mb-1">Quick Actions</h3>
+                <p className="text-sm text-grey-600">
+                  Select an action from the sidebar to test API endpoints. Use the tabs to switch between Actions, Webhooks, and Environments.
+                  {isInternalApp && ' Click the + button to create new resources.'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* App Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <button
-            onClick={() => setActiveFilter('actions')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'actions' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{actionsCount}</p>
-                <p className="text-sm text-grey-600">Actions</p>
-              </div>
-            </div>
-          </button>
 
-          <button
-            onClick={() => setActiveFilter('environments')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'environments' ? 'border-primary bg-primary/5' : 'border-grey-400'
+  return (
+    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+      {/* Sidebar */}
+      <div className={cn(
+        "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300",
+        isSidebarCollapsed ? "w-14" : "w-64"
+      )}>
+        {/* Header - Fixed */}
+        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-3")}>
+          <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2")}>
+            {/* App Logo */}
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                } else {
+                  setSidebarView('overview');
+                  setSelectedAction(null);
+                  setSelectedWebhook(null);
+                  setIsCreatingAction(false);
+                }
+              }}
+              className={cn(
+                "rounded-lg bg-green/10 flex items-center justify-center text-green font-semibold flex-shrink-0 transition-all hover:ring-2 hover:ring-primary/50",
+                isSidebarCollapsed ? "w-8 h-8 text-sm" : "w-9 h-9 text-sm"
+              )}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Return to overview"}
+            >
+              {currentApp?.logo ? (
+                <img
+                  src={currentApp?.logo}
+                  alt={currentApp?.app_name}
+                  className="w-full h-full rounded-lg object-cover"
+                />
+              ) : (
+                getInitials(String(currentApp?.app_name))
+              )}
+            </button>
+            {!isSidebarCollapsed && (
+              <>
+                <button
+                  onClick={() => {
+                    setSidebarView('overview');
+                    setSelectedAction(null);
+                    setSelectedWebhook(null);
+                    setIsCreatingAction(false);
+                  }}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  title="Return to overview"
+                >
+                  <h2 className="font-semibold text-grey text-sm truncate">{currentApp?.app_name}</h2>
+                  <p className="text-xs text-grey-600 truncate">{selectedVersionTag}</p>
+                </button>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <Settings2 className="h-5 w-5 text-green" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{envsCount}</p>
-                <p className="text-sm text-grey-600">Environments</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('webhooks')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'webhooks' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <Webhook className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{webhooksCount}</p>
-                <p className="text-sm text-grey-600">Webhook Channels</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('auths')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'auths' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
-                <Key className="h-5 w-5 text-yellow" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{authsCount}</p>
-                <p className="text-sm text-grey-600">Auths</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('variables')}
-            className={cn(
-              "bg-white rounded-lg border p-4 shadow-sm transition-colors hover:border-primary/50",
-              activeFilter === 'variables' ? 'border-primary bg-primary/5' : 'border-grey-400'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <FileCode className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{variablesCount + constantsCount}</p>
-                <p className="text-sm text-grey-600">Variables</p>
-              </div>
-            </div>
-          </button>
+          </div>
         </div>
 
-        {/* Content Sections with Filtering */}
-        {activeFilter === 'overview' && (
-          <div className="space-y-6">
-            {/* Show all sections in overview mode */}
-            {renderEnvironmentsCard()}
-            {renderWebhooksCard()}
-            {renderAuthsCard()}
-            {renderActionsCard()}
-            {renderVariablesCard()}
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto py-2 min-h-0">
+          {/* Overview */}
+          <div className="px-2 mb-1">
+            <button
+              onClick={() => {
+                setSidebarView('overview');
+                setSelectedAction(null);
+                setSelectedWebhook(null);
+                setIsCreatingAction(false);
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+                sidebarView === 'overview' && !selectedAction && !selectedWebhook
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-grey hover:bg-grey-100",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              title={isSidebarCollapsed ? "Overview" : undefined}
+            >
+              <Home className="h-4 w-4 flex-shrink-0" />
+              {!isSidebarCollapsed && <span>Overview</span>}
+            </button>
           </div>
-        )}
 
-        {activeFilter === 'environments' && renderEnvironmentsCard()}
-        {activeFilter === 'webhooks' && renderWebhooksCard()}
-        {activeFilter === 'auths' && renderAuthsCard()}
-        {activeFilter === 'actions' && renderActionsCard()}
-        {activeFilter === 'variables' && renderVariablesCard()}
+          {/* Environments - below Overview */}
+          <div className="px-2 mb-1">
+            <button
+              onClick={() => {
+                setSidebarView('environments');
+                setSelectedAction(null);
+                setSelectedWebhook(null);
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+                sidebarView === 'environments'
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-grey hover:bg-grey-100",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              title={isSidebarCollapsed ? `Environments (${envsCount})` : undefined}
+            >
+              <Globe className={cn("h-4 w-4 flex-shrink-0", sidebarView === 'environments' ? "text-primary" : "text-grey-600")} />
+              {!isSidebarCollapsed && (
+                <>
+                  <span className="flex-1 text-left">Environments</span>
+                  <span className={cn(
+                    "text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center",
+                    sidebarView === 'environments' ? "bg-primary/20 text-primary" : "bg-grey-100 text-grey-600"
+                  )}>
+                    {envsCount}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Webhooks - below Environments */}
+          <div className="px-2 mb-1">
+            <button
+              onClick={() => {
+                setSidebarView('webhooks');
+                setSelectedAction(null);
+                setSelectedWebhook(null);
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+                sidebarView === 'webhooks'
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-grey hover:bg-grey-100",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              title={isSidebarCollapsed ? `Webhooks (${webhooksCount})` : undefined}
+            >
+              <Webhook className={cn("h-4 w-4 flex-shrink-0", sidebarView === 'webhooks' ? "text-primary" : "text-blue")} />
+              {!isSidebarCollapsed && (
+                <>
+                  <span className="flex-1 text-left">Webhooks</span>
+                  <span className={cn(
+                    "text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center",
+                    sidebarView === 'webhooks' ? "bg-primary/20 text-primary" : "bg-grey-100 text-grey-600"
+                  )}>
+                    {webhooksCount}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Actions - shows icon only when collapsed */}
+          <div className="px-2 mb-1">
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                }
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+                selectedAction
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-grey hover:bg-grey-100",
+                isSidebarCollapsed && "justify-center px-2",
+                !isSidebarCollapsed && "hidden"
+              )}
+              title={isSidebarCollapsed ? `Actions (${actionsCount})` : undefined}
+            >
+              <Zap className={cn("h-4 w-4 flex-shrink-0", selectedAction ? "text-primary" : "text-amber-500")} />
+            </button>
+          </div>
+
+          {/* Actions Section - Resource style like Products (only shown when expanded) */}
+          {!isSidebarCollapsed && (
+            <div className="px-2 mt-3">
+              {/* Actions Header */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-grey-500 uppercase tracking-wider">Actions</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isSidebarRefreshing}
+                    className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100"
+                    title="Refresh"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", isSidebarRefreshing && "animate-spin")} />
+                  </button>
+                  {isInternalApp && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100">
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => handleCreateAction()}>
+                          <Zap className="h-4 w-4 mr-2" />
+                          New Action
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          openTab({
+                            id: `new-folder-${Date.now()}`,
+                            type: 'feature',
+                            title: 'New Folder',
+                            data: {
+                              componentType: 'folder',
+                              isNew: true,
+                              app: currentApp,
+                              appId: currentApp?._id,
+                              appTag: currentApp?.tag,
+                              version: selectedVersionTag,
+                              parentFolderId: null,
+                            },
+                            isDirty: true,
+                          });
+                        }}>
+                          <FolderPlus className="h-4 w-4 mr-2" />
+                          New Folder
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              </div>
+
+              {/* Search for actions */}
+              <div className="relative mb-2">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-400" />
+                <Input
+                  type="text"
+                  placeholder="Search actions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-8 text-xs"
+                />
+              </div>
+
+              {/* Actions List */}
+              <div className="max-h-[calc(100vh-26rem)] overflow-y-auto">
+                {renderActionsListContent()}
+              </div>
+            </div>
+          )}
+
+          {/* Expand button - only shown when collapsed */}
+          {isSidebarCollapsed && (
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                title="Expand sidebar"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Main Content - Key on wrapper div ensures proper unmount/remount when content type changes */}
+      <div
+        key={
+          isCreatingAction
+            ? `creating-${inlineActionTabId}`
+            : selectedAction
+              ? `action-view-${selectedAction.tag || selectedAction._id}`
+              : selectedWebhook
+                ? `webhook-view-${selectedWebhook.tag || selectedWebhook._id}`
+                : 'overview'
+        }
+        className="flex-1 flex flex-col overflow-hidden"
+      >
+        {isCreatingAction ? (
+          <RequestBuilder
+            tabId={inlineActionTabId}
+            data={{
+              isNew: true,
+              app: currentApp,
+              appId: currentApp?._id,
+              appTag: currentApp?.tag,
+              appName: currentApp?.app_name,
+              version: selectedVersionTag,
+              folderId: newActionFolderId,
+              envs: selectedVersion?.envs || [],
+              variables: selectedVersion?.variables || [],
+              constants: selectedVersion?.constants || [],
+              auths: selectedVersion?.auths || [],
+              onSaveSuccess: () => {
+                setIsCreatingAction(false);
+                setNewActionFolderId(null);
+                refetch();
+              },
+              onCancel: () => {
+                setIsCreatingAction(false);
+                setNewActionFolderId(null);
+              },
+            }}
+          />
+        ) : (
+          renderMainContent()
+        )}
+      </div>
+
+      {/* Modals */}
       {showAppCreatedModal && (
         <AppCreatedModal
           app={currentApp}
@@ -629,7 +1805,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         />
       )}
 
-      {/* Create Environment Modal */}
       <CreateAppEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
@@ -637,7 +1812,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         appId={currentApp?._id}
       />
 
-      {/* Update Environment Modal */}
       <UpdateAppEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={(open) => {
@@ -651,7 +1825,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         }}
       />
 
-      {/* Create Variable Modal */}
       <CreateVariableModal
         open={showCreateVariableModal}
         onOpenChange={(open) => {
@@ -663,7 +1836,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         variable={editingVariable}
       />
 
-      {/* Create Constant Modal */}
       <CreateConstantModal
         open={showCreateConstantModal}
         onOpenChange={(open) => {
@@ -675,7 +1847,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         constant={editingConstant}
       />
 
-      {/* Create Shared Variable Modal */}
       <CreateSharedVariableModal
         open={showCreateSharedVariableModal}
         onOpenChange={setShowCreateSharedVariableModal}
@@ -683,7 +1854,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         actions={selectedVersion?.actions || []}
       />
 
-      {/* Integration Modal */}
       {showIntegrationModal && currentApp && (
         <IntegrationProvider>
           <AppIntegrationModal
@@ -705,518 +1875,4 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       )}
     </div>
   );
-
-  // Render functions for each section
-  function renderEnvironmentsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Environments</h2>
-            <span className="text-sm text-grey-600">({envsCount})</span>
-          </div>
-          {isInternalApp && (
-            <Button
-              size="sm"
-              className="gap-2"
-              variant="outline"
-              onClick={() => setShowCreateEnvModal(true)}
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          )}
-        </div>
-
-        {selectedVersion?.envs && selectedVersion.envs.length > 0 ? (
-          <div className="space-y-3">
-            {selectedVersion.envs.map((env) => (
-              <div
-                key={env._id}
-                className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-medium text-grey">{env.env_name}</h3>
-                    <span className={cn(
-                      'px-2 py-0.5 rounded text-xs font-medium',
-                      env.active ? 'bg-green/10 text-green' : 'bg-grey-400 text-grey-600'
-                    )}>
-                      {env.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-grey-600">{env.slug}</p>
-                  {env.base_url && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Globe className="h-3 w-3 text-grey-600" />
-                      <p className="text-xs text-grey-600">{env.base_url}</p>
-                    </div>
-                  )}
-                </div>
-                {isInternalApp && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingEnv(env);
-                      setShowUpdateEnvModal(true);
-                    }}
-                    className="ml-3"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Settings2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No environments configured yet</p>
-            <p className="text-xs text-grey-500">
-              Add environments to organize your app's different deployment stages
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderWebhooksCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Webhook className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Webhook Channels</h2>
-            <span className="text-sm text-grey-600">({webhooksCount})</span>
-          </div>
-          {isInternalApp && (
-            <Button 
-              size="sm" 
-              className="gap-2" 
-              variant="outline"
-              onClick={() => {
-                openTab({
-                  id: `new-webhook-${Date.now()}`,
-                  type: 'webhook',
-                  title: 'New Webhook Channel',
-                  data: { isNew: true, app: currentApp, product: null },
-                  isDirty: true,
-                });
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          )}
-        </div>
-
-        {selectedVersion?.webhooks && selectedVersion.webhooks.length > 0 ? (
-          <div className="space-y-3">
-            {selectedVersion.webhooks.map((webhook: any) => (
-              <button
-                key={webhook._id}
-                onClick={() => {
-                  openTab({
-                    id: `webhook-${webhook._id}-${Date.now()}`,
-                    type: 'webhook',
-                    title: webhook.name || webhook.tag,
-                    itemId: webhook._id,
-                    data: {
-                      ...webhook,
-                      appName: currentApp?.app_name,
-                      appTag: currentApp?.tag,
-                      appLogo: currentApp?.logo,
-                      version: selectedVersionTag,
-                      app: currentApp,
-                    },
-                  });
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-grey">{webhook.name || webhook.tag}</h3>
-                  <p className="text-xs text-grey-600">{webhook.url || webhook.tag}</p>
-                </div>
-                <Pencil className="h-4 w-4 text-grey-400" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Webhook className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No webhooks configured yet</p>
-            <p className="text-xs text-grey-500">
-              Add webhooks to receive real-time notifications from external services
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderAuthsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Key className="h-5 w-5 text-grey-600" />
-            <h2 className="text-lg font-semibold text-grey">Authentication Methods</h2>
-            <span className="text-sm text-grey-600">({authsCount})</span>
-          </div>
-          {isInternalApp && (
-            <Button 
-              size="sm" 
-              className="gap-2" 
-              variant="outline"
-              onClick={() => {
-                openTab({
-                  id: `new-auth-${Date.now()}`,
-                  type: 'auth',
-                  title: 'New Authorization',
-                  data: { 
-                    isNew: true, 
-                    app: currentApp, 
-                    product: null,
-                    actions: selectedVersion?.actions || [],
-                    appId: currentApp?._id,
-                    appTag: currentApp?.tag,
-                    appName: currentApp?.app_name,
-                    workspaceId: currentApp?.workspace_id,
-                  },
-                  isDirty: true,
-                });
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-          )}
-        </div>
-
-        {selectedVersion?.auths && selectedVersion.auths.length > 0 ? (
-          <div className="space-y-3">
-            {selectedVersion.auths.map((auth) => (
-              <button
-                key={auth._id}
-                onClick={() => handleOpenAuth(auth)}
-                className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Key className="h-4 w-4 text-yellow" />
-                  <h3 className="text-sm font-medium text-grey">{auth.name}</h3>
-                </div>
-                <p className="text-xs text-grey-600">{auth.tag}</p>
-                {auth.description && (
-                  <p className="text-xs text-grey-600 mt-1">{auth.description}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Key className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-            <p className="text-sm text-grey-600 mb-2">No authentication methods configured yet</p>
-            <p className="text-xs text-grey-500">
-              Add authentication methods to secure your app's API endpoints
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderActionsCard() {
-    return (
-      <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden flex flex-col" style={actionsCount > 10 ? { height: '600px' } : { height: 'auto' }}>
-        <div className="p-6 border-b border-grey-400">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Actions</h2>
-              <span className="text-sm text-grey-600">({actionsCount})</span>
-            </div>
-            {isInternalApp && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    className="gap-2"
-                    variant="outline"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      openTab({
-                        id: `new-action-${Date.now()}`,
-                        type: 'request',
-                        title: 'New Action',
-                        data: {
-                          isNew: true,
-                          app: currentApp,
-                          appId: currentApp?._id,
-                          appTag: currentApp?.tag,
-                          appName: currentApp?.app_name,
-                          version: selectedVersionTag,
-                          envs: selectedVersion?.envs || [],
-                          variables: selectedVersion?.variables || [],
-                          constants: selectedVersion?.constants || [],
-                          auths: selectedVersion?.auths || [],
-                        },
-                        isDirty: true,
-                      });
-                    }}
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Add Action
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setShowCreateSharedVariableModal(true)}
-                  >
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Add Shared Value
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-              <Input
-                placeholder="Search actions..."
-                value={actionsSearch}
-                onChange={(e) => setActionsSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {folderTree.length > 0 && (
-              <Select
-                value={selectedFolderId || 'all'}
-                onValueChange={(value) => setSelectedFolderId(value === 'all' ? null : value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-4 w-4" />
-                      <span>{selectedFolderName}</span>
-                    </div>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    <div className="flex items-center gap-2">
-                      <Grid3x3 className="h-4 w-4" />
-                      <span>All Actions</span>
-                    </div>
-                  </SelectItem>
-                  {flattenedFolders.map(({ folder, level }) => (
-                    <SelectItem key={folder._id} value={folder._id}>
-                      <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 16}px` }}>
-                        <Folder className="h-4 w-4 flex-shrink-0" />
-                        <span>{folder.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {(actionsSearch || selectedFolderId) && (
-            <button
-              onClick={() => {
-                setActionsSearch('');
-                setSelectedFolderId(null);
-              }}
-              className="text-xs text-primary hover:underline mt-3"
-            >
-              Clear filters ({filteredActions.length} of {selectedVersion?.actions?.length || 0} shown)
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto p-4">
-          {filteredActions.length === 0 ? (
-            <div className="text-center py-8 text-grey-600">
-              <Zap className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-              <p className="text-sm">
-                {actionsSearch || selectedFolderId ? 'No matching actions' : 'No actions configured'}
-              </p>
-     
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredActions.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleOpenAction(action)}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-4 w-4 text-primary flex-shrink-0" />
-                    <p className="text-sm font-medium text-grey truncate">
-                      {action.name || action.tag || `Action ${index + 1}`}
-                    </p>
-                    {action.method && (
-                      <span className={cn(
-                        'px-2 py-0.5 rounded text-xs font-medium flex-shrink-0',
-                        action.method === 'GET' && 'bg-green/10 text-green',
-                        action.method === 'POST' && 'bg-blue/10 text-blue',
-                        action.method === 'PUT' && 'bg-orange-500/10 text-orange-500',
-                        action.method === 'DELETE' && 'bg-red/10 text-red',
-                        action.method === 'PATCH' && 'bg-purple-500/10 text-purple-500'
-                      )}>
-                        {action.method}
-                      </span>
-                    )}
-                  </div>
-                  {action.description && (
-                    <p className="text-xs text-grey-600 line-clamp-2">
-                      {action.description}
-                    </p>
-                  )}
-                  {action.resource && (
-                    <p className="text-xs text-grey-600 mt-1 font-mono truncate">
-                      {action.resource}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderVariablesCard() {
-    return (
-      <div className="space-y-6">
-        {/* Variables */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FileCode className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Variables</h2>
-              <span className="text-sm text-grey-600">({variablesCount})</span>
-            </div>
-            {isInternalApp && (
-              <Button 
-                size="sm" 
-                className="gap-2" 
-                variant="outline"
-                onClick={() => {
-                  setEditingVariable(null);
-                  setShowCreateVariableModal(true);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            )}
-          </div>
-
-          {selectedVersion?.variables && selectedVersion.variables.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {selectedVersion.variables.map((variable) => (
-                <button
-                  key={variable._id}
-                  onClick={() => handleOpenVariable(variable, false)}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileCode className="h-4 w-4 text-purple-500" />
-                    <h3 className="text-sm font-medium text-grey">{variable.key}</h3>
-                    {variable.required && (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-red/10 text-red">
-                        Required
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-grey-600">{variable.type}</p>
-                  {variable.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">{variable.description}</p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <FileCode className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No variables configured yet</p>
-              <p className="text-xs text-grey-500">
-                Add variables to store dynamic configuration values
-              </p>
-
-            </div>
-          )}
-        </div>
-
-        {/* Constants */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FileCode className="h-5 w-5 text-grey-600" />
-              <h2 className="text-lg font-semibold text-grey">Constants</h2>
-              <span className="text-sm text-grey-600">({constantsCount})</span>
-            </div>
-            {isInternalApp && (
-              <Button 
-                size="sm" 
-                className="gap-2" 
-                variant="outline"
-                onClick={() => {
-                  setEditingConstant(null);
-                  setShowCreateConstantModal(true);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            )}
-          </div>
-
-          {selectedVersion?.constants && selectedVersion.constants.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {selectedVersion.constants.map((constant) => (
-                <button
-                  key={constant._id}
-                  onClick={() => handleOpenVariable(constant, true)}
-                  className="p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileCode className="h-4 w-4 text-purple-500" />
-                    <h3 className="text-sm font-medium text-grey">{constant.key}</h3>
-                  </div>
-                  <p className="text-xs text-grey-600">{constant.type}</p>
-                  {constant.description && (
-                    <p className="text-xs text-grey-600 mt-1 line-clamp-2">{constant.description}</p>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <FileCode className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-              <p className="text-sm text-grey-600 mb-2">No constants configured yet</p>
-              <p className="text-xs text-grey-500">
-                Add constants to store fixed configuration values
-              </p>
-
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 }

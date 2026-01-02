@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Key,
   Plus,
@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   Check,
   Loader2,
+  RefreshCw,
+  Shield,
+  MoreVertical,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,13 +33,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
 import tokensServices from "@/services/tokensServices";
+import productServices from "@/services/productServices";
 import { MarkdownEditor } from "../ui/markdown-editor";
-import { connectDuctapeWorkspace } from "@/helpers/ductape";
-import Ductape from "@ductape/sdk";
+import { connectDuctapeWorkspace, SDKProxyService } from "@/helpers/ductape";
+import { IProduct } from "@/types/product";
+import {
+  getCachedTokens,
+  setCachedTokens,
+  addCachedToken,
+  removeCachedToken,
+  updateCachedToken,
+} from "@/stores/tokens-cache";
 
 interface Token {
   name: string;
@@ -68,7 +88,7 @@ export default function TokensTabContent() {
   const [newToken, setNewToken] = useState({
     name: "",
     description: "",
-    token_type: "api",
+    token_type: "credential",
     scope: [] as string[],
     expiryDuration: "",
     expiryPeriod: "days" as ExpiryPeriod,
@@ -84,9 +104,11 @@ export default function TokensTabContent() {
 
   // Copy feedback state
   const [copiedTokenName, setCopiedTokenName] = useState<string | null>(null);
+  const [copiedAccessKey, setCopiedAccessKey] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
-  // Initialize Ductape SDK instance for workspace operations
-  const ductape = useMemo<Ductape | null>(() => {
+  // Initialize Ductape SDK proxy instance for workspace operations
+  const ductape = useMemo<SDKProxyService | null>(() => {
     if (!currentWorkspaceId || !user?._id || !user?.public_key || !user?.auth_token) {
       return null;
     }
@@ -103,37 +125,22 @@ export default function TokensTabContent() {
     }
   }, [currentWorkspaceId, user?._id, user?.public_key, user?.auth_token]);
 
-  // Workspace Credentials State
-  const [workspaceCredentials, setWorkspaceCredentials] = useState([
-    {
-      key: "workspace_id",
-      name: "Workspace ID",
-      description: "Unique identifier for your Ductape workspace",
-      value: "**************************************",
-    },
-    {
-      key: "user_id",
-      name: "User ID",
-      description:
-        "Unique identifier for your user account within your Ductape workspace",
-      value: "**************************************",
-    },
-    {
-      key: "private_key",
-      name: "Private Key",
-      description:
-        "Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.",
-      value: "**************************************",
-    },
-  ]);
+  // Access Key State
+  const [accessKey, setAccessKey] = useState("**************************************");
   const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [otpValues, setOtpValues] = useState(["", "", "", "", "", ""]);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
-  const [visibleCredentials, setVisibleCredentials] = useState<{
-    [key: number]: boolean;
-  }>({});
+  const [accessKeyVisible, setAccessKeyVisible] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(60);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // Products state for scope selection
+  const [products, setProducts] = useState<IProduct[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedProductDetails, setSelectedProductDetails] = useState<IProduct | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingProductDetails, setLoadingProductDetails] = useState(false);
 
   // Get current workspace data
   const currentWorkspace = user?.workspaces?.find(
@@ -146,28 +153,102 @@ export default function TokensTabContent() {
     toast.success("Token copied to clipboard!");
   };
 
-  // Copy token key in $Token{key} format
+  // Copy token key in $Secret{key} format
   const handleCopyTokenKey = (tokenName: string) => {
-    const formattedKey = `$Token{${tokenName}}`;
+    const formattedKey = `$Secret{${tokenName}}`;
     navigator.clipboard.writeText(formattedKey);
     setCopiedTokenName(tokenName);
     toast.success(`Copied: ${formattedKey}`);
     setTimeout(() => setCopiedTokenName(null), 2000);
   };
 
-  // Fetch tokens on mount
+  // Load tokens from cache or fetch on mount
   useEffect(() => {
-    if (ductape) {
+    if (!ductape || !currentWorkspaceId) return;
+
+    // Try to load from cache first
+    const cached = getCachedTokens(currentWorkspaceId);
+    if (cached) {
+      setTokens(cached);
+    } else {
       fetchTokens();
     }
-  }, [ductape]);
+  }, [ductape, currentWorkspaceId]);
 
-  const fetchTokens = async () => {
-    if (!ductape) return;
+  // Fetch products for scope selection
+  useEffect(() => {
+    if (currentWorkspaceId && user?._id && user?.public_key) {
+      fetchProductsList();
+    }
+  }, [currentWorkspaceId, user?._id, user?.public_key]);
+
+  const fetchProductsList = async () => {
+    if (!currentWorkspaceId || !user?._id || !user?.public_key) return;
+
+    setLoadingProducts(true);
+    try {
+      const response = await productServices.fetchProducts({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        status: "all",
+      });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Fetch full product details when a product is selected
+  const fetchProductDetails = async (productId: string) => {
+    if (!currentWorkspaceId || !user?._id || !user?.public_key || !productId) {
+      setSelectedProductDetails(null);
+      return;
+    }
+
+    setLoadingProductDetails(true);
+    try {
+      const response = await productServices.fetchProduct({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        product_id: productId,
+      });
+      setSelectedProductDetails(response.data || null);
+    } catch (error) {
+      console.error("Failed to fetch product details:", error);
+      setSelectedProductDetails(null);
+    } finally {
+      setLoadingProductDetails(false);
+    }
+  };
+
+  // Get available resources for selected product
+  const availableResources = useMemo(() => {
+    if (!selectedProductDetails) return [];
+
+    const resources: { type: string; tag: string; name: string }[] = [];
+
+    // Add apps
+    selectedProductDetails.apps?.forEach((app: any) => {
+      resources.push({
+        type: "app",
+        tag: app.access_tag || app.tag,
+        name: app.name || app.access_tag || app.tag,
+      });
+    });
+
+    return resources;
+  }, [selectedProductDetails]);
+
+  const fetchTokens = useCallback(async () => {
+    if (!ductape || !currentWorkspaceId) return;
 
     setLoading(true);
     try {
-      const secretsList = await (ductape as any).secrets.fetchAll();
+      const secretsList = await (ductape as any).secrets.list();
       // Map secrets to token format
       const tokensData: Token[] = (secretsList || []).map((secret: any) => ({
         name: secret.key,
@@ -181,13 +262,15 @@ export default function TokensTabContent() {
         description: secret.description,
       }));
       setTokens(tokensData);
+      // Save to cache
+      setCachedTokens(currentWorkspaceId, tokensData);
     } catch (error) {
       console.error("Failed to fetch tokens:", error);
       toast.error("Failed to fetch tokens");
     } finally {
       setLoading(false);
     }
-  };
+  }, [ductape, currentWorkspaceId]);
 
   const validateTokenName = (name: string): boolean => {
     // Only allow alphanumeric characters and underscores
@@ -277,12 +360,14 @@ export default function TokensTabContent() {
       setNewToken({
         name: "",
         description: "",
-        token_type: "api",
+        token_type: "credential",
         scope: [],
         expiryDuration: "",
         expiryPeriod: "days",
         envs: [],
       });
+      setSelectedProductId("");
+      setSelectedProductDetails(null);
 
       toast.success("Token created successfully");
     } catch (error: any) {
@@ -303,7 +388,7 @@ export default function TokensTabContent() {
 
   // Handle confirmed revoke action
   const handleConfirmedRevoke = async () => {
-    if (!ductape || confirmInputValue !== confirmTokenName) return;
+    if (!ductape || !currentWorkspaceId || confirmInputValue !== confirmTokenName) return;
 
     setIsConfirmLoading(true);
     try {
@@ -311,8 +396,16 @@ export default function TokensTabContent() {
       await (ductape as any).secrets.update(confirmTokenName, {
         expires_at: Math.floor(Date.now() / 1000) - 1, // Set to past
       });
+
+      // Update local state and cache quietly (no refetch)
+      const updatedTokens = tokens.map((t) =>
+        t.name === confirmTokenName ? { ...t, is_active: false } : t
+      );
+      setTokens(updatedTokens);
+      setCachedTokens(currentWorkspaceId, updatedTokens);
+      updateCachedToken(confirmTokenName, { is_active: false });
+
       toast.success("Token revoked successfully");
-      await fetchTokens();
       setShowConfirmDialog(false);
       setConfirmInputValue('');
     } catch (error: any) {
@@ -325,13 +418,19 @@ export default function TokensTabContent() {
 
   // Handle confirmed delete action
   const handleConfirmedDelete = async () => {
-    if (!ductape || confirmInputValue !== confirmTokenName) return;
+    if (!ductape || !currentWorkspaceId || confirmInputValue !== confirmTokenName) return;
 
     setIsConfirmLoading(true);
     try {
       await (ductape as any).secrets.delete(confirmTokenName);
+
+      // Update local state and cache quietly (no refetch)
+      const updatedTokens = tokens.filter((t) => t.name !== confirmTokenName);
+      setTokens(updatedTokens);
+      setCachedTokens(currentWorkspaceId, updatedTokens);
+      removeCachedToken(confirmTokenName);
+
       toast.success("Token deleted successfully");
-      await fetchTokens();
       setShowConfirmDialog(false);
       setConfirmInputValue('');
     } catch (error: any) {
@@ -358,12 +457,17 @@ export default function TokensTabContent() {
     return is_active ? "active" : "revoked";
   };
 
-  // Workspace Credentials Handlers
-  const copyCredentialToClipboard = (value: string) => {
+  // Access Key Handlers
+  const handleCopyAccessKey = () => {
+    if (!accessKeyVisible) return;
     navigator.clipboard
-      .writeText(value)
-      .then(() => toast.success("Credential copied to clipboard!"))
-      .catch(() => toast.error("Failed to copy credential."));
+      .writeText(accessKey)
+      .then(() => {
+        setCopiedAccessKey(true);
+        toast.success("Access key copied to clipboard!");
+        setTimeout(() => setCopiedAccessKey(false), 2000);
+      })
+      .catch(() => toast.error("Failed to copy access key."));
   };
 
   const handleRequestOtp = async () => {
@@ -396,7 +500,7 @@ export default function TokensTabContent() {
     }
 
     try {
-      // Call API to verify OTP and get actual credentials
+      // Call API to verify OTP and get access_key
       const response = await tokensServices.postTwoFA({
         user_id: user?._id ?? "",
         public_key: user?.public_key ?? "",
@@ -405,30 +509,8 @@ export default function TokensTabContent() {
       });
 
       if (response.status && response.data) {
-        setWorkspaceCredentials([
-          {
-            key: "workspace_id",
-            name: "Workspace ID",
-            description: "Unique identifier for your Ductape workspace",
-            value: response.data.workspace_id,
-          },
-          {
-            key: "user_id",
-            name: "User ID",
-            description:
-              "Unique identifier for your user account within your Ductape workspace",
-            value: response.data.user_id,
-          },
-          {
-            key: "private_key",
-            name: "Private Key",
-            description:
-              "Secure key used for authenticating requests and accessing Ductape services. Please keep confidential and do not share with anyone.",
-            value: response.data.private_key,
-          },
-        ]);
-
-        setVisibleCredentials({ 0: true, 1: true, 2: true });
+        setAccessKey(response.data.access_key);
+        setAccessKeyVisible(true);
         setOtpVerified(true);
         setShowOtpDialog(false);
         setOtpValues(["", "", "", "", "", ""]);
@@ -469,6 +551,46 @@ export default function TokensTabContent() {
     return `${m}:${s}`;
   };
 
+  const handleRegenerateAccessKey = async () => {
+    if (!otpVerified) {
+      toast.error("Please verify with OTP first");
+      return;
+    }
+
+    setIsRegenerating(true);
+    try {
+      const response = await tokensServices.regenerateAccessKey({
+        user_id: user?._id ?? "",
+        public_key: user?.public_key ?? "",
+        workspace_id: currentWorkspaceId || "",
+      });
+
+      if (response.status && response.data) {
+        setAccessKey(response.data.access_key);
+        toast.success("Access key regenerated successfully");
+      } else {
+        toast.error("Failed to regenerate access key");
+      }
+    } catch (error) {
+      toast.error("Failed to regenerate access key");
+      console.error("Error regenerating access key:", error);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleToggleAccessKeyVisibility = () => {
+    if (accessKeyVisible) {
+      setAccessKeyVisible(false);
+    } else {
+      if (!otpVerified) {
+        handleRequestOtp();
+      } else {
+        setAccessKeyVisible(true);
+      }
+    }
+  };
+
   // OTP Timer Effect
   useEffect(() => {
     if (secondsLeft === 0 || !showOtpDialog) return;
@@ -478,348 +600,482 @@ export default function TokensTabContent() {
     return () => clearInterval(interval);
   }, [secondsLeft, showOtpDialog]);
 
+  // State for access key panel
+  const [showAccessKeyPanel, setShowAccessKeyPanel] = useState(false);
+
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+    <div className="h-full overflow-auto bg-grey-100">
+      <div className="max-w-4xl mx-auto p-6 space-y-4">
+        {/* Page Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Key className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold text-grey">
-                  Tokens & Credentials
-                </h1>
+          <h1 className="text-2xl font-bold text-grey">Tokens & Credentials</h1>
+          <p className="text-sm text-grey-500 mt-1">
+            Manage API tokens and SDK access keys for your workspace
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-green/10 flex items-center justify-center">
+                <Key className="h-4 w-4 text-green" />
               </div>
-              <p className="text-grey-600">
-                Manage workspace credentials and tokens for secure access
-              </p>
+              <div>
+                <p className="text-xl font-bold text-grey">
+                  {tokens.filter((t) => t.is_active).length}
+                </p>
+                <p className="text-xs text-grey-500">Active</p>
+              </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Token
-            </Button>
+          </div>
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Key className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-grey">{tokens.length}</p>
+                <p className="text-xs text-grey-500">Total</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-grey">
+                  {tokens.filter((t) => !t.is_active).length}
+                </p>
+                <p className="text-xs text-grey-500">Revoked</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Workspace Credentials (Compact) */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
-              {/* Header with gradient */}
-              <div className="px-4 py-3">
-                <h2 className="text-base font-semibold text-grey flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  Workspace Credentials
-                </h2>
-                <p className="text-xs mt-1 text-grey">
-                  {otpVerified ? "Verified" : "Protected by 2FA"}
-                </p>
-              </div>
+        {/* Header with tabs-style navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-grey-300 p-1">
+            <button
+              onClick={() => setShowAccessKeyPanel(false)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                !showAccessKeyPanel
+                  ? "bg-primary text-white"
+                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                Tokens
+                <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
+                  {tokens.length}
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setShowAccessKeyPanel(true)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                showAccessKeyPanel
+                  ? "bg-primary text-white"
+                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                SDK Access Key
+              </span>
+            </button>
+          </div>
 
-              {/* Info Banner */}
-              <div className="bg-primary/5 border-b border-primary/10 px-3 py-2 flex items-start gap-2">
-                <AlertCircle className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-primary">
-                  Essential for SDK initialization
-                </p>
-              </div>
+          {!showAccessKeyPanel && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={fetchTokens}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={loading}
+              >
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Token
+              </Button>
+            </div>
+          )}
+        </div>
 
-              {/* Credentials List - Compact */}
-              <div className="p-3 space-y-2">
-                {workspaceCredentials.map((credential, index) => (
-                  <div
-                    key={credential.key}
-                    className="border border-grey-400 rounded-md overflow-hidden hover:border-primary/50 transition-colors"
-                  >
-                    <div className="px-3 py-2 bg-grey-50 flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-grey">
-                        {credential.name}
-                      </h3>
-                      <button
-                        onClick={() =>
-                          copyCredentialToClipboard(credential.value)
-                        }
-                        className={cn(
-                          "transition-colors",
-                          visibleCredentials[index]
-                            ? "text-grey hover:text-grey-600"
-                            : "text-grey-400 cursor-not-allowed"
-                        )}
-                        disabled={!visibleCredentials[index]}
-                        title="Copy"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex items-center bg-white px-3 py-2 border-t border-grey-400">
-                      <p className="text-xs font-mono text-grey font-medium flex-1 truncate">
-                        {visibleCredentials[index]
-                          ? credential.value
-                          : "•".repeat(Math.min(credential.value.length, 24))}
-                      </p>
-                    </div>
+        {/* Content based on selected tab */}
+        {showAccessKeyPanel ? (
+          /* SDK Access Key Panel */
+          <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+            {/* Header Section */}
+            <div className="p-6 border-b border-grey-400">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Shield className="h-6 w-6 text-primary" />
                   </div>
-                ))}
-
-                {/* Single Eye Toggle Button */}
-                <div className="flex justify-end pt-1">
-                  <button
-                    onClick={() => {
-                      // Check if all 3 credentials are visible
-                      const allVisible =
-                        visibleCredentials[0] &&
-                        visibleCredentials[1] &&
-                        visibleCredentials[2];
-
-                      if (allVisible) {
-                        // Hide all
-                        setVisibleCredentials({});
-                      } else {
-                        // Show all (trigger OTP if not verified)
-                        if (!otpVerified) {
-                          handleRequestOtp();
-                        } else {
-                          // If already verified, just show all
-                          setVisibleCredentials({ 0: true, 1: true, 2: true });
-                        }
-                      }
-                    }}
-                    className="text-grey-600 hover:text-grey transition-colors flex items-center gap-1.5 text-xs"
-                    title={
-                      visibleCredentials[0] &&
-                      visibleCredentials[1] &&
-                      visibleCredentials[2]
-                        ? "Hide All"
-                        : "Show All"
-                    }
-                  >
-                    {visibleCredentials[0] &&
-                    visibleCredentials[1] &&
-                    visibleCredentials[2] ? (
-                      <>
-                        <EyeOff className="h-3.5 w-3.5" />
-                        <span>Hide All</span>
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>Show All</span>
-                      </>
-                    )}
-                  </button>
+                  <div>
+                    <h2 className="text-lg font-semibold text-grey">SDK Access Key</h2>
+                    <p className="text-sm text-grey-600">
+                      Initialize the Ductape SDK in your application
+                    </p>
+                  </div>
                 </div>
+                <span className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border",
+                  otpVerified
+                    ? "bg-green/10 text-green border-green/20"
+                    : "bg-primary/5 text-primary border-primary/20"
+                )}>
+                  {otpVerified ? "Verified" : "2FA Protected"}
+                </span>
+              </div>
+            </div>
+
+            {/* Access Key Section */}
+            <div className="p-6 bg-grey-50/50">
+              <label className="text-xs font-medium text-grey-600 uppercase tracking-wide mb-2 block">
+                Access Key
+              </label>
+              <div className="bg-white rounded-lg border border-grey-300 p-4 flex items-center justify-between gap-4">
+                <code className="text-sm font-mono text-grey break-all flex-1 select-all">
+                  {accessKeyVisible ? accessKey : "•".repeat(40)}
+                </code>
+                <div className="flex items-center gap-1 shrink-0 border-l border-grey-200 pl-3">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleToggleAccessKeyVisibility}
+                    className="h-8 w-8 p-0 hover:bg-grey-100"
+                    title={accessKeyVisible ? "Hide key" : "Reveal key"}
+                  >
+                    {accessKeyVisible ? (
+                      <EyeOff className="h-4 w-4 text-grey-600" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-grey-600" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCopyAccessKey}
+                    disabled={!accessKeyVisible}
+                    className="h-8 w-8 p-0 hover:bg-grey-100"
+                    title="Copy key"
+                  >
+                    {copiedAccessKey ? (
+                      <Check className="h-4 w-4 text-green" />
+                    ) : (
+                      <Copy className="h-4 w-4 text-grey-600" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-4 flex items-center gap-2">
+                <Button
+                  variant={accessKeyVisible ? "outline" : "default"}
+                  size="sm"
+                  onClick={handleToggleAccessKeyVisibility}
+                  className="gap-2"
+                >
+                  {accessKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {accessKeyVisible ? "Hide Key" : "Reveal Key"}
+                </Button>
+                {accessKeyVisible && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyAccessKey}
+                    className="gap-2"
+                  >
+                    {copiedAccessKey ? <Check className="h-4 w-4 text-green" /> : <Copy className="h-4 w-4" />}
+                    {copiedAccessKey ? "Copied!" : "Copy Key"}
+                  </Button>
+                )}
+                {otpVerified && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRegenerateAccessKey}
+                    disabled={isRegenerating}
+                    className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isRegenerating && "animate-spin")} />
+                    {isRegenerating ? "Regenerating..." : "Regenerate"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Start Section */}
+            <div className="p-6 border-t border-grey-400">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-grey">Quick Start</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const code = `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  accessKey: '${accessKeyVisible ? accessKey : 'your-access-key'}'
+});`;
+                    navigator.clipboard.writeText(code);
+                    setCopiedCode(true);
+                    toast.success("Code copied to clipboard!");
+                    setTimeout(() => setCopiedCode(false), 2000);
+                  }}
+                  className="gap-1.5 h-7 text-xs"
+                >
+                  {copiedCode ? <Check className="h-3.5 w-3.5 text-green" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedCode ? "Copied!" : "Copy code"}
+                </Button>
+              </div>
+              <div className="bg-grey-100 dark:bg-grey-800 rounded-lg p-4 border border-grey-300 dark:border-grey-700 overflow-x-auto">
+                <pre className="text-sm font-mono text-grey dark:text-grey-100 leading-relaxed">{`import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  accessKey: '${accessKeyVisible ? accessKey.slice(0, 24) + '...' : 'your-access-key'}'
+});`}</pre>
+              </div>
+              <div className="mt-4 flex items-center gap-6 text-sm">
+                <a
+                  href="https://docs.ductape.dev"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  Documentation →
+                </a>
+                <a
+                  href="https://www.npmjs.com/package/@ductape/sdk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-grey-600 hover:text-grey transition-colors"
+                >
+                  NPM Package
+                </a>
+              </div>
+            </div>
+
+            {/* Security Notice */}
+            <div className="px-6 py-4 bg-amber-50 border-t border-amber-100">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <p className="text-sm text-amber-700">
+                  Keep your access key secure. Never expose it in client-side code or public repositories.
+                </p>
               </div>
             </div>
           </div>
-
-          {/* Right Column - Workspace Tokens */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                    <Key className="h-5 w-5 text-green" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-grey">
-                      {tokens.filter((t) => t.is_active).length}
-                    </p>
-                    <p className="text-sm text-grey-600">Active</p>
-                  </div>
-                </div>
+        ) : (
+          /* Tokens List */
+          <div>
+            {loading ? (
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-16 text-grey-600">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                <span className="text-sm">Loading tokens...</span>
               </div>
-
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Key className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-grey">
-                      {tokens.length}
-                    </p>
-                    <p className="text-sm text-grey-600">Total</p>
-                  </div>
-                </div>
+            ) : tokens.length === 0 ? (
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-12 px-4">
+                <Key className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <p className="text-sm text-grey-600">No tokens yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  Create Your First Token
+                </Button>
               </div>
-
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <Trash2 className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-grey">
-                      {tokens.filter((t) => !t.is_active).length}
-                    </p>
-                    <p className="text-sm text-grey-600">Revoked</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tokens List */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-4">
-                Workspace Tokens
-              </h2>
-              {loading ? (
-                <div className="text-center py-8 text-grey-600">
-                  Loading tokens...
-                </div>
-              ) : tokens.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-4">
-                    <Key className="h-8 w-8 text-grey-400" />
-                  </div>
-                  <p className="text-grey-600 font-medium mb-1">
-                    No tokens yet
-                  </p>
-                  <p className="text-sm text-grey-500">
-                    Create your first token to get started
-                  </p>
-                </div>
-              ) : (
+            ) : (
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-grey mb-4">Secrets</h2>
                 <div className="space-y-3">
                   {tokens.map((token) => (
                     <div
                       key={token.name}
-                      className="p-4 rounded-lg border border-grey-400 hover:border-primary transition-colors"
+                      className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:shadow-sm transition-all"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-sm font-semibold text-grey">
-                              {token.name}
-                            </h3>
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded text-xs font-medium",
-                                getStatusColor(token.is_active)
-                              )}
-                            >
-                              {getStatusText(token.is_active)}
-                            </span>
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                              {token.token_type}
-                            </span>
+                      {/* Header Row - Icon, Name, Status, Actions */}
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Icon */}
+                          <div className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                            token.is_active ? "bg-primary/10" : "bg-grey-100"
+                          )}>
+                            <Key className={cn(
+                              "h-5 w-5",
+                              token.is_active ? "text-primary" : "text-grey-400"
+                            )} />
                           </div>
 
-                          {token.description && (
-                            <p className="text-xs text-grey-600 mb-2">
-                              {token.description}
-                            </p>
-                          )}
-
-                          <div className="flex items-center gap-4 text-xs text-grey-600 flex-wrap">
-                            <span>
-                              Scope: {token.scope.join(", ") || "None"}
-                            </span>
-                            {token.envs.length > 0 && (
-                              <>
-                                <span>•</span>
-                                <span>Envs: {token.envs.join(", ")}</span>
-                              </>
-                            )}
-                            <span>•</span>
-                            <span>
-                              Created:{" "}
-                              {new Date(token.created_at).toLocaleDateString()}
-                            </span>
-                            {token.expires_in && (
-                              <>
-                                <span>•</span>
-                                <span>
+                          {/* Name and Status */}
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold text-grey" title={token.name}>
+                              {token.name}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge
+                                className={cn(
+                                  'uppercase font-semibold text-[10px] px-1.5 py-0',
+                                  getStatusColor(token.is_active)
+                                )}
+                              >
+                                {getStatusText(token.is_active)}
+                              </Badge>
+                              {token.expires_in && (
+                                <span className={cn(
+                                  "flex items-center gap-1 text-[10px]",
+                                  token.expires_in * 1000 < Date.now() ? "text-red-500" : "text-grey-500"
+                                )}>
+                                  <Clock className="h-3 w-3" />
                                   {(() => {
                                     const expiryMs = token.expires_in * 1000;
                                     const now = Date.now();
-                                    if (expiryMs < now) {
-                                      return 'Expired';
-                                    }
+                                    if (expiryMs < now) return 'Expired';
                                     const diffMs = expiryMs - now;
                                     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                    if (diffDays > 0) return `${diffDays}d left`;
                                     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                                    if (diffDays > 0) {
-                                      return `Expires in: ${diffDays} day${diffDays === 1 ? '' : 's'}`;
-                                    } else if (diffHours > 0) {
-                                      return `Expires in: ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
-                                    } else {
-                                      const diffMins = Math.floor(diffMs / (1000 * 60));
-                                      return `Expires in: ${diffMins} minute${diffMins === 1 ? '' : 's'}`;
-                                    }
+                                    if (diffHours > 0) return `${diffHours}h left`;
+                                    return `${Math.floor(diffMs / (1000 * 60))}m left`;
                                   })()}
                                 </span>
-                              </>
-                            )}
-                            {token.last_used && (
-                              <>
-                                <span>•</span>
-                                <span>
-                                  Last used:{" "}
-                                  {new Date(
-                                    token.last_used
-                                  ).toLocaleDateString()}
-                                </span>
-                              </>
-                            )}
+                              )}
+                              <span className="text-[10px] text-grey-400">
+                                • Created {new Date(token.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
-                          {/* Copy Token Key Button */}
+                        {/* Copy and Actions */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleCopyTokenKey(token.name)}
-                            className="gap-1.5"
+                            className="h-8 gap-1.5 text-xs"
                           >
                             {copiedTokenName === token.name ? (
-                              <>
-                                <Check className="h-4 w-4 text-green" />
-                                <span className="text-green">Copied</span>
-                              </>
+                              <Check className="h-3.5 w-3.5 text-green" />
                             ) : (
-                              <>
-                                <Copy className="h-4 w-4" />
-                                Copy Key
-                              </>
+                              <Copy className="h-3.5 w-3.5" />
                             )}
+                            {copiedTokenName === token.name ? "Copied" : "Copy"}
                           </Button>
-                          {token.is_active && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openConfirmDialog(token.name, 'revoke')}
-                              className="text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
-                            >
-                              Revoke
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openConfirmDialog(token.name, 'delete')}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleCopyTokenKey(token.name)}
+                                className="cursor-pointer text-xs"
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy $Secret Reference
+                              </DropdownMenuItem>
+                              {token.is_active && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => openConfirmDialog(token.name, 'revoke')}
+                                    className="text-orange-500 cursor-pointer focus:text-orange-600 focus:bg-orange-50 text-xs"
+                                  >
+                                    <AlertCircle className="h-4 w-4 mr-2" />
+                                    Revoke Token
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => openConfirmDialog(token.name, 'delete')}
+                                className="text-red-500 cursor-pointer focus:text-red-500 focus:bg-red-50 text-xs font-semibold"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Token
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
+
+                      {/* Description */}
+                      {token.description && (
+                        <p className="text-xs text-grey-600 mb-3 ml-[52px]">{token.description}</p>
+                      )}
+
+                      {/* Scopes and Envs - inline */}
+                      {(token.scope.length > 0 || token.envs.length > 0) && (
+                        <div className="flex items-center gap-4 ml-[52px] flex-wrap">
+                          {/* Scope badges */}
+                          {token.scope.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-grey-500 uppercase font-medium">Scope:</span>
+                              {token.scope.slice(0, 3).map((scope) => (
+                                <Badge
+                                  key={scope}
+                                  variant="secondary"
+                                  className="bg-grey-100 text-grey-600 text-[10px] font-normal px-1.5 py-0"
+                                >
+                                  {scope}
+                                </Badge>
+                              ))}
+                              {token.scope.length > 3 && (
+                                <span className="text-[10px] text-grey-400">+{token.scope.length - 3}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Env badges */}
+                          {token.envs.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-grey-500 uppercase font-medium">Envs:</span>
+                              {token.envs.map((env) => (
+                                <Badge
+                                  key={env}
+                                  className="bg-primary/10 text-primary text-[10px] font-normal px-1.5 py-0"
+                                >
+                                  {env}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-
+              </div>
+            )}
           </div>
-        </div>
+        )}
+
       </div>
 
       {/* Create Token Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open);
+        if (!open) {
+          setSelectedProductId("");
+          setSelectedProductDetails(null);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-grey">Create New Token</DialogTitle>
@@ -893,9 +1149,10 @@ export default function TokensTabContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="credential">Credential</SelectItem>
                   <SelectItem value="api">API Token</SelectItem>
-                  <SelectItem value="access">Bearer Token</SelectItem>
-                  <SelectItem value="access">OAuth Token</SelectItem>
+                  <SelectItem value="bearer">Bearer Token</SelectItem>
+                  <SelectItem value="oauth">OAuth Token</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -936,29 +1193,106 @@ export default function TokensTabContent() {
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               <Label>Scope *</Label>
-              <div className="flex gap-2 flex-wrap">
-                {["read", "write", "delete", "admin"].map((scope) => (
-                  <button
-                    key={scope}
-                    onClick={() => {
-                      const newScope = newToken.scope.includes(scope)
-                        ? newToken.scope.filter((s) => s !== scope)
-                        : [...newToken.scope, scope];
-                      setNewToken({ ...newToken, scope: newScope });
-                    }}
-                    className={cn(
-                      "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                      newToken.scope.includes(scope)
-                        ? "bg-primary text-white"
-                        : "bg-grey-100 text-grey-600 hover:bg-grey-200"
-                    )}
-                  >
-                    {scope}
-                  </button>
-                ))}
+              <p className="text-xs text-grey-600 -mt-2">
+                Select a product and then choose which resources this token can access
+              </p>
+
+              {/* Product Selection */}
+              <div className="space-y-2">
+                <Label className="text-xs text-grey-500">Product</Label>
+                <Select
+                  value={selectedProductId}
+                  onValueChange={(value) => {
+                    setSelectedProductId(value);
+                    // Clear scopes when product changes
+                    setNewToken({ ...newToken, scope: [] });
+                    // Fetch full product details including apps
+                    fetchProductDetails(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingProducts ? "Loading products..." : "Select a product"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product._id} value={product._id || ""}>
+                        {product.name || product.tag}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Resource/App Selection */}
+              {selectedProductId && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-grey-500">Resources & Apps</Label>
+                  {loadingProductDetails ? (
+                    <div className="flex items-center gap-2 text-sm text-grey-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading resources...
+                    </div>
+                  ) : availableResources.length > 0 ? (
+                    <div className="flex gap-2 flex-wrap">
+                      {availableResources.map((resource) => (
+                        <button
+                          key={resource.tag}
+                          onClick={() => {
+                            const scopeValue = `${selectedProductDetails?.tag}:${resource.tag}`;
+                            const newScope = newToken.scope.includes(scopeValue)
+                              ? newToken.scope.filter((s) => s !== scopeValue)
+                              : [...newToken.scope, scopeValue];
+                            setNewToken({ ...newToken, scope: newScope });
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+                            newToken.scope.includes(`${selectedProductDetails?.tag}:${resource.tag}`)
+                              ? "bg-primary text-white"
+                              : "bg-grey-100 text-grey-600 hover:bg-grey-200"
+                          )}
+                        >
+                          <span className="text-[10px] uppercase opacity-70">{resource.type}</span>
+                          {resource.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-grey-500 italic">
+                      No apps found in this product. Add apps to define scopes.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Selected Scopes Display */}
+              {newToken.scope.length > 0 && (
+                <div className="bg-grey-50 rounded-lg p-3 border border-grey-200">
+                  <p className="text-xs text-grey-500 mb-2">Selected scopes:</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {newToken.scope.map((scope) => (
+                      <span
+                        key={scope}
+                        className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 flex items-center gap-1"
+                      >
+                        {scope}
+                        <button
+                          onClick={() => {
+                            setNewToken({
+                              ...newToken,
+                              scope: newToken.scope.filter((s) => s !== scope),
+                            });
+                          }}
+                          className="hover:text-blue-900"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

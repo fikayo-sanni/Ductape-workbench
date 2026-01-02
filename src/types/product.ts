@@ -25,6 +25,7 @@ export interface IProduct {
   }>;
   _id: string;
   private_key: string;
+  public_key?: string;
   apps: any[];
   caches: Cache[];
   features: any[];
@@ -42,6 +43,10 @@ export interface IProduct {
   jobs: any[];
   healthchecks?: any[];
   notifications?: any[];
+  workflows?: any[];
+  vectors?: any[];
+  agents?: any[];
+  models?: any[];
   __v: number;
   logo?: string;
   steps: number;

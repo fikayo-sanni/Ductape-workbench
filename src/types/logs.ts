@@ -9,6 +9,10 @@ export interface LogEntry {
   data: string;
   status: string;
   timestamp: string;
+  start?: number;
+  end?: number;
+  /** Latency/duration in milliseconds */
+  latency?: number;
   __v: number;
 }
 
@@ -98,6 +102,10 @@ export interface ILog {
       data: string;
       status: string;
       timestamp: string;
+      start?: number;
+      end?: number;
+      /** Latency/duration in milliseconds */
+      latency?: number;
       __v: number;
     }[];
   };

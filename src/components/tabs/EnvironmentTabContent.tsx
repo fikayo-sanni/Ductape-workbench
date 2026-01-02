@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface EnvironmentTabContentProps {
@@ -43,11 +44,14 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
               <h1 className="text-2xl font-bold text-grey mb-2">{environment.env_name || environment.name}</h1>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm text-grey-600">Slug: <span className="font-mono">{environment.slug}</span></span>
-                {environment.active && (
-                  <span className="px-2 py-1 rounded text-xs font-medium bg-green/10 text-green">
-                    Active
-                  </span>
-                )}
+                <span className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-semibold border",
+                  environment.active
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+                    : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                )}>
+                  {environment.active ? 'Active' : 'Inactive'}
+                </span>
               </div>
               {environment.description && (
                 <p className="text-sm text-grey-600">{environment.description}</p>

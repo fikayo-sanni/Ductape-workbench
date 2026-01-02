@@ -11,8 +11,10 @@
     "preview": "vite preview",
     "build:desktop": "npm run build && electron-builder",
     "build:mac": "npm run build && electron-builder --mac",
+    "build:mac-arm64": "npm run build && electron-builder --mac --arm64",
     "build:win": "npm run build && electron-builder --win",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:linux": "npm run build && electron-builder --linux",
+    "electron:dev": "electron ."
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0"
@@ -21,7 +23,7 @@
     "node-expat": "npm:noop2@latest"
   },
   "dependencies": {
-    "@ductape/sdk": "^0.0.4-v47",
+    "@ductape/sdk": "^0.0.4-v62",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -39,6 +41,7 @@
     "@radix-ui/react-slot": "^1.2.0",
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.55.4",
     "@tanstack/react-table": "^8.21.3",
     "@types/intro.js": "^5.1.5",
@@ -67,6 +70,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.5.4",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -78,10 +82,13 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.45",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

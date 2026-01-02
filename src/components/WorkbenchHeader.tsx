@@ -254,15 +254,15 @@ export default function WorkbenchHeader() {
       cache: 'New Cache',
       healthcheck: 'New Healthcheck',
       database: 'New Database',
-      'message-broker': 'New Message Broker',
+      'message-broker': 'New Messaging',
       notification: 'New Notification',
       fallback: 'New Fallback',
       quota: 'New Quota',
       job: 'New Job',
     };
 
-    let productData = null;
-    
+    let productData: any = null;
+
     // Fetch complete product data if productId is provided
     if (productId && user?._id && user?.public_key) {
       try {
@@ -283,7 +283,7 @@ export default function WorkbenchHeader() {
     }
 
     // Fetch connected apps if we have product data
-    let connectedApps = [];
+    let connectedApps: any[] = [];
     if (productData && user?._id && user?.public_key) {
       try {
         const appsResponse = await productServices.fetchProductApps({

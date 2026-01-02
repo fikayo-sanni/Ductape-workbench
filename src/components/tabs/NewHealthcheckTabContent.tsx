@@ -602,7 +602,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   <SelectContent>
                     <SelectItem value="app">App</SelectItem>
                      <SelectItem value="database">Database</SelectItem>
-                     <SelectItem value="message_broker">Message Broker</SelectItem>
+                     <SelectItem value="message_broker">Messaging</SelectItem>
                      <SelectItem value="feature">Feature</SelectItem>
                   </SelectContent>
                 </Select>
@@ -880,18 +880,18 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                 </div>
               )}
 
-              {/* Message Broker Selection (for type: message_broker) */}
+              {/* Messaging Selection (for type: message_broker) */}
               {formData.type === 'message_broker' && (
                 <div>
                   <Label htmlFor="messageBroker" className="required">
-                    Message Broker
+                    Messaging
                   </Label>
                   <Select
                     value={formData.selectedMessageBroker}
                     onValueChange={(value) => setFormData({ ...formData, selectedMessageBroker: value })}
                   >
                     <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select a message broker" />
+                      <SelectValue placeholder="Select messaging" />
                     </SelectTrigger>
                     <SelectContent>
                       {messageBrokers.map((broker: any) => (
@@ -902,7 +902,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-grey-600 mt-1">
-                    Select the message broker to monitor with this health check
+                    Select the messaging to monitor with this health check
                   </p>
                 </div>
               )}

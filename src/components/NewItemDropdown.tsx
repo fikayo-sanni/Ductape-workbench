@@ -98,14 +98,14 @@ const newItemOptions: NewItemOption[] = [
   },
   {
     id: 'message-broker',
-    label: 'Message Broker',
+    label: 'Messaging',
     icon: MessageSquare,
     description: 'Add message queue',
     category: 'product',
   },
   {
     id: 'notification',
-    label: 'Notifier',
+    label: 'Notification',
     icon: Bell,
     description: 'Add notification service',
     category: 'product',

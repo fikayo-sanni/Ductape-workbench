@@ -421,14 +421,14 @@ export default function NewMessageBrokerTabContent({
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-xl font-bold text-grey">
-                    Creating message broker for {product.name}
+                    Creating messaging for {product.name}
                   </h2>
                   <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
                     {product.tag}
                   </span>
                 </div>
                 <p className="text-sm text-grey-600">
-                  This message broker will be automatically connected to your
+                  This messaging will be automatically connected to your
                   product and configured for its environments
                 </p>
               </div>
@@ -448,12 +448,12 @@ export default function NewMessageBrokerTabContent({
             </div>
             <div>
               <h1 className="text-2xl font-bold text-grey">
-                Create New Message Broker
+                Create New Messaging
               </h1>
               <p className="text-sm text-grey-600">
                 {product?.name
                   ? `Adding to ${product.name}`
-                  : "Configure a message broker for your product"}
+                  : "Configure messaging for your product"}
               </p>
             </div>
           </div>
@@ -469,13 +469,13 @@ export default function NewMessageBrokerTabContent({
               </Label>
               <Input
                 id="name"
-                placeholder="e.g., Production Message Broker"
+                placeholder="e.g., Production Messaging"
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 className="mt-2"
               />
               <p className="text-xs text-grey-600 mt-1">
-                A friendly name for this message broker configuration
+                A friendly name for this messaging configuration
               </p>
             </div>
 
@@ -522,7 +522,7 @@ export default function NewMessageBrokerTabContent({
                   Environment Configuration
                 </h3>
                 <p className="text-sm text-grey-600">
-                  Configure message broker for each environment
+                  Configure messaging for each environment
                 </p>
               </div>
 
@@ -553,7 +553,7 @@ export default function NewMessageBrokerTabContent({
                       }
                     >
                       <SelectTrigger id={`type-${index}`} className="mt-2">
-                        <SelectValue placeholder="Select message broker type" />
+                        <SelectValue placeholder="Select messaging type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="RABBITMQ">RabbitMQ</SelectItem>
@@ -1412,7 +1412,7 @@ export default function NewMessageBrokerTabContent({
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      Create Message Broker
+                      Create Messaging
                     </>
                   )}
                 </Button>

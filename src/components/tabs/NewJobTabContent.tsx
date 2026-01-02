@@ -498,7 +498,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                   {selectedType === JobEventTypes.ACTION ? 'App' :
                    selectedType === JobEventTypes.DATABASE_ACTION ? 'Database' :
                    selectedType === JobEventTypes.NOTIFICATION ? 'Notification' :
-                   selectedType === JobEventTypes.PUBLISH ? 'Message Broker' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Messaging' :
                    selectedType === JobEventTypes.STORAGE ? 'Storage' : 'Parent'}
                 </Label>
                 <Select
@@ -513,7 +513,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                       selectedType === JobEventTypes.ACTION ? 'Select app' :
                       selectedType === JobEventTypes.DATABASE_ACTION ? 'Select database' :
                       selectedType === JobEventTypes.NOTIFICATION ? 'Select notification' :
-                      selectedType === JobEventTypes.PUBLISH ? 'Select message broker' :
+                      selectedType === JobEventTypes.PUBLISH ? 'Select messaging' :
                       selectedType === JobEventTypes.STORAGE ? 'Select storage' : 'Select parent component'
                     } />
                   </SelectTrigger>
@@ -529,7 +529,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                   {selectedType === JobEventTypes.ACTION ? 'Select the app containing the action' :
                    selectedType === JobEventTypes.DATABASE_ACTION ? 'Select the database to monitor' :
                    selectedType === JobEventTypes.NOTIFICATION ? 'Select the notification to trigger' :
-                   selectedType === JobEventTypes.PUBLISH ? 'Select the message broker' :
+                   selectedType === JobEventTypes.PUBLISH ? 'Select the messaging' :
                    selectedType === JobEventTypes.STORAGE ? 'Select the storage to monitor' : 'The parent component for this event'}
                 </p>
               </div>

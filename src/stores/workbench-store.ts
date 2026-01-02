@@ -10,6 +10,9 @@ import { Tab } from '@/types/tab';
 import { deleteTabState, cleanupOldTabStates } from '@/lib/tab-state-manager';
 
 interface WorkbenchState {
+  // Hydration state
+  _hasHydrated: boolean;
+
   // Workspaces
   workspaces: Workspace[];
   currentWorkspaceId: string | null;
@@ -101,6 +104,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   persist(
     (set) => ({
   // Initial State
+  _hasHydrated: false,
   workspaces: [],
   currentWorkspaceId: null,
   projects: [],
@@ -508,12 +512,69 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             productName: (tab.data as any).productName,
             productTag: (tab.data as any).productTag,
             productLogo: (tab.data as any).productLogo,
+            // Database/resource explorer restoration data
+            isExplorer: (tab.data as any).isExplorer,
+            // For database tabs, persist enough to refetch on restore
+            database: (tab.data as any).database ? {
+              name: (tab.data as any).database.name,
+              tag: (tab.data as any).database.tag,
+              type: (tab.data as any).database.type,
+              productTag: (tab.data as any).database.productTag,
+              productName: (tab.data as any).database.productName,
+              // Only persist env slug - connection_url will be refetched
+              env: (tab.data as any).database.env ? {
+                slug: (tab.data as any).database.env.slug,
+              } : undefined,
+            } : undefined,
+            // For graph tabs, persist enough to refetch on restore
+            graph: (tab.data as any).graph ? {
+              name: (tab.data as any).graph.name,
+              tag: (tab.data as any).graph.tag,
+              type: (tab.data as any).graph.type,
+              productTag: (tab.data as any).graph.productTag,
+              productName: (tab.data as any).graph.productName,
+              // Only persist env slug - connection_url will be refetched
+              env: (tab.data as any).graph.env ? {
+                slug: (tab.data as any).graph.env.slug,
+              } : undefined,
+            } : undefined,
+            // For vector tabs, persist enough to refetch on restore
+            vector: (tab.data as any).vector ? {
+              name: (tab.data as any).vector.name,
+              tag: (tab.data as any).vector.tag,
+              type: (tab.data as any).vector.type,
+              productTag: (tab.data as any).vector.productTag,
+              productName: (tab.data as any).vector.productName,
+              // Only persist env slug - endpoint will be refetched
+              env: (tab.data as any).vector.env ? {
+                slug: (tab.data as any).vector.env.slug,
+              } : undefined,
+              // Also persist envs array slugs for fallback
+              envs: (tab.data as any).vector.envs?.map((e: any) => ({ slug: e.slug })),
+            } : undefined,
+            // For storage tabs, persist enough to refetch on restore
+            storage: (tab.data as any).storage ? {
+              name: (tab.data as any).storage.name,
+              tag: (tab.data as any).storage.tag,
+              type: (tab.data as any).storage.type,
+              provider: (tab.data as any).storage.provider,
+              productTag: (tab.data as any).storage.productTag,
+              productName: (tab.data as any).storage.productName,
+              productId: (tab.data as any).storage.productId,
+              // Only persist env slug - config will be refetched
+              env: (tab.data as any).storage.env ? {
+                slug: (tab.data as any).storage.env.slug,
+              } : undefined,
+            } : undefined,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),
         activeTabId: state.activeTabId,
         chatbotSidebarOpen: state.chatbotSidebarOpen,
       }),
+      onRehydrateStorage: () => () => {
+        useWorkbenchStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

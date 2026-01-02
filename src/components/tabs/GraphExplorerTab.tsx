@@ -26,6 +26,10 @@ import {
   X,
   Code,
   Tag,
+  BarChart3,
+  Link2,
+  ChevronRight,
+  Hash,
 } from 'lucide-react';
 // Import SDK types for graph operations
 import type {
@@ -63,15 +67,20 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDuctapeGraph } from '@/hooks/useDuctapeGraph';
+import { useAuth } from '@/store/useAuth';
 
 interface GraphExplorerTabProps {
   graph: {
     name: string;
     tag: string;
     type: string;
+    productTag?: string;
+    productName?: string;
     env: {
       slug: string;
-      connection_url: string;
+      connection_url?: string; // Optional - not used directly, SDK resolves connection via product/graph/env
       database?: string;
       graphName?: string;
       region?: string;
@@ -150,212 +159,12 @@ const generateActionTag = (name: string): string => {
     .replace(/^-+|-+$/g, '');
 };
 
-// Sample saved actions
-const DUMMY_ACTIONS: IGraphAction[] = [
-  {
-    id: 'action_1',
-    tag: 'find-persons',
-    name: 'Find Persons',
-    description: 'Find persons with configurable limit and skip',
-    operation: 'findNodes',
-    query: {
-      operation: 'findNodes',
-      options: {
-        labels: ['Person'],
-        limit: '{{limit}}',
-        skip: '{{skip}}',
-        orderBy: { property: 'name', direction: '{{direction}}' }
-      }
-    },
-    parameters: [
-      { name: 'limit', path: 'options.limit', defaultValue: 25, type: 'number' },
-      { name: 'skip', path: 'options.skip', defaultValue: 0, type: 'number' },
-      { name: 'direction', path: 'options.orderBy.direction', defaultValue: 'ASC', type: 'string' },
-    ],
-    createdAt: '2024-03-01T10:30:00Z',
-  },
-  {
-    id: 'action_2',
-    tag: 'traverse-from-company',
-    name: 'Traverse from Company',
-    description: 'Traverse graph starting from Company nodes',
-    operation: 'traverse',
-    query: {
-      operation: 'traverse',
-      options: {
-        startNode: { labels: ['Company'] },
-        direction: '{{direction}}',
-        maxDepth: '{{maxDepth}}',
-        limit: '{{limit}}'
-      }
-    },
-    parameters: [
-      { name: 'direction', path: 'options.direction', defaultValue: 'OUTBOUND', type: 'string' },
-      { name: 'maxDepth', path: 'options.maxDepth', defaultValue: 2, type: 'number' },
-      { name: 'limit', path: 'options.limit', defaultValue: 25, type: 'number' },
-    ],
-    createdAt: '2024-03-05T14:15:00Z',
-  },
-  {
-    id: 'action_3',
-    tag: 'find-knows-relationships',
-    name: 'Find KNOWS Relationships',
-    description: 'Find KNOWS relationships between persons',
-    operation: 'findRelationships',
-    query: {
-      operation: 'findRelationships',
-      options: {
-        type: 'KNOWS',
-        limit: '{{limit}}',
-        includeNodes: '{{includeNodes}}'
-      }
-    },
-    parameters: [
-      { name: 'limit', path: 'options.limit', defaultValue: 50, type: 'number' },
-      { name: 'includeNodes', path: 'options.includeNodes', defaultValue: true, type: 'boolean' },
-    ],
-    createdAt: '2024-03-10T09:45:00Z',
-  },
-];
-
-// Property types and label definitions now imported from SDK (GraphPropertyType, IGraphLabelProperty, IGraphLabel)
-
-// Dummy data for graph schema based on SDK types
-const DUMMY_LABELS: IGraphLabel[] = [
-  {
-    name: 'Person',
-    count: 1247,
-    color: 'bg-blue',
-    properties: [
-      { name: 'name', type: 'string' },
-      { name: 'email', type: 'string' },
-      { name: 'age', type: 'number' },
-      { name: 'isActive', type: 'boolean' },
-      { name: 'birthDate', type: 'date' },
-      { name: 'createdAt', type: 'datetime' },
-    ]
-  },
-  {
-    name: 'Company',
-    count: 532,
-    color: 'bg-green',
-    properties: [
-      { name: 'name', type: 'string' },
-      { name: 'companyId', type: 'string' },
-      { name: 'industry', type: 'string' },
-      { name: 'employeeCount', type: 'number' },
-      { name: 'isPublic', type: 'boolean' },
-      { name: 'location', type: 'point' },
-      { name: 'foundedAt', type: 'date' },
-    ]
-  },
-  {
-    name: 'Product',
-    count: 2891,
-    color: 'bg-purple-500',
-    properties: [
-      { name: 'name', type: 'string' },
-      { name: 'sku', type: 'string' },
-      { name: 'description', type: 'string' },
-      { name: 'price', type: 'number' },
-      { name: 'quantity', type: 'number' },
-      { name: 'isAvailable', type: 'boolean' },
-      { name: 'tags', type: 'array' },
-    ]
-  },
-  {
-    name: 'Location',
-    count: 456,
-    color: 'bg-orange-500',
-    properties: [
-      { name: 'name', type: 'string' },
-      { name: 'city', type: 'string' },
-      { name: 'country', type: 'string' },
-      { name: 'coordinates', type: 'point' },
-      { name: 'population', type: 'number' },
-    ]
-  },
-  {
-    name: 'Order',
-    count: 8934,
-    color: 'bg-pink-500',
-    properties: [
-      { name: 'orderId', type: 'string' },
-      { name: 'totalAmount', type: 'number' },
-      { name: 'status', type: 'string' },
-      { name: 'isPaid', type: 'boolean' },
-      { name: 'orderDate', type: 'datetime' },
-      { name: 'items', type: 'array' },
-    ]
-  },
-  {
-    name: 'Category',
-    count: 67,
-    color: 'bg-yellow-500',
-    properties: [
-      { name: 'name', type: 'string' },
-      { name: 'slug', type: 'string' },
-      { name: 'description', type: 'string' },
-      { name: 'isActive', type: 'boolean' },
-    ]
-  },
-];
-
-const DUMMY_RELATIONSHIPS: IGraphRelationshipType[] = [
-  { type: 'KNOWS', count: 3456, fromLabels: ['Person'], toLabels: ['Person'] },
-  { type: 'WORKS_AT', count: 1234, fromLabels: ['Person'], toLabels: ['Company'] },
-  { type: 'PURCHASED', count: 8934, fromLabels: ['Person'], toLabels: ['Product'] },
-  { type: 'LOCATED_IN', count: 988, fromLabels: ['Company'], toLabels: ['Location'] },
-  { type: 'BELONGS_TO', count: 2891, fromLabels: ['Product'], toLabels: ['Category'] },
-  { type: 'CONTAINS', count: 12453, fromLabels: ['Order'], toLabels: ['Product'] },
-];
-
-const DUMMY_CONSTRAINTS: IGraphConstraint[] = [
-  { name: 'person_email_unique', type: 'UNIQUE', label: 'Person', property: 'email' },
-  { name: 'company_id_unique', type: 'UNIQUE', label: 'Company', property: 'companyId' },
-  { name: 'product_sku_unique', type: 'UNIQUE', label: 'Product', property: 'sku' },
-  { name: 'person_email_exists', type: 'EXISTS', label: 'Person', property: 'email' },
-];
-
-const DUMMY_INDEXES: IGraphIndex[] = [
-  { name: 'person_name_index', type: 'RANGE', labelOrType: 'Person', properties: ['name'], unique: false, state: 'ONLINE' },
-  { name: 'product_search_index', type: 'FULLTEXT', labelOrType: 'Product', properties: ['name', 'description'], unique: false, state: 'ONLINE' },
-  { name: 'company_location_index', type: 'POINT', labelOrType: 'Company', properties: ['location'], unique: false, state: 'ONLINE' },
-  { name: 'person_vector_index', type: 'VECTOR', labelOrType: 'Person', properties: ['embedding'], unique: false, state: 'POPULATING' },
-];
-
-// Sample query results based on SDK IGraphQueryResult
-const SAMPLE_QUERY_RESULTS = {
-  success: true,
-  executionTime: 42,
-  columns: ['n', 'r', 'm'],
-  count: 5,
-  data: [
-    {
-      n: { id: '1', labels: ['Person'], properties: { name: 'Alice Johnson', email: 'alice@example.com', age: 32 } },
-      r: { id: 'r1', type: 'KNOWS', startNode: '1', endNode: '2', properties: { since: '2020-01-15' } },
-      m: { id: '2', labels: ['Person'], properties: { name: 'Bob Smith', email: 'bob@example.com', age: 28 } },
-    },
-    {
-      n: { id: '1', labels: ['Person'], properties: { name: 'Alice Johnson', email: 'alice@example.com', age: 32 } },
-      r: { id: 'r2', type: 'WORKS_AT', startNode: '1', endNode: '3', properties: { role: 'Engineer', since: '2019-06-01' } },
-      m: { id: '3', labels: ['Company'], properties: { name: 'TechCorp', industry: 'Technology' } },
-    },
-    {
-      n: { id: '4', labels: ['Person'], properties: { name: 'Carol White', email: 'carol@example.com', age: 45 } },
-      r: { id: 'r3', type: 'PURCHASED', startNode: '4', endNode: '5', properties: { quantity: 2, date: '2024-03-10' } },
-      m: { id: '5', labels: ['Product'], properties: { name: 'Laptop Pro', sku: 'LP-2024', price: 1299.99 } },
-    },
-  ],
-  statistics: {
-    nodesCreated: 0,
-    nodesDeleted: 0,
-    relationshipsCreated: 0,
-    relationshipsDeleted: 0,
-    propertiesSet: 0,
-    labelsAdded: 0,
-  },
-};
+// Empty arrays for when SDK data is not available
+const EMPTY_LABELS: IGraphLabel[] = [];
+const EMPTY_RELATIONSHIPS: IGraphRelationshipType[] = [];
+const EMPTY_CONSTRAINTS: IGraphConstraint[] = [];
+const EMPTY_INDEXES: IGraphIndex[] = [];
+const EMPTY_ACTIONS: IGraphAction[] = [];
 
 // SDK-style query templates
 const getDefaultQuery = () => JSON.stringify({
@@ -437,6 +246,36 @@ const getQueryLanguageName = (type: string): string => {
 
 export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const { setSidebarCollapsed } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Guard: Show error if critical graph data is missing (e.g., tab restored with incomplete data)
+  if (!graph?.name || !graph?.tag || !graph?.env?.slug) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete graph data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the graph from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Initialize Graph Proxy Service
+  const graphConfig = {
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+  };
+
+  const graphService = useDuctapeGraph(graphConfig);
 
   // Collapse workbench sidebar when GraphExplorer opens
   useEffect(() => {
@@ -468,18 +307,13 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
   const [queryResult, setQueryResult] = useState<any>(persistedState?.queryResult || null);
   const [queryError, setQueryError] = useState<string | null>(persistedState?.queryError || null);
-  const [selectedLabel, setSelectedLabel] = useState<any>(() => {
-    if (persistedState?.selectedLabelName) {
-      return DUMMY_LABELS.find((l: IGraphLabel) => l.name === persistedState.selectedLabelName) || null;
-    }
-    return null;
-  });
-  const [selectedRelType, setSelectedRelType] = useState<any>(() => {
-    if (persistedState?.selectedRelTypeName) {
-      return DUMMY_RELATIONSHIPS.find((r: typeof DUMMY_RELATIONSHIPS[0]) => r.type === persistedState.selectedRelTypeName) || null;
-    }
-    return null;
-  });
+  // Selected label/relationship - will be resolved from SDK data once loaded
+  const [selectedLabelName, setSelectedLabelName] = useState<string | null>(
+    persistedState?.selectedLabelName || null
+  );
+  const [selectedRelTypeName, setSelectedRelTypeName] = useState<string | null>(
+    persistedState?.selectedRelTypeName || null
+  );
   const [resultsView, setResultsView] = useState<'table' | 'graph'>(persistedState?.resultsView || 'table');
   const [graphZoom, setGraphZoom] = useState(1);
   const [selectedNode, setSelectedNode] = useState<any>(null);
@@ -515,19 +349,16 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [indexLabel, setIndexLabel] = useState('');
   const [indexProperties, setIndexProperties] = useState<string[]>(['']);
 
-  // Actions state
-  const [savedActions, setSavedActions] = useState<IGraphAction[]>(DUMMY_ACTIONS);
-  const [selectedAction, setSelectedAction] = useState<IGraphAction | null>(() => {
-    if (persistedState?.selectedActionTag) {
-      return DUMMY_ACTIONS.find(a => a.tag === persistedState.selectedActionTag) || null;
-    }
-    return null;
-  });
+  // Actions state - will be populated from SDK data
+  const [selectedActionTag, setSelectedActionTag] = useState<string | null>(
+    persistedState?.selectedActionTag || null
+  );
   const [showSaveActionModal, setShowSaveActionModal] = useState(false);
   const [showExecuteActionModal, setShowExecuteActionModal] = useState(false);
 
   // Query Builder state - initialized from persisted state
   const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
+  const [showQueryEditor, setShowQueryEditor] = useState(persistedState?.showQueryEditor || false);
   const [queryBuilderOperation, setQueryBuilderOperation] = useState<GraphOperation>(persistedState?.queryBuilderOperation || 'findNodes');
   const [queryBuilderLabel, setQueryBuilderLabel] = useState(persistedState?.queryBuilderLabel || '');
   const [queryBuilderRelType, setQueryBuilderRelType] = useState(persistedState?.queryBuilderRelType || '');
@@ -546,6 +377,301 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const [queryTestResult, setQueryTestResult] = useState<any>(persistedState?.queryTestResult || null);
   const [isTestingQuery, setIsTestingQuery] = useState(false);
 
+  // ==================== GRAPH PROXY QUERIES ====================
+
+  // Establish graph connection first
+  const { data: connectionResult, isLoading: isConnecting, error: connectionError, isSuccess: isConnected } = useQuery({
+    queryKey: ['graph-connection', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) {
+        throw new Error('Graph service not available');
+      }
+      const result = await graphService.connect({
+        env: graph.env.slug,
+        product: graph.productTag,
+        graph: graph.tag,
+      });
+      return result;
+    },
+    enabled: !!graphService && !!graph.productTag,
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+  });
+
+  // Fetch labels (node types) from the graph database
+  const { data: sdkLabels, isLoading: isLoadingLabels, refetch: refetchLabels } = useQuery({
+    queryKey: ['graph-labels', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.schema.listLabels();
+        console.log('[Graph-Explorer] Labels result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching labels:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch relationship types from the graph database
+  const { data: sdkRelationshipTypes, isLoading: isLoadingRelTypes, refetch: refetchRelTypes } = useQuery({
+    queryKey: ['graph-relationship-types', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.schema.listRelationshipTypes();
+        console.log('[Graph-Explorer] Relationship types result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching relationship types:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch indexes from the graph database
+  const { data: sdkIndexes, isLoading: isLoadingIndexes, refetch: refetchIndexes } = useQuery({
+    queryKey: ['graph-indexes', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.schema.listIndexes();
+        console.log('[Graph-Explorer] Indexes result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching indexes:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch constraints from the graph database
+  const { data: sdkConstraints, isLoading: isLoadingConstraints, refetch: refetchConstraints } = useQuery({
+    queryKey: ['graph-constraints', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.schema.listConstraints();
+        console.log('[Graph-Explorer] Constraints result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching constraints:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch saved actions
+  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery<{ actions: IGraphAction[] } | null>({
+    queryKey: ['graph-actions', graph.productTag, graph.tag],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.action.list(graph.tag);
+        console.log('[Graph-Explorer] Actions result:', result);
+        return result as { actions: IGraphAction[] };
+      } catch (error) {
+        console.error('Error fetching actions:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Use SDK data only - no fallback to dummy data
+  // SDK returns { labels: [...] }, { types: [...] }, { indexes: [...] }, { constraints: [...] }, { actions: [...] }
+  const labels: IGraphLabel[] = sdkLabels?.labels || [];
+  const relationshipTypes: IGraphRelationshipType[] = sdkRelationshipTypes?.types || [];
+  const indexes: IGraphIndex[] = sdkIndexes?.indexes || [];
+  const constraints: IGraphConstraint[] = sdkConstraints?.constraints || [];
+  const actions: IGraphAction[] = sdkActions?.actions || [];
+
+  // Derive selected items from SDK data based on stored names/tags
+  const selectedLabel = useMemo(() => {
+    if (!selectedLabelName || labels.length === 0) return null;
+    return labels.find(l => l.name === selectedLabelName) || null;
+  }, [selectedLabelName, labels]);
+
+  const selectedRelType = useMemo(() => {
+    if (!selectedRelTypeName || relationshipTypes.length === 0) return null;
+    return relationshipTypes.find(r => r.type === selectedRelTypeName) || null;
+  }, [selectedRelTypeName, relationshipTypes]);
+
+  const selectedAction = useMemo(() => {
+    if (!selectedActionTag || actions.length === 0) return null;
+    return actions.find(a => a.tag === selectedActionTag) || null;
+  }, [selectedActionTag, actions]);
+
+  // Wrapper functions to update selection by name/tag
+  const setSelectedLabel = useCallback((label: IGraphLabel | null) => {
+    setSelectedLabelName(label?.name || null);
+  }, []);
+
+  const setSelectedRelType = useCallback((relType: IGraphRelationshipType | null) => {
+    setSelectedRelTypeName(relType?.type || null);
+  }, []);
+
+  const setSelectedAction = useCallback((action: IGraphAction | null) => {
+    setSelectedActionTag(action?.tag || null);
+  }, []);
+
+  // ==================== MUTATIONS ====================
+
+  // Execute a graph query
+  const executeQueryMutation = useMutation({
+    mutationFn: async (queryData: { operation: string; options: any }) => {
+      if (!graphService) throw new Error('Graph service not available');
+      const result = await graphService.query(queryData);
+      return result;
+    },
+    onSuccess: (data) => {
+      setQueryResult(data);
+      setQueryError(null);
+      toast.success('Query executed successfully');
+    },
+    onError: (error: Error) => {
+      setQueryError(error.message);
+      setQueryResult(null);
+      toast.error(`Query failed: ${error.message}`);
+    },
+  });
+
+  // Create action mutation
+  const createActionMutation = useMutation({
+    mutationFn: async (actionData: any) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.action.create(actionData);
+    },
+    onSuccess: () => {
+      refetchActions();
+      toast.success('Action created successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create action: ${error.message}`);
+    },
+  });
+
+  // Delete action mutation
+  const deleteActionMutation = useMutation({
+    mutationFn: async (actionTag: string) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.action.delete(actionTag);
+    },
+    onSuccess: () => {
+      refetchActions();
+      toast.success('Action deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete action: ${error.message}`);
+    },
+  });
+
+  // Execute action mutation
+  const executeActionMutation = useMutation({
+    mutationFn: async (dispatchData: any) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.action.dispatch(dispatchData);
+    },
+    onSuccess: (data) => {
+      setQueryResult(data);
+      setQueryError(null);
+      toast.success('Action executed successfully');
+    },
+    onError: (error: Error) => {
+      setQueryError(error.message);
+      toast.error(`Action failed: ${error.message}`);
+    },
+  });
+
+  // Create index mutation
+  const createIndexMutation = useMutation({
+    mutationFn: async (indexData: any) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.schema.createNodeIndex(indexData);
+    },
+    onSuccess: () => {
+      refetchIndexes();
+      toast.success('Index created successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create index: ${error.message}`);
+    },
+  });
+
+  // Drop index mutation
+  const dropIndexMutation = useMutation({
+    mutationFn: async (indexName: string) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.schema.dropIndex(indexName);
+    },
+    onSuccess: () => {
+      refetchIndexes();
+      toast.success('Index dropped successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to drop index: ${error.message}`);
+    },
+  });
+
+  // Create constraint mutation
+  const createConstraintMutation = useMutation({
+    mutationFn: async (constraintData: any) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.schema.createNodeConstraint(constraintData);
+    },
+    onSuccess: () => {
+      refetchConstraints();
+      toast.success('Constraint created successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create constraint: ${error.message}`);
+    },
+  });
+
+  // Drop constraint mutation
+  const dropConstraintMutation = useMutation({
+    mutationFn: async (constraintName: string) => {
+      if (!graphService) throw new Error('Graph service not available');
+      return graphService.schema.dropConstraint(constraintName);
+    },
+    onSuccess: () => {
+      refetchConstraints();
+      toast.success('Constraint dropped successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to drop constraint: ${error.message}`);
+    },
+  });
+
+  // Refresh all schema data
+  const handleRefreshSchema = async () => {
+    setIsSidebarRefreshing(true);
+    try {
+      await Promise.all([
+        refetchLabels(),
+        refetchRelTypes(),
+        refetchIndexes(),
+        refetchConstraints(),
+        refetchActions(),
+      ]);
+      toast.success('Schema refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh schema');
+    } finally {
+      setIsSidebarRefreshing(false);
+    }
+  };
+
   // Persist state to localStorage whenever relevant state changes
   useEffect(() => {
     const stateToSave = {
@@ -558,6 +684,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
       resultsView,
       selectedActionTag: selectedAction?.tag,
       showQueryBuilder,
+      showQueryEditor,
       queryBuilderOperation,
       queryBuilderLabel,
       queryBuilderRelType,
@@ -587,6 +714,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     resultsView,
     selectedAction,
     showQueryBuilder,
+    showQueryEditor,
     queryBuilderOperation,
     queryBuilderLabel,
     queryBuilderRelType,
@@ -692,7 +820,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   };
 
   // Save action
-  const handleSaveAction = () => {
+  const handleSaveAction = async () => {
     if (!actionName.trim()) {
       toast.error('Please enter an action name');
       return;
@@ -720,8 +848,8 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
       const actionTag = generateActionTag(actionName);
 
-      const newAction: IGraphAction = {
-        id: `action_${Date.now()}`,
+      const newAction = {
+        graph: graph.tag,
         tag: actionTag,
         name: actionName,
         description: actionDescription || undefined,
@@ -733,13 +861,13 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
           defaultValue: p.value,
           type: p.type as 'string' | 'number' | 'boolean' | 'array' | 'object',
         })),
-        createdAt: new Date().toISOString(),
       };
 
-      setSavedActions([newAction, ...savedActions]);
+      // Use SDK to create action
+      await createActionMutation.mutateAsync(newAction);
       setShowSaveActionModal(false);
-      setSelectedAction(newAction); // Show the newly created action
-      toast.success(`Action "${actionName}" saved with tag: ${actionTag}`);
+      // Action will be selected after refetch completes
+      setSelectedActionTag(actionTag);
     } catch (error) {
       toast.error('Failed to save action');
     }
@@ -838,12 +966,15 @@ await ductape.init();`,
   };
 
   // Delete action
-  const handleDeleteAction = (actionId: string) => {
-    setSavedActions(savedActions.filter(a => a.id !== actionId));
-    if (selectedAction?.id === actionId) {
-      setSelectedAction(null);
+  const handleDeleteAction = async (actionTag: string) => {
+    try {
+      await deleteActionMutation.mutateAsync(actionTag);
+      if (selectedAction?.tag === actionTag) {
+        setSelectedAction(null);
+      }
+    } catch (error) {
+      // Error handled by mutation
     }
-    toast.success('Action deleted');
   };
 
   // Generate query from Query Builder state
@@ -1094,7 +1225,7 @@ await ductape.init();`,
   };
 
   // Filter actions by search
-  const filteredActions = savedActions.filter(a =>
+  const filteredActions = actions.filter(a =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     a.operation.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -1120,9 +1251,9 @@ await ductape.init();`,
       return;
     }
 
-    // Validate JSON
+    let parsedQuery: any;
     try {
-      JSON.parse(queryInput);
+      parsedQuery = JSON.parse(queryInput);
     } catch {
       toast.error('Invalid JSON query format');
       return;
@@ -1132,11 +1263,23 @@ await ductape.init();`,
     setQueryError(null);
     setQueryResult(null);
 
+    const startTime = Date.now();
+
     try {
-      // Simulated response based on SDK types
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setQueryResult(SAMPLE_QUERY_RESULTS);
-      toast.success(`Query executed in ${SAMPLE_QUERY_RESULTS.executionTime}ms`);
+      if (!graphService) {
+        throw new Error('Graph service not available. Please check your connection.');
+      }
+
+      // Execute through the graph service proxy
+      const result = await graphService.query(parsedQuery);
+      const executionTime = Date.now() - startTime;
+
+      setQueryResult({
+        success: true,
+        executionTime,
+        ...result,
+      });
+      toast.success(`Query executed in ${executionTime}ms`);
     } catch (error: any) {
       setQueryError(error.message || 'Failed to execute query');
       toast.error('Failed to execute query');
@@ -1147,9 +1290,20 @@ await ductape.init();`,
 
   const handleSidebarRefresh = async () => {
     setIsSidebarRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsSidebarRefreshing(false);
-    toast.success('Schema refreshed');
+    try {
+      await Promise.all([
+        refetchLabels(),
+        refetchRelTypes(),
+        refetchIndexes(),
+        refetchConstraints(),
+        refetchActions(),
+      ]);
+      toast.success('Schema refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh schema');
+    } finally {
+      setIsSidebarRefreshing(false);
+    }
   };
 
   const handleViewChange = (view: SidebarView) => {
@@ -1159,19 +1313,19 @@ await ductape.init();`,
     setSelectedRelType(null);
   };
 
-  const filteredLabels = DUMMY_LABELS.filter(l =>
+  const filteredLabels = labels.filter(l =>
     l.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredRelationships = DUMMY_RELATIONSHIPS.filter(r =>
+  const filteredRelationships = relationshipTypes.filter(r =>
     r.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredConstraints = DUMMY_CONSTRAINTS.filter(c =>
+  const filteredConstraints = constraints.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredIndexes = DUMMY_INDEXES.filter(i =>
+  const filteredIndexes = indexes.filter(i =>
     i.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -1194,7 +1348,7 @@ await ductape.init();`,
     }
   };
 
-  const getIndexStateColor = (state: string) => {
+  const getIndexStateColor = (state?: string) => {
     switch (state) {
       case 'ONLINE': return 'text-green';
       case 'POPULATING': return 'text-yellow-500';
@@ -1310,6 +1464,171 @@ await ductape.init();`,
     });
   };
 
+  // Show loading state while initializing the graph service
+  if (!graphService) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse delay-150" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-sm text-center">
+            {/* Animated graph icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Share2 className="h-10 w-10 text-primary" />
+              </div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 border-2 border-primary/20 rounded-full animate-ping" />
+              </div>
+            </div>
+
+            {/* Loading status */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Initializing</h3>
+              <p className="text-sm text-grey-600">
+                Setting up graph service...
+              </p>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="mt-6">
+              <div className="flex items-center justify-center gap-1">
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connecting state while establishing graph database connection
+  if (isConnecting) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse delay-150" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-sm text-center">
+            {/* Animated graph icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Share2 className="h-10 w-10 text-primary" />
+              </div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 border-2 border-primary/20 rounded-full animate-ping" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-28 h-28 border border-primary/10 rounded-full animate-[ping_2s_ease-in-out_infinite]" />
+              </div>
+            </div>
+
+            {/* Connection status */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connecting to Graph Database</h3>
+              <p className="text-sm text-grey-600">
+                Establishing secure connection to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Share2 className="h-4 w-4 text-primary" />
+                <span className="font-medium text-grey-800">{graph.name}</span>
+              </div>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+                </div>
+              </div>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{graph.env.slug}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connection error state
+  if (connectionError) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red/5 rounded-full blur-3xl" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-md text-center">
+            {/* Error icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-red/20 to-red/5 flex items-center justify-center">
+                <Share2 className="h-10 w-10 text-red" />
+              </div>
+              {/* X indicator */}
+              <div className="absolute -bottom-1 -right-1 left-1/2 ml-4 w-8 h-8 bg-red rounded-full flex items-center justify-center shadow-lg">
+                <X className="h-5 w-5 text-white" />
+              </div>
+            </div>
+
+            {/* Error content */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connection Failed</h3>
+              <p className="text-sm text-grey-600">
+                Unable to connect to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Share2 className="h-4 w-4 text-grey-500" />
+                <span className="font-medium text-grey-800">{graph.name}</span>
+              </div>
+            </div>
+
+            {/* Error message */}
+            <div className="mt-4 p-4 bg-red/5 border border-red/20 rounded-xl">
+              <p className="text-sm text-red font-medium">
+                {connectionError instanceof Error ? connectionError.message : 'Unknown error occurred'}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex flex-col gap-3">
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['graph-connection', graph.productTag, graph.tag, graph.env.slug] })}
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry Connection
+              </Button>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{graph.env.slug}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
       {/* Sidebar */}
@@ -1389,9 +1708,9 @@ await ductape.init();`,
             >
               <Bookmark className="h-3 w-3" />
               Actions
-              {savedActions.length > 0 && (
+              {actions.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-grey-100 rounded text-xs">
-                  {savedActions.length}
+                  {actions.length}
                 </span>
               )}
             </button>
@@ -1612,7 +1931,7 @@ await ductape.init();`,
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteAction(action.id);
+                            handleDeleteAction(action.tag);
                           }}
                           className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
                           title="Delete action"
@@ -1754,7 +2073,7 @@ await ductape.init();`,
                             <SelectValue placeholder="Select a label..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {DUMMY_LABELS.map((label) => (
+                            {labels.map((label) => (
                               <SelectItem key={label.name} value={label.name}>
                                 <span className="flex items-center gap-2">
                                   <span className={cn('w-2 h-2 rounded-full', label.color)} />
@@ -1777,7 +2096,7 @@ await ductape.init();`,
                           <SelectValue placeholder="Select a relationship type..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {DUMMY_RELATIONSHIPS.map((rel) => (
+                          {relationshipTypes.map((rel) => (
                             <SelectItem key={rel.type} value={rel.type}>
                               {rel.type} ({rel.fromLabels?.join('/') || '-'} → {rel.toLabels?.join('/') || '-'})
                             </SelectItem>
@@ -1816,7 +2135,7 @@ await ductape.init();`,
                             <SelectValue placeholder="Select label..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {DUMMY_LABELS.map((label) => (
+                            {labels.map((label) => (
                               <SelectItem key={label.name} value={label.name}>{label.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1831,7 +2150,7 @@ await ductape.init();`,
                             <SelectValue placeholder="Select label..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {DUMMY_LABELS.map((label) => (
+                            {labels.map((label) => (
                               <SelectItem key={label.name} value={label.name}>{label.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1884,12 +2203,12 @@ await ductape.init();`,
                     <div>
                       <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
                       {queryBuilderWhere.map((condition, idx) => {
-                        const selectedLabelDef = DUMMY_LABELS.find(l => l.name === queryBuilderLabel);
+                        const selectedLabelDef = labels.find(l => l.name === queryBuilderLabel);
                         const selectedProp = selectedLabelDef?.properties.find(p => p.name === condition.property);
                         const propType = selectedProp?.type || 'string';
 
                         // Operators based on property type
-                        const getOperatorsForType = (type: PropertyType) => {
+                        const getOperatorsForType = (type: string) => {
                           switch (type) {
                             case 'number':
                               return [
@@ -2078,7 +2397,7 @@ await ductape.init();`,
                       <Label className="text-xs text-grey mb-2 block">Properties</Label>
                       {queryBuilderProperties.map((prop, idx) => {
                         const isNodeOp = ['createNode', 'mergeNode', 'updateNode'].includes(queryBuilderOperation);
-                        const selectedLabelDef = isNodeOp ? DUMMY_LABELS.find(l => l.name === queryBuilderLabel) : null;
+                        const selectedLabelDef = isNodeOp ? labels.find(l => l.name === queryBuilderLabel) : null;
                         const selectedProp = selectedLabelDef?.properties.find(p => p.name === prop.key);
                         const propType = selectedProp?.type || 'string';
 
@@ -2221,7 +2540,7 @@ await ductape.init();`,
                             <SelectValue placeholder="Select an index..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {DUMMY_INDEXES.filter(i => i.type === 'FULLTEXT').map((index) => (
+                            {indexes.filter(i => i.type === 'FULLTEXT').map((index) => (
                               <SelectItem key={index.name} value={index.name}>{index.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -2382,7 +2701,7 @@ await ductape.init();`,
                 <Button
                   variant="outline"
                   onClick={() => {
-                    handleDeleteAction(selectedAction.id);
+                    handleDeleteAction(selectedAction.tag);
                   }}
                   className="gap-2 text-red hover:text-red hover:bg-red/10"
                 >
@@ -2428,7 +2747,7 @@ await ductape.init();`,
               </div>
             </div>
           </div>
-        ) : (
+        ) : showQueryEditor ? (
           <>
             {/* Query Editor - Fixed */}
             <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
@@ -2874,61 +3193,174 @@ await ductape.init();`,
               )}
             </div>
           )}
-
-          {!queryResult && !queryError && (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Network className="h-16 w-16 text-grey-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-grey mb-2">Ready to Explore</h3>
-                <p className="text-sm text-grey max-w-md mb-4">
-                  Write a graph adapter query above and click Execute to explore your graph data.
-                  The SDK will translate it to {getQueryLanguageName(graph.type)} for {graph.type}.
-                </p>
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getNodeCountsQuery());
-                      handleExecuteQuery();
-                    }}
-                  >
-                    Show Node Counts
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getRelationshipCountsQuery());
-                      handleExecuteQuery();
-                    }}
-                  >
-                    Show Relationship Counts
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getNeighborhoodQuery());
-                    }}
-                  >
-                    Neighborhood Query
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQueryInput(getTraverseQuery('Person'));
-                    }}
-                  >
-                    Traverse Example
-                  </Button>
+            </div>
+          </>
+        ) : (
+          /* Graph Overview - Default view when no query editor or builder is active */
+          <div className="flex-1 overflow-auto p-6 space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Circle className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{labels.length}</div>
+                    <div className="text-xs text-grey-500">Node Labels</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
+                    <ArrowRight className="h-5 w-5 text-blue" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{relationshipTypes.length}</div>
+                    <div className="text-xs text-grey-500">Relationship Types</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <Bookmark className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey">{actions.length}</div>
+                    <div className="text-xs text-grey-500">Saved Actions</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                    <Network className="h-5 w-5 text-green" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-grey capitalize">{graph.type || 'Neo4j'}</div>
+                    <div className="text-xs text-grey-500">Graph Type</div>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Quick Actions */}
+            <div>
+              <h3 className="text-sm font-semibold text-grey mb-3">Quick Actions</h3>
+              <div className="grid grid-cols-4 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowQueryEditor(true)}
+                >
+                  <Code className="h-5 w-5 text-primary" />
+                  <span className="text-sm">Query Editor</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowQueryBuilder(true)}
+                >
+                  <Settings2 className="h-5 w-5 text-blue" />
+                  <span className="text-sm">Query Builder</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setShowAddNodeModal(true)}
+                >
+                  <Plus className="h-5 w-5 text-green" />
+                  <span className="text-sm">Create Node</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => setSidebarView('actions')}
+                >
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  <span className="text-sm">View Actions</span>
+                </Button>
+              </div>
             </div>
-          </>
+
+            {/* Node Labels Overview */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-grey">Node Labels</h3>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarView('labels')}>
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {labels.slice(0, 6).map((label) => (
+                  <button
+                    key={label.name}
+                    onClick={() => {
+                      setSelectedLabel(label);
+                      setQueryInput(getTraverseQuery(label.name));
+                      setShowQueryEditor(true);
+                    }}
+                    className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: label.color }}
+                        />
+                        <span className="font-medium text-grey">{label.name}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                      <span className="flex items-center gap-1">
+                        <Circle className="h-3 w-3" />
+                        {label.count.toLocaleString()} nodes
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {label.properties.length} props
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Saved Actions */}
+            {actions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-grey">Saved Actions</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setSidebarView('actions')}>
+                    View All
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {actions.slice(0, 3).map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleLoadAction(action)}
+                      className="w-full bg-white rounded-lg border border-grey-400 p-3 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm text-grey">{action.name}</span>
+                        <span className={cn('text-xs px-2 py-0.5 rounded', GRAPH_OPERATIONS[action.operation]?.color || 'bg-grey-100 text-grey')}>
+                          {action.operation}
+                        </span>
+                      </div>
+                      {action.description && (
+                        <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
