@@ -772,13 +772,21 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
         return null;
       }
       try {
-        // Use SDK listTables to get real tables
-        const result = await databaseService.listTables({
+        // Use listTablesWithInfo to get tables with row counts in a single efficient call
+        const tablesInfo = await databaseService.listTablesWithInfo({
           product: database.productTag,
           database: database.tag,
           env: database.env.slug,
         });
-        return result;
+
+        // Map SDK table info to workbench table definition
+        return tablesInfo.map(tableInfo => ({
+          name: tableInfo.name,
+          type: isNoSQL ? 'collection' as const : 'table' as const,
+          rowCount: tableInfo.estimatedRowCount ?? 0,
+          documentCount: isNoSQL ? tableInfo.estimatedRowCount ?? 0 : undefined,
+          columns: [], // Columns will be fetched when table is selected
+        }));
       } catch (error) {
         console.error('Error fetching tables:', error);
         return null;
@@ -3667,26 +3675,33 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           {/* Tables List */}
           {sidebarView === 'tables' && (
             <div className="space-y-1">
-              {filteredTables.map((table) => (
-                <button
-                  key={table.name}
-                  onClick={() => setSelectedTable(table)}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
-                    selectedTable?.name === table.name
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Table className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{table.name}</span>
-                  </div>
-                  <span className="text-xs text-grey-600 flex-shrink-0">
-                    {'rowCount' in table ? table.rowCount : table.documentCount}
-                  </span>
-                </button>
-              ))}
+              {isLoadingTables ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                  <span className="ml-2 text-sm text-grey-600">Loading {isNoSQL ? 'collections' : 'tables'}...</span>
+                </div>
+              ) : (
+                filteredTables.map((table) => (
+                  <button
+                    key={table.name}
+                    onClick={() => setSelectedTable(table)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
+                      selectedTable?.name === table.name
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-grey hover:bg-grey-100'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Table className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{table.name}</span>
+                    </div>
+                    <span className="text-xs text-grey-600 flex-shrink-0">
+                      {'rowCount' in table ? table.rowCount : table.documentCount}
+                    </span>
+                  </button>
+                ))
+              )}
             </div>
           )}
 

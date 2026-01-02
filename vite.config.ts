@@ -16,14 +16,17 @@ export default defineConfig({
       mysql2: path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress mysql2
       pg: path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress pg (PostgreSQL)
       mongodb: path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress mongodb
+      "cassandra-driver": path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress cassandra
+      "@aws-sdk/client-dynamodb": path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress dynamodb
+      "@aws-sdk/lib-dynamodb": path.resolve(__dirname, "./empty-module-file.js"), // 👈 suppress dynamodb
     },
   },
   define: {
-    global: "window", // 👈 this helps some node packages expecting a global
+    global: "globalThis", // 👈 this helps some node packages expecting a global
   },
   optimizeDeps: {
     include: ["buffer"], // 👈 ensures Vite optimizes it properly
-    exclude: ['bullmq', 'ajv', 'ajv-draft-04', 'mysql2', 'pg', 'mongodb'],
+    exclude: ['bullmq', 'ajv', 'ajv-draft-04', 'mysql2', 'pg', 'mongodb', 'cassandra-driver', '@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb'],
   },
   ssr: {
     external: ['bullmq'],

@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/ductape-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ductape Workbench</title>
+    <script type="module">
+      import { Buffer } from 'buffer';
+      window.Buffer = Buffer;
+      globalThis.Buffer = Buffer;
+      globalThis.global = globalThis;
+      window.global = window;
+      globalThis.process = window.process = {
+        env: {},
+        browser: true,
+        version: 'v18.0.0',
+        versions: { node: '18.0.0' },
+        nextTick: (fn) => setTimeout(fn, 0),
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

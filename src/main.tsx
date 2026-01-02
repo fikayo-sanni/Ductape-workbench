@@ -5,8 +5,12 @@ import App from './App.tsx';
 import { Buffer } from 'buffer';
 
 // Polyfills for Node.js globals required by @ductape/sdk
+(globalThis as any).Buffer = Buffer;
 window.Buffer = Buffer;
-(window as any).process = {
+(globalThis as any).global = globalThis;
+(window as any).global = window;
+
+(globalThis as any).process = (window as any).process = {
   env: {},
   browser: true,
   version: 'v18.0.0', // Mock Node.js version
