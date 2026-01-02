@@ -30,6 +30,9 @@ import {
   XCircle,
   Plug,
   Home,
+  Rocket,
+  Loader2,
+  Box,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -58,11 +61,14 @@ import UpdateAppEnvironmentModal from '@/components/modals/UpdateAppEnvironmentM
 import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useDuctape } from '@/hooks/useDuctape';
+import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
 import ActionViewTabContent from './ActionViewTabContent';
 import WebhookTabContent from './WebhookTabContent';
 import RequestBuilder from './RequestBuilder';
+import InlineWebhookForm from '@/components/forms/InlineWebhookForm';
 
 interface AppTabContentProps {
   app?: IApp;
@@ -85,6 +91,7 @@ interface FolderTreeNode {
 export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const { openTab, tabs, activeTabId } = useWorkbenchStore();
   const { currentWorkspaceId, user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Get itemId and initialization data from active tab if app is undefined (after refresh)
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -147,11 +154,11 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const [newActionFolderId, setNewActionFolderId] = useState<string | null>(null);
   const [inlineActionTabId, setInlineActionTabId] = useState<string>('');
 
+  // State for creating a new webhook inline
+  const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+
   // Note: State reset when switching apps is handled by the key prop in TabContent.tsx
   // which forces a complete remount of this component
-
-  // Determine if app is internal or third-party
-  const isInternalApp = app?.workspace_id === currentWorkspaceId;
 
   // Check if app data is incomplete (missing versions, actions, app_name, etc.)
   const isAppDataIncomplete = app && (!app.versions || app.versions.length === 0 || !app.app_name);
@@ -171,6 +178,10 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
 
   // Use fetched app details if available, otherwise use the passed app
   const currentApp = appDetails?.data || app;
+
+  // Determine if app is internal or third-party
+  // Use currentApp to ensure we have workspace_id after data is fetched (e.g., after page refresh)
+  const isInternalApp = currentApp?.workspace_id === currentWorkspaceId;
 
   // Update tab with fetched data
   useEffect(() => {
@@ -192,6 +203,38 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const variablesCount = selectedVersion?.variables?.length || 0;
   const constantsCount = selectedVersion?.constants?.length || 0;
   const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any)?.webhooks_count || 0;
+
+  // Check if the selected version is unpublished (draft or private)
+  const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private' || !selectedVersion?.status;
+
+  // Initialize Ductape SDK for publishing
+  const ductape = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'app',
+  }) as any;
+
+  // Publish app mutation
+  const { mutate: publishApp, isPending: isPublishing } = useMutation({
+    mutationFn: async () => {
+      if (!ductape || !currentApp?.tag) throw new Error('Unable to publish');
+      await ductape.init(currentApp.tag);
+      await ductape.update(currentApp.tag, {
+        status: 'public',
+        version: selectedVersion?.tag,
+      });
+    },
+    onSuccess: () => {
+      toast.success('App version published successfully');
+      queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to publish app');
+    },
+  });
 
   // Build folder tree structure with actions
   const folderTree = useMemo((): FolderTreeNode[] => {
@@ -823,6 +866,29 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
 
   // Render webhooks content for the Webhooks view (matching ProductTabContent design)
   const renderWebhooksContent = () => {
+    // Show inline form if creating webhook
+    if (isCreatingWebhook && currentApp) {
+      return (
+        <InlineWebhookForm
+          app={{
+            _id: currentApp._id || '',
+            app_name: currentApp.app_name || '',
+            tag: currentApp.tag || '',
+            logo: currentApp.logo,
+            versions: currentApp.versions,
+            envs: selectedVersion?.envs,
+            workspace_id: currentApp.workspace_id,
+          }}
+          onCancel={() => setIsCreatingWebhook(false)}
+          onSuccess={() => {
+            setIsCreatingWebhook(false);
+            // Refresh app data to show new webhook
+            queryClient.invalidateQueries({ queryKey: ['app', currentApp._id] });
+          }}
+        />
+      );
+    }
+
     const webhooks = selectedVersion?.webhooks || [];
     const webhooksLength = webhooks.length;
 
@@ -867,21 +933,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 )}
                 {isInternalApp && (
                   <Button
-                    onClick={() => {
-                      openTab({
-                        id: `new-webhook-${Date.now()}`,
-                        type: 'feature',
-                        title: 'New Webhook',
-                        data: {
-                          componentType: 'new-webhook',
-                          app: currentApp,
-                          appId: currentApp?._id,
-                          appTag: currentApp?.tag,
-                          version: selectedVersionTag,
-                        },
-                        isDirty: true,
-                      });
-                    }}
+                    onClick={() => setIsCreatingWebhook(true)}
                     className="gap-2 shadow-sm"
                   >
                     <Plus className="h-4 w-4" />
@@ -1001,21 +1053,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   </p>
                   {isInternalApp && (
                     <Button
-                      onClick={() => {
-                        openTab({
-                          id: `new-webhook-${Date.now()}`,
-                          type: 'feature',
-                          title: 'New Webhook',
-                          data: {
-                            componentType: 'new-webhook',
-                            app: currentApp,
-                            appId: currentApp?._id,
-                            appTag: currentApp?.tag,
-                            version: selectedVersionTag,
-                          },
-                          isDirty: true,
-                        });
-                      }}
+                      onClick={() => setIsCreatingWebhook(true)}
                       className="gap-2 shadow-sm"
                     >
                       <Plus className="h-4 w-4" />
@@ -1036,7 +1074,16 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const renderMainContent = () => {
     if (selectedAction) {
       // Use unique key combining type prefix + id to force remount when switching between different actions
-      return <ActionViewTabContent key={`action-${selectedAction.tag || selectedAction._id}`} action={selectedAction} />;
+      // Pass product context from app data (if app was opened from ProductTabContent's Connected Apps)
+      return (
+        <ActionViewTabContent
+          key={`action-${selectedAction.tag || selectedAction._id}`}
+          action={selectedAction}
+          appTag={currentApp?.tag}
+          productTag={(currentApp as any)?.productTag}
+          envSlug={selectedVersion?.envs?.find((e: any) => e.active)?.slug}
+        />
+      );
     }
 
     if (selectedWebhook) {
@@ -1170,6 +1217,16 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                       {isInternalApp ? <Building2 className="h-3 w-3" /> : <ExternalLink className="h-3 w-3" />}
                       {isInternalApp ? 'Internal' : 'Third-party'}
                     </span>
+                    {/* Product Context - shown when app was opened from ProductTabContent */}
+                    {(currentApp as any)?.productTag && (
+                      <>
+                        <span className="text-grey-400">•</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-purple-500/10 text-purple-600">
+                          <Box className="h-3 w-3" />
+                          {(currentApp as any)?.productName || (currentApp as any)?.productTag}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1189,6 +1246,21 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+                {selectedVersion && isInternalApp && isVersionUnpublished && (
+                  <Button
+                    onClick={() => publishApp()}
+                    size="sm"
+                    className="w-36"
+                    disabled={isPublishing}
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Rocket className="h-4 w-4 mr-1" />
+                    )}
+                    {isPublishing ? 'Publishing...' : 'Publish'}
+                  </Button>
                 )}
                 {selectedVersion && (
                   <Button onClick={handleIntegrateApp} size="sm" variant="outline" className="w-36">

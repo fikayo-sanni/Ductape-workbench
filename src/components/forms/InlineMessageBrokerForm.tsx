@@ -44,13 +44,8 @@ interface EnvConfig {
   slug: string;
   env_name: string;
   type: string;
-  // RabbitMQ
-  rabbitmqHost: string;
-  rabbitmqPort: string;
-  rabbitmqUsername: string;
-  rabbitmqPassword: string;
-  rabbitmqQueue: string;
-  rabbitmqRoutingKey: string;
+  // RabbitMQ - URL-based connection
+  rabbitmqUrl: string;
   // Redis
   redisHost: string;
   redisPort: string;
@@ -70,7 +65,6 @@ interface EnvConfig {
   // Google Pub/Sub
   gcpProjectId: string;
   gcpConfigType: string;
-  gcpConfigProjectId: string;
   gcpPrivateKeyId: string;
   gcpPrivateKey: string;
   gcpClientEmail: string;
@@ -80,6 +74,12 @@ interface EnvConfig {
   gcpAuthProviderX509CertUrl: string;
   gcpClientX509CertUrl: string;
   gcpUniverseDomain: string;
+  // NATS
+  natsServers: string;
+  natsToken: string;
+  natsUser: string;
+  natsPass: string;
+  natsTls: boolean;
 }
 
 export default function InlineMessageBrokerForm({
@@ -94,6 +94,7 @@ export default function InlineMessageBrokerForm({
   const [formData, setFormData] = useState({
     name: "",
     tag: "",
+    description: "",
   });
 
   const [showEnvs, setShowEnvs] = useState(false);
@@ -116,18 +117,17 @@ export default function InlineMessageBrokerForm({
         slug: env.slug,
         env_name: env.name || env.env_name || env.slug,
         type: "",
-        rabbitmqHost: "",
-        rabbitmqPort: "5672",
-        rabbitmqUsername: "",
-        rabbitmqPassword: "",
-        rabbitmqQueue: "",
-        rabbitmqRoutingKey: "",
+        // RabbitMQ - URL-based
+        rabbitmqUrl: "",
+        // Redis
         redisHost: "",
         redisPort: "6379",
         redisPassword: "",
+        // AWS SQS
         awsRegion: "",
         awsAccessKeyId: "",
         awsSecretAccessKey: "",
+        // Kafka
         kafkaBrokers: "",
         kafkaClientId: "",
         kafkaGroupId: "",
@@ -135,9 +135,9 @@ export default function InlineMessageBrokerForm({
         kafkaSaslMechanism: "",
         kafkaSaslUsername: "",
         kafkaSaslPassword: "",
+        // Google Pub/Sub
         gcpProjectId: "",
         gcpConfigType: "service_account",
-        gcpConfigProjectId: "",
         gcpPrivateKeyId: "",
         gcpPrivateKey: "",
         gcpClientEmail: "",
@@ -147,6 +147,12 @@ export default function InlineMessageBrokerForm({
         gcpAuthProviderX509CertUrl: "https://www.googleapis.com/oauth2/v1/certs",
         gcpClientX509CertUrl: "",
         gcpUniverseDomain: "googleapis.com",
+        // NATS
+        natsServers: "",
+        natsToken: "",
+        natsUser: "",
+        natsPass: "",
+        natsTls: false,
       }));
       setEnvConfigs(configs);
     }
@@ -154,7 +160,18 @@ export default function InlineMessageBrokerForm({
 
   const handleNameChange = (value: string) => {
     const sanitizedValue = value.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase();
-    setFormData({ name: value, tag: sanitizedValue });
+    // Auto-fill description if it's empty or still the auto-generated one
+    const shouldUpdateDescription =
+      !formData.description ||
+      formData.description.startsWith('Message broker for ');
+
+    setFormData({
+      name: value,
+      tag: sanitizedValue,
+      description: shouldUpdateDescription && value.trim()
+        ? `Message broker for ${value.trim()}`
+        : formData.description,
+    });
   };
 
   const handleContinue = () => {
@@ -187,7 +204,7 @@ export default function InlineMessageBrokerForm({
         updated[index] = {
           ...updated[index],
           gcpConfigType: json.type || "service_account",
-          gcpConfigProjectId: json.project_id || "",
+          gcpProjectId: json.project_id || "",
           gcpPrivateKeyId: json.private_key_id || "",
           gcpPrivateKey: json.private_key || "",
           gcpClientEmail: json.client_email || "",
@@ -212,12 +229,7 @@ export default function InlineMessageBrokerForm({
     switch (env.type) {
       case "RABBITMQ":
         return {
-          host: env.rabbitmqHost,
-          port: parseInt(env.rabbitmqPort) || 5672,
-          username: env.rabbitmqUsername,
-          password: env.rabbitmqPassword,
-          queue: env.rabbitmqQueue,
-          routingKey: env.rabbitmqRoutingKey,
+          url: env.rabbitmqUrl,
         };
       case "REDIS":
         return {
@@ -235,7 +247,7 @@ export default function InlineMessageBrokerForm({
         return {
           brokers: env.kafkaBrokers.split(",").map((b) => b.trim()).filter(Boolean),
           clientId: env.kafkaClientId,
-          groupId: env.kafkaGroupId,
+          groupId: env.kafkaGroupId || undefined,
           ssl: env.kafkaSsl,
           sasl: env.kafkaSaslMechanism
             ? {
@@ -249,6 +261,7 @@ export default function InlineMessageBrokerForm({
         return {
           projectId: env.gcpProjectId,
           credentials: {
+            type: env.gcpConfigType,
             project_id: env.gcpProjectId,
             private_key_id: env.gcpPrivateKeyId,
             private_key: env.gcpPrivateKey,
@@ -261,13 +274,21 @@ export default function InlineMessageBrokerForm({
             universe_domain: env.gcpUniverseDomain,
           },
         };
+      case "NATS":
+        return {
+          servers: env.natsServers.split(",").map((s) => s.trim()).filter(Boolean),
+          token: env.natsToken || undefined,
+          user: env.natsUser || undefined,
+          pass: env.natsPass || undefined,
+          tls: env.natsTls,
+        };
       default:
         return {};
     }
   };
 
   const { mutateAsync: createMessageBroker, isPending: isCreating } = useMutation({
-    mutationFn: async (values: { name: string; tag: string; envs: EnvConfig[] }) => {
+    mutationFn: async (values: { name: string; tag: string; description?: string; envs: EnvConfig[] }) => {
       if (!ductape) throw new Error("Product not initialized");
       if (!product?.tag) throw new Error("Product tag not found");
 
@@ -276,6 +297,7 @@ export default function InlineMessageBrokerForm({
       const payload = {
         name: values.name,
         tag: values.tag,
+        description: values.description || undefined,
         envs: values.envs.map((env) => ({
           slug: env.slug,
           type: env.type.toLowerCase() as MessageBrokerTypes,
@@ -309,6 +331,7 @@ export default function InlineMessageBrokerForm({
     await createMessageBroker({
       name: formData.name,
       tag: formData.tag,
+      description: formData.description || undefined,
       envs: envConfigs.filter((env) => env.type.trim()),
     });
   };
@@ -369,6 +392,18 @@ export default function InlineMessageBrokerForm({
               <p className="text-xs text-grey-600 mt-1">Unique identifier (auto-generated from name)</p>
             </div>
 
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="e.g., Primary message broker for production event processing"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-2 min-h-[80px]"
+              />
+              <p className="text-xs text-grey-600 mt-1">Optional description for this messaging configuration</p>
+            </div>
+
             {!showEnvs && (
               <Button onClick={handleContinue} className="gap-2">
                 Continue to Environment Configuration
@@ -406,6 +441,7 @@ export default function InlineMessageBrokerForm({
                         <SelectItem value="AWS_SQS">AWS SQS</SelectItem>
                         <SelectItem value="KAFKA">Apache Kafka</SelectItem>
                         <SelectItem value="GOOGLE_PUBSUB">Google Pub/Sub</SelectItem>
+                        <SelectItem value="NATS">NATS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -413,77 +449,28 @@ export default function InlineMessageBrokerForm({
                   {/* RabbitMQ Configuration */}
                   {env.type === "RABBITMQ" && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor={`rabbitmqHost-${index}`} className="required">Host</Label>
-                          <Input
-                            id={`rabbitmqHost-${index}`}
-                            placeholder="rabbitmq.yourdomain.com"
-                            value={env.rabbitmqHost}
-                            onChange={(e) => updateEnvConfig(index, "rabbitmqHost", e.target.value)}
-                            className="mt-2"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`rabbitmqPort-${index}`} className="required">Port</Label>
-                          <Input
-                            id={`rabbitmqPort-${index}`}
-                            placeholder="5672"
-                            value={env.rabbitmqPort}
-                            onChange={(e) => updateEnvConfig(index, "rabbitmqPort", e.target.value)}
-                            className="mt-2"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`rabbitmqUsername-${index}`} className="required">Username</Label>
-                          <Input
-                            id={`rabbitmqUsername-${index}`}
-                            placeholder="rabbitmq-user"
-                            value={env.rabbitmqUsername}
-                            onChange={(e) => updateEnvConfig(index, "rabbitmqUsername", e.target.value)}
-                            className="mt-2"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`rabbitmqPassword-${index}`} className="required">Password</Label>
-                          <div className="relative">
-                            <Input
-                              id={`rabbitmqPassword-${index}`}
-                              type={passwordVisibility[`${index}-rabbitmqPassword`] ? "text" : "password"}
-                              placeholder="••••••••"
-                              value={env.rabbitmqPassword}
-                              onChange={(e) => updateEnvConfig(index, "rabbitmqPassword", e.target.value)}
-                              className="mt-2 pr-10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => togglePasswordVisibility(`${index}-rabbitmqPassword`)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey mt-1"
-                            >
-                              {passwordVisibility[`${index}-rabbitmqPassword`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
                       <div>
-                        <Label htmlFor={`rabbitmqQueue-${index}`} className="required">Queue</Label>
-                        <Input
-                          id={`rabbitmqQueue-${index}`}
-                          placeholder="my-queue"
-                          value={env.rabbitmqQueue}
-                          onChange={(e) => updateEnvConfig(index, "rabbitmqQueue", e.target.value)}
-                          className="mt-2"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`rabbitmqRoutingKey-${index}`} className="required">Routing Key</Label>
-                        <Input
-                          id={`rabbitmqRoutingKey-${index}`}
-                          placeholder="my-routing-key"
-                          value={env.rabbitmqRoutingKey}
-                          onChange={(e) => updateEnvConfig(index, "rabbitmqRoutingKey", e.target.value)}
-                          className="mt-2"
-                        />
+                        <Label htmlFor={`rabbitmqUrl-${index}`} className="required">Connection URL</Label>
+                        <div className="relative">
+                          <Input
+                            id={`rabbitmqUrl-${index}`}
+                            type={passwordVisibility[`${index}-rabbitmqUrl`] ? "text" : "password"}
+                            placeholder="amqp://user:password@rabbitmq.yourdomain.com:5672/vhost"
+                            value={env.rabbitmqUrl}
+                            onChange={(e) => updateEnvConfig(index, "rabbitmqUrl", e.target.value)}
+                            className="mt-2 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(`${index}-rabbitmqUrl`)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey mt-1"
+                          >
+                            {passwordVisibility[`${index}-rabbitmqUrl`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <p className="text-xs text-grey-600 mt-1">
+                          AMQP connection URL (e.g., amqp://user:pass@host:5672/vhost)
+                        </p>
                       </div>
                     </div>
                   )}
@@ -630,6 +617,62 @@ export default function InlineMessageBrokerForm({
                           <p className="text-xs text-grey-600">Enable SSL for secure communication</p>
                         </div>
                       </div>
+
+                      {/* SASL Authentication */}
+                      <div className="space-y-4 p-4 border rounded-lg bg-grey-100">
+                        <h5 className="font-medium text-grey">SASL Authentication (Optional)</h5>
+                        <div>
+                          <Label htmlFor={`kafkaSaslMechanism-${index}`}>Mechanism</Label>
+                          <Select
+                            value={env.kafkaSaslMechanism}
+                            onValueChange={(value) => updateEnvConfig(index, "kafkaSaslMechanism", value)}
+                          >
+                            <SelectTrigger id={`kafkaSaslMechanism-${index}`} className="mt-2">
+                              <SelectValue placeholder="Select SASL mechanism (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="plain">PLAIN</SelectItem>
+                              <SelectItem value="scram-sha-256">SCRAM-SHA-256</SelectItem>
+                              <SelectItem value="scram-sha-512">SCRAM-SHA-512</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {env.kafkaSaslMechanism && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor={`kafkaSaslUsername-${index}`} className="required">Username</Label>
+                              <Input
+                                id={`kafkaSaslUsername-${index}`}
+                                placeholder="SASL username"
+                                value={env.kafkaSaslUsername}
+                                onChange={(e) => updateEnvConfig(index, "kafkaSaslUsername", e.target.value)}
+                                className="mt-2"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`kafkaSaslPassword-${index}`} className="required">Password</Label>
+                              <div className="relative">
+                                <Input
+                                  id={`kafkaSaslPassword-${index}`}
+                                  type={passwordVisibility[`${index}-kafkaSaslPassword`] ? "text" : "password"}
+                                  placeholder="SASL password"
+                                  value={env.kafkaSaslPassword}
+                                  onChange={(e) => updateEnvConfig(index, "kafkaSaslPassword", e.target.value)}
+                                  className="mt-2 pr-10"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => togglePasswordVisibility(`${index}-kafkaSaslPassword`)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey mt-1"
+                                >
+                                  {passwordVisibility[`${index}-kafkaSaslPassword`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -699,6 +742,90 @@ export default function InlineMessageBrokerForm({
                           onChange={(e) => updateEnvConfig(index, "gcpPrivateKey", e.target.value)}
                           className="mt-2 min-h-[100px]"
                         />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* NATS Configuration */}
+                  {env.type === "NATS" && (
+                    <div className="space-y-4 pt-4 border-t border-grey-300">
+                      <div>
+                        <Label htmlFor={`natsServers-${index}`} className="required">Servers (comma-separated)</Label>
+                        <Input
+                          id={`natsServers-${index}`}
+                          placeholder="nats://localhost:4222,nats://server2:4222"
+                          value={env.natsServers}
+                          onChange={(e) => updateEnvConfig(index, "natsServers", e.target.value)}
+                          className="mt-2"
+                        />
+                        <p className="text-xs text-grey-600 mt-1">
+                          NATS server URLs (e.g., nats://localhost:4222)
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`natsUser-${index}`}>Username</Label>
+                          <Input
+                            id={`natsUser-${index}`}
+                            placeholder="nats-user"
+                            value={env.natsUser}
+                            onChange={(e) => updateEnvConfig(index, "natsUser", e.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`natsPass-${index}`}>Password</Label>
+                          <div className="relative">
+                            <Input
+                              id={`natsPass-${index}`}
+                              type={passwordVisibility[`${index}-natsPass`] ? "text" : "password"}
+                              placeholder="••••••••"
+                              value={env.natsPass}
+                              onChange={(e) => updateEnvConfig(index, "natsPass", e.target.value)}
+                              className="mt-2 pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => togglePasswordVisibility(`${index}-natsPass`)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey mt-1"
+                            >
+                              {passwordVisibility[`${index}-natsPass`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor={`natsToken-${index}`}>Token</Label>
+                        <div className="relative">
+                          <Input
+                            id={`natsToken-${index}`}
+                            type={passwordVisibility[`${index}-natsToken`] ? "text" : "password"}
+                            placeholder="Authentication token (optional)"
+                            value={env.natsToken}
+                            onChange={(e) => updateEnvConfig(index, "natsToken", e.target.value)}
+                            className="mt-2 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(`${index}-natsToken`)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey mt-1"
+                          >
+                            {passwordVisibility[`${index}-natsToken`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 p-4 border rounded-lg">
+                        <input
+                          type="checkbox"
+                          id={`natsTls-${index}`}
+                          checked={env.natsTls}
+                          onChange={(e) => updateEnvConfig(index, "natsTls", e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <div>
+                          <Label htmlFor={`natsTls-${index}`} className="font-medium">Enable TLS</Label>
+                          <p className="text-xs text-grey-600">Enable TLS for secure communication</p>
+                        </div>
                       </div>
                     </div>
                   )}

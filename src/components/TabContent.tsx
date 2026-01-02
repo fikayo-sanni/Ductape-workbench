@@ -76,7 +76,7 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
       const componentType = tab.data.componentType;
 
       // App-level components (from app versions)
-      if (['auth', 'environment', 'webhook', 'healthcheck'].includes(componentType)) {
+      if (['auth', 'environment', 'webhook', 'healthcheck', 'new-webhook'].includes(componentType)) {
         switch (componentType) {
           case 'auth':
             // Check if this is a new auth creation tab
@@ -86,6 +86,9 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
             return <AuthTabContent auth={tab.data} />;
           case 'environment':
             return <EnvironmentTabContent environment={tab.data} />;
+          case 'new-webhook':
+            // Direct new webhook creation tab
+            return <NewWebhookTabContent tabId={tab.id} data={tab.data} />;
           case 'webhook':
             // Check if this is a new webhook creation tab
             if (tab.isDirty && tab.data?.isNew) {
@@ -181,7 +184,15 @@ export default function TabContent() {
 
         // Check if this is an action request (from app actions)
         if (activeTab.data?.componentType === 'action') {
-          return <ActionViewTabContent key={activeTab.id} action={activeTab.data} />;
+          return (
+            <ActionViewTabContent
+              key={activeTab.id}
+              action={activeTab.data}
+              appTag={activeTab.data?.appTag}
+              productTag={activeTab.data?.productTag}
+              envSlug={activeTab.data?.envSlug}
+            />
+          );
         }
 
         // Regular request (manual API testing)

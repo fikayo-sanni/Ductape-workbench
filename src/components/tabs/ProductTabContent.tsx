@@ -37,6 +37,8 @@ import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +60,7 @@ import InlineSessionForm from '@/components/forms/InlineSessionForm';
 import InlineCacheForm from '@/components/forms/InlineCacheForm';
 import InlineMessageBrokerForm from '@/components/forms/InlineMessageBrokerForm';
 import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
+import CodeSidebar from '@/components/CodeSidebar';
 
 interface ProductTabContentProps {
   product?: IProduct;
@@ -100,8 +103,8 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
   { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
+  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
   // Disabled categories (coming soon)
-  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job', disabled: true },
   { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
   { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
   { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
@@ -136,6 +139,8 @@ export default function ProductTabContent({ product: initialProduct, productId }
   const [showDatabaseTypeDialog, setShowDatabaseTypeDialog] = useState(false);
   const [showIntelligenceTypeDialog, setShowIntelligenceTypeDialog] = useState(false);
   const [showResilienceTypeDialog, setShowResilienceTypeDialog] = useState(false);
+  const [showJobsCodeDialog, setShowJobsCodeDialog] = useState(false);
+  const [selectedJobType, setSelectedJobType] = useState<string>('app-action');
 
   // Inline component creation state (null = not creating, string = type being created)
   const [inlineCreateMode, setInlineCreateMode] = useState<string | null>(null);
@@ -226,7 +231,14 @@ export default function ProductTabContent({ product: initialProduct, productId }
         type: 'app',
         title: fullApp.app_name,
         itemId: fullApp._id,
-        data: fullApp,
+        data: {
+          ...fullApp,
+          // Pass product context so actions can be run via ductape.actions.run
+          productTag: product?.tag,
+          productId: product?._id,
+          productName: product?.name,
+          productEnvs: product?.envs || [],
+        },
       });
       setLoadingAppTag(null);
     },
@@ -427,6 +439,11 @@ export default function ProductTabContent({ product: initialProduct, productId }
     }
     if (type === 'notification') {
       setInlineCreateMode('notifier');
+      return;
+    }
+    // Jobs are dispatched via code, show code examples dialog
+    if (type === 'job') {
+      setShowJobsCodeDialog(true);
       return;
     }
 
@@ -843,6 +860,66 @@ export default function ProductTabContent({ product: initialProduct, productId }
       ? getDatabaseTypeBadge()
       : null;
 
+    // Get message broker type badge
+    const getMessageBrokerTypeBadge = () => {
+      if (category.id !== 'messageBrokers') return null;
+
+      // Check envs array for broker type
+      const envs = item.envs || [];
+      const brokerType = envs.length > 0 ? envs[0].type : null;
+
+      if (!brokerType) return null;
+
+      const type = brokerType.toLowerCase();
+      if (type.includes('rabbitmq') || type === 'rabbitmq') {
+        return { label: 'RabbitMQ', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+      }
+      if (type.includes('kafka')) {
+        return { label: 'Kafka', bgColor: 'bg-slate-100', textColor: 'text-slate-700' };
+      }
+      if (type.includes('redis')) {
+        return { label: 'Redis', bgColor: 'bg-rose-100', textColor: 'text-rose-700' };
+      }
+      if (type.includes('sqs') || type.includes('aws_sqs')) {
+        return { label: 'AWS SQS', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+      }
+      if (type.includes('pubsub') || type.includes('google_pubsub')) {
+        return { label: 'Google Pub/Sub', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+      }
+      if (type.includes('nats')) {
+        return { label: 'NATS', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+      }
+      // Default for other types
+      return { label: brokerType, bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' };
+    };
+
+    // Get storage type badge
+    const getStorageTypeBadge = () => {
+      if (category.id !== 'storage') return null;
+
+      // Check envs array for storage type
+      const envs = item.envs || [];
+      const storageType = envs.length > 0 ? envs[0].type : null;
+
+      if (!storageType) return null;
+
+      const type = storageType.toLowerCase();
+      if (type.includes('s3') || type.includes('aws') || type === 'aws') {
+        return { label: 'AWS S3', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+      }
+      if (type.includes('gcp') || type.includes('google') || type.includes('gcs')) {
+        return { label: 'Google Cloud', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+      }
+      if (type.includes('azure') || type.includes('blob')) {
+        return { label: 'Azure Blob', bgColor: 'bg-sky-100', textColor: 'text-sky-700' };
+      }
+      // Default for other types
+      return { label: storageType, bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+    };
+
+    const messageBrokerTypeBadge = getMessageBrokerTypeBadge();
+    const storageTypeBadge = getStorageTypeBadge();
+
     // Get category-specific detail text
     const getDetailText = () => {
       if (category.id === 'caches' && item.expiry) {
@@ -936,6 +1013,28 @@ export default function ProductTabContent({ product: initialProduct, productId }
                 databaseTypeBadge.textColor
               )}>
                 {databaseTypeBadge.label}
+              </span>
+            )}
+
+            {/* Message Broker Type Badge */}
+            {messageBrokerTypeBadge && (
+              <span className={cn(
+                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
+                messageBrokerTypeBadge.bgColor,
+                messageBrokerTypeBadge.textColor
+              )}>
+                {messageBrokerTypeBadge.label}
+              </span>
+            )}
+
+            {/* Storage Type Badge */}
+            {storageTypeBadge && (
+              <span className={cn(
+                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
+                storageTypeBadge.bgColor,
+                storageTypeBadge.textColor
+              )}>
+                {storageTypeBadge.label}
               </span>
             )}
 
@@ -1876,6 +1975,332 @@ export default function ProductTabContent({ product: initialProduct, productId }
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Jobs Code Sidebar */}
+      {showJobsCodeDialog && (
+        <CodeSidebar
+          title="Dispatching Jobs"
+          subtitle="Jobs in Ductape are background tasks that run asynchronously. They are dispatched from your code using the SDK and can be scheduled, delayed, or run immediately."
+          tag={product?.tag}
+          onClose={() => setShowJobsCodeDialog(false)}
+          environments={product?.envs || []}
+          additionalControls={
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+                  Job Type
+                </Label>
+                <Select value={selectedJobType} onValueChange={setSelectedJobType}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="app-action">App Action</SelectItem>
+                    <SelectItem value="database">Database</SelectItem>
+                    <SelectItem value="storage">Storage</SelectItem>
+                    <SelectItem value="messaging">Messaging</SelectItem>
+                    <SelectItem value="notification">Notification</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <a
+                href="https://docs.ductape.app/jobs/scheduling-jobs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View full documentation
+              </a>
+            </div>
+          }
+          generateCodeSections={(language, env) => {
+            const productTag = product?.tag || 'your-product';
+            const envSlug = env || 'prd';
+
+            // Generate code sections based on selected job type
+            // API based on https://docs.ductape.app/jobs/scheduling-jobs
+            const jobTypeSections: Record<string, Array<{ title: string; code: string }>> = {
+              'app-action': [
+                {
+                  title: 'Dispatch App Action Job',
+                  code: `import ductape from '@ductape/sdk';
+
+// Dispatch a job that calls an app action
+const job = await ductape.actions.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  app: 'email-service',
+  event: 'send_welcome_email',
+  input: {
+    userId: 'user_123',
+    email: 'john@example.com'
+  },
+  retries: 3
+});`,
+                },
+                {
+                  title: 'Delayed App Action',
+                  code: `// Schedule an app action to run after 1 hour
+const job = await ductape.actions.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  app: 'payment-service',
+  event: 'process_refund',
+  input: { orderId: 'order_456', amount: 99.99 },
+  retries: 3,
+  schedule: {
+    start_at: Date.now() + 3600000 // 1 hour from now
+  }
+});`,
+                },
+                {
+                  title: 'Recurring App Action (Cron)',
+                  code: `// Schedule a recurring app action job
+const job = await ductape.actions.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  app: 'analytics-service',
+  event: 'sync_data',
+  input: { fullSync: false },
+  retries: 3,
+  schedule: {
+    cron: '0 */6 * * *', // Every 6 hours
+    tz: 'America/New_York'
+  }
+});`,
+                },
+              ],
+              'database': [
+                {
+                  title: 'Dispatch Database Job',
+                  code: `import ductape from '@ductape/sdk';
+
+// Dispatch a job that performs database operations
+const job = await ductape.database.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  database: 'main-db',
+  operation: 'insert',
+  input: {
+    table: 'audit_logs',
+    data: { action: 'user_login', userId: 'user_123' }
+  },
+  retries: 3
+});`,
+                },
+                {
+                  title: 'Scheduled Database Sync',
+                  code: `// Schedule a recurring database sync job
+const job = await ductape.database.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  database: 'inventory-db',
+  operation: 'sync',
+  input: { table: 'products', source: 'external_api' },
+  retries: 3,
+  schedule: {
+    every: 86400000, // Every 24 hours
+    limit: 30 // Run max 30 times
+  }
+});`,
+                },
+                {
+                  title: 'Database Cleanup Job',
+                  code: `// Schedule a database cleanup job
+const job = await ductape.database.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  database: 'sessions-db',
+  operation: 'delete',
+  input: {
+    table: 'expired_sessions',
+    filter: { expiresAt: { $lt: new Date() } }
+  },
+  retries: 3,
+  schedule: {
+    cron: '0 3 * * *', // Every day at 3 AM
+    tz: 'UTC'
+  }
+});`,
+                },
+              ],
+              'storage': [
+                {
+                  title: 'Dispatch Storage Job',
+                  code: `import ductape from '@ductape/sdk';
+
+// Dispatch a job that processes files in storage
+const job = await ductape.storage.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  storage: 'media-bucket',
+  operation: 'process',
+  input: {
+    sourcePath: 'uploads/raw/',
+    destPath: 'uploads/processed/',
+    transform: { resize: { width: 800, height: 600 } }
+  },
+  retries: 3
+});`,
+                },
+                {
+                  title: 'Delayed Storage Operation',
+                  code: `// Schedule a storage operation after a delay
+const job = await ductape.storage.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  storage: 'backup-bucket',
+  operation: 'copy',
+  input: {
+    source: 'data/reports/',
+    destination: 'archives/2024/'
+  },
+  retries: 3,
+  schedule: {
+    start_at: Date.now() + 7200000 // 2 hours from now
+  }
+});`,
+                },
+                {
+                  title: 'Scheduled Storage Cleanup',
+                  code: `// Schedule a recurring storage cleanup job
+const job = await ductape.storage.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  storage: 'temp-bucket',
+  operation: 'delete',
+  input: {
+    path: 'temp/',
+    olderThan: '7d'
+  },
+  retries: 3,
+  schedule: {
+    cron: '0 4 * * 0', // Every Sunday at 4 AM
+    tz: 'UTC'
+  }
+});`,
+                },
+              ],
+              'messaging': [
+                {
+                  title: 'Dispatch Message Broker Job',
+                  code: `import ductape from '@ductape/sdk';
+
+// Dispatch a job that publishes to a message broker
+const job = await ductape.events.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  broker: 'order-events',
+  event: 'order.created',
+  input: {
+    orderId: 'order-123',
+    customerId: 'cust-456',
+    items: [{ sku: 'ITEM-001', qty: 2 }]
+  },
+  retries: 3
+});`,
+                },
+                {
+                  title: 'Delayed Message Publishing',
+                  code: `// Schedule a message to be published after a delay
+const job = await ductape.events.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  broker: 'notifications',
+  event: 'reminder.send',
+  input: {
+    userId: 'user_123',
+    message: 'Your trial expires tomorrow'
+  },
+  retries: 3,
+  schedule: {
+    start_at: Date.now() + 86400000 // 24 hours from now
+  }
+});`,
+                },
+                {
+                  title: 'Recurring Event Publishing',
+                  code: `// Schedule recurring event publishing
+const job = await ductape.events.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  broker: 'metrics',
+  event: 'heartbeat',
+  input: { service: '${productTag}', status: 'healthy' },
+  retries: 3,
+  schedule: {
+    every: 60000, // Every minute
+    endDate: Date.now() + 86400000 // Stop after 24 hours
+  }
+});`,
+                },
+              ],
+              'notification': [
+                {
+                  title: 'Dispatch Notification Job',
+                  code: `import ductape from '@ductape/sdk';
+
+// Dispatch a job that sends notifications
+const job = await ductape.notifications.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  notifier: 'email-service',
+  event: 'welcome_email',
+  input: {
+    to: 'user@example.com',
+    data: {
+      userName: 'John Doe',
+      activationLink: 'https://app.example.com/activate'
+    }
+  },
+  retries: 3
+});`,
+                },
+                {
+                  title: 'Delayed Notification',
+                  code: `// Schedule a notification after a delay
+const job = await ductape.notifications.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  notifier: 'sms-service',
+  event: 'appointment_reminder',
+  input: {
+    to: '+1234567890',
+    data: { appointmentTime: '2:00 PM' }
+  },
+  retries: 3,
+  schedule: {
+    start_at: Date.now() + 3600000 // 1 hour from now
+  }
+});`,
+                },
+                {
+                  title: 'Scheduled Recurring Notification',
+                  code: `// Schedule a recurring notification job
+const job = await ductape.notifications.dispatch({
+  env: '${envSlug}',
+  product: '${productTag}',
+  notifier: 'slack-alerts',
+  event: 'weekly_summary',
+  input: {
+    channel: '#team-updates',
+    data: { reportType: 'weekly' }
+  },
+  retries: 3,
+  schedule: {
+    cron: '0 9 * * 1', // Every Monday at 9 AM
+    tz: 'America/New_York'
+  }
+});`,
+                },
+              ],
+            };
+
+            return jobTypeSections[selectedJobType] || jobTypeSections['app-action'];
+          }}
+        />
+      )}
     </div>
   );
 }

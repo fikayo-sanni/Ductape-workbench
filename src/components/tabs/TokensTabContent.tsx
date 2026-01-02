@@ -12,6 +12,8 @@ import {
   Loader2,
   RefreshCw,
   Shield,
+  MoreVertical,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
@@ -238,7 +248,7 @@ export default function TokensTabContent() {
 
     setLoading(true);
     try {
-      const secretsList = await (ductape as any).secrets.fetchAll();
+      const secretsList = await (ductape as any).secrets.list();
       // Map secrets to token format
       const tokensData: Token[] = (secretsList || []).map((secret: any) => ({
         name: secret.key,
@@ -876,161 +886,181 @@ const ductape = new Ductape({
                 <span className="text-sm">Loading tokens...</span>
               </div>
             ) : tokens.length === 0 ? (
-              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-16 px-4">
-                <Key className="h-10 w-10 text-grey-300 mx-auto mb-3" />
-                <p className="text-base text-grey-600 font-medium mb-1">No tokens yet</p>
-                <p className="text-sm text-grey-500 mb-4">Create your first API token to get started</p>
-                <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Token
+              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-12 px-4">
+                <Key className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <p className="text-sm text-grey-600">No tokens yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  Create Your First Token
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {tokens.map((token) => (
-                  <div
-                    key={token.name}
-                    className="p-4 bg-white rounded-lg border border-grey-400 hover:border-primary transition-colors shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-sm font-semibold text-grey">
-                            {token.name}
-                          </h3>
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded text-xs font-medium",
-                              getStatusColor(token.is_active)
-                            )}
-                          >
-                            {getStatusText(token.is_active)}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                            {token.token_type}
-                          </span>
-                        </div>
+              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-grey mb-4">Secrets</h2>
+                <div className="space-y-3">
+                  {tokens.map((token) => (
+                    <div
+                      key={token.name}
+                      className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:shadow-sm transition-all"
+                    >
+                      {/* Header Row - Icon, Name, Status, Actions */}
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Icon */}
+                          <div className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                            token.is_active ? "bg-primary/10" : "bg-grey-100"
+                          )}>
+                            <Key className={cn(
+                              "h-5 w-5",
+                              token.is_active ? "text-primary" : "text-grey-400"
+                            )} />
+                          </div>
 
-                        {token.description && (
-                          <p className="text-xs text-grey-600 mb-2">
-                            {token.description}
-                          </p>
-                        )}
-
-                        {/* Scopes as badges */}
-                        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                          <span className="text-xs text-grey-500">Scope:</span>
-                          {token.scope.length > 0 ? (
-                            token.scope.map((scope) => (
-                              <span
-                                key={scope}
-                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700"
+                          {/* Name and Status */}
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-semibold text-grey" title={token.name}>
+                              {token.name}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge
+                                className={cn(
+                                  'uppercase font-semibold text-[10px] px-1.5 py-0',
+                                  getStatusColor(token.is_active)
+                                )}
                               >
-                                {scope}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-grey-400">None</span>
-                          )}
-                          {token.envs.length > 0 && (
-                            <>
-                              <span className="text-grey-300 mx-1">|</span>
-                              <span className="text-xs text-grey-500">Envs:</span>
-                              {token.envs.map((env) => (
-                                <span
-                                  key={env}
-                                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700"
-                                >
-                                  {env}
+                                {getStatusText(token.is_active)}
+                              </Badge>
+                              {token.expires_in && (
+                                <span className={cn(
+                                  "flex items-center gap-1 text-[10px]",
+                                  token.expires_in * 1000 < Date.now() ? "text-red-500" : "text-grey-500"
+                                )}>
+                                  <Clock className="h-3 w-3" />
+                                  {(() => {
+                                    const expiryMs = token.expires_in * 1000;
+                                    const now = Date.now();
+                                    if (expiryMs < now) return 'Expired';
+                                    const diffMs = expiryMs - now;
+                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                    if (diffDays > 0) return `${diffDays}d left`;
+                                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                    if (diffHours > 0) return `${diffHours}h left`;
+                                    return `${Math.floor(diffMs / (1000 * 60))}m left`;
+                                  })()}
                                 </span>
-                              ))}
-                            </>
-                          )}
+                              )}
+                              <span className="text-[10px] text-grey-400">
+                                • Created {new Date(token.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-4 text-xs text-grey-600 flex-wrap">
-                          <span>
-                            Created:{" "}
-                            {new Date(token.created_at).toLocaleDateString()}
-                          </span>
-                          {token.expires_in && (
-                            <>
-                              <span>•</span>
-                              <span className={token.expires_in * 1000 < Date.now() ? "text-red-500" : ""}>
-                                {(() => {
-                                  const expiryMs = token.expires_in * 1000;
-                                  const now = Date.now();
-                                  if (expiryMs < now) {
-                                    return 'Expired';
-                                  }
-                                  const diffMs = expiryMs - now;
-                                  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                                  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                                  if (diffDays > 0) {
-                                    return `Expires in: ${diffDays} day${diffDays === 1 ? '' : 's'}`;
-                                  } else if (diffHours > 0) {
-                                    return `Expires in: ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
-                                  } else {
-                                    const diffMins = Math.floor(diffMs / (1000 * 60));
-                                    return `Expires in: ${diffMins} minute${diffMins === 1 ? '' : 's'}`;
-                                  }
-                                })()}
-                              </span>
-                            </>
-                          )}
-                          {token.last_used && (
-                            <>
-                              <span>•</span>
-                              <span>
-                                Last used:{" "}
-                                {new Date(token.last_used).toLocaleDateString()}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCopyTokenKey(token.name)}
-                          className="gap-1.5"
-                        >
-                          {copiedTokenName === token.name ? (
-                            <>
-                              <Check className="h-4 w-4 text-green" />
-                              <span className="text-green">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4" />
-                              Copy Key
-                            </>
-                          )}
-                        </Button>
-                        {token.is_active && (
+                        {/* Copy and Actions */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openConfirmDialog(token.name, 'revoke')}
-                            className="text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
+                            onClick={() => handleCopyTokenKey(token.name)}
+                            className="h-8 gap-1.5 text-xs"
                           >
-                            Revoke
+                            {copiedTokenName === token.name ? (
+                              <Check className="h-3.5 w-3.5 text-green" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                            {copiedTokenName === token.name ? "Copied" : "Copy"}
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openConfirmDialog(token.name, 'delete')}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleCopyTokenKey(token.name)}
+                                className="cursor-pointer text-xs"
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy $Secret Reference
+                              </DropdownMenuItem>
+                              {token.is_active && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => openConfirmDialog(token.name, 'revoke')}
+                                    className="text-orange-500 cursor-pointer focus:text-orange-600 focus:bg-orange-50 text-xs"
+                                  >
+                                    <AlertCircle className="h-4 w-4 mr-2" />
+                                    Revoke Token
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => openConfirmDialog(token.name, 'delete')}
+                                className="text-red-500 cursor-pointer focus:text-red-500 focus:bg-red-50 text-xs font-semibold"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Token
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
+
+                      {/* Description */}
+                      {token.description && (
+                        <p className="text-xs text-grey-600 mb-3 ml-[52px]">{token.description}</p>
+                      )}
+
+                      {/* Scopes and Envs - inline */}
+                      {(token.scope.length > 0 || token.envs.length > 0) && (
+                        <div className="flex items-center gap-4 ml-[52px] flex-wrap">
+                          {/* Scope badges */}
+                          {token.scope.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-grey-500 uppercase font-medium">Scope:</span>
+                              {token.scope.slice(0, 3).map((scope) => (
+                                <Badge
+                                  key={scope}
+                                  variant="secondary"
+                                  className="bg-grey-100 text-grey-600 text-[10px] font-normal px-1.5 py-0"
+                                >
+                                  {scope}
+                                </Badge>
+                              ))}
+                              {token.scope.length > 3 && (
+                                <span className="text-[10px] text-grey-400">+{token.scope.length - 3}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Env badges */}
+                          {token.envs.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-grey-500 uppercase font-medium">Envs:</span>
+                              {token.envs.map((env) => (
+                                <Badge
+                                  key={env}
+                                  className="bg-primary/10 text-primary text-[10px] font-normal px-1.5 py-0"
+                                >
+                                  {env}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1188,7 +1218,7 @@ const ductape = new Ductape({
                   <SelectContent>
                     {products.map((product) => (
                       <SelectItem key={product._id} value={product._id || ""}>
-                        {product.product_name || product.tag}
+                        {product.name || product.tag}
                       </SelectItem>
                     ))}
                   </SelectContent>

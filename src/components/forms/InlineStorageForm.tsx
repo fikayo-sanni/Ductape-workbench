@@ -68,6 +68,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
   const [formData, setFormData] = useState({
     name: '',
     tag: '',
+    description: '',
   });
 
   const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
@@ -144,7 +145,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
 
   // Create storage mutation
   const { mutateAsync: createStorage, isPending: isCreating } = useMutation({
-    mutationFn: async (values: { name: string; tag: string; envs: Array<{ slug: string; type: string; config: any }> }) => {
+    mutationFn: async (values: { name: string; tag: string; description?: string; envs: Array<{ slug: string; type: string; config: any }> }) => {
       if (!ductape) throw new Error('Product not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
 
@@ -152,6 +153,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
       const storage = await ductape.storage.create({
         name: values.name,
         tag: values.tag,
+        description: values.description || undefined,
         envs: values.envs.map(env => ({
           slug: env.slug,
           type: env.type.toLowerCase() as StorageProviders,
@@ -214,6 +216,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
       await createStorage({
         name: formData.name,
         tag: formData.tag,
+        description: formData.description || undefined,
         envs: envConfigs
           .filter(env => env.type)
           .map(env => ({
@@ -229,7 +232,19 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
 
   const handleNameChange = (value: string) => {
     const sanitizedTag = value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    setFormData({ ...formData, name: value, tag: sanitizedTag });
+    // Auto-fill description if it's empty or still the auto-generated one
+    const shouldUpdateDescription =
+      !formData.description ||
+      formData.description.startsWith('Storage for ');
+
+    setFormData({
+      ...formData,
+      name: value,
+      tag: sanitizedTag,
+      description: shouldUpdateDescription && value.trim()
+        ? `Storage for ${value.trim()}`
+        : formData.description,
+    });
   };
 
   const handleContinue = () => {
@@ -305,6 +320,20 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
               </div>
               <p className="text-xs text-grey-600 mt-1">
                 Unique identifier (auto-generated from name)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="e.g., Primary storage for production assets and user uploads"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-2 min-h-[80px]"
+              />
+              <p className="text-xs text-grey-600 mt-1">
+                Optional description for this storage configuration
               </p>
             </div>
 

@@ -225,12 +225,31 @@ export class SDKProxyService {
 
     webhooks: {
       create: <T = any>(appTag: string, data: any) =>
-        this.execute<T>('app', 'webhooks.create', appTag, data),
-      list: <T = any>(appTag: string) => this.execute<T>('app', 'webhooks.list', appTag),
+        this.execute<T>('webhooks', 'create', appTag, data),
+      /**
+       * Creates a webhook with events in a single orchestrated call
+       * The proxy will create the webhook first, then create all events
+       * @param appTag - The app tag
+       * @param data - Webhook data including an `events` array
+       */
+      createWithEvents: <T = any>(appTag: string, data: any) =>
+        this.execute<T>('webhooks', 'createWithEvents', appTag, data),
+      list: <T = any>(appTag: string) => this.execute<T>('webhooks', 'list', appTag),
       fetch: <T = any>(appTag: string, tag: string) =>
-        this.execute<T>('app', 'webhooks.fetch', appTag, tag),
+        this.execute<T>('webhooks', 'fetch', appTag, tag),
       update: <T = any>(appTag: string, tag: string, data: any) =>
-        this.execute<T>('app', 'webhooks.update', appTag, tag, data),
+        this.execute<T>('webhooks', 'update', appTag, tag, data),
+
+      events: {
+        create: <T = any>(appTag: string, data: any) =>
+          this.execute<T>('webhooks', 'events.create', appTag, data),
+        list: <T = any>(appTag: string, webhookTag: string) =>
+          this.execute<T>('webhooks', 'events.list', appTag, webhookTag),
+        fetch: <T = any>(appTag: string, eventTag: string) =>
+          this.execute<T>('webhooks', 'events.fetch', appTag, eventTag),
+        update: <T = any>(appTag: string, eventTag: string, data: any) =>
+          this.execute<T>('webhooks', 'events.update', appTag, eventTag, data),
+      },
     },
   };
 
@@ -472,28 +491,67 @@ export class SDKProxyService {
 
   // ==================== VECTOR MODULE ====================
   vector = {
-    create: <T = any>(product: string, data: any) =>
-      this.execute<T>('vector', 'create', product, data),
-    list: <T = any>(product: string) => this.execute<T>('vector', 'list', product),
-    fetch: <T = any>(product: string, tag: string) =>
-      this.execute<T>('vector', 'fetch', product, tag),
-    update: <T = any>(product: string, tag: string, data: any) =>
-      this.execute<T>('vector', 'update', product, tag, data),
-    delete: <T = any>(product: string, tag: string) =>
-      this.execute<T>('vector', 'delete', product, tag),
+    // CRUD operations
+    create: <T = any>(options: any) => this.execute<T>('vector', 'create', options),
+    list: <T = any>(options: { product: string }) => this.execute<T>('vector', 'list', options),
+    fetch: <T = any>(options: { product: string; tag: string }) =>
+      this.execute<T>('vector', 'fetch', options),
+    update: <T = any>(options: any) => this.execute<T>('vector', 'update', options),
+    delete: <T = any>(options: { product: string; tag: string }) =>
+      this.execute<T>('vector', 'delete', options),
 
-    // Collection operations
-    createCollection: <T = any>(data: any) =>
-      this.execute<T>('vector', 'createCollection', data),
-    listCollections: <T = any>(data: any) =>
-      this.execute<T>('vector', 'listCollections', data),
-    deleteCollection: <T = any>(data: any) =>
-      this.execute<T>('vector', 'deleteCollection', data),
+    // Connection management
+    connect: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'connect', options),
+    disconnect: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'disconnect', options),
+    disconnectAll: <T = any>() => this.execute<T>('vector', 'disconnectAll'),
+    testConnection: (options: { product: string; env: string; vector: string }) =>
+      this.execute<boolean>('vector', 'testConnection', options),
 
-    // Embedding operations
-    upsert: <T = any>(data: any) => this.execute<T>('vector', 'upsert', data),
-    query: <T = any>(data: any) => this.execute<T>('vector', 'query', data),
-    deleteVectors: <T = any>(data: any) => this.execute<T>('vector', 'deleteVectors', data),
+    // Vector operations
+    query: <T = any>(options: any) => this.execute<T>('vector', 'query', options),
+    upsert: <T = any>(options: any) => this.execute<T>('vector', 'upsert', options),
+    upsertOne: <T = any>(options: any) => this.execute<T>('vector', 'upsertOne', options),
+    fetchVectors: <T = any>(options: any) => this.execute<T>('vector', 'fetchVectors', options),
+    fetchOne: <T = any>(options: any) => this.execute<T>('vector', 'fetchOne', options),
+    deleteVectors: <T = any>(options: any) => this.execute<T>('vector', 'deleteVectors', options),
+    deleteByIds: <T = any>(options: any) => this.execute<T>('vector', 'deleteByIds', options),
+    deleteAll: <T = any>(options: any) => this.execute<T>('vector', 'deleteAll', options),
+    findSimilar: <T = any>(options: any) => this.execute<T>('vector', 'findSimilar', options),
+    updateVector: <T = any>(options: any) => this.execute<T>('vector', 'updateVector', options),
+    updateMetadata: <T = any>(options: any) => this.execute<T>('vector', 'updateMetadata', options),
+
+    // List operations
+    listVectors: <T = any>(options: any) => this.execute<T>('vector', 'listVectors', options),
+    listAllVectors: <T = any>(options: any) => this.execute<T>('vector', 'listAllVectors', options),
+
+    // Namespace operations
+    listNamespaces: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'listNamespaces', options),
+    deleteNamespace: <T = any>(options: any) =>
+      this.execute<T>('vector', 'deleteNamespace', options),
+
+    // Index operations
+    describeIndex: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'describeIndex', options),
+    getStats: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'getStats', options),
+    createIndex: <T = any>(options: any) => this.execute<T>('vector', 'createIndex', options),
+    deleteIndex: <T = any>(options: any) => this.execute<T>('vector', 'deleteIndex', options),
+    listIndexes: <T = any>(options: { product: string; env: string; vector: string }) =>
+      this.execute<T>('vector', 'listIndexes', options),
+
+    // Utility methods
+    count: (options: { product: string; env: string; vector: string; namespace?: string }) =>
+      this.execute<number>('vector', 'count', options),
+    exists: (options: { product: string; env: string; vector: string; id: string; namespace?: string }) =>
+      this.execute<boolean>('vector', 'exists', options),
+    supportsFeature: (options: { product: string; env: string; vector: string; feature: string }) =>
+      this.execute<boolean>('vector', 'supportsFeature', options),
+
+    // Service access
+    getService: <T = any>() => this.execute<T>('vector', 'getService'),
   };
 
   // ==================== LOGS MODULE ====================
@@ -530,12 +588,14 @@ export class SDKProxyService {
   // ==================== SECRETS MODULE ====================
   secrets = {
     create: <T = any>(data: any) => this.execute<T>('secrets', 'create', data),
-    fetchAll: <T = any>() => this.execute<T>('secrets', 'fetchAll'),
+    list: <T = any>() => this.execute<T>('secrets', 'list'),
     fetch: <T = any>(key: string) => this.execute<T>('secrets', 'fetch', key),
     update: <T = any>(key: string, data: any) => this.execute<T>('secrets', 'update', key, data),
     delete: <T = any>(key: string) => this.execute<T>('secrets', 'delete', key),
     exists: (key: string) => this.execute<boolean>('secrets', 'exists', key),
     revoke: <T = any>(key: string) => this.execute<T>('secrets', 'revoke', key),
+    resolve: <T = any>(value: any, options?: any) => this.execute<T>('secrets', 'resolve', value, options),
+    validate: <T = any>(value: any) => this.execute<T>('secrets', 'validate', value),
   };
 
   // ==================== HEALTH MODULE ====================

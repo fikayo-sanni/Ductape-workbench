@@ -25,7 +25,7 @@ export interface GraphProxyConfig {
  * Response from the graph proxy endpoint
  */
 interface GraphProxyResponse<T = any> {
-  success: boolean;
+  status: boolean;
   data?: {
     data: T;
     execution_time_ms: number;
@@ -74,7 +74,7 @@ export class GraphProxyService {
       }
     );
 
-    if (!response.data.success) {
+    if (!response.data.status) {
       throw new Error(response.data.message || 'Graph operation failed');
     }
 
@@ -141,34 +141,36 @@ export class GraphProxyService {
     query: <T = any>(options: any) => this.execute<T>('query', options),
 
     // ==================== SCHEMA OPERATIONS ====================
+    // Note: In the SDK, these methods are directly on ductape.graph, not under schema
     schema: {
       createNodeIndex: <T = any>(options: any) =>
-        this.execute<T>('schema.createNodeIndex', options),
+        this.execute<T>('createNodeIndex', options),
       createNodeConstraint: <T = any>(options: any) =>
-        this.execute<T>('schema.createNodeConstraint', options),
+        this.execute<T>('createNodeConstraint', options),
       createRelationshipIndex: <T = any>(options: any) =>
-        this.execute<T>('schema.createRelationshipIndex', options),
-      listIndexes: <T = any>(options?: any) => this.execute<T>('schema.listIndexes', options),
+        this.execute<T>('createRelationshipIndex', options),
+      listIndexes: <T = any>(options?: any) => this.execute<T>('listIndexes', options),
       listConstraints: <T = any>(options?: any) =>
-        this.execute<T>('schema.listConstraints', options),
+        this.execute<T>('listConstraints', options),
       dropIndex: <T = any>(indexName: string, options?: any) =>
-        this.execute<T>('schema.dropIndex', indexName, options),
+        this.execute<T>('dropIndex', indexName, options),
       dropConstraint: <T = any>(constraintName: string, options?: any) =>
-        this.execute<T>('schema.dropConstraint', constraintName, options),
-      listLabels: <T = any>(options?: any) => this.execute<T>('schema.listLabels', options),
+        this.execute<T>('dropConstraint', constraintName, options),
+      listLabels: <T = any>(options?: any) => this.execute<T>('listLabels', options),
       listRelationshipTypes: <T = any>(options?: any) =>
-        this.execute<T>('schema.listRelationshipTypes', options),
+        this.execute<T>('listRelationshipTypes', options),
     },
 
     // ==================== ACTION OPERATIONS ====================
+    // Note: In the SDK, these methods are createAction, listActions, etc. - not nested under action
     action: {
-      create: <T = any>(options: any) => this.execute<T>('action.create', options),
-      list: <T = any>(graphTag: string) => this.execute<T>('action.list', graphTag),
-      fetch: <T = any>(actionTag: string) => this.execute<T>('action.fetch', actionTag),
-      update: <T = any>(actionTag: string, data: any) =>
-        this.execute<T>('action.update', actionTag, data),
-      delete: <T = any>(actionTag: string) => this.execute<T>('action.delete', actionTag),
-      dispatch: <T = any>(data: any) => this.execute<T>('action.dispatch', data),
+      create: <T = any>(options: any, productTag?: string) => this.execute<T>('createAction', options, productTag),
+      list: <T = any>(graphTag?: string, productTag?: string) => this.execute<T>('listActions', graphTag, productTag),
+      fetch: <T = any>(actionTag: string, graphTag?: string, productTag?: string) => this.execute<T>('getAction', actionTag, graphTag, productTag),
+      update: <T = any>(actionTag: string, updates: any, graphTag?: string, productTag?: string) =>
+        this.execute<T>('updateAction', actionTag, updates, graphTag, productTag),
+      delete: <T = any>(actionTag: string, graphTag?: string, productTag?: string) => this.execute<T>('deleteAction', actionTag, graphTag, productTag),
+      dispatch: <T = any>(data: any) => this.execute<T>('dispatchAction', data),
     },
 
     // ==================== TRANSACTION OPERATIONS ====================

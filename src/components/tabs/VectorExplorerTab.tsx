@@ -73,6 +73,9 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDuctapeVector } from '@/hooks/useDuctapeVector';
+import { useAuth } from '@/store/useAuth';
 
 interface VectorExplorerTabProps {
   vector: {
@@ -340,6 +343,40 @@ const getVectorTypeColor = (type?: string) => {
 
 export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const { setSidebarCollapsed } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Guard: Show error if critical vector data is missing (e.g., tab restored with incomplete data)
+  if (!vector?.name || !vector?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete vector data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the vector store from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Compute current environment slug with fallback
+  // Prioritize currentEnvSlug, fall back to first env in envs array, or 'default'
+  const currentEnvSlug = vector.env?.slug || vector.envs?.[0]?.slug || 'default';
+
+  // Initialize Vector Proxy Service
+  const vectorConfig = {
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+  };
+
+  const vectorService = useDuctapeVector(vectorConfig);
 
   // Collapse workbench sidebar when VectorExplorer opens
   useEffect(() => {
@@ -366,13 +403,9 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const [sidebarView, setSidebarView] = useState<SidebarView>(persistedState?.sidebarView || 'namespaces');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Selected items
-  const [selectedNamespace, setSelectedNamespace] = useState<VectorNamespace | null>(() => {
-    if (persistedState?.selectedNamespaceName) {
-      return DUMMY_NAMESPACES.find(n => n.name === persistedState.selectedNamespaceName) || null;
-    }
-    return null;
-  });
+  // Selected items - Note: We'll restore selected namespace after namespaces load
+  const [selectedNamespace, setSelectedNamespace] = useState<VectorNamespace | null>(null);
+  const persistedNamespaceName = persistedState?.selectedNamespaceName;
   const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(null);
   const [selectedAction, setSelectedAction] = useState<IVectorAction | null>(() => {
     if (persistedState?.selectedActionTag) {
@@ -428,6 +461,220 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const [isLoadingNamespace, setIsLoadingNamespace] = useState(false);
   const [isLoadingVector, setIsLoadingVector] = useState(false);
 
+  // ==================== VECTOR PROXY QUERIES ====================
+
+  // Test connection to vector database by fetching stats
+  const { data: connectionResult, isLoading: isConnecting, error: connectionError, isSuccess: isConnected } = useQuery({
+    queryKey: ['vector-connection', vector.productTag, vector.tag, currentEnvSlug],
+    queryFn: async () => {
+      if (!vectorService || !vector.productTag) {
+        throw new Error('Vector service not available');
+      }
+      // Use getStats to verify connection
+      const result = await vectorService.getStats({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.tag,
+      });
+      return result;
+    },
+    enabled: !!vectorService && !!vector.productTag,
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+  });
+
+  // Fetch namespaces from the vector database
+  const { data: sdkNamespaces, isLoading: isLoadingNamespaces, refetch: refetchNamespaces } = useQuery({
+    queryKey: ['vector-namespaces', vector.productTag, vector.tag, currentEnvSlug],
+    queryFn: async () => {
+      if (!vectorService || !vector.productTag) return null;
+      try {
+        const result = await vectorService.listNamespaces({
+          product: vector.productTag,
+          env: currentEnvSlug,
+          vector: vector.tag,
+        });
+        console.log('[Vector-Explorer] Namespaces result:', result);
+        return result?.namespaces || [];
+      } catch (error) {
+        console.error('Error fetching namespaces:', error);
+        return null;
+      }
+    },
+    enabled: !!vectorService && !!vector.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch index stats
+  const { data: sdkStats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
+    queryKey: ['vector-stats', vector.productTag, vector.tag, currentEnvSlug],
+    queryFn: async () => {
+      if (!vectorService || !vector.productTag) return null;
+      try {
+        const result = await vectorService.getStats({
+          product: vector.productTag,
+          env: currentEnvSlug,
+          vector: vector.tag,
+        });
+        console.log('[Vector-Explorer] Stats result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        return null;
+      }
+    },
+    enabled: !!vectorService && !!vector.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Fetch index info
+  const { data: sdkIndexInfo, refetch: refetchIndexInfo } = useQuery({
+    queryKey: ['vector-index-info', vector.productTag, vector.tag, currentEnvSlug],
+    queryFn: async () => {
+      if (!vectorService || !vector.productTag) return null;
+      try {
+        const result = await vectorService.describeIndex({
+          product: vector.productTag,
+          env: currentEnvSlug,
+          vector: vector.tag,
+        });
+        console.log('[Vector-Explorer] Index info:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching index info:', error);
+        return null;
+      }
+    },
+    enabled: !!vectorService && !!vector.productTag && isConnected,
+    staleTime: 60000,
+  });
+
+  // Transform SDK namespaces to local format
+  const namespaces: VectorNamespace[] = useMemo(() => {
+    if (sdkNamespaces && Array.isArray(sdkNamespaces)) {
+      return sdkNamespaces.map((ns: any) => ({
+        name: typeof ns === 'string' ? ns : ns.name,
+        vectorCount: ns.vectorCount || sdkStats?.namespaces?.[typeof ns === 'string' ? ns : ns.name]?.vectorCount || 0,
+        dimensions: ns.dimensions || sdkIndexInfo?.dimension || vector.dimensions,
+        metric: ns.metric || vector.metric,
+        status: 'ready' as const,
+      }));
+    }
+    // Return empty array when no SDK data available
+    return [];
+  }, [sdkNamespaces, sdkStats, sdkIndexInfo, vector.dimensions, vector.metric]);
+
+  // State for vectors fetched from SDK
+  const [namespaceVectors, setNamespaceVectors] = useState<VectorRecord[]>([]);
+  const [isLoadingVectors, setIsLoadingVectors] = useState(false);
+
+  // Restore selected namespace from persisted state after namespaces load
+  useEffect(() => {
+    if (persistedNamespaceName && namespaces.length > 0 && !selectedNamespace) {
+      const found = namespaces.find(n => n.name === persistedNamespaceName);
+      if (found) {
+        setSelectedNamespace(found);
+      }
+    }
+  }, [persistedNamespaceName, namespaces, selectedNamespace]);
+
+  // ==================== MUTATIONS ====================
+
+  // Execute a vector query
+  const executeQueryMutation = useMutation({
+    mutationFn: async (queryData: any) => {
+      if (!vectorService || !vector.productTag) throw new Error('Vector service not available');
+      const result = await vectorService.query({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.tag,
+        ...queryData,
+      });
+      return result;
+    },
+    onSuccess: (data) => {
+      setQueryResult(data);
+      setQueryError(null);
+      toast.success('Query executed successfully');
+    },
+    onError: (error: Error) => {
+      setQueryError(error.message);
+      setQueryResult(null);
+      toast.error(`Query failed: ${error.message}`);
+    },
+  });
+
+  // Upsert vectors mutation
+  const upsertMutation = useMutation({
+    mutationFn: async (upsertData: any) => {
+      if (!vectorService || !vector.productTag) throw new Error('Vector service not available');
+      return vectorService.upsert({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.tag,
+        ...upsertData,
+      });
+    },
+    onSuccess: () => {
+      refetchStats();
+      refetchNamespaces();
+      toast.success('Vectors upserted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Upsert failed: ${error.message}`);
+    },
+  });
+
+  // Delete vectors mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (deleteData: { ids: string[]; namespace?: string }) => {
+      if (!vectorService || !vector.productTag) throw new Error('Vector service not available');
+      return vectorService.deleteByIds({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.tag,
+        ...deleteData,
+      });
+    },
+    onSuccess: () => {
+      refetchStats();
+      toast.success('Vectors deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Delete failed: ${error.message}`);
+    },
+  });
+
+  // Fetch vectors mutation
+  const fetchVectorsMutation = useMutation({
+    mutationFn: async (fetchData: { ids: string[]; namespace?: string }) => {
+      if (!vectorService || !vector.productTag) throw new Error('Vector service not available');
+      return vectorService.fetchVectors({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.tag,
+        ...fetchData,
+      });
+    },
+  });
+
+  // Refresh all data
+  const handleRefreshData = async () => {
+    setIsSidebarRefreshing(true);
+    try {
+      await Promise.all([
+        refetchNamespaces(),
+        refetchStats(),
+        refetchIndexInfo(),
+      ]);
+      toast.success('Data refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh data');
+    } finally {
+      setIsSidebarRefreshing(false);
+    }
+  };
+
   // Persist state to localStorage
   useEffect(() => {
     const stateToSave = {
@@ -471,19 +718,20 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Filter namespaces based on search
   const filteredNamespaces = useMemo(() => {
-    return DUMMY_NAMESPACES.filter(ns =>
+    return namespaces.filter(ns =>
       ns.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [namespaces, searchQuery]);
 
   // Filter vectors based on selected namespace
   const filteredVectors = useMemo(() => {
     if (!selectedNamespace) return [];
-    return DUMMY_VECTORS.filter(v =>
+    // Use real vectors from SDK
+    return namespaceVectors.filter(v =>
       v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (v.metadata && JSON.stringify(v.metadata).toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [selectedNamespace, searchQuery]);
+  }, [selectedNamespace, searchQuery, namespaceVectors]);
 
   // Filter actions based on search
   const filteredActions = useMemo(() => {
@@ -493,14 +741,26 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     );
   }, [savedActions, searchQuery]);
 
-  // Calculate total stats
+  // Calculate total stats - use SDK stats if available, otherwise compute from namespaces
   const totalStats = useMemo(() => {
-    const total = DUMMY_NAMESPACES.reduce((acc, ns) => acc + ns.vectorCount, 0);
+    // Prefer SDK stats if available
+    if (sdkStats?.totalVectorCount !== undefined) {
+      return {
+        totalVectors: sdkStats.totalVectorCount,
+        avgDimensions: sdkStats.dimension || sdkIndexInfo?.dimension || vector.dimensions || 0,
+        namespaceCount: Object.keys(sdkStats.namespaces || {}).length || namespaces.length,
+      };
+    }
+    // Fall back to computing from namespaces
+    if (namespaces.length === 0) {
+      return { totalVectors: 0, avgDimensions: vector.dimensions || 0, namespaceCount: 0 };
+    }
+    const total = namespaces.reduce((acc, ns) => acc + ns.vectorCount, 0);
     const avgDimensions = Math.round(
-      DUMMY_NAMESPACES.reduce((acc, ns) => acc + (ns.dimensions || 0), 0) / DUMMY_NAMESPACES.length
+      namespaces.reduce((acc, ns) => acc + (ns.dimensions || 0), 0) / namespaces.length
     );
-    return { totalVectors: total, avgDimensions, namespaceCount: DUMMY_NAMESPACES.length };
-  }, []);
+    return { totalVectors: total, avgDimensions, namespaceCount: namespaces.length };
+  }, [sdkStats, sdkIndexInfo, namespaces, vector.dimensions]);
 
   // Handle namespace selection
   const handleSelectNamespace = async (namespace: VectorNamespace) => {
@@ -508,11 +768,40 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     setSelectedVector(null);
     setMainView('namespace');
     setQueryBuilderNamespace(namespace.name);
-
-    // Simulate loading namespace data
     setIsLoadingNamespace(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsLoadingNamespace(false);
+    setNamespaceVectors([]);
+
+    try {
+      // Fetch vectors from the namespace using SDK
+      if (vectorService && vector.productTag) {
+        setIsLoadingVectors(true);
+        const result = await vectorService.listVectors({
+          product: vector.productTag,
+          env: currentEnvSlug,
+          vector: vector.tag,
+          namespace: namespace.name,
+          limit: 100,
+          includeMetadata: true,
+        });
+        console.log('[Vector-Explorer] Vectors in namespace:', result);
+        if (result?.vectors && Array.isArray(result.vectors)) {
+          setNamespaceVectors(result.vectors.map((v: any) => ({
+            id: v.id,
+            values: v.values,
+            metadata: v.metadata,
+            score: v.score,
+            sparseValues: v.sparseValues,
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching vectors:', error);
+      // Fall back to dummy data on error
+      setNamespaceVectors([]);
+    } finally {
+      setIsLoadingNamespace(false);
+      setIsLoadingVectors(false);
+    }
 
     // Update query to list vectors in this namespace
     setQueryInput(getNamespaceQuery(namespace.name));
@@ -552,23 +841,21 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     }
   };
 
-  // Handle refresh sidebar
+  // Handle refresh sidebar - uses real SDK data when available
   const handleRefreshSidebar = async () => {
-    setIsSidebarRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsSidebarRefreshing(false);
-    toast.success('Data refreshed');
+    await handleRefreshData();
   };
 
-  // Handle execute query
+  // Handle execute query - uses real SDK when available
   const handleExecuteQuery = async () => {
     if (!queryInput.trim()) {
       toast.error('Please enter a query');
       return;
     }
 
+    let parsedQuery: any;
     try {
-      JSON.parse(queryInput);
+      parsedQuery = JSON.parse(queryInput);
     } catch {
       toast.error('Invalid JSON query format');
       return;
@@ -578,11 +865,104 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     setQueryError(null);
     setQueryResult(null);
 
+    const startTime = Date.now();
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setQueryResult(SAMPLE_QUERY_RESULTS);
-      setMainView('results');
-      toast.success(`Query executed in ${SAMPLE_QUERY_RESULTS.executionTime}ms`);
+      // Use real SDK if available
+      if (vectorService && vector.productTag) {
+        const operation = parsedQuery.operation;
+        const options = parsedQuery.options || {};
+        let result: any;
+
+        switch (operation) {
+          case 'query':
+          case 'findSimilar':
+            result = await vectorService.query({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'fetch':
+          case 'fetchOne':
+            result = await vectorService.fetchVectors({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'list':
+            result = await vectorService.listVectors({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'upsert':
+          case 'upsertOne':
+            result = await vectorService.upsert({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'deleteByIds':
+            result = await vectorService.deleteByIds({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'count':
+            result = await vectorService.count({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+              ...options,
+            });
+            break;
+          case 'listNamespaces':
+            result = await vectorService.listNamespaces({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+            });
+            break;
+          case 'getStats':
+            result = await vectorService.getStats({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+            });
+            break;
+          case 'describeIndex':
+            result = await vectorService.describeIndex({
+              product: vector.productTag,
+              env: currentEnvSlug,
+              vector: vector.tag,
+            });
+            break;
+          default:
+            throw new Error(`Unsupported operation: ${operation}`);
+        }
+
+        const executionTime = Date.now() - startTime;
+        setQueryResult({
+          success: true,
+          executionTime,
+          ...result,
+          matches: result?.vectors || result?.matches || result?.results || [],
+        });
+        setMainView('results');
+        toast.success(`Query executed in ${executionTime}ms`);
+      } else {
+        throw new Error('Vector service not available. Please check your connection.');
+      }
     } catch (error: any) {
       setQueryError(error.message || 'Failed to execute query');
       toast.error('Failed to execute query');
@@ -958,7 +1338,7 @@ await ductape.init();`,
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {DUMMY_NAMESPACES.slice(0, 4).map((ns) => (
+          {namespaces.slice(0, 4).map((ns) => (
             <button
               key={ns.name}
               onClick={() => handleSelectNamespace(ns)}
@@ -986,14 +1366,14 @@ await ductape.init();`,
             </button>
           ))}
         </div>
-        {DUMMY_NAMESPACES.length > 4 && (
+        {namespaces.length > 4 && (
           <Button
             variant="ghost"
             size="sm"
             className="w-full mt-2"
             onClick={() => setSidebarView('namespaces')}
           >
-            View all {DUMMY_NAMESPACES.length} namespaces
+            View all {namespaces.length} namespaces
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}
@@ -1121,90 +1501,109 @@ await ductape.init();`,
             </div>
           </div>
 
-          {resultsView === 'table' && (
-            <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-grey-50">
-                  <tr className="border-b border-grey-400">
-                    <th className="text-left py-3 px-4 font-medium text-grey-600">ID</th>
-                    <th className="text-left py-3 px-4 font-medium text-grey-600">Metadata</th>
-                    <th className="text-right py-3 px-4 font-medium text-grey-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {DUMMY_VECTORS.map((vec) => (
-                    <tr
+          {isLoadingVectors ? (
+            <div className="flex items-center justify-center py-12 bg-white rounded-lg border border-grey-400">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+                <p className="text-grey-500">Loading vectors...</p>
+              </div>
+            </div>
+          ) : filteredVectors.length === 0 ? (
+            <div className="flex items-center justify-center py-12 bg-white rounded-lg border border-grey-400">
+              <div className="text-center">
+                <Database className="h-8 w-8 text-grey-400 mx-auto mb-3" />
+                <p className="text-grey-500 mb-2">No vectors in this namespace</p>
+                <p className="text-xs text-grey-400">Run a query to fetch vectors</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {resultsView === 'table' && (
+                <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-grey-50">
+                      <tr className="border-b border-grey-400">
+                        <th className="text-left py-3 px-4 font-medium text-grey-600">ID</th>
+                        <th className="text-left py-3 px-4 font-medium text-grey-600">Metadata</th>
+                        <th className="text-right py-3 px-4 font-medium text-grey-600">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredVectors.map((vec) => (
+                        <tr
+                          key={vec.id}
+                          className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
+                          onClick={() => handleSelectVector(vec)}
+                        >
+                          <td className="py-3 px-4">
+                            <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                          </td>
+                          <td className="py-3 px-4 text-grey-600 truncate max-w-md">
+                            {vec.metadata ? JSON.stringify(vec.metadata) : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Button variant="ghost" size="sm" onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyToClipboard(vec.id);
+                            }}>
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {resultsView === 'cards' && (
+                <div className="grid grid-cols-2 gap-4">
+                  {filteredVectors.map((vec) => (
+                    <button
                       key={vec.id}
-                      className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
                       onClick={() => handleSelectVector(vec)}
+                      className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
                     >
-                      <td className="py-3 px-4">
-                        <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
-                      </td>
-                      <td className="py-3 px-4 text-grey-600 truncate max-w-md">
-                        {vec.metadata ? JSON.stringify(vec.metadata) : '—'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-between mb-2">
+                        <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
                         <Button variant="ghost" size="sm" onClick={(e) => {
                           e.stopPropagation();
                           handleCopyToClipboard(vec.id);
                         }}>
                           <Copy className="h-4 w-4" />
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {resultsView === 'cards' && (
-            <div className="grid grid-cols-2 gap-4">
-              {DUMMY_VECTORS.map((vec) => (
-                <button
-                  key={vec.id}
-                  onClick={() => handleSelectVector(vec)}
-                  className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
-                    <Button variant="ghost" size="sm" onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyToClipboard(vec.id);
-                    }}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {vec.metadata && (
-                    <div className="space-y-1">
-                      {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
-                        <div key={key} className="flex items-center gap-2 text-xs">
-                          <span className="text-grey-500">{key}:</span>
-                          <span className="text-grey truncate">{String(value)}</span>
+                      </div>
+                      {vec.metadata && (
+                        <div className="space-y-1">
+                          {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
+                            <div key={key} className="flex items-center gap-2 text-xs">
+                              <span className="text-grey-500">{key}:</span>
+                              <span className="text-grey truncate">{String(value)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-          {resultsView === 'json' && (
-            <div className="relative bg-white rounded-lg border border-grey-400">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => handleCopyToClipboard(JSON.stringify(DUMMY_VECTORS, null, 2))}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <pre className="p-4 text-sm overflow-auto max-h-[400px]">
-                {JSON.stringify(DUMMY_VECTORS, null, 2)}
-              </pre>
-            </div>
+              {resultsView === 'json' && (
+                <div className="relative bg-white rounded-lg border border-grey-400">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => handleCopyToClipboard(JSON.stringify(filteredVectors, null, 2))}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <pre className="p-4 text-sm overflow-auto max-h-[400px]">
+                    {JSON.stringify(filteredVectors, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1456,7 +1855,7 @@ await ductape.init();`,
                       <SelectValue placeholder="Select namespace" />
                     </SelectTrigger>
                     <SelectContent>
-                      {DUMMY_NAMESPACES.map(ns => (
+                      {namespaces.map(ns => (
                         <SelectItem key={ns.name} value={ns.name}>{ns.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1940,6 +2339,171 @@ await ductape.init();`,
     </div>
   );
 
+  // Show loading state while initializing the vector service
+  if (!vectorService) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse delay-150" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-sm text-center">
+            {/* Animated vector icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Boxes className="h-10 w-10 text-primary" />
+              </div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 border-2 border-primary/20 rounded-full animate-ping" />
+              </div>
+            </div>
+
+            {/* Loading status */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Initializing</h3>
+              <p className="text-sm text-grey-600">
+                Setting up vector service...
+              </p>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="mt-6">
+              <div className="flex items-center justify-center gap-1">
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connecting state while establishing vector database connection
+  if (isConnecting) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse delay-150" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-sm text-center">
+            {/* Animated vector icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Boxes className="h-10 w-10 text-primary" />
+              </div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 border-2 border-primary/20 rounded-full animate-ping" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-28 h-28 border border-primary/10 rounded-full animate-[ping_2s_ease-in-out_infinite]" />
+              </div>
+            </div>
+
+            {/* Connection status */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connecting to Vector Database</h3>
+              <p className="text-sm text-grey-600">
+                Establishing secure connection to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Boxes className="h-4 w-4 text-primary" />
+                <span className="font-medium text-grey-800">{vector.name}</span>
+              </div>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+                </div>
+              </div>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{currentEnvSlug}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connection error state
+  if (connectionError) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red/5 rounded-full blur-3xl" />
+          </div>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-md text-center">
+            {/* Error icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-red/20 to-red/5 flex items-center justify-center">
+                <Boxes className="h-10 w-10 text-red" />
+              </div>
+              {/* X indicator */}
+              <div className="absolute -bottom-1 -right-1 left-1/2 ml-4 w-8 h-8 bg-red rounded-full flex items-center justify-center shadow-lg">
+                <X className="h-5 w-5 text-white" />
+              </div>
+            </div>
+
+            {/* Error content */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connection Failed</h3>
+              <p className="text-sm text-grey-600">
+                Unable to connect to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Boxes className="h-4 w-4 text-grey-500" />
+                <span className="font-medium text-grey-800">{vector.name}</span>
+              </div>
+            </div>
+
+            {/* Error message */}
+            <div className="mt-4 p-4 bg-red/5 border border-red/20 rounded-xl">
+              <p className="text-sm text-red font-medium">
+                {connectionError instanceof Error ? connectionError.message : 'Unknown error occurred'}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex flex-col gap-3">
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['vector-connection', vector.productTag, vector.tag, currentEnvSlug] })}
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry Connection
+              </Button>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{currentEnvSlug}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
       {/* Sidebar */}
@@ -1955,7 +2519,7 @@ await ductape.init();`,
               <div className="flex items-center gap-2 text-xs text-grey-500">
                 {vector.env?.slug && (
                   <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                    {vector.env.slug}
+                    {currentEnvSlug}
                   </span>
                 )}
                 {vector.type && (
@@ -1982,6 +2546,20 @@ await ductape.init();`,
               )}
             </div>
           )}
+
+          {/* Connection Status */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 text-xs text-green bg-green/5 rounded-lg px-3 py-2">
+              <CheckCircle2 className="h-3 w-3" />
+              Connected
+              {isLoadingNamespaces && (
+                <span className="text-grey-500 ml-2 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading...
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* View Selector */}
           <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
@@ -2037,6 +2615,18 @@ await ductape.init();`,
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
             </button>
+            {sidebarView === 'namespaces' && (
+              <button
+                onClick={() => {
+                  // TODO: Open create namespace modal
+                  console.log('Create new namespace');
+                }}
+                className="text-grey-600 hover:text-primary transition-colors"
+                title="Create new namespace"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
             {sidebarView === 'actions' && (
               <button
                 onClick={() => {
@@ -2088,10 +2678,15 @@ await ductape.init();`,
                   </div>
                 </button>
               ))}
-              {filteredNamespaces.length === 0 && (
+              {isLoadingNamespaces ? (
+                <div className="text-center py-8 text-grey-500">
+                  <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-primary" />
+                  <p className="text-sm">Loading namespaces...</p>
+                </div>
+              ) : filteredNamespaces.length === 0 && (
                 <div className="text-center py-8 text-grey-500">
                   <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No namespaces found</p>
+                  <p className="text-sm">{isConnected ? 'No namespaces found' : 'Connect to view namespaces'}</p>
                 </div>
               )}
             </div>
@@ -2156,7 +2751,7 @@ await ductape.init();`,
           tag={vector.tag}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
-          environments={vector.envs || (vector.env ? [{ slug: vector.env.slug }] : [])}
+          environments={vector.envs || (vector.env ? [{ slug: currentEnvSlug }] : [])}
         />
       )}
 

@@ -31,6 +31,8 @@ import {
   Tag,
   PanelLeft,
   PanelLeftClose,
+  FileText,
+  Hash,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -222,7 +224,7 @@ interface DatabaseExplorerTabProps {
     productName?: string;
     env: {
       slug: string;
-      connection_url: string;
+      connection_url?: string; // Optional - not used directly, SDK resolves connection via product/database/env
     };
   };
 }
@@ -231,6 +233,24 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const { setSidebarCollapsed } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
+
+  // Guard: Show error if critical database data is missing (e.g., tab restored with incomplete data)
+  if (!database?.name || !database?.tag || !database?.env?.slug) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete database data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the database from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Initialize SDK Database Service
   const dbConfig = {
@@ -278,7 +298,8 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
       return result;
     },
     enabled: !!databaseService && !!database.productTag,
-    staleTime: 5 * 60 * 1000, // Cache connection for 5 minutes
+    staleTime: 30 * 1000, // Reduce stale time to 30 seconds to ensure fresh connections
+    refetchOnMount: 'always', // Always re-establish connection when component mounts
     retry: 2, // Retry failed connections
   });
 
@@ -329,7 +350,10 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   });
 
   // Use SDK tables or empty array if not available
-  const tables = sdkTables || EMPTY_TABLES;
+  // Filter out internal Ductape system tables from the main tables list
+  const DUCTAPE_SYSTEM_TABLES = ['_ductape_migrations', '_ductape_schema', '_ductape_counters'];
+  const allTables = sdkTables || EMPTY_TABLES;
+  const tables = allTables.filter(t => !DUCTAPE_SYSTEM_TABLES.includes(t.name));
 
   // Track selected table for schema fetching
   const [selectedTableName, setSelectedTableName] = useState<string | null>(null);
@@ -1195,56 +1219,56 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
   // ==================== MIGRATION MUTATIONS ====================
 
-  // SDK Query for fetching migrations
-  // NOTE: Temporarily disabled due to SDK bug where product tags with colons (e.g., "ductape:rematch")
-  // are incorrectly parsed. The SDK splits on ":" which breaks product tags that contain colons.
+  // Fetch migrations from _ductape_migrations table
   const { data: sdkMigrations, isLoading: isLoadingMigrations, refetch: refetchMigrations } = useQuery({
-    queryKey: ['database-migrations', database.productTag, database.tag],
-    queryFn: async () => {
-      // TODO: Re-enable once SDK parsing is fixed
-      return null;
-      /*
-      if (!databaseService || !database.productTag) {
-        return null;
-      }
-      try {
-        const result = await databaseService.migration.list({
-          product: database.productTag,
-          database: database.tag,
-        });
-        return result;
-      } catch (error) {
-        console.error('Error fetching migrations:', error);
-        return null;
-      }
-      */
-    },
-    enabled: false, // Disabled until SDK bug is fixed
-    staleTime: 30000,
-  });
-
-  // SDK Query for migration history (which migrations have been run)
-  const { data: migrationHistory, refetch: refetchMigrationHistory } = useQuery({
-    queryKey: ['migration-history', database.productTag, database.tag, database.env.slug],
+    queryKey: ['database-migrations', database.productTag, database.tag, database.env.slug],
     queryFn: async () => {
       if (!databaseService || !database.productTag) {
         return null;
       }
       try {
-        const result = await databaseService.getMigrationHistory({
+        // Query the _ductape_migrations table directly to get migration history
+        const query = {
           product: database.productTag,
           database: database.tag,
           env: database.env.slug,
-        });
-        return result;
+          table: '_ductape_migrations',
+          operation: 'select',
+          options: {
+            orderBy: { applied_at: 'desc' },
+          },
+        }
+
+        const result = await databaseService.query(query);
+        console.log('[DB-Explorer] Migrations from table:', result);
+
+        // The query returns { data: [...], count: n } format
+        const rows = result?.data || result?.rows || (Array.isArray(result) ? result : []);
+
+        if (Array.isArray(rows) && rows.length > 0) {
+          return rows.map((row: any) => ({
+            tag: row.tag || row.migration_tag || row.name,
+            name: row.name || row.migration_name || row.tag,
+            status: 'completed',
+            appliedAt: row.applied_at || row.appliedAt || row.created_at,
+            up: row.up,
+            down: row.down,
+          }));
+        }
+
+        // Return empty array if result is not in expected format
+        return [];
       } catch (error) {
-        console.error('Error fetching migration history:', error);
-        return null;
+        console.error('Error fetching migrations from table:', error);
+        return [];
       }
     },
-    enabled: !!databaseService && !!database.productTag,
+    enabled: !!databaseService && !!database.productTag && isConnected,
     staleTime: 30000,
   });
+
+  // Migration history is now fetched directly from _ductape_migrations table above
+  const migrationHistory = Array.isArray(sdkMigrations) ? sdkMigrations : [];
 
   // SDK Mutation for running a migration
   const runMigrationMutation = useMutation({
@@ -1600,9 +1624,13 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
     // Use SDK mutation if available, otherwise use demo mode
     if (databaseService && database.productTag && selectedTable && selectedRow) {
-      // Build where clause from the original row's primary key (id or _id)
-      const primaryKey = selectedRow.id !== undefined ? 'id' : '_id';
-      const where = { [primaryKey]: selectedRow[primaryKey] };
+      // Build where clause from the row's primary key, unique field, or first available column
+      const pkField = getPrimaryKeyField(selectedRow);
+      if (!pkField) {
+        toast.error('Cannot update: no unique identifier found for this record');
+        return;
+      }
+      const where = { [pkField.field]: pkField.value };
       // Pass originalData so we only send changed fields
       updateMutation.mutate({ data: processedData, where, originalData: selectedRow });
     } else {
@@ -1619,9 +1647,13 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const handleDelete = async () => {
     // Use SDK mutation if available, otherwise use demo mode
     if (databaseService && database.productTag && selectedTable && selectedRow) {
-      // Build where clause from the row's primary key
-      const primaryKey = selectedRow.id !== undefined ? 'id' : '_id';
-      const where = { [primaryKey]: selectedRow[primaryKey] };
+      // Build where clause from the row's primary key, unique field, or first available column
+      const pkField = getPrimaryKeyField(selectedRow);
+      if (!pkField) {
+        toast.error('Cannot delete: no unique identifier found for this record');
+        return;
+      }
+      const where = { [pkField.field]: pkField.value };
       deleteMutation.mutate(where);
     } else {
       // Fallback demo mode
@@ -2324,6 +2356,41 @@ await ductape.init();`,
       }));
       return false;
     }
+  };
+
+  // Get the primary key or unique identifier column for a row
+  // Priority: 1) id/ID, 2) _id, 3) primaryKey from schema, 4) unique field from schema, 5) first column with value
+  const getPrimaryKeyField = (row: Record<string, any>): { field: string; value: any } | null => {
+    // 1. Check for common primary key names
+    if (row.id !== undefined) return { field: 'id', value: row.id };
+    if (row.ID !== undefined) return { field: 'ID', value: row.ID };
+    if (row._id !== undefined) return { field: '_id', value: row._id };
+
+    // 2. Check tableSchema for primaryKey or unique columns
+    if (tableSchema?.columns && Array.isArray(tableSchema.columns)) {
+      // First look for explicit primaryKey
+      const pkColumn = tableSchema.columns.find((col: any) => col.primaryKey === true);
+      if (pkColumn && row[pkColumn.name] !== undefined) {
+        return { field: pkColumn.name, value: row[pkColumn.name] };
+      }
+
+      // Then look for unique columns (like email)
+      const uniqueColumn = tableSchema.columns.find((col: any) => col.unique === true);
+      if (uniqueColumn && row[uniqueColumn.name] !== undefined) {
+        return { field: uniqueColumn.name, value: row[uniqueColumn.name] };
+      }
+    }
+
+    // 3. Fallback: use the first column that has a non-null value
+    const columns = Object.keys(row);
+    for (const col of columns) {
+      if (row[col] !== null && row[col] !== undefined) {
+        console.warn(`[DB-Explorer] No primary key found, using first available column: ${col}`);
+        return { field: col, value: row[col] };
+      }
+    }
+
+    return null;
   };
 
   // Get column type from tableSchema (fetched from SDK) or tableColumns (for create table dialog)
@@ -3159,19 +3226,10 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
   );
 
   // Use SDK migrations if available, otherwise use empty array
-  const migrations = sdkMigrations || EMPTY_MIGRATIONS;
+  // Migrations are now fetched directly from _ductape_migrations table with status already set
+  const migrations = Array.isArray(sdkMigrations) ? sdkMigrations : EMPTY_MIGRATIONS;
 
-  // Combine migration data with history to determine status
-  const migrationsWithStatus = migrations.map((m: any) => {
-    const historyEntry = migrationHistory?.find((h: any) => h.tag === m.tag);
-    return {
-      ...m,
-      status: historyEntry ? 'completed' : 'pending',
-      appliedAt: historyEntry?.appliedAt,
-    };
-  });
-
-  const filteredMigrations = migrationsWithStatus.filter((m: any) =>
+  const filteredMigrations = migrations.filter((m: any) =>
     m?.name?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
     m?.tag?.toLowerCase()?.includes(searchQuery.toLowerCase())
   );
@@ -3187,18 +3245,56 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
   // Show connecting state while establishing database connection
   if (isConnecting) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-grey-100">
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse delay-150" />
           </div>
-          <h3 className="text-lg font-semibold text-grey mb-2">Connecting to Database</h3>
-          <p className="text-sm text-grey-600">
-            Establishing connection to <span className="font-medium">{database.name}</span>...
-          </p>
-          <p className="text-xs text-grey-500 mt-1">
-            Environment: {database.env.slug}
-          </p>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-sm text-center">
+            {/* Animated database icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <Database className="h-10 w-10 text-primary" />
+              </div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-24 h-24 border-2 border-primary/20 rounded-full animate-ping" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-28 h-28 border border-primary/10 rounded-full animate-[ping_2s_ease-in-out_infinite]" />
+              </div>
+            </div>
+
+            {/* Connection status */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connecting to Database</h3>
+              <p className="text-sm text-grey-600">
+                Establishing secure connection to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Database className="h-4 w-4 text-primary" />
+                <span className="font-medium text-grey-800">{database.name}</span>
+              </div>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+                </div>
+              </div>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{database.env.slug}</span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -3207,26 +3303,59 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
   // Show connection error state
   if (connectionError) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-grey-100">
-        <div className="text-center max-w-md">
-          <div className="flex items-center justify-center mb-4">
-            <Database className="h-8 w-8 text-red" />
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+        <div className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red/5 rounded-full blur-3xl" />
           </div>
-          <h3 className="text-lg font-semibold text-grey mb-2">Connection Failed</h3>
-          <p className="text-sm text-grey-600 mb-4">
-            Unable to connect to <span className="font-medium">{database.name}</span>
-          </p>
-          <p className="text-xs text-red bg-red/10 p-3 rounded mb-4">
-            {connectionError instanceof Error ? connectionError.message : 'Unknown error occurred'}
-          </p>
-          <Button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['database-connection', database.productTag, database.tag, database.env.slug] })}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry Connection
-          </Button>
+
+          {/* Main content card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-md text-center">
+            {/* Error icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-red/20 to-red/5 flex items-center justify-center">
+                <Database className="h-10 w-10 text-red" />
+              </div>
+              {/* X indicator */}
+              <div className="absolute -bottom-1 -right-1 left-1/2 ml-4 w-8 h-8 bg-red rounded-full flex items-center justify-center shadow-lg">
+                <X className="h-5 w-5 text-white" />
+              </div>
+            </div>
+
+            {/* Error content */}
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold text-grey-800">Connection Failed</h3>
+              <p className="text-sm text-grey-600">
+                Unable to connect to
+              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
+                <Database className="h-4 w-4 text-grey-500" />
+                <span className="font-medium text-grey-800">{database.name}</span>
+              </div>
+            </div>
+
+            {/* Error message */}
+            <div className="mt-4 p-4 bg-red/5 border border-red/20 rounded-xl">
+              <p className="text-sm text-red font-medium">
+                {connectionError instanceof Error ? connectionError.message : 'Unknown error occurred'}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex flex-col gap-3">
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['database-connection', database.productTag, database.tag, database.env.slug] })}
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry Connection
+              </Button>
+              <p className="text-xs text-grey-400">
+                Environment: <span className="font-medium text-grey-500">{database.env.slug}</span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -3460,7 +3589,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <span className="truncate">{table.name}</span>
                   </div>
                   <span className="text-xs text-grey-600 flex-shrink-0">
-                    {'rowCount' in table ? table.rowCount : table.documentCount}
+                    {'rowCount' in table && table.rowCount != null ? table.rowCount : 'documentCount' in table && table.documentCount != null ? table.documentCount : '-'}
                   </span>
                 </button>
               ))}
@@ -3485,14 +3614,14 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <GitBranch className="h-3.5 w-3.5 flex-shrink-0" />
                     <span className="truncate font-medium">{migration.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-grey-600 ml-5">
+                  <div className="flex items-center gap-2 text-xs text-grey-600 ml-5 min-w-0">
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded',
+                      'px-1.5 py-0.5 rounded flex-shrink-0',
                       migration.status === 'completed' ? 'bg-green/10 text-green' : 'bg-yellow/10 text-yellow'
                     )}>
                       {migration.status}
                     </span>
-                    <span>{migration.tag}</span>
+                    <span className="truncate" title={migration.tag}>{migration.tag}</span>
                   </div>
                 </button>
               ))}
@@ -3627,7 +3756,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">
-                      {tables.reduce((acc, t) => acc + ('rowCount' in t ? t.rowCount : t.documentCount), 0).toLocaleString()}
+                      {tables.reduce((acc, t) => acc + ('rowCount' in t && t.rowCount != null ? t.rowCount : 'documentCount' in t && t.documentCount != null ? t.documentCount : 0), 0).toLocaleString()}
                     </div>
                     <div className="text-xs text-grey-500">Total {isNoSQL ? 'Documents' : 'Rows'}</div>
                   </div>
@@ -3730,11 +3859,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-grey-500">
-                      <span className="flex items-center gap-1">
-                        <FileText className="h-3 w-3" />
-                        {'rowCount' in table ? `${table.rowCount.toLocaleString()} rows` : `${table.documentCount.toLocaleString()} docs`}
-                      </span>
-                      {'columnCount' in table && (
+                      {('rowCount' in table && table.rowCount != null) || ('documentCount' in table && table.documentCount != null) ? (
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {'rowCount' in table && table.rowCount != null
+                            ? `${table.rowCount.toLocaleString()} rows`
+                            : 'documentCount' in table && table.documentCount != null
+                              ? `${table.documentCount.toLocaleString()} docs`
+                              : ''}
+                        </span>
+                      ) : null}
+                      {'columnCount' in table && table.columnCount != null && (
                         <span className="flex items-center gap-1">
                           <Hash className="h-3 w-3" />
                           {table.columnCount} columns
@@ -3801,9 +3936,11 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                   <div>
                     <h2 className="text-lg font-semibold text-grey">{selectedTable.name}</h2>
                     <p className="text-xs text-grey-600">
-                      {'rowCount' in selectedTable
+                      {'rowCount' in selectedTable && selectedTable.rowCount != null
                         ? `${selectedTable.rowCount} rows`
-                        : `${selectedTable.documentCount} documents`}
+                        : 'documentCount' in selectedTable && selectedTable.documentCount != null
+                          ? `${selectedTable.documentCount} documents`
+                          : ''}
                     </p>
                   </div>
                 </div>
@@ -4171,7 +4308,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                             {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, tableData.length)}
                           </span> of{' '}
                           <span className="font-semibold text-grey">
-                            {'rowCount' in selectedTable ? selectedTable.rowCount : selectedTable.documentCount}
+                            {'rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : tableData.length}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">

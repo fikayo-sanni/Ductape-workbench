@@ -26,9 +26,16 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
 import CodeSidebar from '@/components/CodeSidebar';
+import { useSDKProxy } from '@/hooks/useSDKProxy';
 
 interface ActionViewTabContentProps {
   action: any;
+  /** Product tag - required for running action via SDK */
+  productTag?: string;
+  /** App tag - required for running action via SDK */
+  appTag?: string;
+  /** Selected environment slug for running action */
+  envSlug?: string;
 }
 
 interface KeyValue {
@@ -74,8 +81,9 @@ const syntaxHighlightJSON = (jsonString: any) => {
   }
 };
 
-export default function ActionViewTabContent({ action }: ActionViewTabContentProps) {
+export default function ActionViewTabContent({ action, productTag, appTag, envSlug }: ActionViewTabContentProps) {
   const { user } = useAuth();
+  const sdkProxy = useSDKProxy();
 
   // Persistent state key based on action identifier
   const stateKey = `action-view-state-${action?.appTag}-${action?.tag}`;
@@ -496,12 +504,15 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
   };
 
   const handleTest = async () => {
-    if (!fullUrl) {
-      toast.error('Please enter a valid URL');
-      return;
-    }
+    // Determine if we should use SDK actions.run or fallback to test endpoint
+    const effectiveAppTag = appTag || action?.appTag;
+    const activeCustomEnv = customEnvs.find(e => e.active);
+    const effectiveEnvSlug = envSlug || activeCustomEnv?.slug;
+    const canUseSDK = productTag && effectiveAppTag && effectiveEnvSlug && action?.tag;
 
     setIsLoadingRequest(true);
+    const startTime = Date.now();
+
     try {
       // Collect simple user inputs from UI
       const userQueryParams: Record<string, string> = {};
@@ -557,55 +568,110 @@ export default function ActionViewTabContent({ action }: ActionViewTabContentPro
       const pathParams = reconstructed.params || userPathParams;
       const parsedBody = reconstructed.body || userBodyData;
 
-      // Call backend proxy
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
-      const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
+      // Use SDK actions.run when in product context
+      if (canUseSDK) {
+        // Build input object combining all parts
+        const input: Record<string, any> = {};
 
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.auth_token}`,
-          'x-user-id': user?._id || '',
-          'x-workspace-id': '',
-        },
-        body: JSON.stringify({
-          url: fullUrl,
-          method: formData.method,
-          headers: requestHeaders,
-          query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
-          params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
-          body: parsedBody,
-        }),
-      });
+        // Add path params
+        if (Object.keys(pathParams).length > 0) {
+          Object.assign(input, pathParams);
+        }
 
-      const responseData = await res.json();
+        // Add query params
+        if (Object.keys(queryParams).length > 0) {
+          Object.assign(input, queryParams);
+        }
 
-      // Extract metadata and actual response data
-      const { _meta, data: actualData } = responseData;
+        // Add headers (as a nested object if needed by the action)
+        if (Object.keys(requestHeaders).length > 0) {
+          input._headers = requestHeaders;
+        }
 
-      if (res.ok) {
-        setResponse({
-          status: _meta?.status || res.status,
-          statusText: _meta?.statusText || res.statusText,
-          headers: _meta?.headers || {},
-          data: actualData, // The actual API response (can be array or object)
-          time: _meta?.time,
-          size: _meta?.size,
+        // Add body data
+        if (parsedBody && typeof parsedBody === 'object') {
+          Object.assign(input, parsedBody);
+        } else if (parsedBody) {
+          input._body = parsedBody;
+        }
+
+        // Call SDK actions.run
+        const result = await sdkProxy.actions.run({
+          product: productTag,
+          env: effectiveEnvSlug,
+          app: effectiveAppTag,
+          action: action.tag,
+          input,
         });
-        toast.success('Request completed');
+
+        const executionTime = Date.now() - startTime;
+
+        // Format response from SDK
+        setResponse({
+          status: result?.statusCode || result?.status || 200,
+          statusText: result?.statusText || 'OK',
+          headers: result?.headers || {},
+          data: result?.data || result,
+          time: executionTime,
+          size: JSON.stringify(result).length,
+        });
+        toast.success('Action executed successfully');
       } else {
-        // Handle error response
-        setResponse({
-          status: _meta?.status || res.status,
-          statusText: _meta?.statusText || res.statusText,
-          headers: _meta?.headers || {},
-          data: actualData, // The actual API error response
-          error: _meta?.error || 'Request failed',
-          time: _meta?.time,
-          size: _meta?.size,
+        // Fallback to test endpoint when not in product context
+        if (!fullUrl) {
+          toast.error('Please enter a valid URL');
+          setIsLoadingRequest(false);
+          return;
+        }
+
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
+        const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
+
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user?.auth_token}`,
+            'x-user-id': user?._id || '',
+            'x-workspace-id': '',
+          },
+          body: JSON.stringify({
+            url: fullUrl,
+            method: formData.method,
+            headers: requestHeaders,
+            query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+            params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
+            body: parsedBody,
+          }),
         });
-        toast.error(_meta?.error || 'Request failed');
+
+        const responseData = await res.json();
+
+        // Extract metadata and actual response data
+        const { _meta, data: actualData } = responseData;
+
+        if (res.ok) {
+          setResponse({
+            status: _meta?.status || res.status,
+            statusText: _meta?.statusText || res.statusText,
+            headers: _meta?.headers || {},
+            data: actualData,
+            time: _meta?.time,
+            size: _meta?.size,
+          });
+          toast.success('Request completed');
+        } else {
+          setResponse({
+            status: _meta?.status || res.status,
+            statusText: _meta?.statusText || res.statusText,
+            headers: _meta?.headers || {},
+            data: actualData,
+            error: _meta?.error || 'Request failed',
+            time: _meta?.time,
+            size: _meta?.size,
+          });
+          toast.error(_meta?.error || 'Request failed');
+        }
       }
 
       setActiveTab('response'); // Auto-switch to response tab

@@ -183,6 +183,19 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
 
+  // Guard: Check for incomplete storage data (can happen after tab restoration)
+  if (!storage?.name || !storage?.tag || !storage?.env?.slug) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <HardDrive className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete storage data</p>
+          <p className="text-sm text-grey-500">Please close this tab and reopen the storage from the explorer.</p>
+        </div>
+      </div>
+    );
+  }
+
   // SDK proxy configuration
   const sdkProxyConfig: SDKProxyConfig | null = useMemo(() => {
     if (!currentWorkspaceId || !user?._id || !user?.auth_token || !user?.public_key) {

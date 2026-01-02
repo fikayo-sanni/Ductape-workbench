@@ -130,7 +130,8 @@ export class DatabaseProxyService {
     // ==================== QUERY OPERATIONS ====================
     query: <T = any>(options: any) => this.execute<T>('query', options),
     insert: <T = any>(options: any) => this.execute<T>('insert', options),
-    updateRecords: <T = any>(options: any) => this.execute<T>('updateRecords', options),
+    // updateRecords maps to SDK's 'update' method for record updates
+    updateRecords: <T = any>(options: any) => this.execute<T>('update', options),
     delete: <T = any>(options: any) => this.execute<T>('delete', options),
     upsert: <T = any>(options: any) => this.execute<T>('upsert', options),
 
