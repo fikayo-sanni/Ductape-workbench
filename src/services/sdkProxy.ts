@@ -82,6 +82,11 @@ export class SDKProxyService {
    * @param params - Parameters to pass to the method
    */
   private async execute<T = any>(module: SDKModule, method: string, ...params: any[]): Promise<T> {
+    // Log vector operations for debugging
+    if (module === 'vector' && ['fetchVectors', 'listVectors', 'listNamespaces', 'getStats'].includes(method)) {
+      console.log(`[SDKProxy.execute] ${module}.${method}`, params);
+    }
+
     // Encrypt sensitive data (module, method, params, user_id) using public_key
     const sensitiveData = {
       module,
@@ -280,8 +285,8 @@ export class SDKProxyService {
 
   // ==================== STORAGE MODULE ====================
   storage = {
-    create: <T = any>(product: string, data: any) =>
-      this.execute<T>('storage', 'create', product, data),
+    create: <T = any>(data: any) =>
+      this.execute<T>('storage', 'create', data),
     list: <T = any>(product: string) => this.execute<T>('storage', 'list', product),
     fetch: <T = any>(product: string, tag: string) =>
       this.execute<T>('storage', 'fetch', product, tag),
@@ -297,6 +302,7 @@ export class SDKProxyService {
     listFiles: <T = any>(data: any) => this.execute<T>('storage', 'listFiles', data),
     getSignedUrl: <T = any>(data: any) => this.execute<T>('storage', 'getSignedUrl', data),
     dispatch: <T = any>(data: any) => this.execute<T>('storage', 'dispatch', data),
+    stats: <T = any>(data: any) => this.execute<T>('storage', 'stats', data),
   };
 
   // ==================== NOTIFICATIONS MODULE ====================
@@ -456,9 +462,36 @@ export class SDKProxyService {
     delete: <T = any>(product: string, tag: string) =>
       this.execute<T>('databases', 'delete', product, tag),
 
+    // Connection management
+    connect: <T = any>(data: any) => this.execute<T>('databases', 'connect', data),
+    disconnect: <T = any>(data: any) => this.execute<T>('databases', 'disconnect', data),
+    closeAll: <T = any>() => this.execute<T>('databases', 'closeAll'),
+    testConnection: (data: any) => this.execute<boolean>('databases', 'testConnection', data),
+
     // Database query operations
     query: <T = any>(data: any) => this.execute<T>('databases', 'query', data),
     execute: <T = any>(data: any) => this.execute<T>('databases', 'execute', data),
+    insert: <T = any>(data: any) => this.execute<T>('databases', 'insert', data),
+    updateData: <T = any>(data: any) => this.execute<T>('databases', 'update', data),
+    deleteData: <T = any>(data: any) => this.execute<T>('databases', 'delete', data),
+    count: (data: any) => this.execute<number>('databases', 'count', data),
+
+    // Table/Collection operations
+    listTables: <T = any>(data: any) => this.execute<T>('databases', 'listTables', data),
+    listTablesWithInfo: <T = any>(data: any) => this.execute<T>('databases', 'listTablesWithInfo', data),
+    createTable: <T = any>(data: any) => this.execute<T>('databases', 'createTable', data),
+    dropTable: <T = any>(data: any) => this.execute<T>('databases', 'dropTable', data),
+    alterTable: <T = any>(data: any) => this.execute<T>('databases', 'alterTable', data),
+    truncateTable: <T = any>(data: any) => this.execute<T>('databases', 'truncateTable', data),
+
+    // Schema operations
+    describe: <T = any>(data: any) => this.execute<T>('databases', 'describe', data),
+    getSchema: <T = any>(data: any) => this.execute<T>('databases', 'getSchema', data),
+
+    // Index operations
+    createIndex: <T = any>(data: any) => this.execute<T>('databases', 'createIndex', data),
+    dropIndex: <T = any>(data: any) => this.execute<T>('databases', 'dropIndex', data),
+    listIndexes: <T = any>(data: any) => this.execute<T>('databases', 'listIndexes', data),
   };
 
   // ==================== WEBHOOKS MODULE ====================
@@ -501,15 +534,15 @@ export class SDKProxyService {
       this.execute<T>('vector', 'delete', options),
 
     // Connection management
-    connect: <T = any>(options: { product: string; env: string; vector: string }) =>
+    connect: <T = any>(options: { product: string; env: string; tag: string }) =>
       this.execute<T>('vector', 'connect', options),
-    disconnect: <T = any>(options: { product: string; env: string; vector: string }) =>
+    disconnect: <T = any>(options: { product: string; env: string; tag: string }) =>
       this.execute<T>('vector', 'disconnect', options),
     disconnectAll: <T = any>() => this.execute<T>('vector', 'disconnectAll'),
-    testConnection: (options: { product: string; env: string; vector: string }) =>
+    testConnection: (options: { product: string; env: string; tag: string }) =>
       this.execute<boolean>('vector', 'testConnection', options),
 
-    // Vector operations
+    // Vector operations - interface matches SDK exactly (uses 'vector' parameter)
     query: <T = any>(options: any) => this.execute<T>('vector', 'query', options),
     upsert: <T = any>(options: any) => this.execute<T>('vector', 'upsert', options),
     upsertOne: <T = any>(options: any) => this.execute<T>('vector', 'upsertOne', options),
@@ -529,8 +562,7 @@ export class SDKProxyService {
     // Namespace operations
     listNamespaces: <T = any>(options: { product: string; env: string; vector: string }) =>
       this.execute<T>('vector', 'listNamespaces', options),
-    deleteNamespace: <T = any>(options: any) =>
-      this.execute<T>('vector', 'deleteNamespace', options),
+    deleteNamespace: <T = any>(options: any) => this.execute<T>('vector', 'deleteNamespace', options),
 
     // Index operations
     describeIndex: <T = any>(options: { product: string; env: string; vector: string }) =>

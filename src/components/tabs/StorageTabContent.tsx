@@ -1,12 +1,12 @@
 import { HardDrive, Cloud, Server, Copy, Check, Eye, EyeOff, Loader2, CheckCircle, ArrowRight, FolderOpen } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { connectDuctapeWorkspace } from '@/helpers/ductape';
+import { useSDKProxy } from '@/services/sdkProxy';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -20,31 +20,37 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
 
-  // Initialize SDK using memoized value
-  const ductape = useMemo(() => {
-    if (!currentWorkspaceId || !user?._id || !user?.auth_token || !user?.public_key) {
-      return null;
-    }
-    return connectDuctapeWorkspace({
-      workspace_id: currentWorkspaceId,
-      user_id: user._id,
-      token: user.auth_token,
-      public_key: user.public_key,
-    });
-  }, [currentWorkspaceId, user?._id, user?.auth_token, user?.public_key]);
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(
+    storage?.productTag && user?._id
+      ? {
+          workspace_id: currentWorkspaceId || '',
+          user_id: user._id || '',
+          token: user.auth_token || '',
+          public_key: user.public_key || '',
+        }
+      : null
+  );
 
-  // Fetch storage details from SDK
+  // Fetch storage details from SDK Proxy
   const { data: storageData, isLoading } = useQuery({
-    queryKey: ['storage', storage?.tag],
+    queryKey: ['storage', storage?.productTag, storage?.tag],
     queryFn: async () => {
-      if (!ductape || !storage?.tag || !storage?.productTag) {
+      if (!sdkProxy || !storage?.tag || !storage?.productTag) {
+        console.log('[StorageTabContent] Cannot fetch - missing data:', {
+          hasProxy: !!sdkProxy,
+          tag: storage?.tag,
+          productTag: storage?.productTag,
+        });
         return storage;
       }
 
-      const result = await ductape.storage.fetch(storage.productTag, storage.tag);
+      console.log('[StorageTabContent] Fetching storage:', storage.productTag, storage.tag);
+      const result = await sdkProxy.storage.fetch(storage.productTag, storage.tag);
+      console.log('[StorageTabContent] Fetch result:', result);
       return result;
     },
-    enabled: !!ductape && !!storage?.tag && !!storage?.productTag,
+    enabled: !!sdkProxy && !!storage?.tag && !!storage?.productTag,
   });
 
   const displayData = storageData || storage;
@@ -499,21 +505,22 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
                           </div>
                         </div>
                       </div>
+
                       <div>
-                        <Label className="text-sm font-semibold text-grey">Client Email</Label>
+                        <Label className="text-sm font-semibold text-grey">Private Key ID</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <Input
-                            value={config.config?.client_email || ''}
+                            value={config.config?.private_key_id || ''}
                             readOnly
                             className="font-mono text-sm"
                           />
-                          {config.config?.client_email && (
+                          {config.config?.private_key_id && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => copyToClipboard(config.config?.client_email || '', `clientEmail-${index}`)}
+                              onClick={() => copyToClipboard(config.config?.private_key_id || '', `privateKeyId-${index}`)}
                             >
-                              {copiedKey === `clientEmail-${index}` ? (
+                              {copiedKey === `privateKeyId-${index}` ? (
                                 <Check className="h-4 w-4" />
                               ) : (
                                 <Copy className="h-4 w-4" />
@@ -522,6 +529,56 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
                           )}
                         </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-semibold text-grey">Client Email</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              value={config.config?.client_email || ''}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            {config.config?.client_email && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => copyToClipboard(config.config?.client_email || '', `clientEmail-${index}`)}
+                              >
+                                {copiedKey === `clientEmail-${index}` ? (
+                                  <Check className="h-4 w-4" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-semibold text-grey">Client ID</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              value={config.config?.client_id || ''}
+                              readOnly
+                              className="font-mono text-sm"
+                            />
+                            {config.config?.client_id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => copyToClipboard(config.config?.client_id || '', `clientId-${index}`)}
+                              >
+                                {copiedKey === `clientId-${index}` ? (
+                                  <Check className="h-4 w-4" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       <div>
                         <Label className="text-sm font-semibold text-grey">Private Key</Label>
                         <div className="flex items-center gap-2 mt-1">

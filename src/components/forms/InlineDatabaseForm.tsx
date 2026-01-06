@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Database as DatabaseIcon, Save, ChevronRight, Loader2, CheckCircle, Eye, EyeOff, X, Share2, Boxes, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useDatabaseProxy } from '@/services/databaseProxy';
+import { useGraphProxy } from '@/services/graphProxy';
+import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
 
 interface InlineDatabaseFormProps {
@@ -28,20 +30,42 @@ interface EnvConnection {
   slug: string;
   env_name: string;
   connection_url: string;
+  // Additional fields for graph databases
+  username?: string;
+  password?: string;
+  database?: string;
+  // Neptune-specific fields
+  region?: string;
+  iamAuth?: boolean;
+  // Vector database-specific fields
+  endpoint?: string;
+  apiKey?: string;
+  index?: string;
+  namespace?: string;
 }
 
 export default function InlineDatabaseForm({ product, databaseType, onCancel, onSuccess }: InlineDatabaseFormProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product'
-  }) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user._id || '',
+        token: user.auth_token || '',
+        public_key: user.public_key || '',
+      }
+    : null;
+
+  // Initialize Database Proxy (for regular databases)
+  const databaseProxy = useDatabaseProxy(databaseType === 'database' ? proxyConfig : null);
+
+  // Initialize SDK Proxy (for vectors)
+  const sdkProxy = useSDKProxy(databaseType === 'vector' ? proxyConfig : null);
+
+  // Initialize Graph Proxy (for graph databases - not yet in SDK proxy)
+  const graphProxy = useGraphProxy(databaseType === 'graph' ? proxyConfig : null);
 
   const getDefaultDbType = () => {
     if (databaseType === 'graph') return 'neo4j';
@@ -53,6 +77,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     name: '',
     tag: '',
     type: getDefaultDbType(),
+    // Vector-specific fields
+    dimensions: databaseType === 'vector' ? 1536 : undefined,
+    metric: databaseType === 'vector' ? 'cosine' : undefined,
   });
 
   const [envConnections, setEnvConnections] = useState<EnvConnection[]>([]);
@@ -67,6 +94,16 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
           slug: env.slug,
           env_name: env.name || env.env_name || env.slug,
           connection_url: '',
+          username: '',
+          password: '',
+          database: '',
+          region: '',
+          iamAuth: false,
+          // Vector fields
+          endpoint: '',
+          apiKey: '',
+          index: '',
+          namespace: '',
         }))
       );
     }
@@ -91,7 +128,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     },
     neo4j: {
       port: '7687',
-      example: 'bolt://username:password@localhost:7687',
+      example: 'bolt://localhost:7687',
     },
     pinecone: {
       port: '',
@@ -107,6 +144,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     if (databaseType === 'graph') {
       return [
         { value: 'neo4j', label: 'Neo4j' },
+        { value: 'memgraph', label: 'Memgraph' },
         { value: 'neptune', label: 'Amazon Neptune' },
         { value: 'arangodb', label: 'ArangoDB' },
       ];
@@ -115,9 +153,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       return [
         { value: 'pinecone', label: 'Pinecone' },
         { value: 'weaviate', label: 'Weaviate' },
-        { value: 'milvus', label: 'Milvus' },
+        //{ value: 'milvus', label: 'Milvus' },
         { value: 'qdrant', label: 'Qdrant' },
-        { value: 'chroma', label: 'Chroma' },
+        //{ value: 'chroma', label: 'Chroma' },
       ];
     }
     return [
@@ -149,21 +187,49 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
   // Create database mutation
   const { mutateAsync: createDatabase, isPending: isCreating } = useMutation({
     mutationFn: async (values: { name: string; tag: string; type: string; envs: Array<{ slug: string; connection_url: string }> }) => {
-      if (!ductape) throw new Error('Product not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
 
-      await ductape.init(product.tag);
-      const database = await ductape.databases.create({
-        name: values.name,
-        tag: values.tag,
-        type: values.type.toLowerCase(),
-        envs: values.envs,
-      });
-      return database;
+      // Use appropriate proxy based on database type
+      if (databaseType === 'graph') {
+        if (!graphProxy) throw new Error('Graph proxy not initialized');
+        return await graphProxy.graph.create({
+          product: product.tag,
+          name: values.name,
+          tag: values.tag,
+          type: values.type.toLowerCase(),
+          envs: values.envs,
+        });
+      } else if (databaseType === 'vector') {
+        if (!sdkProxy) throw new Error('SDK proxy not initialized');
+        return await sdkProxy.vector.create({
+          product: product.tag,
+          name: values.name,
+          tag: values.tag,
+          type: values.type.toLowerCase(),
+          dimensions: (values as any).dimensions,
+          metric: (values as any).metric,
+          envs: values.envs,
+        });
+      } else {
+        if (!databaseProxy) throw new Error('Database proxy not initialized');
+        return await databaseProxy.databases.create({
+          product: product.tag,
+          name: values.name,
+          tag: values.tag,
+          type: values.type.toLowerCase(),
+          envs: values.envs,
+        });
+      }
     },
     onSuccess: async () => {
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['databases'] });
+      // Invalidate queries based on database type
+      if (databaseType === 'graph') {
+        queryClient.invalidateQueries({ queryKey: ['graphs'] });
+      } else if (databaseType === 'vector') {
+        queryClient.invalidateQueries({ queryKey: ['vectors'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['databases'] });
+      }
       queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
       queryClient.invalidateQueries({ queryKey: ['product', product._id] });
 
@@ -186,16 +252,34 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       return;
     }
 
+    // Validate vector-specific fields
+    if (databaseType === 'vector') {
+      if (!formData.dimensions || formData.dimensions < 1) {
+        toast.error('Please enter valid dimensions (minimum 1)');
+        return;
+      }
+    }
+
     // Validate at least one environment is configured
-    const hasConfiguredEnv = envConnections.some(env => env.connection_url.trim());
+    const hasConfiguredEnv = databaseType === 'vector'
+      ? envConnections.some(env => env.endpoint?.trim())
+      : envConnections.some(env => env.connection_url.trim());
+
     if (!hasConfiguredEnv) {
       toast.error('Please configure at least one environment connection');
       return;
     }
 
-    // Validate connection URLs
+    // Validate connection URLs or endpoints
     for (const env of envConnections) {
-      if (env.connection_url.trim()) {
+      if (databaseType === 'vector' && env.endpoint?.trim()) {
+        try {
+          new URL(env.endpoint);
+        } catch {
+          toast.error(`Invalid endpoint URL for ${env.env_name}`);
+          return;
+        }
+      } else if (databaseType !== 'vector' && env.connection_url.trim()) {
         try {
           new URL(env.connection_url);
         } catch {
@@ -210,13 +294,42 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
         name: formData.name,
         tag: formData.tag,
         type: formData.type,
+        ...(databaseType === 'vector' && {
+          dimensions: formData.dimensions,
+          metric: formData.metric,
+        }),
         envs: envConnections
-          .filter(env => env.connection_url.trim())
-          .map(env => ({
-            slug: env.slug,
-            connection_url: env.connection_url,
-          })),
-      });
+          .filter(env => databaseType === 'vector' ? env.endpoint?.trim() : env.connection_url.trim())
+          .map(env => {
+            const envConfig: any = {
+              slug: env.slug,
+            };
+
+            // Vector database fields
+            if (databaseType === 'vector') {
+              if (env.endpoint && env.endpoint.trim()) envConfig.endpoint = env.endpoint;
+              if (env.apiKey && env.apiKey.trim()) envConfig.apiKey = env.apiKey;
+              if (env.index && env.index.trim()) envConfig.index = env.index;
+              if (env.namespace && env.namespace.trim()) envConfig.namespace = env.namespace;
+              if (env.region && env.region.trim()) envConfig.region = env.region;
+            }
+            // Graph database fields
+            else if (databaseType === 'graph') {
+              envConfig.connection_url = env.connection_url;
+              if (env.username && env.username.trim()) envConfig.username = env.username;
+              if (env.password && env.password.trim()) envConfig.password = env.password;
+              if (env.database && env.database.trim()) envConfig.database = env.database;
+              if (env.region && env.region.trim()) envConfig.region = env.region;
+              if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
+            }
+            // Regular database fields
+            else {
+              envConfig.connection_url = env.connection_url;
+            }
+
+            return envConfig;
+          }),
+      } as any);
     } catch (error: any) {
       // Error already handled in mutation
     }
@@ -236,15 +349,15 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     setShowEnvs(true);
   };
 
-  const updateEnvConnection = (index: number, url: string) => {
+  const updateEnvConnection = (index: number, field: string, value: string | boolean) => {
     const updated = [...envConnections];
-    updated[index] = { ...updated[index], connection_url: url };
+    updated[index] = { ...updated[index], [field]: value };
     setEnvConnections(updated);
   };
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 pb-24">
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -325,9 +438,52 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
               <p className="text-xs text-grey-600 mt-1">Select your {getTypeTitle().toLowerCase()} system</p>
             </div>
 
+            {/* Vector-specific fields */}
+            {databaseType === 'vector' && (
+              <>
+                <div>
+                  <Label htmlFor="dimensions" className="required">
+                    Vector Dimensions
+                  </Label>
+                  <Input
+                    id="dimensions"
+                    type="number"
+                    min="1"
+                    max="65536"
+                    placeholder="e.g., 1536"
+                    value={formData.dimensions || ''}
+                    onChange={(e) => setFormData({ ...formData, dimensions: parseInt(e.target.value) || undefined })}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-grey-600 mt-1">
+                    Number of dimensions in your vectors (e.g., 1536 for OpenAI embeddings)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="metric">
+                    Distance Metric
+                  </Label>
+                  <Select value={formData.metric} onValueChange={(value) => setFormData({ ...formData, metric: value })}>
+                    <SelectTrigger id="metric" className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cosine">Cosine</SelectItem>
+                      <SelectItem value="euclidean">Euclidean</SelectItem>
+                      <SelectItem value="dotproduct">Dot Product</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-600 mt-1">
+                    Similarity metric for vector comparisons
+                  </p>
+                </div>
+              </>
+            )}
+
             {!showEnvs && (
               <Button onClick={handleContinue} className="gap-2">
-                Continue to Connection URLs
+                {databaseType === 'vector' ? 'Continue to Configuration' : 'Continue to Connection URLs'}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             )}
@@ -337,7 +493,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
           {showEnvs && (
             <div className="space-y-6 pt-6 border-t border-grey-400">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-grey">Connection URLs</h3>
+                <h3 className="text-lg font-semibold text-grey">
+                  {databaseType === 'vector' ? 'Environment Configuration' : 'Connection URLs'}
+                </h3>
                 <p className="text-sm text-grey-600">Configure connection for each environment</p>
               </div>
 
@@ -360,26 +518,192 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                     <span className="text-xs text-grey-600">{env.slug}</span>
                   </div>
 
-                  <div>
-                    <Label htmlFor={`connection-${index}`}>Connection URL</Label>
-                    <div className="relative mt-1.5">
-                      <Input
-                        id={`connection-${index}`}
-                        type={showPasswords[index] ? 'text' : 'password'}
-                        placeholder={dbTypeDefaults[formData.type]?.example || 'Enter connection URL'}
-                        value={env.connection_url}
-                        onChange={(e) => updateEnvConnection(index, e.target.value)}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords({ ...showPasswords, [index]: !showPasswords[index] })}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
-                      >
-                        {showPasswords[index] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
+                  {/* Vector database fields */}
+                  {databaseType === 'vector' ? (
+                    <>
+                      {/* Endpoint URL */}
+                      <div>
+                        <Label htmlFor={`endpoint-${index}`} className="required">Endpoint URL</Label>
+                        <Input
+                          id={`endpoint-${index}`}
+                          placeholder={dbTypeDefaults[formData.type]?.example || 'https://...'}
+                          value={env.endpoint || ''}
+                          onChange={(e) => updateEnvConnection(index, 'endpoint', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+
+                      {/* API Key */}
+                      {(formData.type === 'pinecone' || formData.type === 'qdrant' || formData.type === 'weaviate') && (
+                        <div>
+                          <Label htmlFor={`apiKey-${index}`} className={formData.type === 'pinecone' ? 'required' : ''}>
+                            API Key
+                          </Label>
+                          <div className="relative mt-1.5">
+                            <Input
+                              id={`apiKey-${index}`}
+                              type={showPasswords[index] ? 'text' : 'password'}
+                              placeholder="Enter API key"
+                              value={env.apiKey || ''}
+                              onChange={(e) => updateEnvConnection(index, 'apiKey', e.target.value)}
+                              className="pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswords({ ...showPasswords, [index]: !showPasswords[index] })}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
+                            >
+                              {showPasswords[index] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Index/Collection Name */}
+                      <div>
+                        <Label htmlFor={`index-${index}`} className={formData.type === 'pinecone' ? 'required' : ''}>
+                          {formData.type === 'pinecone' ? 'Index Name' : formData.type === 'qdrant' ? 'Collection Name' : 'Class Name'}
+                        </Label>
+                        <Input
+                          id={`index-${index}`}
+                          placeholder={formData.type === 'pinecone' ? 'my-index' : formData.type === 'qdrant' ? 'my-collection' : 'MyClass'}
+                          value={env.index || ''}
+                          onChange={(e) => updateEnvConnection(index, 'index', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+
+                      {/* Namespace (Pinecone) */}
+                      {formData.type === 'pinecone' && (
+                        <div>
+                          <Label htmlFor={`namespace-${index}`}>Namespace</Label>
+                          <Input
+                            id={`namespace-${index}`}
+                            placeholder="default"
+                            value={env.namespace || ''}
+                            onChange={(e) => updateEnvConnection(index, 'namespace', e.target.value)}
+                            className="mt-1.5"
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Connection URL for databases and graphs */
+                    <div>
+                      <Label htmlFor={`connection-${index}`}>Connection URL</Label>
+                      <div className="relative mt-1.5">
+                        <Input
+                          id={`connection-${index}`}
+                          type={showPasswords[index] ? 'text' : 'password'}
+                          placeholder={dbTypeDefaults[formData.type]?.example || 'Enter connection URL'}
+                          value={env.connection_url}
+                          onChange={(e) => updateEnvConnection(index, 'connection_url', e.target.value)}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords({ ...showPasswords, [index]: !showPasswords[index] })}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
+                        >
+                          {showPasswords[index] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Neo4j specific fields */}
+                  {formData.type === 'neo4j' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor={`username-${index}`}>Username</Label>
+                          <Input
+                            id={`username-${index}`}
+                            placeholder="neo4j"
+                            value={env.username || ''}
+                            onChange={(e) => updateEnvConnection(index, 'username', e.target.value)}
+                            className="mt-1.5"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`password-${index}`}>Password</Label>
+                          <Input
+                            id={`password-${index}`}
+                            type="password"
+                            placeholder="Enter password"
+                            value={env.password || ''}
+                            onChange={(e) => updateEnvConnection(index, 'password', e.target.value)}
+                            className="mt-1.5"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor={`database-${index}`}>Database</Label>
+                        <Input
+                          id={`database-${index}`}
+                          placeholder="neo4j"
+                          value={env.database || ''}
+                          onChange={(e) => updateEnvConnection(index, 'database', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Memgraph specific fields */}
+                  {formData.type === 'memgraph' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`username-${index}`}>Username</Label>
+                        <Input
+                          id={`username-${index}`}
+                          placeholder="Enter username"
+                          value={env.username || ''}
+                          onChange={(e) => updateEnvConnection(index, 'username', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`password-${index}`}>Password</Label>
+                        <Input
+                          id={`password-${index}`}
+                          type="password"
+                          placeholder="Enter password"
+                          value={env.password || ''}
+                          onChange={(e) => updateEnvConnection(index, 'password', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Neptune specific fields */}
+                  {formData.type === 'neptune' && (
+                    <>
+                      <div>
+                        <Label htmlFor={`region-${index}`}>AWS Region</Label>
+                        <Input
+                          id={`region-${index}`}
+                          placeholder="us-east-1"
+                          value={env.region || ''}
+                          onChange={(e) => updateEnvConnection(index, 'region', e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`iamAuth-${index}`}
+                          checked={env.iamAuth || false}
+                          onChange={(e) => updateEnvConnection(index, 'iamAuth', e.target.checked)}
+                          className="h-4 w-4 rounded border-grey-400"
+                        />
+                        <Label htmlFor={`iamAuth-${index}`} className="cursor-pointer">
+                          Use IAM Authentication
+                        </Label>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
 

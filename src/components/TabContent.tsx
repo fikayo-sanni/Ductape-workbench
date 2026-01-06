@@ -23,6 +23,7 @@ import DatabaseExplorerTab from './tabs/DatabaseExplorerTab';
 import GraphTabContent from './tabs/GraphTabContent';
 import GraphExplorerTab from './tabs/GraphExplorerTab';
 import NewGraphTabContent from './tabs/NewGraphTabContent';
+import VectorTabContent from './tabs/VectorTabContent';
 import VectorExplorerTab from './tabs/VectorExplorerTab';
 import WorkflowExplorerTab from './tabs/WorkflowExplorerTab';
 import WorkflowRunTab from './tabs/WorkflowRunTab';
@@ -223,7 +224,7 @@ export default function TabContent() {
         if (activeTab.isDirty && !activeTab.itemId && !activeTab.data?._id) {
           return <NewProductTabContent key={activeTab.id} tabId={activeTab.id} data={activeTab.data} />;
         }
-        return <ProductTabContent key={activeTab.id} product={activeTab.data} productId={activeTab.itemId} />;
+        return <ProductTabContent key={activeTab.id} tabId={activeTab.id} product={activeTab.data} productId={activeTab.itemId} />;
 
       case 'auth':
         // Check if this is a new auth creation tab
@@ -259,7 +260,7 @@ export default function TabContent() {
       case 'storage':
         // Check if this is a storage explorer tab
         if (activeTab.data?.isExplorer) {
-          return <StorageExplorerTab key={activeTab.id} storage={activeTab.data.storage} />;
+          return <StorageExplorerTab key={activeTab.id} tabId={activeTab.id} storage={activeTab.data.storage} />;
         }
         // Check if this is a new storage creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
@@ -307,8 +308,7 @@ export default function TabContent() {
         if (activeTab.data?.isExplorer) {
           return <VectorExplorerTab key={activeTab.id} vector={activeTab.data.vector} />;
         }
-        // For now, vectors only have the explorer view
-        return <VectorExplorerTab key={activeTab.id} vector={activeTab.data} />;
+        return <VectorTabContent key={activeTab.id} vector={activeTab.data} />;
 
       case 'workflow':
         // Check if this is a workflow explorer tab

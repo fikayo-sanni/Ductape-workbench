@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
 import CodeSidebar from '@/components/CodeSidebar';
-import { useSDKProxy } from '@/hooks/useSDKProxy';
+import { useSDKProxy } from '@/services/sdkProxy';
 
 interface ActionViewTabContentProps {
   action: any;
@@ -82,8 +82,13 @@ const syntaxHighlightJSON = (jsonString: any) => {
 };
 
 export default function ActionViewTabContent({ action, productTag, appTag, envSlug }: ActionViewTabContentProps) {
-  const { user } = useAuth();
-  const sdkProxy = useSDKProxy();
+  const { user, currentWorkspaceId } = useAuth();
+  const sdkProxy = useSDKProxy(user ? {
+    workspace_id: currentWorkspaceId || '',
+    user_id: user._id,
+    token: user.auth_token,
+    public_key: user.public_key
+  } : null);
 
   // Persistent state key based on action identifier
   const stateKey = `action-view-state-${action?.appTag}-${action?.tag}`;
@@ -569,7 +574,7 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
       const parsedBody = reconstructed.body || userBodyData;
 
       // Use SDK actions.run when in product context
-      if (canUseSDK) {
+      if (canUseSDK && sdkProxy) {
         // Build input object combining all parts
         const input: Record<string, any> = {};
 

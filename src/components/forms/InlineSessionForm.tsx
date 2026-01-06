@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { KeyRound, Save, CheckCircle, Loader2, XCircle, Check, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useSDKProxy } from '@/services/sdkProxy';
 import { TokenPeriods } from '@/types';
 
 interface InlineSessionFormProps {
@@ -29,14 +29,18 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product'
-  }) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user._id || '',
+        token: user.auth_token || '',
+        public_key: user.public_key || '',
+      }
+    : null;
+
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -51,7 +55,8 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
   // Create session mutation
   const { mutateAsync: createSession, isPending: isCreating } = useMutation({
     mutationFn: async (values: typeof formData) => {
-      if (!ductape) throw new Error('Product not initialized');
+      if (!sdkProxy) throw new Error('SDK proxy not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
 
       // Parse and validate schema
       let parsedSchema;
@@ -75,8 +80,7 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
         period: values.period,
       };
 
-      await ductape.init(product.tag);
-      const session = await ductape.sessions.create(payload);
+      const session = await sdkProxy.sessions.create(product.tag, payload);
       return session;
     },
     onSuccess: () => {

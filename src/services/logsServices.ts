@@ -92,6 +92,10 @@ export interface SessionDashboardMetrics {
     refresh: number;
     revoke: number;
   }[];
+  hourlyActivity?: {
+    hour: string;
+    count: number;
+  }[];
   successRate: number;
   errorRate: number;
   averageSessionDuration: number;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useSDKProxy } from '@/services/sdkProxy';
 import { useAuth } from '@/store/useAuth';
 import { cn } from '@/lib/utils';
 import { Notifiers } from '@ductape/sdk/dist/types/enums';
@@ -87,25 +87,18 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
     }
   }, [product?.envs]);
 
-  // Initialize Ductape SDK
-  const shouldInitDuctape = product?.workspace_id && user?._id && user?.auth_token && user?.public_key;
-  const ductape = useDuctape(
-    shouldInitDuctape
-      ? {
-          workspace_id: product.workspace_id!,
-          user_id: user._id,
-          token: user.auth_token,
-          public_key: user.public_key,
-          type: 'product',
-        }
-      : {
-          workspace_id: '',
-          user_id: '',
-          token: '',
-          public_key: '',
-          type: 'product',
-        }
-  ) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user._id || '',
+        token: user.auth_token || '',
+        public_key: user.public_key || '',
+      }
+    : null;
+
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   // Auto-generate tag from name
   useEffect(() => {
@@ -127,10 +120,8 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
 
   const { mutateAsync: createNotification, isPending: isCreating } = useMutation({
     mutationFn: async () => {
-      if (!ductape) throw new Error('Product not initialized');
+      if (!sdkProxy) throw new Error('SDK proxy not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
-
-      await ductape.init(product.tag);
 
       const envs = envConfigs.map((config) => ({
         slug: config.slug,
@@ -155,7 +146,9 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
         envs,
       };
 
-      const notification = await ductape.notifications.create(payload);
+      alert(JSON.stringify(payload, null, 2));
+
+      const notification = await sdkProxy.notifications.create(product.tag, payload);
       return notification;
     },
     onSuccess: () => {
@@ -194,7 +187,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
   const isFormComplete = isStep1Complete && isStep2Complete;
 
   return (
-    <div className="bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
@@ -412,7 +405,10 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <NotificationTypeConfig envConfig={envConfig} onConfigChange={onConfigChange} envIndex={envIndex} />
+              <NotificationTypeConfig
+                onFieldChange={(value) => onConfigChange({ ...envConfig, push_notifications: value })}
+                envIndex={envIndex}
+              />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -431,7 +427,7 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <EmailConfig envConfig={envConfig} onConfigChange={onConfigChange} />
+              <EmailConfig onFieldChange={(value) => onConfigChange({ ...envConfig, emails: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -450,7 +446,7 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <SmsConfig envConfig={envConfig} onConfigChange={onConfigChange} />
+              <SmsConfig onFieldChange={(value) => onConfigChange({ ...envConfig, sms: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -469,7 +465,7 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <CallbackConfig envConfig={envConfig} onConfigChange={onConfigChange} />
+              <CallbackConfig onFieldChange={(value) => onConfigChange({ ...envConfig, callbacks: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -478,7 +474,7 @@ function EnvironmentConfigCard({
   );
 }
 
-function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void; envIndex?: number }) {
+function NotificationTypeConfig({ onFieldChange, envIndex }: { onFieldChange: (value: any) => void; envIndex?: number }) {
   const [notificationType, setNotificationType] = useState<'firebase' | 'expo'>('firebase');
   const [credentials, setCredentials] = useState({
     type: 'service_account',
@@ -493,26 +489,17 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
     client_x509_cert_url: '',
   });
   const [databaseUrl, setDatabaseUrl] = useState('');
-  const isSyncingRef = useRef(false);
 
   useEffect(() => {
-    if (isSyncingRef.current) return;
-
     if (notificationType === 'firebase') {
-      onConfigChange({
-        ...envConfig,
-        push_notifications: {
-          type: Notifiers.FIREBASE,
-          credentials,
-          databaseUrl,
-        },
+      onFieldChange({
+        type: Notifiers.FIREBASE,
+        credentials,
+        databaseUrl,
       });
     } else {
-      onConfigChange({
-        ...envConfig,
-        push_notifications: {
-          type: Notifiers.EXPO,
-        },
+      onFieldChange({
+        type: Notifiers.EXPO,
       });
     }
   }, [notificationType, credentials, databaseUrl]);
@@ -612,6 +599,24 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
                 placeholder="service@project.iam.gserviceaccount.com"
               />
             </div>
+            <div>
+              <Label>Client ID</Label>
+              <Input
+                value={credentials.client_id}
+                onChange={(e) => setCredentials({ ...credentials, client_id: e.target.value })}
+                className="mt-1"
+                placeholder="123456789012345678901"
+              />
+            </div>
+            <div>
+              <Label>Private Key ID</Label>
+              <Input
+                value={credentials.private_key_id}
+                onChange={(e) => setCredentials({ ...credentials, private_key_id: e.target.value })}
+                className="mt-1"
+                placeholder="abc123def456..."
+              />
+            </div>
           </div>
 
           <div>
@@ -624,13 +629,52 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
               rows={4}
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Auth URI</Label>
+              <Input
+                value={credentials.auth_uri}
+                onChange={(e) => setCredentials({ ...credentials, auth_uri: e.target.value })}
+                className="mt-1"
+                placeholder="https://accounts.google.com/o/oauth2/auth"
+              />
+            </div>
+            <div>
+              <Label>Token URI</Label>
+              <Input
+                value={credentials.token_uri}
+                onChange={(e) => setCredentials({ ...credentials, token_uri: e.target.value })}
+                className="mt-1"
+                placeholder="https://oauth2.googleapis.com/token"
+              />
+            </div>
+            <div>
+              <Label>Auth Provider X509 Cert URL</Label>
+              <Input
+                value={credentials.auth_provider_x509_cert_url}
+                onChange={(e) => setCredentials({ ...credentials, auth_provider_x509_cert_url: e.target.value })}
+                className="mt-1"
+                placeholder="https://www.googleapis.com/oauth2/v1/certs"
+              />
+            </div>
+            <div>
+              <Label>Client X509 Cert URL</Label>
+              <Input
+                value={credentials.client_x509_cert_url}
+                onChange={(e) => setCredentials({ ...credentials, client_x509_cert_url: e.target.value })}
+                className="mt-1"
+                placeholder="https://www.googleapis.com/robot/v1/metadata/x509/..."
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function EmailConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void }) {
+function EmailConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
   const [emailConfig, setEmailConfig] = useState({
     host: '',
     port: '',
@@ -639,11 +683,8 @@ function EmailConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onCo
     auth_pass: '',
     secure: false,
   });
-  const isSyncingRef = useRef(false);
 
   useEffect(() => {
-    if (isSyncingRef.current) return;
-
     const emailsData = {
       host: emailConfig.host,
       port: emailConfig.port,
@@ -655,10 +696,7 @@ function EmailConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onCo
       secure: emailConfig.secure,
     };
 
-    onConfigChange({
-      ...envConfig,
-      emails: emailsData,
-    });
+    onFieldChange(emailsData);
   }, [emailConfig]);
 
   return (
@@ -718,49 +756,70 @@ function EmailConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onCo
   );
 }
 
-function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void }) {
+function SmsConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
   const [smsConfig, setSmsConfig] = useState({
     provider: '',
+    // Twilio fields
     accountSid: '',
     authToken: '',
+    // Nexmo/Plivo fields
+    apiKey: '',
+    apiSecret: '',
+    // Common field
     sender: '',
   });
-  const [showAuthToken, setShowAuthToken] = useState(false);
-  const isSyncingRef = useRef(false);
+  const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    if (isSyncingRef.current) return;
-
-    const smsData = {
+    // Build provider-specific config
+    let smsData: any = {
       provider: smsConfig.provider,
-      accountSid: smsConfig.accountSid,
-      authToken: smsConfig.authToken,
       sender: smsConfig.sender,
     };
 
-    onConfigChange({
-      ...envConfig,
-      sms: smsData,
-    });
+    if (smsConfig.provider === 'twilio') {
+      smsData.accountSid = smsConfig.accountSid;
+      smsData.authToken = smsConfig.authToken;
+    } else if (smsConfig.provider === 'nexmo') {
+      smsData.apiKey = smsConfig.apiKey;
+      smsData.apiSecret = smsConfig.apiSecret;
+    } else if (smsConfig.provider === 'plivo') {
+      smsData.apiKey = smsConfig.apiKey;
+    }
+
+    onFieldChange(smsData);
   }, [smsConfig]);
+
+  // Reset provider-specific fields when provider changes
+  const handleProviderChange = (provider: string) => {
+    setSmsConfig({
+      provider,
+      accountSid: '',
+      authToken: '',
+      apiKey: '',
+      apiSecret: '',
+      sender: smsConfig.sender, // Keep sender
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="col-span-2">
         <Label>SMS Provider</Label>
-        <Select value={smsConfig.provider} onValueChange={(v) => setSmsConfig({ ...smsConfig, provider: v })}>
+        <Select value={smsConfig.provider} onValueChange={handleProviderChange}>
           <SelectTrigger className="mt-1">
             <SelectValue placeholder="Select provider" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="twilio">Twilio</SelectItem>
-            <SelectItem value="nexmo">Nexmo</SelectItem>
+            <SelectItem value="nexmo">Nexmo (Vonage)</SelectItem>
             <SelectItem value="plivo">Plivo</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {smsConfig.provider && (
+      {/* Twilio-specific fields */}
+      {smsConfig.provider === 'twilio' && (
         <>
           <div>
             <Label>Account SID</Label>
@@ -775,7 +834,7 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
             <Label>Auth Token</Label>
             <div className="relative mt-1">
               <Input
-                type={showAuthToken ? 'text' : 'password'}
+                type={showSecret ? 'text' : 'password'}
                 value={smsConfig.authToken}
                 onChange={(e) => setSmsConfig({ ...smsConfig, authToken: e.target.value })}
                 className="pr-10"
@@ -783,29 +842,88 @@ function SmsConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConf
               />
               <button
                 type="button"
-                onClick={() => setShowAuthToken((prev) => !prev)}
+                onClick={() => setShowSecret((prev) => !prev)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
               >
-                {showAuthToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
-          <div className="col-span-2">
-            <Label>Sender Phone Number</Label>
+        </>
+      )}
+
+      {/* Nexmo-specific fields */}
+      {smsConfig.provider === 'nexmo' && (
+        <>
+          <div>
+            <Label>API Key</Label>
             <Input
-              value={smsConfig.sender}
-              onChange={(e) => setSmsConfig({ ...smsConfig, sender: e.target.value })}
+              value={smsConfig.apiKey}
+              onChange={(e) => setSmsConfig({ ...smsConfig, apiKey: e.target.value })}
               className="mt-1"
-              placeholder="+1415xxxxxxx"
+              placeholder="Your API key"
             />
           </div>
+          <div>
+            <Label>API Secret</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={smsConfig.apiSecret}
+                onChange={(e) => setSmsConfig({ ...smsConfig, apiSecret: e.target.value })}
+                className="pr-10"
+                placeholder="Your API secret"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
         </>
+      )}
+
+      {/* Plivo-specific fields */}
+      {smsConfig.provider === 'plivo' && (
+        <div className="col-span-2">
+          <Label>Auth ID (API Key)</Label>
+          <Input
+            value={smsConfig.apiKey}
+            onChange={(e) => setSmsConfig({ ...smsConfig, apiKey: e.target.value })}
+            className="mt-1"
+            placeholder="Your Auth ID"
+          />
+          <p className="text-xs text-grey-600 mt-1">
+            Find your Auth ID in your Plivo console
+          </p>
+        </div>
+      )}
+
+      {/* Sender field - common to all providers */}
+      {smsConfig.provider && (
+        <div className="col-span-2">
+          <Label>Sender Phone Number</Label>
+          <Input
+            value={smsConfig.sender}
+            onChange={(e) => setSmsConfig({ ...smsConfig, sender: e.target.value })}
+            className="mt-1"
+            placeholder="+1415xxxxxxx"
+          />
+          <p className="text-xs text-grey-600 mt-1">
+            {smsConfig.provider === 'twilio' && 'Your Twilio phone number'}
+            {smsConfig.provider === 'nexmo' && 'Your Vonage virtual number or sender ID'}
+            {smsConfig.provider === 'plivo' && 'Your Plivo phone number'}
+          </p>
+        </div>
       )}
     </div>
   );
 }
 
-function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void }) {
+function CallbackConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('POST');
   const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>([]);
@@ -839,10 +957,7 @@ function CallbackConfig({ envConfig, onConfigChange }: { envConfig: EnvConfig; o
       body: body || undefined,
     };
 
-    onConfigChange({
-      ...envConfig,
-      callbacks: newCallbacks,
-    });
+    onFieldChange(newCallbacks);
   }, [url, method, requestFields]);
 
   const handleAddField = () => {

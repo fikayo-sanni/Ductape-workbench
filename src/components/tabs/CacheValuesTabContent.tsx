@@ -55,96 +55,6 @@ interface CacheValuesTabContentProps {
   cache: any;
 }
 
-// Dummy data for display
-const DUMMY_CACHE_VALUES: IRemoteCache[] = [
-  {
-    key: 'user:session:12345',
-    value: JSON.stringify({ userId: '12345', username: 'john_doe', email: 'john@example.com', role: 'admin' }),
-    cache_tag: 'user-sessions',
-    product_tag: 'auth-service',
-    component_tag: 'session-manager',
-    component_type: 'session',
-    expiry: new Date(Date.now() + 3600000),
-    reads: 1247,
-    latency: 5,
-  },
-  {
-    key: 'product:inventory:98765',
-    value: JSON.stringify({ productId: '98765', name: 'Premium Widget', stock: 150, price: 99.99 }),
-    cache_tag: 'inventory',
-    product_tag: 'ecommerce',
-    component_tag: 'product-db',
-    component_type: 'database',
-    expiry: new Date(Date.now() + 7200000),
-    reads: 3892,
-    latency: 12,
-  },
-  {
-    key: 'config:feature-flags',
-    value: JSON.stringify({ darkMode: true, betaFeatures: false, analytics: true }),
-    cache_tag: 'configuration',
-    product_tag: 'app-config',
-    component_tag: 'config-storage',
-    component_type: 'storage',
-    expiry: new Date(Date.now() + 86400000),
-    reads: 567,
-    latency: 3,
-  },
-  {
-    key: 'api:rate-limit:user-789',
-    value: '{"requests": 45, "limit": 100, "resetTime": "2024-12-01T15:00:00Z"}',
-    cache_tag: 'rate-limiting',
-    product_tag: 'api-gateway',
-    component_tag: 'notification-service',
-    component_type: 'notification',
-    expiry: new Date(Date.now() + 900000),
-    reads: 15234,
-    latency: 8,
-  },
-  {
-    key: 'geo:location:ip-192.168.1.1',
-    value: 'United States, California, San Francisco',
-    cache_tag: 'geolocation',
-    product_tag: 'location-service',
-    component_tag: 'message-queue',
-    component_type: 'message-broker',
-    reads: 8421,
-    latency: 15,
-  },
-  {
-    key: 'user:preferences:user-456',
-    value: JSON.stringify({ theme: 'dark', language: 'en', timezone: 'UTC-8' }),
-    cache_tag: 'user-sessions',
-    product_tag: 'auth-service',
-    component_tag: 'session-manager',
-    component_type: 'session',
-    expiry: new Date(Date.now() + 1800000),
-    reads: 234,
-    latency: 4,
-  },
-  {
-    key: 'cart:items:cart-789',
-    value: JSON.stringify({ items: [{ id: 'p1', qty: 2 }, { id: 'p2', qty: 1 }], total: 149.97 }),
-    cache_tag: 'shopping-cart',
-    product_tag: 'ecommerce',
-    component_tag: 'cart-service',
-    component_type: 'storage',
-    expiry: new Date(Date.now() + 7200000),
-    reads: 892,
-    latency: 6,
-  },
-  {
-    key: 'analytics:daily:2024-01-15',
-    value: JSON.stringify({ pageViews: 12500, uniqueVisitors: 3400, avgSessionTime: 245 }),
-    cache_tag: 'analytics',
-    product_tag: 'analytics-platform',
-    component_tag: 'metrics-db',
-    component_type: 'database',
-    reads: 5621,
-    latency: 18,
-  },
-];
-
 type FilterType = 'all' | 'expiring' | 'permanent' | 'expired';
 
 // Sparkline component for mini charts
@@ -185,6 +95,24 @@ const Sparkline = ({ data, color, height = 32 }: { data: number[]; color: string
 };
 
 export default function CacheValuesTabContent({ cache }: CacheValuesTabContentProps) {
+  // Show error if cache data is incomplete
+  if (!cache?.name && !cache?.tag && !cache?.cacheTag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background-tertiary">
+        <div className="text-center">
+          <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete cache data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the cache from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const { user, currentWorkspaceId } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
@@ -225,20 +153,20 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
         });
 
         if (!response.ok) {
-          return DUMMY_CACHE_VALUES;
+          return [];
         }
 
         const data = await response.json();
-        return data.data || DUMMY_CACHE_VALUES;
+        return data.data || [];
       } catch (error) {
-        console.log('Using dummy cache data:', error);
-        return DUMMY_CACHE_VALUES;
+        console.error('Error fetching cache values:', error);
+        return [];
       }
     },
     enabled: true,
   });
 
-  const cacheValues: IRemoteCache[] = cacheValuesData || DUMMY_CACHE_VALUES;
+  const cacheValues: IRemoteCache[] = cacheValuesData || [];
 
   // Fetch cache dashboard metrics from logs service
   const { data: dashboardMetrics } = useQuery({

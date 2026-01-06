@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Zap, Save, CheckCircle, Loader2, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useSDKProxy } from '@/services/sdkProxy';
 
 interface InlineCacheFormProps {
   product: {
@@ -25,14 +25,18 @@ export default function InlineCacheForm({ product, onCancel, onSuccess }: Inline
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product'
-  }) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user._id || '',
+        token: user.auth_token || '',
+        public_key: user.public_key || '',
+      }
+    : null;
+
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,7 +47,8 @@ export default function InlineCacheForm({ product, onCancel, onSuccess }: Inline
   // Create cache mutation
   const { mutateAsync: createCache, isPending: isCreating } = useMutation({
     mutationFn: async (values: { name: string; tag: string; expiry: number }) => {
-      if (!ductape) throw new Error('Product not initialized');
+      if (!sdkProxy) throw new Error('SDK proxy not initialized');
+      if (!product?.tag) throw new Error('Product tag not found');
 
       const payload = {
         name: values.name,
@@ -51,8 +56,7 @@ export default function InlineCacheForm({ product, onCancel, onSuccess }: Inline
         expiry: values.expiry,
       };
 
-      await ductape.init(product.tag);
-      const cache = await ductape.caches.create(payload);
+      const cache = await sdkProxy.caches.create(product.tag, payload);
       return cache;
     },
     onSuccess: async () => {

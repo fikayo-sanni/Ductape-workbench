@@ -257,27 +257,27 @@ export default function SessionDashboard({
           </div>
         </div>
 
-        {/* Sessions Over Time */}
-        {metrics?.sessionsOverTime && metrics.sessionsOverTime.length > 0 && (
-          <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-grey mb-4">Sessions Over Time</h2>
+        {/* Activity Timeline (7 Days) - Simplified View */}
+        <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+          {metrics?.sessionsOverTime && metrics.sessionsOverTime.length > 0 ? (
             <div className="space-y-3">
-              {metrics.sessionsOverTime.map((period) => {
-                const maxSessions = Math.max(...metrics.sessionsOverTime.map(p => p.created + p.expired));
+              {metrics.sessionsOverTime.slice(0, 7).map((period) => {
+                const maxActivity = Math.max(...metrics.sessionsOverTime.slice(0, 7).map(p => p.created + p.expired));
                 const total = period.created + period.expired;
-                const percentage = maxSessions > 0 ? (total / maxSessions) * 100 : 0;
+                const percentage = maxActivity > 0 ? (total / maxActivity) * 100 : 0;
 
                 return (
                   <div key={period.period} className="flex items-center gap-3">
-                    <div className="w-20 text-xs font-medium text-grey-600 truncate">{period.period}</div>
+                    <div className="w-12 text-xs font-medium text-grey-600">{period.period}</div>
                     <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                       <div
                         className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg transition-all duration-500"
                         style={{ width: `${percentage}%` }}
                       ></div>
                       <div className="absolute inset-0 flex items-center px-3">
-                        <span className="text-xs font-semibold text-white dark:text-grey">
-                          {period.created} created, {period.expired} expired
+                        <span className="text-xs font-semibold text-white">
+                          {period.created.toLocaleString()} created, {period.expired.toLocaleString()} expired
                         </span>
                       </div>
                     </div>
@@ -285,87 +285,153 @@ export default function SessionDashboard({
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+              <p className="text-sm text-grey-600 font-medium mb-1">No session activity data available</p>
+              <p className="text-xs text-grey-500">Activity charts will appear once sessions are created</p>
+            </div>
+          )}
+        </div>
 
-        {/* Operations Over Time */}
-        {metrics?.operationsOverTime && metrics.operationsOverTime.length > 0 && (
+        {/* Peak Activity Hours & Operations Over Time - Side by Side (45-55) */}
+        <div className="grid grid-cols-[45%_55%] gap-4">
+          {/* Peak Activity Hours */}
           <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-grey mb-4">Operations Over Time</h2>
-            <div className="space-y-3">
-              {metrics.operationsOverTime.map((period) => {
-                const total = period.create + period.verify + period.refresh + period.revoke;
-                const maxOps = Math.max(...metrics.operationsOverTime.map(p => p.create + p.verify + p.refresh + p.revoke));
-                const percentage = maxOps > 0 ? (total / maxOps) * 100 : 0;
+            <h2 className="text-lg font-semibold text-grey mb-4">Peak Activity Hours</h2>
+            {metrics?.hourlyActivity && metrics.hourlyActivity.length > 0 ? (
+              <div className="space-y-2">
+                {(() => {
+                  // Use backend hourly activity data
+                  const hourlyData = metrics.hourlyActivity.map((data: any) => ({
+                    hour: data.hour,
+                    count: data.totalOperations,
+                  }));
 
-                return (
-                  <div key={period.period} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-grey-600">{period.period}</span>
-                      <span className="text-grey-500">{total.toLocaleString()} ops</span>
-                    </div>
-                    <div className="flex h-6 bg-grey-100 rounded overflow-hidden">
-                      {period.create > 0 && (
-                        <div
-                          className="bg-green h-full flex items-center justify-center"
-                          style={{ width: `${(period.create / total) * percentage}%` }}
-                          title={`Create: ${period.create}`}
-                        >
-                          {period.create > 5 && <span className="text-[10px] text-white font-medium">C</span>}
+                  const maxActivity = Math.max(...hourlyData.map(h => h.count));
+                  const topHours = hourlyData
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 8);
+
+                  return topHours.map(({ hour, count }) => {
+                    const percentage = maxActivity > 0 ? (count / maxActivity) * 100 : 0;
+                    const hourLabel = `${hour.toString().padStart(2, '0')}:00`;
+
+                    return (
+                      <div key={hour} className="flex items-center gap-3">
+                        <div className="w-14 text-xs font-medium text-grey-600">{hourLabel}</div>
+                        <div className="flex-1 h-6 bg-grey-100 rounded overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center px-2">
+                            <span className="text-[10px] font-semibold text-white">
+                              {count} ops
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      {period.verify > 0 && (
-                        <div
-                          className="bg-blue-500 h-full flex items-center justify-center"
-                          style={{ width: `${(period.verify / total) * percentage}%` }}
-                          title={`Verify: ${period.verify}`}
-                        >
-                          {period.verify > 5 && <span className="text-[10px] text-white font-medium">V</span>}
-                        </div>
-                      )}
-                      {period.refresh > 0 && (
-                        <div
-                          className="bg-purple-500 h-full flex items-center justify-center"
-                          style={{ width: `${(period.refresh / total) * percentage}%` }}
-                          title={`Refresh: ${period.refresh}`}
-                        >
-                          {period.refresh > 5 && <span className="text-[10px] text-white font-medium">R</span>}
-                        </div>
-                      )}
-                      {period.revoke > 0 && (
-                        <div
-                          className="bg-red-500 h-full flex items-center justify-center"
-                          style={{ width: `${(period.revoke / total) * percentage}%` }}
-                          title={`Revoke: ${period.revoke}`}
-                        >
-                          {period.revoke > 5 && <span className="text-[10px] text-white font-medium">X</span>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-4 mt-4 text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-green"></div>
-                <span className="text-grey-600">Create</span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-blue-500"></div>
-                <span className="text-grey-600">Verify</span>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Clock className="h-12 w-12 text-grey-300 mb-3" />
+                <p className="text-sm text-grey-600 font-medium mb-1">No activity data available</p>
+                <p className="text-xs text-grey-500">Peak hours will appear once sessions are active</p>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-purple-500"></div>
-                <span className="text-grey-600">Refresh</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-red-500"></div>
-                <span className="text-grey-600">Revoke</span>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+
+          {/* Operations Over Time */}
+          <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-grey mb-4">Operations Over Time</h2>
+          {metrics?.operationsOverTime && metrics.operationsOverTime.length > 0 ? (
+            <>
+              <div className="space-y-3">
+                {metrics.operationsOverTime.map((period) => {
+                  const total = period.create + period.verify + period.refresh + period.revoke;
+                  const maxOps = Math.max(...metrics.operationsOverTime.map(p => p.create + p.verify + p.refresh + p.revoke));
+                  const percentage = maxOps > 0 ? (total / maxOps) * 100 : 0;
+
+                  return (
+                    <div key={period.period} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-grey-600">{period.period}</span>
+                        <span className="text-grey-500">{total.toLocaleString()} ops</span>
+                      </div>
+                      <div className="flex h-6 bg-grey-100 rounded overflow-hidden">
+                        {period.create > 0 && (
+                          <div
+                            className="bg-green h-full flex items-center justify-center"
+                            style={{ width: `${(period.create / total) * percentage}%` }}
+                            title={`Create: ${period.create}`}
+                          >
+                            {period.create > 5 && <span className="text-[10px] text-white font-medium">C</span>}
+                          </div>
+                        )}
+                        {period.verify > 0 && (
+                          <div
+                            className="bg-blue-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.verify / total) * percentage}%` }}
+                            title={`Verify: ${period.verify}`}
+                          >
+                            {period.verify > 5 && <span className="text-[10px] text-white font-medium">V</span>}
+                          </div>
+                        )}
+                        {period.refresh > 0 && (
+                          <div
+                            className="bg-purple-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.refresh / total) * percentage}%` }}
+                            title={`Refresh: ${period.refresh}`}
+                          >
+                            {period.refresh > 5 && <span className="text-[10px] text-white font-medium">R</span>}
+                          </div>
+                        )}
+                        {period.revoke > 0 && (
+                          <div
+                            className="bg-red-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.revoke / total) * percentage}%` }}
+                            title={`Revoke: ${period.revoke}`}
+                          >
+                            {period.revoke > 5 && <span className="text-[10px] text-white font-medium">X</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-4 mt-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green"></div>
+                  <span className="text-grey-600">Create</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-blue-500"></div>
+                  <span className="text-grey-600">Verify</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-purple-500"></div>
+                  <span className="text-grey-600">Refresh</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-500"></div>
+                  <span className="text-grey-600">Revoke</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Activity className="h-12 w-12 text-grey-300 mb-3" />
+              <p className="text-sm text-grey-600 font-medium mb-1">No operations data available</p>
+              <p className="text-xs text-grey-500">Operation charts will appear once session operations are performed</p>
+            </div>
+          )}
+          </div>
+        </div>
 
         {/* Info Box */}
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
