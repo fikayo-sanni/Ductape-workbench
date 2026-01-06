@@ -802,21 +802,70 @@ export default function PricingTabContent() {
     setBundleFormOpen(true);
   };
 
-  const handleEditBundle = (bundle: PricingBundle) => {
-    setEditingBundle(bundle);
-    setBundleFormOpen(true);
+  const editMutation = useMutation({
+  mutationFn: (payload: {
+    _id: string;
+    user_id: string;
+    public_key: string;
+    workspace_id: string; // Add this if needed
+    name: string;
+    pricing_mode: string;
+    interval: string;
+    unit_price: number;
+    currency: string;
+    overage_price: number;
+    limits?: {
+      per_minute?: number;
+      per_hour?: number;
+      per_day?: number;
+      per_week?: number;
+      per_month?: number;
+    };
+  }) => pricingServices.editBundles(payload),
+
+  onSuccess: (data) => {
+    if (!data) return;
+    toast.success('Bundle edited successfully');
+    
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ['bundles'] });
+  },
+
+  onError: (error: Error) => {
+    toast.error(error.message || 'Failed to edit bundle');
+  },
+});
+
+
+  const deleteMutation = useMutation({
+    mutationFn: (payload: {
+      _id: string;
+      user_id: string;
+      public_key: string;
+    }) => pricingServices.deleteBundle(payload),
+
+    onSuccess: () => {
+      toast.success('Bundle deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+    },
+
+    onError: error => {
+      toast.error(error.message || 'Failed to delete bundle');
+    },
+    
+  });
+
+  const handleDeleteBundle = (bundleId) => {
+    if (!user?._id || !user?.public_key || !bundleId) return;
+
+    deleteMutation.mutate({
+      _id: bundleId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key,
+    });
   };
 
-  const handleDeleteBundle = (bundle: PricingBundle) => {
-    setDeletingBundle(bundle);
-  };
 
-  const confirmDeleteBundle = () => {
-    if (deletingBundle) {
-      setPricingBundles(pricingBundles.filter(b => b._id !== deletingBundle._id));
-      setDeletingBundle(null);
-    }
-  };
 
   const form = useForm<BundleFormValues>({
     resolver: zodResolver(bundleFormSchema),
@@ -875,15 +924,65 @@ export default function PricingTabContent() {
   });
 
   const onSubmit = async (data: BundleFormValues) => {
-    // Prepare limits object
-    const limits: Record<string, number> = {};
-    if (data.per_minute) limits.per_minute = data.per_minute || 0;
-    if (data.per_hour) limits.per_hour = data.per_hour || 0;
-    if (data.per_day) limits.per_day = data.per_day || 0;
-    if (data.per_week) limits.per_week = data.per_week || 0;
-    if (data.per_month) limits.per_month = data.per_month || 0;
+  // Prepare limits object
+  const limits: Record<string, number> = {};
+  if (data.per_minute) limits.per_minute = data.per_minute || 0;
+  if (data.per_hour) limits.per_hour = data.per_hour || 0;
+  if (data.per_day) limits.per_day = data.per_day || 0;
+  if (data.per_week) limits.per_week = data.per_week || 0;
+  if (data.per_month) limits.per_month = data.per_month || 0;
 
-    // Prepare API payload
+  if (editingBundle) {
+    // EDIT MODE - Use handleEditBundle logic
+    if (!user?._id || !user?.public_key) {
+      toast.error('User information is required');
+      return;
+    }
+
+    // Combine form data with editingBundle data
+    const bundleData = {
+      _id: editingBundle._id, // Use the ID from editingBundle
+      name: data.name,
+      pricing_mode: data.pricing_mode,
+      interval: data.interval,
+      unit_price: data.unit_price,
+      currency: data.currency,
+      overage_price: data.overage_price,
+      per_minute: data.per_minute,
+      per_hour: data.per_hour,
+      per_day: data.per_day,
+      per_week: data.per_week,
+      per_month: data.per_month,
+    };
+
+    // Create payload matching the mutationFn structure
+    const payload = {
+      _id: bundleData._id,
+      user_id: user._id,
+      public_key: user.public_key,
+      workspace_id: currentWorkspaceId || '',
+      name: bundleData.name,
+      pricing_mode: bundleData.pricing_mode,
+      interval: bundleData.interval,
+      unit_price: bundleData.unit_price,
+      currency: bundleData.currency,
+      overage_price: bundleData.overage_price,
+      ...(Object.keys(limits).length > 0 && { limits }),
+    };
+
+    // Call edit mutation
+    editMutation.mutate(payload, {
+      onSuccess: () => {
+        setBundleFormOpen(false);
+        setEditingBundle(null);
+      },
+      onError: () => {
+        // Keep modal open on error
+      }
+    });
+    
+  } else {
+    // CREATE MODE - Add new bundle
     const payload = {
       name: data.name,
       pricing_mode: data.pricing_mode,
@@ -894,35 +993,24 @@ export default function PricingTabContent() {
       ...limits,
     };
 
+    useCreateBundle.mutate({
+      user_id: user?._id || "",
+      public_key: user?.public_key || "",
+      workspace_id: currentWorkspaceId || "",
+      payload,
+    }, {
+      onSuccess: () => {
+        setBundleFormOpen(false);
+      }
+    });
+  }
+};
 
-    if (editingBundle) {
-      // Update existing bundle
-      setPricingBundles(pricingBundles.map(b =>
-        b._id === editingBundle._id
-          ? {
-              ...b,
-              name: data.name,
-              pricing_mode: data.pricing_mode,
-              interval: data.interval,
-              unit_price: data.unit_price,
-              currency: data.currency,
-              limits: Object.keys(limits).length > 0 ? limits : undefined,
-            }
-          : b
-      ));
-    } else {
-      // Add new bundle
-      useCreateBundle.mutate({
-        user_id: user?._id || "",
-        public_key: user?.public_key || "",
-        workspace_id: currentWorkspaceId || "",
-        payload,
-      });
-    }
-
-    setBundleFormOpen(false);
-    setEditingBundle(null);
-  };
+// When clicking edit button
+const handleEditClick = (bundle) => {
+  setEditingBundle(bundle); // Set the bundle to edit
+  setBundleFormOpen(true); // Open the form modal
+};
 
   const { data: totalIncomeData, status: isLoadingIncome } = useQuery({
   queryKey: ['incomes', user?._id, currentWorkspaceId],
@@ -945,8 +1033,10 @@ export default function PricingTabContent() {
 });
 
 
-console.log("total income", {totalIncomeData, isLoadingIncome});
+console.log("total incomes", {totalIncomeData, isLoadingIncome});
+const incomeData = totalIncomeData?.data;
 console.log("total expense", {totalExpenseData, isLoadingExpense});
+const expenseData = totalExpenseData?.data;
 
   const { data: bundleData, isLoading } = useQuery({
   queryKey: ['bundles', user?._id, currentWorkspaceId],
@@ -959,6 +1049,7 @@ console.log("total expense", {totalExpenseData, isLoadingExpense});
 });
 
 const pricingData = bundleData?.data;
+console.log("pricing bundles", {pricingData, isLoading});
 
 const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_active) || [];
 
@@ -998,17 +1089,13 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
 
   // Calculate expenditure stats
   const totalExpenditureAmount = expenditures.reduce((sum, exp) => sum + exp.amount, 0);
-  const paidExpenditures = expenditures.filter(exp => exp.status === ExpenditureStatus.PAID).length;
-  const pendingExpenditures = expenditures.filter(exp => exp.status === ExpenditureStatus.PENDING).length;
-  const overdueExpenditures = expenditures.filter(exp => exp.status === ExpenditureStatus.OVERDUE).length;
-  const failedExpenditures = expenditures.filter(exp => exp.status === ExpenditureStatus.FAILED).length;
+  
 
   // Prepare expenditure category distribution for pie chart
-  const categoryDistribution = [
-    { name: 'Ductape', value: expenditures.filter(e => e.category === ExpenditureCategory.DUCTAPE_SUBSCRIPTION).length, fill: CHART_COLORS.primary },
-    { name: 'Bundles', value: expenditures.filter(e => e.category === ExpenditureCategory.BUNDLE_SUBSCRIPTION).length, fill: CHART_COLORS.blue },
-    { name: 'Usage', value: expenditures.filter(e => e.category === ExpenditureCategory.USAGE_BASED).length, fill: CHART_COLORS.green },
-  ].filter(item => item.value > 0);
+const categoryDistribution = expenseData?.categoryBreakdown;
+const filterDistribution = categoryDistribution?.filter(item => item.amount > 0);
+const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
+
 
   // Prepare revenue trend data
   const revenueTrendData = incomeRecords.map(record => ({
@@ -1382,7 +1469,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                               className="h-8 w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleEditBundle(bundle);
+                                handleEditClick(bundle);
                               }}
                               title="Edit bundle"
                             >
@@ -1394,7 +1481,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteBundle(bundle);
+                                handleDeleteBundle(bundle._id);
                               }}
                               title="Delete bundle"
                             >
@@ -1500,7 +1587,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <DollarSign className="h-5 w-5 text-green" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">${totalRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-grey">${incomeData?.totalRevenue.toLocaleString()}</p>
                     <p className="text-sm text-grey-600">Total Revenue</p>
                   </div>
                 </div>
@@ -1513,7 +1600,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-grey">
-                      {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth.toFixed(1)}%
+                      {incomeData?.growthRate >= 0 ? '+' : ''}{incomeData?.growthRate.toFixed(1)}%
                     </p>
                     <p className="text-sm text-grey-600">Growth Rate</p>
                   </div>
@@ -1526,7 +1613,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <Calendar className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">${currentMonthRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-grey">${incomeData?.revenueThisMonth.toLocaleString()}</p>
                     <p className="text-sm text-grey-600">This Month</p>
                   </div>
                 </div>
@@ -1538,7 +1625,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <FileText className="h-5 w-5 text-orange" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">${Math.round(totalRevenue / incomeRecords.length).toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-grey">${incomeData?.averageRevenuePerMonth.toLocaleString()}</p>
                     <p className="text-sm text-grey-600">Avg / Month</p>
                   </div>
                 </div>
@@ -1760,7 +1847,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <ShoppingBag className="h-5 w-5 text-red" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">${totalExpenditureAmount.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-grey">${expenseData?.totalSpending.toLocaleString()}</p>
                     <p className="text-sm text-grey-600">Total Spending</p>
                   </div>
                 </div>
@@ -1772,7 +1859,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <CheckCircle className="h-5 w-5 text-green" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{paidExpenditures}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.paid}</p>
                     <p className="text-sm text-grey-600">Paid</p>
                   </div>
                 </div>
@@ -1784,7 +1871,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <AlertCircle className="h-5 w-5 text-yellow" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{pendingExpenditures}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.pending}</p>
                     <p className="text-sm text-grey-600">Pending</p>
                   </div>
                 </div>
@@ -1796,7 +1883,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     <XCircle className="h-5 w-5 text-orange" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{overdueExpenditures + failedExpenditures}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.issues}</p>
                     <p className="text-sm text-grey-600">Issues</p>
                   </div>
                 </div>
@@ -1809,20 +1896,21 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
-                    data={categoryDistribution}
+                    data={filterDistribution}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
+                    nameKey="category"
                     label={(props: any) => {
-                      const { name, percent } = props;
-                      return `${name || ''} ${percent ? (percent * 100).toFixed(0) : 0}%`;
+                      const { category, percentage } = props;
+                      return `${category || ''} ${percentage ? (percentage) : 0}%`;
                     }}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="value"
+                    dataKey="amount"
                   >
-                    {categoryDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    {(filterDistribution ?? []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -1854,41 +1942,41 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expenditures.map((expenditure) => (
-                      <TableRow key={expenditure._id} className="hover:bg-grey-100 transition-colors">
+                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
+                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
                         <TableCell>
-                          <span className="font-medium text-grey">{expenditure.reference_number}</span>
+                          <span className="font-medium text-grey">{expenditure.reference}</span>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium text-grey-700">{expenditure.vendor_name}</span>
-                            <span className="text-xs text-grey-600">{expenditure.description}</span>
+                            <span className="font-medium text-grey-700">{expenditure.vendor}</span>
+                            <span className="text-xs text-grey-600">{expenditure.details}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="gap-1.5 text-grey">
-                            {getCategoryIcon(expenditure.category)}
-                            {getCategoryLabel(expenditure.category)}
+                            {getCategoryIcon(expenditure?.category)}
+                            {getCategoryLabel(expenditure?.category)}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {expenditure.usage_count && (
+                          {expenditure?.usage_count && (
                             <span className="text-sm text-grey-600">
-                              {expenditure.usage_count.toLocaleString()} requests
+                              {expenditure?.usage_count.toLocaleString()} requests
                             </span>
                           )}
-                          {expenditure.bundle_name && (
+                          {expenditure?.bundle_name && (
                             <span className="text-sm text-grey-600">
-                              {expenditure.bundle_name}
+                              {expenditure?.bundle_name}
                             </span>
                           )}
-                          {!expenditure.usage_count && !expenditure.bundle_name && (
+                          {!expenditure?.usage_count && !expenditure?.bundle_name && (
                             <span className="text-sm text-grey-600">-</span>
                           )}
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-red">
-                            {formatCurrency(expenditure.amount, expenditure.currency)}
+                            {formatCurrency(expenditure.amount, expenseData?.currency)}
                           </span>
                         </TableCell>
                         <TableCell>

@@ -94,7 +94,16 @@ export interface TotalExpenseRecord {
                 details: string;
                 amount: number;
                 status: string;
+                ussage_count?: number;
+                bundle_name?: string;
+                date?: string;
             }
         ]
     }
+}
+
+export interface DeletePricingResponse {
+  status: boolean,
+  meta: object,
+  data: boolean
 }
