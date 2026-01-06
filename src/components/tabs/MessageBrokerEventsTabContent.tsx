@@ -53,194 +53,35 @@ interface MessageBrokerEvent {
   };
 }
 
+// Consumer instance - represents a unique consumer in the codebase
+interface ConsumerInstance {
+  id: string;
+  name: string;
+  topic: string;
+  eventCount: number;
+  successCount: number;
+  failedCount: number;
+  lastActivity: Date;
+  status: 'active' | 'inactive' | 'error';
+}
+
+// Producer instance - represents a unique producer in the codebase
+interface ProducerInstance {
+  id: string;
+  name: string;
+  topic: string;
+  eventCount: number;
+  successCount: number;
+  failedCount: number;
+  lastActivity: Date;
+  status: 'active' | 'inactive' | 'error';
+}
+
 interface MessageBrokerEventsTabContentProps {
   broker: any;
 }
 
-// Dummy data
-const DUMMY_BROKER_EVENTS: MessageBrokerEvent[] = [
-  {
-    id: '1',
-    event_type: 'message.consumed',
-    category: 'consumer',
-    topic: 'user-registration',
-    message: 'Consumer "email-service" processed message successfully',
-    timestamp: new Date(Date.now() - 30000),
-    status: 'success',
-    idempotent: false,
-    request_data: {
-      userId: 'user-12345',
-      email: 'john@example.com',
-      name: 'John Doe',
-      registeredAt: '2024-01-15T10:30:00Z'
-    },
-    response_data: {
-      emailSent: true,
-      messageId: 'email-msg-789',
-      deliveryStatus: 'delivered'
-    },
-    metadata: {
-      consumer_id: 'email-service-001',
-      message_id: 'msg-123456',
-    },
-  },
-  {
-    id: '2',
-    event_type: 'message.published',
-    category: 'producer',
-    topic: 'order-created',
-    message: 'Producer "order-service" published message',
-    timestamp: new Date(Date.now() - 120000),
-    status: 'success',
-    idempotent: true,
-    request_data: {
-      orderId: 'order-987654',
-      customerId: 'cust-456',
-      items: [
-        { productId: 'prod-123', quantity: 2, price: 49.99 },
-        { productId: 'prod-456', quantity: 1, price: 29.99 }
-      ],
-      totalAmount: 129.97
-    },
-    response_data: {
-      published: true,
-      messageId: 'msg-234567',
-      partition: 2
-    },
-    metadata: {
-      producer_id: 'order-service-002',
-      message_id: 'msg-234567',
-      idempotency_key: 'order-unique-123',
-    },
-  },
-  {
-    id: '3',
-    event_type: 'consumer.failed',
-    category: 'error',
-    topic: 'payment-processing',
-    message: 'Failed to process payment notification',
-    timestamp: new Date(Date.now() - 300000),
-    status: 'failed',
-    idempotent: false,
-    metadata: {
-      consumer_id: 'payment-service-003',
-      error_message: 'Connection timeout after 30s',
-      retry_count: 3,
-    },
-  },
-  {
-    id: '4',
-    event_type: 'message.deadlettered',
-    category: 'dead-letter',
-    topic: 'notification-failed',
-    message: 'Message moved to dead letter queue after max retries',
-    timestamp: new Date(Date.now() - 600000),
-    status: 'failed',
-    idempotent: false,
-    request_data: {
-      userId: 'user-789',
-      notificationType: 'email',
-      template: 'welcome-email',
-      recipient: 'user@example.com',
-      data: { name: 'John Doe', action: 'signup' }
-    },
-    metadata: {
-      consumer_id: 'notification-service-004',
-      error_message: 'Max retry attempts exceeded',
-      retry_count: 5,
-      message_id: 'msg-345678',
-    },
-  },
-  {
-    id: '5',
-    event_type: 'message.queued',
-    category: 'message',
-    topic: 'inventory-update',
-    message: 'Message queued for processing',
-    timestamp: new Date(Date.now() - 15000),
-    status: 'pending',
-    idempotent: false,
-    metadata: {
-      message_id: 'msg-456789',
-    },
-  },
-  {
-    id: '6',
-    event_type: 'duplicate.detected',
-    category: 'message',
-    topic: 'order-created',
-    message: 'Duplicate message detected and ignored via idempotency check',
-    timestamp: new Date(Date.now() - 45000),
-    status: 'duplicate',
-    idempotent: true,
-    metadata: {
-      idempotency_key: 'order-abc123-retry',
-      message_id: 'msg-567890',
-      producer_id: 'order-service-002',
-    },
-  },
-  {
-    id: '7',
-    event_type: 'message.consumed',
-    category: 'consumer',
-    topic: 'user-login',
-    message: 'Consumer "analytics-service" processed message',
-    timestamp: new Date(Date.now() - 90000),
-    status: 'success',
-    idempotent: true,
-    metadata: {
-      consumer_id: 'analytics-service-005',
-      message_id: 'msg-678901',
-      idempotency_key: 'login-track-xyz',
-    },
-  },
-  {
-    id: '8',
-    event_type: 'message.published',
-    category: 'producer',
-    topic: 'inventory-update',
-    message: 'Producer "inventory-service" published message',
-    timestamp: new Date(Date.now() - 180000),
-    status: 'success',
-    idempotent: false,
-    metadata: {
-      producer_id: 'inventory-service-006',
-      message_id: 'msg-789012',
-    },
-  },
-  {
-    id: '9',
-    event_type: 'producer.failed',
-    category: 'error',
-    topic: 'email-send',
-    message: 'Failed to send email notification',
-    timestamp: new Date(Date.now() - 420000),
-    status: 'failed',
-    idempotent: false,
-    metadata: {
-      consumer_id: 'email-service-001',
-      error_message: 'SMTP server unavailable',
-      retry_count: 2,
-    },
-  },
-  {
-    id: '10',
-    event_type: 'message.consumed',
-    category: 'consumer',
-    topic: 'payment-processing',
-    message: 'Payment processed successfully with idempotency guarantee',
-    timestamp: new Date(Date.now() - 240000),
-    status: 'success',
-    idempotent: true,
-    metadata: {
-      idempotency_key: 'payment-xyz789-unique',
-      message_id: 'msg-890123',
-      consumer_id: 'payment-service-003',
-    },
-  },
-];
-
-type CategoryFilter = 'all' | 'consumer' | 'producer' | 'dead-letter' | 'message' | 'error';
+type ViewMode = 'overview' | 'consumers' | 'producers' | 'consumer-detail' | 'producer-detail' | 'dead-letter' | 'all-events' | 'events';
 type StatusFilter = 'all' | 'success' | 'failed' | 'pending' | 'duplicate';
 
 // Sparkline component for mini charts
@@ -283,14 +124,16 @@ const Sparkline = ({ data, color, height = 32 }: { data: number[]; color: string
 export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerEventsTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'consumer' | 'producer' | 'dead-letter' | 'message' | 'error'>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [viewMode, setViewMode] = useState<'overview' | 'events'>('overview');
+  const [viewMode, setViewMode] = useState<ViewMode>('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listViewMode, setListViewMode] = useState<'list' | 'grid'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [selectedConsumer, setSelectedConsumer] = useState<ConsumerInstance | null>(null);
+  const [selectedProducer, setSelectedProducer] = useState<ProducerInstance | null>(null);
 
   // Update current time every second for live countdown
   useEffect(() => {
@@ -345,7 +188,14 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     );
   }
 
-  const brokerEvents = DUMMY_BROKER_EVENTS;
+  // TODO: Replace with actual API call to fetch broker events
+  const brokerEvents: MessageBrokerEvent[] = [];
+
+  // TODO: Replace with actual API call to fetch consumer instances
+  const consumerInstances: ConsumerInstance[] = [];
+
+  // TODO: Replace with actual API call to fetch producer instances
+  const producerInstances: ProducerInstance[] = [];
 
   // Calculate metrics - use dashboard metrics from logs service when available
   const metrics = useMemo(() => {
@@ -546,17 +396,17 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </button>
             </div>
 
-            {/* Category Filters */}
+            {/* Main Navigation */}
             {!isSidebarCollapsed && (
               <div className="flex items-center justify-between px-2 py-2">
                 <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-                  Category
+                  Navigation
                 </div>
                 <button
                   onClick={handleRefresh}
                   disabled={isRefreshing}
                   className="text-grey-600 hover:text-cyan-600 transition-colors"
-                  title="Refresh events"
+                  title="Refresh data"
                 >
                   <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
                 </button>
@@ -564,87 +414,146 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
             )}
 
             <div className="space-y-0.5">
-              {([
-                { value: 'all', label: 'All Events', icon: <LayoutGrid className="h-4 w-4" />, count: metrics.total },
-                { value: 'consumer', label: 'Consumers', icon: <Users className="h-4 w-4" />, count: metrics.consumers },
-                { value: 'producer', label: 'Producers', icon: <Send className="h-4 w-4" />, count: metrics.producers },
-                { value: 'dead-letter', label: 'Dead Letters', icon: <Trash2 className="h-4 w-4" />, count: metrics.deadLetter },
-                { value: 'error', label: 'Errors', icon: <AlertCircle className="h-4 w-4" />, count: metrics.errors },
-              ] as const).map((filter) => (
-                <button
-                  key={filter.value}
-                  onClick={() => {
-                    setCategoryFilter(filter.value);
-                    setViewMode('events');
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                    viewMode === 'events' && categoryFilter === filter.value
-                      ? 'bg-cyan-600/10 text-cyan-600'
-                      : 'text-grey hover:bg-background-secondary',
-                    isSidebarCollapsed && 'justify-center px-2'
-                  )}
-                  title={isSidebarCollapsed ? filter.label : undefined}
-                >
-                  <span className={cn(
-                    'flex-shrink-0',
-                    viewMode === 'events' && categoryFilter === filter.value ? 'text-cyan-600' : 'text-grey-600'
-                  )}>
-                    {filter.icon}
-                  </span>
-                  {!isSidebarCollapsed && (
-                    <>
-                      <span className="flex-1 text-left">{filter.label}</span>
-                      <span className={cn(
-                        'text-xs px-1.5 py-0.5 rounded',
-                        viewMode === 'events' && categoryFilter === filter.value
-                          ? 'bg-cyan-600/20 text-cyan-600'
-                          : 'bg-background-secondary text-grey-600'
-                      )}>
-                        {filter.count}
-                      </span>
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
+              {/* All Events */}
+              <button
+                onClick={() => {
+                  setViewMode('all-events');
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'all-events'
+                    ? 'bg-cyan-600/10 text-cyan-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'All Events' : undefined}
+              >
+                <LayoutGrid className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'all-events' ? 'text-cyan-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">All Events</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded',
+                      viewMode === 'all-events'
+                        ? 'bg-cyan-600/20 text-cyan-600'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {metrics.total}
+                    </span>
+                  </>
+                )}
+              </button>
 
-            {/* Status Filters */}
-            {!isSidebarCollapsed && (
-              <div className="mt-4 px-2">
-                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
-                  Status
-                </div>
-                <div className="space-y-0.5">
-                  {([
-                    { value: 'success', label: 'Success', count: metrics.success, color: 'bg-green' },
-                    { value: 'failed', label: 'Failed', count: metrics.failed, color: 'bg-red' },
-                    { value: 'pending', label: 'Pending', count: metrics.pending, color: 'bg-orange-500' },
-                    { value: 'duplicate', label: 'Duplicate', count: metrics.duplicate, color: 'bg-grey-500' },
-                  ] as const).map((filter) => (
-                    <button
-                      key={filter.value}
-                      onClick={() => {
-                        setStatusFilter(filter.value === statusFilter ? 'all' : filter.value);
-                        setViewMode('events');
-                      }}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                        statusFilter === filter.value
-                          ? 'bg-cyan-600/10 text-cyan-600'
-                          : 'text-grey hover:bg-background-secondary'
-                      )}
-                    >
-                      <div className={cn('w-2 h-2 rounded-full', filter.color)} />
-                      <span className="flex-1 text-left">{filter.label}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
-                        {filter.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+              {/* Consumers */}
+              <button
+                onClick={() => {
+                  setViewMode('consumers');
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'consumers'
+                    ? 'bg-cyan-600/10 text-cyan-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'Consumers' : undefined}
+              >
+                <Users className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'consumers' ? 'text-cyan-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">Consumers</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded',
+                      viewMode === 'consumers'
+                        ? 'bg-cyan-600/20 text-cyan-600'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {consumerInstances.length}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {/* Producers */}
+              <button
+                onClick={() => {
+                  setViewMode('producers');
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'producers'
+                    ? 'bg-cyan-600/10 text-cyan-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'Producers' : undefined}
+              >
+                <Send className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'producers' ? 'text-cyan-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">Producers</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded',
+                      viewMode === 'producers'
+                        ? 'bg-cyan-600/20 text-cyan-600'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {producerInstances.length}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {/* Dead Letters */}
+              <button
+                onClick={() => {
+                  setViewMode('dead-letter');
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'dead-letter'
+                    ? 'bg-cyan-600/10 text-cyan-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'Dead Letters' : undefined}
+              >
+                <Trash2 className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'dead-letter' ? 'text-cyan-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">Dead Letters</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded',
+                      viewMode === 'dead-letter'
+                        ? 'bg-cyan-600/20 text-cyan-600'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {metrics.deadLetter}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Collapse Toggle Button */}
@@ -981,7 +890,16 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </Button>
                 </div>
                 <div className="divide-y divide-border">
-                  {brokerEvents.slice(0, 5).map((event) => {
+                  {brokerEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
+                        <Activity className="h-6 w-6 text-grey-500" />
+                      </div>
+                      <p className="text-grey font-medium">No recent events</p>
+                      <p className="text-grey-500 text-sm mt-1">Events will appear once message broker operations occur</p>
+                    </div>
+                  ) : (
+                    brokerEvents.slice(0, 5).map((event) => {
                     const statusConfig = getStatusConfig(event.status);
                     const categoryConfig = getCategoryConfig(event.category);
                     return (
@@ -1006,7 +924,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                         </div>
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               </div>
             </div>

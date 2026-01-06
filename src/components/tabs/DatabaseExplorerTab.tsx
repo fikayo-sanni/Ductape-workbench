@@ -33,6 +33,7 @@ import {
   PanelLeftClose,
   FileText,
   Hash,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -311,8 +312,8 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
         return null;
       }
       try {
-        // Use SDK listTables to get real tables
-        const result = await databaseService.listTables({
+        // Use SDK listTablesWithInfo to get tables with row counts
+        const result = await databaseService.listTablesWithInfo({
           product: database.productTag,
           database: database.tag,
           env: database.env.slug,
@@ -320,19 +321,24 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
         console.log('[DB-Explorer] Raw tables result:', result);
 
-        // Transform string array to TableDefinition objects
-        // The SDK returns an array of table names like ["users", "orders", ...]
+        // Transform ITableInfo array to TableDefinition objects
         if (Array.isArray(result)) {
-          const tableDefinitions: TableDefinition[] = result.map((tableName: string | TableDefinition) => {
+          const tableDefinitions: TableDefinition[] = result.map((tableInfo: any) => {
             // If it's already a TableDefinition object, return as-is
-            if (typeof tableName === 'object' && tableName !== null && 'name' in tableName) {
-              return tableName as TableDefinition;
+            if (typeof tableInfo === 'object' && tableInfo !== null && 'name' in tableInfo) {
+              return {
+                name: tableInfo.name,
+                type: isNoSQL ? 'collection' : 'table',
+                columns: [], // Columns will be fetched when table is selected
+                rowCount: tableInfo.estimatedRowCount,
+                documentCount: isNoSQL ? tableInfo.estimatedRowCount : undefined,
+              } as TableDefinition;
             }
-            // Otherwise, transform string to TableDefinition
+            // Fallback for string names
             return {
-              name: String(tableName),
+              name: String(tableInfo),
               type: isNoSQL ? 'collection' : 'table',
-              columns: [], // Columns will be fetched when table is selected
+              columns: [],
             } as TableDefinition;
           });
           console.log('[DB-Explorer] Transformed tables:', tableDefinitions);
@@ -420,6 +426,11 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
       setSelectedTableName(selectedTable.name);
     }
   }, [selectedTable, selectedTableName]);
+
+  // Reset current page to 1 when switching tables
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTable?.name]);
 
   const [selectedMigration, setSelectedMigration] = useState<any | null>(null);
   const [selectedAction, setSelectedAction] = useState<IDatabaseAction | null>(null);
@@ -631,29 +642,66 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
               'BETWEEN': '$BETWEEN',
               'IN': '$IN',
               'NOT IN': '$NOT_IN',
+              // UI uses lowercase with underscores
+              'equals': '$EQ',
+              'not_equals': '$NE',
+              'greater_than': '$GT',
+              'less_than': '$LT',
+              'greater_than_or_equal': '$GTE',
+              'less_than_or_equal': '$LTE',
+              'contains': '$LIKE',
+              'starts_with': '$LIKE',
+              'ends_with': '$LIKE',
+              'is_null': '$IS_NULL',
+              'is_not_null': '$IS_NOT_NULL',
+              'between': '$BETWEEN',
+              'in': '$IN',
+              'not_in': '$NOT_IN',
             };
 
             let value: any = condition.value;
 
-            // Handle LIKE patterns
-            if (condition.operator === 'CONTAINS') {
+            // Handle LIKE patterns (check both uppercase and lowercase variants)
+            const op = condition.operator;
+            if (op === 'CONTAINS' || op === 'contains') {
               value = `%${condition.value}%`;
-            } else if (condition.operator === 'STARTS_WITH') {
+            } else if (op === 'STARTS_WITH' || op === 'starts_with') {
               value = `${condition.value}%`;
-            } else if (condition.operator === 'ENDS_WITH') {
+            } else if (op === 'ENDS_WITH' || op === 'ends_with') {
               value = `%${condition.value}`;
-            } else if (condition.operator === 'BETWEEN') {
+            } else if (op === 'BETWEEN' || op === 'between') {
               // BETWEEN expects an array of two values: [min, max]
               const parts = condition.value.split(',').map((v: string) => v.trim());
               if (parts.length === 2) {
                 value = parts;
               }
-            } else if (condition.operator === 'IN' || condition.operator === 'NOT IN') {
+            } else if (op === 'IN' || op === 'in' || op === 'NOT IN' || op === 'not_in') {
               // IN/NOT IN expects an array of values
               value = condition.value.split(',').map((v: string) => v.trim());
-            } else if (condition.operator === 'IS NULL' || condition.operator === 'IS NOT NULL') {
+            } else if (op === 'IS NULL' || op === 'is_null' || op === 'IS NOT NULL' || op === 'is_not_null') {
               // NULL checks don't need a value
               value = true;
+            }
+
+            // Convert value to appropriate type based on column type
+            const columnType = getColumnType(condition.field);
+            const isNumericType = ['number', 'integer', 'int', 'bigint', 'smallint', 'decimal', 'numeric', 'float', 'double', 'real'].includes(columnType.toLowerCase());
+            const isBooleanType = ['boolean', 'bool'].includes(columnType.toLowerCase());
+
+            if (op !== 'IS NULL' && op !== 'is_null' && op !== 'IS NOT NULL' && op !== 'is_not_null') {
+              if (isNumericType) {
+                // Convert to number for numeric columns
+                if (op === 'BETWEEN' || op === 'between') {
+                  value = value.map((v: string) => parseFloat(v));
+                } else if (op === 'IN' || op === 'in' || op === 'NOT IN' || op === 'not_in') {
+                  value = value.map((v: string) => parseFloat(v));
+                } else {
+                  value = parseFloat(value);
+                }
+              } else if (isBooleanType && typeof value === 'string') {
+                // Convert to boolean for boolean columns
+                value = value.toLowerCase() === 'true';
+              }
             }
 
             const sdkOperator = operatorMap[condition.operator] || '$EQ';
@@ -3573,26 +3621,33 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           {/* Tables List */}
           {sidebarView === 'tables' && (
             <div className="space-y-1">
-              {filteredTables.map((table) => (
-                <button
-                  key={table.name}
-                  onClick={() => setSelectedTable(table)}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
-                    selectedTable?.name === table.name
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Table className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{table.name}</span>
-                  </div>
-                  <span className="text-xs text-grey-600 flex-shrink-0">
-                    {'rowCount' in table && table.rowCount != null ? table.rowCount : 'documentCount' in table && table.documentCount != null ? table.documentCount : '-'}
-                  </span>
-                </button>
-              ))}
+              {isLoadingTables ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                  <span className="ml-2 text-sm text-grey-600">Loading {isNoSQL ? 'collections' : 'tables'}...</span>
+                </div>
+              ) : (
+                filteredTables.map((table) => (
+                  <button
+                    key={table.name}
+                    onClick={() => setSelectedTable(table)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
+                      selectedTable?.name === table.name
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-grey hover:bg-grey-100'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Table className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{table.name}</span>
+                    </div>
+                    <span className="text-xs text-grey-600 flex-shrink-0">
+                      {'rowCount' in table && table.rowCount != null ? table.rowCount : 'documentCount' in table && table.documentCount != null ? table.documentCount : '-'}
+                    </span>
+                  </button>
+                ))
+              )}
             </div>
           )}
 
@@ -3783,6 +3838,16 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <div className="text-xs text-grey-500">Database Type</div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Activity Timeline (7 Days) */}
+            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+                <p className="text-sm text-grey-600 font-medium mb-1">No database activity data available</p>
+                <p className="text-xs text-grey-500">Activity charts will appear once database operations are logged</p>
               </div>
             </div>
 
@@ -4084,9 +4149,13 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                   <SelectValue placeholder="Select field" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {allColumns.map(col => (
-                                    <SelectItem key={col} value={col}>{col}</SelectItem>
-                                  ))}
+                                  {allColumns && allColumns.length > 0 ? (
+                                    allColumns.map(col => (
+                                      <SelectItem key={col} value={col}>{col}</SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="" disabled>No columns available</SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                               <Select
@@ -4107,6 +4176,8 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                   <SelectItem value="ends_with">Ends with</SelectItem>
                                   <SelectItem value="greater_than">Greater than</SelectItem>
                                   <SelectItem value="less_than">Less than</SelectItem>
+                                  <SelectItem value="greater_than_or_equal">Greater than or equal</SelectItem>
+                                  <SelectItem value="less_than_or_equal">Less than or equal</SelectItem>
                                 </SelectContent>
                               </Select>
                               <div className="flex gap-2">
@@ -4199,7 +4270,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
 
             {/* Table Content */}
             <div className="flex-1 overflow-auto p-4">
-              {tableData.length === 0 ? (
+              {isLoadingTableData ? (
+                <div className="bg-white rounded-lg border border-grey-400 p-12 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mb-4" />
+                    <h3 className="text-lg font-semibold text-grey mb-2">Loading Data</h3>
+                    <p className="text-sm text-grey-600">
+                      Fetching {isNoSQL ? 'documents' : 'rows'} from {selectedTable?.name}...
+                    </p>
+                  </div>
+                </div>
+              ) : tableData.length === 0 ? (
                 <div className="bg-white rounded-lg border border-grey-400 p-12 text-center">
                   <Table className="h-12 w-12 text-grey-400 mx-auto mb-3" />
                   <h3 className="text-lg font-semibold text-grey mb-2">No Data</h3>
@@ -4246,9 +4327,8 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                       </thead>
                       <tbody className="divide-y divide-grey-400">
                         {tableData
-                          .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                           .map((row, rowIndex) => {
-                            const actualRowIndex = (currentPage - 1) * pageSize + rowIndex;
+                            const actualRowIndex = rowIndex;
                             const hasExpandedCells = rowHasExpandedCells(actualRowIndex);
 
                             return (
@@ -4305,10 +4385,10 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                       <div className="flex items-center gap-4">
                         <div>
                           Showing <span className="font-semibold text-grey">
-                            {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, tableData.length)}
+                            {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, ('rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : 0))}
                           </span> of{' '}
                           <span className="font-semibold text-grey">
-                            {'rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : tableData.length}
+                            {'rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : 0}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -4338,12 +4418,12 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                           Previous
                         </Button>
                         <span className="text-xs px-2">
-                          Page {currentPage} of {Math.ceil(tableData.length / pageSize)}
+                          Page {currentPage} of {Math.ceil(('rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : 0) / pageSize)}
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={currentPage >= Math.ceil(tableData.length / pageSize)}
+                          disabled={currentPage >= Math.ceil(('rowCount' in selectedTable && selectedTable.rowCount != null ? selectedTable.rowCount : 'documentCount' in selectedTable && selectedTable.documentCount != null ? selectedTable.documentCount : 0) / pageSize)}
                           onClick={() => setCurrentPage(currentPage + 1)}
                         >
                           Next
@@ -4705,11 +4785,15 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                           <SelectValue placeholder="Select a table..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {tables.map((table) => (
-                            <SelectItem key={table.name} value={table.name}>
-                              {table.name}
-                            </SelectItem>
-                          ))}
+                          {tables && tables.length > 0 ? (
+                            tables.map((table) => (
+                              <SelectItem key={table.name} value={table.name}>
+                                {table.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>No tables available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

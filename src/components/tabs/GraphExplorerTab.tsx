@@ -3246,6 +3246,16 @@ await ductape.init();`,
               </div>
             </div>
 
+            {/* Activity Timeline (7 Days) */}
+            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+                <p className="text-sm text-grey-600 font-medium mb-1">No graph activity data available</p>
+                <p className="text-xs text-grey-500">Activity charts will appear once graph operations are logged</p>
+              </div>
+            </div>
+
             {/* Quick Actions */}
             <div>
               <h3 className="text-sm font-semibold text-grey mb-3">Quick Actions</h3>

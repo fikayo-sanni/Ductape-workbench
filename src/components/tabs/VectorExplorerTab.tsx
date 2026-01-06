@@ -47,6 +47,8 @@ import {
   Activity,
   Server,
   Cpu,
+  PanelLeftClose,
+  PanelRightClose,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +74,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
+import { JsonViewer } from '@/components/JsonViewer';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeVector } from '@/hooks/useDuctapeVector';
@@ -80,7 +83,7 @@ import { useAuth } from '@/store/useAuth';
 interface VectorExplorerTabProps {
   vector: {
     name: string;
-    tag: string;
+    vector: string;
     type?: string;
     productTag?: string;
     productName?: string;
@@ -155,7 +158,7 @@ const VECTOR_OPERATIONS: Record<VectorOperation, {
 // Vector action interface
 interface IVectorAction {
   id: string;
-  tag: string;
+  vector: string;
   name: string;
   description?: string;
   operation: VectorOperation;
@@ -204,74 +207,8 @@ const generateActionTag = (name: string): string => {
     .replace(/^-+|-+$/g, '');
 };
 
-// Sample saved actions
-const DUMMY_ACTIONS: IVectorAction[] = [
-  {
-    id: 'action_1',
-    tag: 'search-products',
-    name: 'Search Products',
-    description: 'Semantic search for products by description',
-    operation: 'query',
-    query: {
-      operation: 'query',
-      options: {
-        namespace: '{{namespace}}',
-        topK: 10,
-        includeMetadata: true,
-        filter: { category: '{{category}}' }
-      }
-    },
-    parameters: [
-      { name: 'namespace', path: 'options.namespace', defaultValue: 'products', type: 'string' },
-      { name: 'category', path: 'options.filter.category', defaultValue: 'electronics', type: 'string' }
-    ],
-    createdAt: '2024-03-15T10:30:00Z'
-  },
-  {
-    id: 'action_2',
-    tag: 'fetch-user-embeddings',
-    name: 'Fetch User Embeddings',
-    description: 'Fetch embeddings for specific user IDs',
-    operation: 'fetch',
-    query: {
-      operation: 'fetch',
-      options: {
-        namespace: 'users',
-        ids: ['{{userId}}'],
-        includeMetadata: true
-      }
-    },
-    parameters: [
-      { name: 'userId', path: 'options.ids[0]', defaultValue: 'user_001', type: 'string' }
-    ],
-    createdAt: '2024-03-14T15:20:00Z'
-  },
-];
 
-// Sample namespaces
-const DUMMY_NAMESPACES: VectorNamespace[] = [
-  { name: 'default', vectorCount: 15432, dimensions: 1536, metric: 'cosine', status: 'ready' },
-  { name: 'products', vectorCount: 8291, dimensions: 1536, metric: 'cosine', status: 'ready' },
-  { name: 'users', vectorCount: 3456, dimensions: 768, metric: 'dotproduct', status: 'ready' },
-  { name: 'documents', vectorCount: 12087, dimensions: 1536, metric: 'cosine', status: 'indexing' },
-  { name: 'images', vectorCount: 5623, dimensions: 512, metric: 'euclidean', status: 'ready' },
-];
 
-// Sample vectors for display
-const DUMMY_VECTORS: VectorRecord[] = [
-  { id: 'vec_001', metadata: { title: 'Introduction to AI', category: 'tech', author: 'John Doe' }, score: 0.95 },
-  { id: 'vec_002', metadata: { title: 'Machine Learning Basics', category: 'tech', author: 'Jane Smith' }, score: 0.89 },
-  { id: 'vec_003', metadata: { title: 'Neural Networks Deep Dive', category: 'tech', author: 'Bob Wilson' }, score: 0.87 },
-  { id: 'vec_004', metadata: { title: 'Data Science Handbook', category: 'data', author: 'Alice Brown' }, score: 0.82 },
-  { id: 'vec_005', metadata: { title: 'Python for AI', category: 'programming', author: 'Charlie Davis' }, score: 0.79 },
-];
-
-// Sample query results
-const SAMPLE_QUERY_RESULTS = {
-  success: true,
-  executionTime: 42,
-  matches: DUMMY_VECTORS,
-};
 
 // SDK-style query templates
 const getDefaultQuery = () => JSON.stringify({
@@ -347,7 +284,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const queryClient = useQueryClient();
 
   // Guard: Show error if critical vector data is missing (e.g., tab restored with incomplete data)
-  if (!vector?.name || !vector?.tag) {
+  if (!vector?.name || !vector?.vector) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
@@ -384,7 +321,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   }, [setSidebarCollapsed]);
 
   // Persistent state key
-  const stateKey = `vector-explorer-state-${vector.tag}-${vector.env?.slug || 'default'}`;
+  const stateKey = `vector-explorer-state-${vector.vector}-${vector.env?.slug || 'default'}`;
 
   // Load persisted state from localStorage
   const getPersistedState = () => {
@@ -401,18 +338,14 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   // Main view state
   const [mainView, setMainView] = useState<MainView>(persistedState?.mainView || 'overview');
   const [sidebarView, setSidebarView] = useState<SidebarView>(persistedState?.sidebarView || 'namespaces');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Selected items - Note: We'll restore selected namespace after namespaces load
   const [selectedNamespace, setSelectedNamespace] = useState<VectorNamespace | null>(null);
   const persistedNamespaceName = persistedState?.selectedNamespaceName;
-  const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(null);
-  const [selectedAction, setSelectedAction] = useState<IVectorAction | null>(() => {
-    if (persistedState?.selectedActionTag) {
-      return DUMMY_ACTIONS.find(a => a.tag === persistedState.selectedActionTag) || null;
-    }
-    return null;
-  });
+  const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(persistedState?.selectedVector || null);
+  const [selectedAction, setSelectedAction] = useState<IVectorAction | null>(null);
 
   // Query state
   const [queryInput, setQueryInput] = useState(persistedState?.queryInput || getDefaultQuery());
@@ -441,7 +374,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const [queryBuilderIds, setQueryBuilderIds] = useState(persistedState?.queryBuilderIds || '');
 
   // Actions state
-  const [savedActions, setSavedActions] = useState<IVectorAction[]>(DUMMY_ACTIONS);
+  const [savedActions, setSavedActions] = useState<IVectorAction[]>([]);
 
   // Save action form state
   const [actionName, setActionName] = useState('');
@@ -465,7 +398,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Test connection to vector database by fetching stats
   const { data: connectionResult, isLoading: isConnecting, error: connectionError, isSuccess: isConnected } = useQuery({
-    queryKey: ['vector-connection', vector.productTag, vector.tag, currentEnvSlug],
+    queryKey: ['vector-connection', vector.productTag, vector.vector, currentEnvSlug],
     queryFn: async () => {
       if (!vectorService || !vector.productTag) {
         throw new Error('Vector service not available');
@@ -474,7 +407,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       const result = await vectorService.getStats({
         product: vector.productTag,
         env: currentEnvSlug,
-        vector: vector.tag,
+        vector: vector.vector,
       });
       return result;
     },
@@ -485,14 +418,14 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Fetch namespaces from the vector database
   const { data: sdkNamespaces, isLoading: isLoadingNamespaces, refetch: refetchNamespaces } = useQuery({
-    queryKey: ['vector-namespaces', vector.productTag, vector.tag, currentEnvSlug],
+    queryKey: ['vector-namespaces', vector.productTag, vector.vector, currentEnvSlug],
     queryFn: async () => {
       if (!vectorService || !vector.productTag) return null;
       try {
         const result = await vectorService.listNamespaces({
           product: vector.productTag,
           env: currentEnvSlug,
-          vector: vector.tag,
+          vector: vector.vector,
         });
         console.log('[Vector-Explorer] Namespaces result:', result);
         return result?.namespaces || [];
@@ -507,14 +440,14 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Fetch index stats
   const { data: sdkStats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
-    queryKey: ['vector-stats', vector.productTag, vector.tag, currentEnvSlug],
+    queryKey: ['vector-stats', vector.productTag, vector.vector, currentEnvSlug],
     queryFn: async () => {
       if (!vectorService || !vector.productTag) return null;
       try {
         const result = await vectorService.getStats({
           product: vector.productTag,
           env: currentEnvSlug,
-          vector: vector.tag,
+          vector: vector.vector,
         });
         console.log('[Vector-Explorer] Stats result:', result);
         return result;
@@ -529,14 +462,14 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Fetch index info
   const { data: sdkIndexInfo, refetch: refetchIndexInfo } = useQuery({
-    queryKey: ['vector-index-info', vector.productTag, vector.tag, currentEnvSlug],
+    queryKey: ['vector-index-info', vector.productTag, vector.vector, currentEnvSlug],
     queryFn: async () => {
       if (!vectorService || !vector.productTag) return null;
       try {
         const result = await vectorService.describeIndex({
           product: vector.productTag,
           env: currentEnvSlug,
-          vector: vector.tag,
+          vector: vector.vector,
         });
         console.log('[Vector-Explorer] Index info:', result);
         return result;
@@ -555,8 +488,8 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       return sdkNamespaces.map((ns: any) => ({
         name: typeof ns === 'string' ? ns : ns.name,
         vectorCount: ns.vectorCount || sdkStats?.namespaces?.[typeof ns === 'string' ? ns : ns.name]?.vectorCount || 0,
-        dimensions: ns.dimensions || sdkIndexInfo?.dimension || vector.dimensions,
-        metric: ns.metric || vector.metric,
+        dimensions: ns.dimensions || sdkIndexInfo?.dimensions || vector.dimensions,
+        metric: ns.metric || sdkIndexInfo?.metric || vector.metric,
         status: 'ready' as const,
       }));
     }
@@ -565,8 +498,13 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   }, [sdkNamespaces, sdkStats, sdkIndexInfo, vector.dimensions, vector.metric]);
 
   // State for vectors fetched from SDK
-  const [namespaceVectors, setNamespaceVectors] = useState<VectorRecord[]>([]);
+  const [namespaceVectors, setNamespaceVectors] = useState<VectorRecord[]>(persistedState?.namespaceVectors || []);
   const [isLoadingVectors, setIsLoadingVectors] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const [totalVectorCount, setTotalVectorCount] = useState(0);
 
   // Restore selected namespace from persisted state after namespaces load
   useEffect(() => {
@@ -587,7 +525,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       const result = await vectorService.query({
         product: vector.productTag,
         env: currentEnvSlug,
-        vector: vector.tag,
+        vector: vector.vector,
         ...queryData,
       });
       return result;
@@ -611,7 +549,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       return vectorService.upsert({
         product: vector.productTag,
         env: currentEnvSlug,
-        vector: vector.tag,
+        vector: vector.vector,
         ...upsertData,
       });
     },
@@ -632,7 +570,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       return vectorService.deleteByIds({
         product: vector.productTag,
         env: currentEnvSlug,
-        vector: vector.tag,
+        vector: vector.vector,
         ...deleteData,
       });
     },
@@ -652,7 +590,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       return vectorService.fetchVectors({
         product: vector.productTag,
         env: currentEnvSlug,
-        vector: vector.tag,
+        vector: vector.vector,
         ...fetchData,
       });
     },
@@ -684,8 +622,10 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
       queryResult,
       queryError,
       selectedNamespaceName: selectedNamespace?.name,
+      namespaceVectors, // Persist loaded vectors
+      selectedVector, // Persist selected vector
       resultsView,
-      selectedActionTag: selectedAction?.tag,
+      selectedActionTag: selectedAction?.vector,
       showQueryBuilder,
       queryBuilderOperation,
       queryBuilderNamespace,
@@ -704,6 +644,8 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     queryResult,
     queryError,
     selectedNamespace,
+    namespaceVectors, // Add to dependency array
+    selectedVector, // Add to dependency array
     resultsView,
     selectedAction,
     showQueryBuilder,
@@ -725,19 +667,60 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
   // Filter vectors based on selected namespace
   const filteredVectors = useMemo(() => {
-    if (!selectedNamespace) return [];
+    if (!selectedNamespace) {
+      console.log('[Vector-Explorer] filteredVectors: no selected namespace');
+      return [];
+    }
     // Use real vectors from SDK
+    const filtered = namespaceVectors.filter(v =>
+      v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.metadata && JSON.stringify(v.metadata).toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    console.log('[Vector-Explorer] filteredVectors:', {
+      total: namespaceVectors.length,
+      filtered: filtered.length,
+      searchQuery,
+      selectedNamespace: selectedNamespace.name,
+    });
+    return filtered;
+  }, [selectedNamespace, searchQuery, namespaceVectors]);
+
+  // For server-side pagination, we use namespaceVectors directly (already paginated from server)
+  // Only apply client-side filtering if search query is active
+  const displayVectors = useMemo(() => {
+    if (!searchQuery) {
+      return namespaceVectors;
+    }
+    // If searching, filter the current page results
     return namespaceVectors.filter(v =>
       v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (v.metadata && JSON.stringify(v.metadata).toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [selectedNamespace, searchQuery, namespaceVectors]);
+  }, [namespaceVectors, searchQuery]);
+
+  const totalPages = Math.ceil(totalVectorCount / itemsPerPage);
+
+  // Fetch new page when currentPage changes
+  useEffect(() => {
+    if (selectedNamespace && currentPage > 1) {
+      fetchVectorsForPage(selectedNamespace, currentPage);
+    }
+  }, [currentPage]);
+
+  // Reset to page 1 when search query or namespace changes
+  useEffect(() => {
+    if (searchQuery) {
+      // For search, we need all data - this is a limitation
+      // In production, you'd want server-side search too
+      setCurrentPage(1);
+    }
+  }, [searchQuery]);
 
   // Filter actions based on search
   const filteredActions = useMemo(() => {
     return savedActions.filter(a =>
       a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.tag.toLowerCase().includes(searchQuery.toLowerCase())
+      a.vector.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [savedActions, searchQuery]);
 
@@ -762,42 +745,125 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
     return { totalVectors: total, avgDimensions, namespaceCount: namespaces.length };
   }, [sdkStats, sdkIndexInfo, namespaces, vector.dimensions]);
 
+  // Fetch vectors for current page
+  const fetchVectorsForPage = async (namespace: VectorNamespace, page: number) => {
+    if (!vectorService || !vector.productTag) {
+      console.log('[Vector-Explorer] No vector service available');
+      return;
+    }
+
+    setIsLoadingVectors(true);
+
+    try {
+      // Calculate pagination offset
+      const offset = (page - 1) * itemsPerPage;
+
+      // First, get the total count and list of IDs with pagination
+      const listResult = await vectorService.listVectors({
+        product: vector.productTag,
+        env: currentEnvSlug,
+        vector: vector.vector,
+        namespace: namespace.name,
+        limit: itemsPerPage,
+        offset: offset,
+      });
+      console.log('[Vector-Explorer] Vector IDs for page', page, ':', listResult);
+
+      // Store total count for pagination
+      if (listResult?.totalCount !== undefined) {
+        setTotalVectorCount(listResult.totalCount);
+      } else if (listResult?.ids) {
+        // If totalCount not available, use namespace vector count
+        setTotalVectorCount(namespace.vectorCount);
+      }
+
+      // If we got IDs, fetch the full vector data with metadata
+      if (listResult?.ids && Array.isArray(listResult.ids) && listResult.ids.length > 0) {
+        const fetchResult = await vectorService.fetchVectors({
+          product: vector.productTag,
+          env: currentEnvSlug,
+          vector: vector.vector,
+          namespace: namespace.name,
+          ids: listResult.ids,
+        });
+        console.log('[Vector-Explorer] Fetched vectors for page:', fetchResult);
+
+        // fetchResult.vectors is an object/dict keyed by ID, convert to array
+        if (fetchResult?.vectors && typeof fetchResult.vectors === 'object') {
+          const vectorsArray = Object.entries(fetchResult.vectors)
+            .filter(([_, v]) => v !== null) // Filter out null entries (not found)
+            .map(([id, v]: [string, any]) => ({
+              id: v?.id || id,
+              values: v?.values,
+              metadata: v?.metadata || {},
+              score: v?.score,
+              sparseValues: v?.sparseValues,
+            }));
+          console.log('[Vector-Explorer] Setting namespace vectors:', vectorsArray.length, 'vectors');
+          setNamespaceVectors(vectorsArray);
+        } else {
+          console.log('[Vector-Explorer] fetchResult has no vectors object, using IDs only');
+          // If fetch doesn't return full vectors, at least show the IDs
+          const idsArray = listResult.ids.map((id: string) => ({
+            id,
+            metadata: {},
+          }));
+          setNamespaceVectors(idsArray);
+        }
+      } else {
+        console.log('[Vector-Explorer] No vectors found for page', page);
+        setNamespaceVectors([]);
+      }
+    } catch (error) {
+      console.error('[Vector-Explorer] Error fetching vectors:', error);
+      toast.error(`Failed to load vectors: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setNamespaceVectors([]);
+    } finally {
+      setIsLoadingVectors(false);
+    }
+  };
+
   // Handle namespace selection
   const handleSelectNamespace = async (namespace: VectorNamespace) => {
+    console.log('[Vector-Explorer] handleSelectNamespace called:', {
+      namespace: namespace.name,
+      vectorService: !!vectorService,
+      productTag: vector.productTag,
+      vectorTag: vector.vector,
+      env: currentEnvSlug,
+    });
+
     setSelectedNamespace(namespace);
     setSelectedVector(null);
     setMainView('namespace');
     setQueryBuilderNamespace(namespace.name);
     setIsLoadingNamespace(true);
     setNamespaceVectors([]);
+    setCurrentPage(1); // Reset to first page
+    setTotalVectorCount(namespace.vectorCount); // Set initial count from namespace
 
     try {
-      // Fetch vectors from the namespace using SDK
-      if (vectorService && vector.productTag) {
-        setIsLoadingVectors(true);
-        const result = await vectorService.listVectors({
-          product: vector.productTag,
-          env: currentEnvSlug,
-          vector: vector.tag,
-          namespace: namespace.name,
-          limit: 100,
-          includeMetadata: true,
-        });
-        console.log('[Vector-Explorer] Vectors in namespace:', result);
-        if (result?.vectors && Array.isArray(result.vectors)) {
-          setNamespaceVectors(result.vectors.map((v: any) => ({
-            id: v.id,
-            values: v.values,
-            metadata: v.metadata,
-            score: v.score,
-            sparseValues: v.sparseValues,
-          })));
-        }
+      // Validate required data
+      if (!vectorService) {
+        console.error('[Vector-Explorer] Vector service not available');
+        toast.error('Vector service not available');
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching vectors:', error);
-      // Fall back to dummy data on error
-      setNamespaceVectors([]);
+
+      if (!vector.productTag) {
+        console.error('[Vector-Explorer] Product tag missing');
+        toast.error('Product tag missing');
+        return;
+      }
+
+      if (!vector.vector) {
+        console.error('[Vector-Explorer] Vector tag missing');
+        toast.error('Vector configuration missing');
+        return;
+      }
+
+      // Fetch first page of vectors
+      await fetchVectorsForPage(namespace, 1);
     } finally {
       setIsLoadingNamespace(false);
       setIsLoadingVectors(false);
@@ -880,7 +946,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.query({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -889,7 +955,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.fetchVectors({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -897,7 +963,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.listVectors({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -906,7 +972,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.upsert({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -914,7 +980,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.deleteByIds({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -922,7 +988,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.count({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
               ...options,
             });
             break;
@@ -930,21 +996,21 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
             result = await vectorService.listNamespaces({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
             });
             break;
           case 'getStats':
             result = await vectorService.getStats({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
             });
             break;
           case 'describeIndex':
             result = await vectorService.describeIndex({
               product: vector.productTag,
               env: currentEnvSlug,
-              vector: vector.tag,
+              vector: vector.vector,
             });
             break;
           default:
@@ -1078,7 +1144,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
 
       const newAction: IVectorAction = {
         id: `action_${Date.now()}`,
-        tag: actionTag,
+        vector: actionTag,
         name: actionName,
         description: actionDescription || undefined,
         operation: query.operation,
@@ -1139,7 +1205,7 @@ export default function VectorExplorerTab({ vector }: VectorExplorerTabProps) {
   const generateCodeSections = (language: string, env?: string) => {
     const productTag = vector.productTag || 'your-product';
     const envSlug = env || vector.env?.slug || 'prd';
-    const vectorTag = vector.tag;
+    const vectorTag = vector.vector;
     const namespace = selectedNamespace?.name || 'default';
 
     return [
@@ -1271,6 +1337,16 @@ await ductape.init();`,
               <div className="text-xs text-grey-500">Saved Actions</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Activity Timeline (7 Days) */}
+      <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+          <p className="text-sm text-grey-600 font-medium mb-1">No vector activity data available</p>
+          <p className="text-xs text-grey-500">Activity charts will appear once vector operations are logged</p>
         </div>
       </div>
 
@@ -1419,101 +1495,112 @@ await ductape.init();`,
 
     if (isLoadingNamespace) {
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-            <p className="text-grey-500">Loading namespace data...</p>
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header - Fixed */}
+          <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={handleBackToOverview} className="gap-1">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="w-px h-6 bg-grey-400" />
+              <Layers className="h-5 w-5 text-blue" />
+              <div>
+                <h2 className="text-lg font-semibold text-grey">{selectedNamespace.name}</h2>
+                <p className="text-xs text-grey-600">Loading namespace data...</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Content */}
+          <div className="flex-1 flex items-center justify-center bg-grey-50">
+            <div className="text-center">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                </div>
+                <Loader2 className="h-16 w-16 animate-spin text-primary relative" />
+              </div>
+              <p className="text-grey-600 mt-6 text-sm">Loading vectors...</p>
+              <p className="text-grey-500 mt-2 text-xs">This may take a moment</p>
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Namespace Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={handleBackToOverview}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div className="flex-1">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Namespace Header - Fixed */}
+        <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Layers className="h-5 w-5 text-primary" />
-              </div>
+              <Button variant="ghost" size="sm" onClick={handleBackToOverview} className="gap-1">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="w-px h-6 bg-grey-400" />
+              <Layers className="h-5 w-5 text-blue" />
               <div>
-                <h2 className="text-xl font-semibold text-grey">{selectedNamespace.name}</h2>
-                <div className="flex items-center gap-2 text-sm text-grey-500">
-                  {renderNamespaceStatus(selectedNamespace.status)}
-                </div>
+                <h2 className="text-lg font-semibold text-grey">{selectedNamespace.name}</h2>
+                <p className="text-xs text-grey-600">{selectedNamespace.vectorCount.toLocaleString()} vectors</p>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => {
-              setQueryInput(getNamespaceQuery(selectedNamespace.name));
-              setMainView('query');
-            }}>
-              <Code className="h-4 w-4 mr-1" />
-              Query
-            </Button>
-            <Button size="sm" onClick={handleExecuteQuery}>
-              <Play className="h-4 w-4 mr-1" />
-              Execute
-            </Button>
-          </div>
-        </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <div className="text-2xl font-bold text-grey">{selectedNamespace.vectorCount.toLocaleString()}</div>
-            <div className="text-xs text-grey-500">Vectors</div>
-          </div>
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <div className="text-2xl font-bold text-grey">{selectedNamespace.dimensions || '-'}</div>
-            <div className="text-xs text-grey-500">Dimensions</div>
-          </div>
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <div className="text-2xl font-bold text-grey capitalize">{selectedNamespace.metric || '-'}</div>
-            <div className="text-xs text-grey-500">Metric</div>
-          </div>
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <div className="text-2xl font-bold text-green capitalize">{selectedNamespace.status}</div>
-            <div className="text-xs text-grey-500">Status</div>
-          </div>
-        </div>
-
-        {/* Vectors List */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-grey">Vectors in {selectedNamespace.name}</h3>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setResultsView('table')}>
-                <Table2 className={cn('h-4 w-4', resultsView === 'table' && 'text-primary')} />
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('table')} className={cn(resultsView === 'table' && 'bg-grey-100')}>
+                <Table2 className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setResultsView('cards')}>
-                <Grid3X3 className={cn('h-4 w-4', resultsView === 'cards' && 'text-primary')} />
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('cards')} className={cn(resultsView === 'cards' && 'bg-grey-100')}>
+                <Grid3X3 className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setResultsView('json')}>
-                <Braces className={cn('h-4 w-4', resultsView === 'json' && 'text-primary')} />
+              <Button variant="ghost" size="sm" onClick={() => setResultsView('json')} className={cn(resultsView === 'json' && 'bg-grey-100')}>
+                <Braces className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-6 bg-grey-400 mx-1" />
+              <Button variant="outline" size="sm" onClick={() => {
+                setQueryInput(getNamespaceQuery(selectedNamespace.name));
+                setMainView('query');
+              }} className="gap-2">
+                <Code className="h-4 w-4" />
+                Query
+              </Button>
+              <Button size="sm" onClick={handleExecuteQuery} className="gap-2">
+                <Play className="h-4 w-4" />
+                Execute
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-auto p-4">
 
           {isLoadingVectors ? (
-            <div className="flex items-center justify-center py-12 bg-white rounded-lg border border-grey-400">
+            <div className="flex items-center justify-center py-20 bg-white rounded-lg border border-grey-400">
               <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-                <p className="text-grey-500">Loading vectors...</p>
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 border-4 border-primary/20 rounded-full"></div>
+                  </div>
+                  <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
+                </div>
+                <p className="text-grey-600 font-medium">Loading vectors...</p>
+                <p className="text-grey-500 text-sm mt-1">Fetching data from {selectedNamespace.name}</p>
               </div>
             </div>
-          ) : filteredVectors.length === 0 ? (
-            <div className="flex items-center justify-center py-12 bg-white rounded-lg border border-grey-400">
-              <div className="text-center">
-                <Database className="h-8 w-8 text-grey-400 mx-auto mb-3" />
-                <p className="text-grey-500 mb-2">No vectors in this namespace</p>
-                <p className="text-xs text-grey-400">Run a query to fetch vectors</p>
+          ) : displayVectors.length === 0 ? (
+            <div className="flex items-center justify-center py-20 bg-white rounded-lg border border-grey-400">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-4">
+                  <Database className="h-8 w-8 text-grey-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-grey mb-2">No vectors found</h3>
+                <p className="text-grey-500 text-sm mb-4">This namespace doesn't contain any vectors yet, or they haven't been loaded.</p>
+                <Button size="sm" onClick={handleExecuteQuery} className="gap-2">
+                  <Play className="h-4 w-4" />
+                  Load Vectors
+                </Button>
               </div>
             </div>
           ) : (
@@ -1529,16 +1616,16 @@ await ductape.init();`,
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredVectors.map((vec) => (
+                      {displayVectors.map((vec) => (
                         <tr
                           key={vec.id}
                           className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
                           onClick={() => handleSelectVector(vec)}
                         >
                           <td className="py-3 px-4">
-                            <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                            <code className="text-sm text-grey dark:text-grey bg-grey-100 dark:bg-grey-400 px-2 py-1 rounded">{vec.id}</code>
                           </td>
-                          <td className="py-3 px-4 text-grey-600 truncate max-w-md">
+                          <td className="py-3 px-4 text-grey-600 dark:text-grey truncate max-w-md">
                             {vec.metadata ? JSON.stringify(vec.metadata) : '—'}
                           </td>
                           <td className="py-3 px-4 text-right">
@@ -1556,52 +1643,147 @@ await ductape.init();`,
                 </div>
               )}
 
-              {resultsView === 'cards' && (
-                <div className="grid grid-cols-2 gap-4">
-                  {filteredVectors.map((vec) => (
-                    <button
-                      key={vec.id}
-                      onClick={() => handleSelectVector(vec)}
-                      className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+              {resultsView === 'table' && totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 bg-white rounded-lg border border-grey-400 px-4 py-3">
+                  <div className="text-sm text-grey-600">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalVectorCount)} of {totalVectorCount.toLocaleString()} vectors
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
-                        <Button variant="ghost" size="sm" onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyToClipboard(vec.id);
-                        }}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {vec.metadata && (
-                        <div className="space-y-1">
-                          {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
-                            <div key={key} className="flex items-center gap-2 text-xs">
-                              <span className="text-grey-500">{key}:</span>
-                              <span className="text-grey truncate">{String(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               )}
 
+              {resultsView === 'cards' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    {displayVectors.map((vec) => (
+                      <button
+                        key={vec.id}
+                        onClick={() => handleSelectVector(vec)}
+                        className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <code className="text-sm font-medium text-grey bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
+                          <Button variant="ghost" size="sm" onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyToClipboard(vec.id);
+                          }}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {vec.metadata && (
+                          <div className="space-y-1">
+                            {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
+                              <div key={key} className="flex items-center gap-2 text-xs">
+                                <span className="text-grey-500">{key}:</span>
+                                <span className="text-grey truncate">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 bg-white rounded-lg border border-grey-400 px-4 py-3">
+                      <div className="text-sm text-grey-600">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalVectorCount)} of {totalVectorCount.toLocaleString()} vectors
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "ghost"}
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                                className="w-8 h-8 p-0"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {resultsView === 'json' && (
-                <div className="relative bg-white rounded-lg border border-grey-400">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={() => handleCopyToClipboard(JSON.stringify(filteredVectors, null, 2))}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <pre className="p-4 text-sm overflow-auto max-h-[400px]">
-                    {JSON.stringify(filteredVectors, null, 2)}
-                  </pre>
-                </div>
+                <JsonViewer
+                  data={filteredVectors}
+                  defaultExpanded={false}
+                  onCopy={handleCopyToClipboard}
+                />
               )}
             </>
           )}
@@ -1616,126 +1798,128 @@ await ductape.init();`,
 
     if (isLoadingVector) {
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-            <p className="text-grey-500">Loading vector data...</p>
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header - Fixed */}
+          <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setMainView('namespace')} className="gap-1">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="w-px h-6 bg-grey-400" />
+              <FileText className="h-5 w-5 text-blue" />
+              <div>
+                <h2 className="text-lg font-semibold text-grey font-mono">{selectedVector.id}</h2>
+                <p className="text-xs text-grey-600">Loading vector details...</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Content */}
+          <div className="flex-1 flex items-center justify-center bg-grey-50">
+            <div className="text-center">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                </div>
+                <Loader2 className="h-16 w-16 animate-spin text-primary relative" />
+              </div>
+              <p className="text-grey-600 mt-6 text-sm">Loading vector data...</p>
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Vector Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => setMainView('namespace')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to {selectedNamespace?.name || 'Namespace'}
-          </Button>
-          <div className="flex-1">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Vector Header - Fixed */}
+        <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-blue" />
-              </div>
+              <Button variant="ghost" size="sm" onClick={() => setMainView('namespace')} className="gap-1">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="w-px h-6 bg-grey-400" />
+              <FileText className="h-5 w-5 text-blue" />
               <div>
-                <h2 className="text-xl font-semibold text-grey font-mono">{selectedVector.id}</h2>
-                <div className="text-sm text-grey-500">
-                  Vector in {selectedNamespace?.name || 'namespace'}
-                </div>
+                <h2 className="text-lg font-semibold text-grey font-mono">{selectedVector.id}</h2>
+                <p className="text-xs text-grey-600">Vector in {selectedNamespace?.name || 'namespace'}</p>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedVector.id)}>
-              <Copy className="h-4 w-4 mr-1" />
-              Copy ID
-            </Button>
-            <Button variant="outline" size="sm" className="text-red hover:text-red" onClick={() => setShowDeleteModal(true)}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedVector.id)} className="gap-2">
+                <Copy className="h-4 w-4" />
+                Copy ID
+              </Button>
+              <Button variant="outline" size="sm" className="text-red hover:text-red gap-2" onClick={() => setShowDeleteModal(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Vector Info */}
-        <div className="grid grid-cols-2 gap-6">
-          {/* Metadata */}
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <h3 className="text-sm font-semibold text-grey mb-3 flex items-center gap-2">
-              <Tag className="h-4 w-4" />
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+
+        {/* Vector Properties */}
+        <div className="bg-white rounded-lg border border-grey-400 p-4">
+          <h3 className="text-sm font-semibold text-grey mb-4 flex items-center gap-2">
+            <Info className="h-4 w-4 text-blue" />
+            Vector Properties
+          </h3>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div className="flex flex-col col-span-2">
+              <span className="text-xs text-grey-500 mb-1">ID</span>
+              <code className="text-sm text-grey dark:text-grey bg-slate-50 dark:bg-grey-400 px-2 py-1.5 rounded border border-grey-400 font-mono break-all">{selectedVector.id}</code>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-grey-500 mb-1">Namespace</span>
+              <span className="text-sm text-grey px-2 py-1.5">{selectedNamespace?.name || 'default'}</span>
+            </div>
+            {selectedVector.score !== undefined && (
+              <div className="flex flex-col">
+                <span className="text-xs text-grey-500 mb-1">Similarity Score</span>
+                <span className="text-sm text-blue-700 font-semibold px-2 py-1.5">{selectedVector.score.toFixed(4)}</span>
+              </div>
+            )}
+            <div className="flex flex-col">
+              <span className="text-xs text-grey-500 mb-1">Has Vector Values</span>
+              <span className="text-sm text-grey px-2 py-1.5">{selectedVector.values ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Metadata */}
+        {selectedVector.metadata && Object.keys(selectedVector.metadata).length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-grey mb-2 flex items-center gap-2">
+              <Tag className="h-4 w-4 text-emerald-600" />
               Metadata
             </h3>
-            {selectedVector.metadata ? (
-              <div className="space-y-2">
-                {Object.entries(selectedVector.metadata).map(([key, value]) => (
-                  <div key={key} className="flex items-start gap-2 py-2 border-b border-grey-200 last:border-0">
-                    <span className="text-sm text-grey-500 min-w-[100px]">{key}:</span>
-                    <span className="text-sm text-grey flex-1">{String(value)}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => handleCopyToClipboard(String(value))}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-grey-500">No metadata</p>
-            )}
+            <JsonViewer
+              data={selectedVector.metadata}
+              defaultExpanded={true}
+              onCopy={handleCopyToClipboard}
+            />
           </div>
+        )}
 
-          {/* Vector Properties */}
-          <div className="bg-white rounded-xl border border-grey-400 p-4">
-            <h3 className="text-sm font-semibold text-grey mb-3 flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              Properties
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between py-2 border-b border-grey-200">
-                <span className="text-sm text-grey-500">ID</span>
-                <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedVector.id}</code>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-grey-200">
-                <span className="text-sm text-grey-500">Namespace</span>
-                <span className="text-sm text-grey">{selectedNamespace?.name || 'default'}</span>
-              </div>
-              {selectedVector.score !== undefined && (
-                <div className="flex items-center justify-between py-2 border-b border-grey-200">
-                  <span className="text-sm text-grey-500">Score</span>
-                  <span className="text-sm text-primary font-medium">{selectedVector.score.toFixed(4)}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-grey-500">Has Values</span>
-                <span className="text-sm text-grey">{selectedVector.values ? 'Yes' : 'No'}</span>
-              </div>
-            </div>
-          </div>
+        {/* Full Vector Data */}
+        <div>
+          <h3 className="text-sm font-semibold text-grey mb-2 flex items-center gap-2">
+            <Braces className="h-4 w-4 text-slate-600" />
+            Complete Vector Data
+          </h3>
+          <JsonViewer
+            data={selectedVector}
+            defaultExpanded={false}
+            onCopy={handleCopyToClipboard}
+          />
         </div>
-
-        {/* Raw JSON */}
-        <div className="bg-white rounded-xl border border-grey-400 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-grey flex items-center gap-2">
-              <Braces className="h-4 w-4" />
-              Raw Data
-            </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleCopyToClipboard(JSON.stringify(selectedVector, null, 2))}
-            >
-              <Copy className="h-4 w-4 mr-1" />
-              Copy
-            </Button>
-          </div>
-          <pre className="bg-grey-50 rounded-lg p-4 text-sm overflow-auto max-h-[300px]">
-            {JSON.stringify(selectedVector, null, 2)}
-          </pre>
         </div>
       </div>
     );
@@ -1761,7 +1945,7 @@ await ductape.init();`,
               <>
                 <Bookmark className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-grey">{selectedAction.name}</span>
-                <code className="text-xs bg-grey-100 px-2 py-1 rounded text-grey-600">{selectedAction.tag}</code>
+                <code className="text-xs bg-grey-100 px-2 py-1 rounded text-grey-600">{selectedAction.vector}</code>
               </>
             ) : (
               <>
@@ -2084,19 +2268,11 @@ await ductape.init();`,
 
                 {/* Results */}
                 {resultsView === 'json' && (
-                  <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2"
-                      onClick={() => handleCopyToClipboard(JSON.stringify(queryResult, null, 2))}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <pre className="bg-white rounded-lg p-4 text-sm overflow-auto max-h-[400px] border border-grey-400">
-                      {JSON.stringify(queryResult, null, 2)}
-                    </pre>
-                  </div>
+                  <JsonViewer
+                    data={queryResult}
+                    defaultExpanded={false}
+                    onCopy={handleCopyToClipboard}
+                  />
                 )}
 
                 {resultsView === 'table' && queryResult.matches && (
@@ -2319,19 +2495,11 @@ await ductape.init();`,
             )}
 
             {resultsView === 'json' && (
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2"
-                  onClick={() => handleCopyToClipboard(JSON.stringify(queryResult, null, 2))}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <pre className="bg-white rounded-lg border border-grey-400 p-4 text-sm overflow-auto">
-                  {JSON.stringify(queryResult, null, 2)}
-                </pre>
-              </div>
+              <JsonViewer
+                data={queryResult}
+                defaultExpanded={false}
+                onCopy={handleCopyToClipboard}
+              />
             )}
           </>
         )}
@@ -2488,7 +2656,7 @@ await ductape.init();`,
             {/* Actions */}
             <div className="mt-6 flex flex-col gap-3">
               <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['vector-connection', vector.productTag, vector.tag, currentEnvSlug] })}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['vector-connection', vector.productTag, vector.vector, currentEnvSlug] })}
                 className="w-full"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -2507,30 +2675,52 @@ await ductape.init();`,
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
       {/* Sidebar */}
-      <div className="w-72 border-r border-grey-400 bg-white flex flex-col flex-shrink-0">
+      <div className={cn(
+        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
+        isSidebarCollapsed ? 'w-14' : 'w-64'
+      )}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-grey-400">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', getVectorTypeColor(vector.type))}>
+        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
+            {/* Vector Icon Button */}
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={cn(
+                'flex items-center justify-center rounded-lg flex-shrink-0',
+                getVectorTypeColor(vector.type),
+                isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
+              )}
+            >
               <Boxes className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-grey truncate">{vector.name || 'Vector Explorer'}</h2>
-              <div className="flex items-center gap-2 text-xs text-grey-500">
-                {vector.env?.slug && (
-                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                    {currentEnvSlug}
-                  </span>
-                )}
-                {vector.type && (
-                  <span>{getVectorDBDisplayName(vector.type)}</span>
-                )}
-              </div>
-            </div>
+            </button>
+
+            {!isSidebarCollapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-grey text-sm truncate">{vector.name || 'Vector Explorer'}</h2>
+                  <div className="flex items-center gap-2 text-xs text-grey-600">
+                    {vector.env?.slug && (
+                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                        {currentEnvSlug}
+                      </span>
+                    )}
+                    {vector.type && (
+                      <span className="truncate">{getVectorDBDisplayName(vector.type)}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Quick Stats */}
-          {(vector.dimensions || vector.metric) && (
+          {/* Quick Stats - Only show when expanded */}
+          {!isSidebarCollapsed && (vector.dimensions || vector.metric) && (
             <div className="flex items-center gap-3 text-xs text-grey-600 mb-3">
               {vector.dimensions && (
                 <span className="flex items-center gap-1">
@@ -2547,135 +2737,152 @@ await ductape.init();`,
             </div>
           )}
 
-          {/* Connection Status */}
-          <div className="mb-3">
-            <div className="flex items-center gap-2 text-xs text-green bg-green/5 rounded-lg px-3 py-2">
-              <CheckCircle2 className="h-3 w-3" />
-              Connected
-              {isLoadingNamespaces && (
-                <span className="text-grey-500 ml-2 flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading...
-                </span>
+          {/* View Selector - Only show when expanded */}
+          {!isSidebarCollapsed && (
+            <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
+              <button
+                onClick={() => setSidebarView('namespaces')}
+                className={cn(
+                  'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                  sidebarView === 'namespaces'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-grey-600 hover:text-grey'
+                )}
+              >
+                <Layers className="h-3 w-3 inline mr-1" />
+                Namespaces
+              </button>
+              <button
+                onClick={() => setSidebarView('actions')}
+                className={cn(
+                  'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                  sidebarView === 'actions'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-grey-600 hover:text-grey'
+                )}
+              >
+                <Zap className="h-3 w-3 inline mr-1" />
+                Actions
+              </button>
+            </div>
+          )}
+
+          {/* Search - Only show when expanded */}
+          {!isSidebarCollapsed && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+              <Input
+                placeholder={`Search ${sidebarView}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Collapsed View Selector - Only show when collapsed */}
+        {isSidebarCollapsed && (
+          <div className="flex-1 flex flex-col gap-2 p-2 overflow-y-auto">
+            <button
+              onClick={() => {
+                setIsSidebarCollapsed(false);
+                setSidebarView('namespaces');
+              }}
+              className={cn(
+                'w-full h-10 flex items-center justify-center rounded-lg transition-colors',
+                sidebarView === 'namespaces'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+              )}
+              title="Namespaces"
+            >
+              <Layers className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => {
+                setIsSidebarCollapsed(false);
+                setSidebarView('actions');
+              }}
+              className={cn(
+                'w-full h-10 flex items-center justify-center rounded-lg transition-colors',
+                sidebarView === 'actions'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+              )}
+              title="Actions"
+            >
+              <Zap className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Sidebar Content Header - Only show when expanded */}
+        {!isSidebarCollapsed && (
+          <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+            <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+              {sidebarView === 'namespaces' ? 'Namespaces' : 'Saved Actions'}
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={handleRefreshSidebar}
+                disabled={isSidebarRefreshing}
+                className="text-grey-600 hover:text-primary transition-colors"
+                title="Refresh list"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+              </button>
+              {sidebarView === 'namespaces' && (
+                <button
+                  onClick={() => {
+                    // TODO: Open create namespace modal
+                    console.log('Create new namespace');
+                  }}
+                  className="text-grey-600 hover:text-primary transition-colors"
+                  title="Create new namespace"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {sidebarView === 'actions' && (
+                <button
+                  onClick={() => {
+                    setMainView('query');
+                    setShowQueryBuilder(true);
+                  }}
+                  className="text-grey-600 hover:text-primary transition-colors"
+                  title="Create new action"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
           </div>
+        )}
 
-          {/* View Selector */}
-          <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
-            <button
-              onClick={() => setSidebarView('namespaces')}
-              className={cn(
-                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
-                sidebarView === 'namespaces'
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-grey-600 hover:text-grey'
-              )}
-            >
-              <Layers className="h-3 w-3 inline mr-1" />
-              Namespaces
-            </button>
-            <button
-              onClick={() => setSidebarView('actions')}
-              className={cn(
-                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
-                sidebarView === 'actions'
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-grey-600 hover:text-grey'
-              )}
-            >
-              <Zap className="h-3 w-3 inline mr-1" />
-              Actions
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-            <Input
-              placeholder={`Search ${sidebarView}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Sidebar Content Header */}
-        <div className="px-3 pt-2 pb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
-            {sidebarView === 'namespaces' ? 'Namespaces' : 'Saved Actions'}
-          </span>
-          <div className="flex gap-1">
-            <button
-              onClick={handleRefreshSidebar}
-              disabled={isSidebarRefreshing}
-              className="text-grey-600 hover:text-primary transition-colors"
-              title="Refresh list"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
-            </button>
-            {sidebarView === 'namespaces' && (
-              <button
-                onClick={() => {
-                  // TODO: Open create namespace modal
-                  console.log('Create new namespace');
-                }}
-                className="text-grey-600 hover:text-primary transition-colors"
-                title="Create new namespace"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {sidebarView === 'actions' && (
-              <button
-                onClick={() => {
-                  setMainView('query');
-                  setShowQueryBuilder(true);
-                }}
-                className="text-grey-600 hover:text-primary transition-colors"
-                title="Create new action"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar Content */}
-        <div className="flex-1 overflow-auto px-3 pb-3">
+        {/* Sidebar Content - Only show when expanded */}
+        {!isSidebarCollapsed && (
+          <div className="flex-1 overflow-auto px-3 pb-3 min-h-0">
           {sidebarView === 'namespaces' && (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {filteredNamespaces.map((ns) => (
                 <button
                   key={ns.name}
                   onClick={() => handleSelectNamespace(ns)}
                   className={cn(
-                    'w-full p-3 rounded-lg border text-left transition-colors',
+                    'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
                     selectedNamespace?.name === ns.name
-                      ? 'border-primary bg-primary/5'
-                      : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-grey hover:bg-grey-100'
                   )}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-sm text-grey">{ns.name}</span>
-                    </div>
-                    {renderNamespaceStatus(ns.status)}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Layers className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{ns.name}</span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-grey-500">
-                    <span className="flex items-center gap-1">
-                      <FileText className="h-3 w-3" />
-                      {ns.vectorCount.toLocaleString()}
-                    </span>
-                    {ns.dimensions && (
-                      <span className="flex items-center gap-1">
-                        <Hash className="h-3 w-3" />
-                        {ns.dimensions}d
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-xs text-grey-600 flex-shrink-0 ml-2">
+                    {ns.vectorCount.toLocaleString()}
+                  </span>
                 </button>
               ))}
               {isLoadingNamespaces ? (
@@ -2693,33 +2900,25 @@ await ductape.init();`,
           )}
 
           {sidebarView === 'actions' && (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {filteredActions.map((action) => (
                 <button
                   key={action.id}
                   onClick={() => handleLoadAction(action)}
                   className={cn(
-                    'w-full p-3 rounded-lg border text-left transition-colors',
+                    'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
                     selectedAction?.id === action.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-grey-400 hover:border-grey-500 hover:bg-grey-50'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-grey hover:bg-grey-100'
                   )}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm text-grey">{action.name}</span>
-                    <span className={cn('text-xs px-2 py-0.5 rounded', VECTOR_OPERATIONS[action.operation].color)}>
-                      {VECTOR_OPERATIONS[action.operation].label}
-                    </span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Zap className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{action.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-grey-500">
-                    <Tag className="h-3 w-3" />
-                    <code>{action.tag}</code>
-                  </div>
-                  {action.parameters.length > 0 && (
-                    <div className="text-xs text-grey-500 mt-1">
-                      {action.parameters.length} parameter{action.parameters.length !== 1 ? 's' : ''}
-                    </div>
-                  )}
+                  <span className="text-xs text-grey-600 flex-shrink-0 ml-2">
+                    {action.parameters.length > 0 ? `${action.parameters.length} params` : ''}
+                  </span>
                 </button>
               ))}
               {filteredActions.length === 0 && (
@@ -2730,7 +2929,40 @@ await ductape.init();`,
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
+
+        {/* Bottom Status Bar - Only show when expanded */}
+        {!isSidebarCollapsed && (
+          <div className="flex-shrink-0 border-t border-grey-400 bg-grey-50 p-3">
+            <div className="text-xs text-grey-600">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  {isConnected ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-green" />
+                      <span className="text-green">Connected</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-3 w-3 text-red" />
+                      <span className="text-red">Disconnected</span>
+                    </>
+                  )}
+                </div>
+                {isLoadingNamespaces && (
+                  <div className="flex items-center gap-1 text-grey-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Loading...</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-grey-500">
+                {totalStats.namespaceCount} namespace{totalStats.namespaceCount !== 1 ? 's' : ''} · {totalStats.totalVectors.toLocaleString()} vectors
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -2748,7 +2980,7 @@ await ductape.init();`,
         <CodeSidebar
           title="Vector SDK"
           subtitle={vector.name}
-          tag={vector.tag}
+          tag={vector.vector}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
           environments={vector.envs || (vector.env ? [{ slug: currentEnvSlug }] : [])}
