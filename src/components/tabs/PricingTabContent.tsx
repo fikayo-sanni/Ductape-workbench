@@ -30,8 +30,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import pricingServices from '@/services/pricingServices';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/store/useAuth';
 
-// Pricing types based on backend pricing service
 enum PricingMode {
   PER_REQUEST = 'per_request',
   ONE_TIME = 'one_time',
@@ -48,83 +51,6 @@ enum PaymentInterval {
   YEARLY = 'yearly',
   ONCE = 'one-time',
 }
-
-interface PricingBundle {
-  _id: string;
-  name: string;
-  pricing_mode: PricingMode;
-  interval?: PaymentInterval;
-  unit_price: number;
-  currency: string;
-  limits?: {
-    per_minute?: number;
-    per_hour?: number;
-    per_day?: number;
-    per_week?: number;
-    per_month?: number;
-  };
-  created_at: string;
-}
-
-// Dummy data for display
-const DUMMY_PRICING_BUNDLES: PricingBundle[] = [
-  {
-    _id: 'price_1',
-    name: 'Starter Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.MONTHLY,
-    unit_price: 29,
-    currency: 'USD',
-    limits: {
-      per_day: 1000,
-      per_month: 30000,
-    },
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_2',
-    name: 'Professional Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.MONTHLY,
-    unit_price: 99,
-    currency: 'USD',
-    limits: {
-      per_day: 5000,
-      per_month: 150000,
-    },
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_3',
-    name: 'Enterprise Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.YEARLY,
-    unit_price: 999,
-    currency: 'USD',
-    limits: {
-      per_day: 50000,
-      per_month: 1500000,
-    },
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_4',
-    name: 'Pay Per Request',
-    pricing_mode: PricingMode.PER_REQUEST,
-    unit_price: 0.01,
-    currency: 'USD',
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_5',
-    name: 'One-Time Setup Fee',
-    pricing_mode: PricingMode.ONE_TIME,
-    interval: PaymentInterval.ONCE,
-    unit_price: 199,
-    currency: 'USD',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
 
 // Bundle customer subscription interface
 interface BundleCustomer {
@@ -267,6 +193,65 @@ interface Expenditure {
   usage_count?: number; // For usage-based billing
   created_at: string;
 }
+
+const DUMMY_PRICING_BUNDLES: PricingBundle[] = [
+  {
+    _id: 'price_1',
+    name: 'Starter Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.MONTHLY,
+    unit_price: 29,
+    currency: 'USD',
+    limits: {
+      per_day: 1000,
+      per_month: 30000,
+    },
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_2',
+    name: 'Professional Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.MONTHLY,
+    unit_price: 99,
+    currency: 'USD',
+    limits: {
+      per_day: 5000,
+      per_month: 150000,
+    },
+    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_3',
+    name: 'Enterprise Plan',
+    pricing_mode: PricingMode.RECURRING,
+    interval: PaymentInterval.YEARLY,
+    unit_price: 999,
+    currency: 'USD',
+    limits: {
+      per_day: 50000,
+      per_month: 1500000,
+    },
+    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_4',
+    name: 'Pay Per Request',
+    pricing_mode: PricingMode.PER_REQUEST,
+    unit_price: 0.01,
+    currency: 'USD',
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    _id: 'price_5',
+    name: 'One-Time Setup Fee',
+    pricing_mode: PricingMode.ONE_TIME,
+    interval: PaymentInterval.ONCE,
+    unit_price: 199,
+    currency: 'USD',
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
 
 const DUMMY_EXPENDITURES: Expenditure[] = [
   // Ductape Platform Subscription
@@ -776,6 +761,7 @@ const bundleFormSchema = z.object({
 type BundleFormValues = z.infer<typeof bundleFormSchema>;
 
 export default function PricingTabContent() {
+  const {currentWorkspaceId, user} = useAuth();
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>(DUMMY_PRICING_BUNDLES);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
@@ -799,6 +785,8 @@ export default function PricingTabContent() {
 
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const handleMonthClick = (incomeId: string) => {
     setExpandedMonth(expandedMonth === incomeId ? null : incomeId);
@@ -866,14 +854,46 @@ export default function PricingTabContent() {
       });
     }
   };
+  
 
-  const onSubmit = (data: BundleFormValues) => {
-    const limits: PricingBundle['limits'] = {};
-    if (data.per_minute) limits.per_minute = data.per_minute;
-    if (data.per_hour) limits.per_hour = data.per_hour;
-    if (data.per_day) limits.per_day = data.per_day;
-    if (data.per_week) limits.per_week = data.per_week;
-    if (data.per_month) limits.per_month = data.per_month;
+  const useCreateBundle = useMutation({
+    mutationFn: pricingServices.createBundle,
+    onSuccess: newBundle => {
+      
+      if (newBundle) {
+        toast.success('Bundle created successfully');
+        form.reset();
+      }
+
+       queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+      
+    },
+    onError: error => {
+      console.error('Error creating bundle:', error);
+      toast.error('Failed to create bundle');
+    },
+  });
+
+  const onSubmit = async (data: BundleFormValues) => {
+    // Prepare limits object
+    const limits: Record<string, number> = {};
+    if (data.per_minute) limits.per_minute = data.per_minute || 0;
+    if (data.per_hour) limits.per_hour = data.per_hour || 0;
+    if (data.per_day) limits.per_day = data.per_day || 0;
+    if (data.per_week) limits.per_week = data.per_week || 0;
+    if (data.per_month) limits.per_month = data.per_month || 0;
+
+    // Prepare API payload
+    const payload = {
+      name: data.name,
+      pricing_mode: data.pricing_mode,
+      interval: data.interval,
+      unit_price: data.unit_price,
+      currency: data.currency,
+      overage_price: data.overage_price,
+      ...limits,
+    };
+
 
     if (editingBundle) {
       // Update existing bundle
@@ -892,28 +912,61 @@ export default function PricingTabContent() {
       ));
     } else {
       // Add new bundle
-      const newBundle: PricingBundle = {
-        _id: `price_${Date.now()}`,
-        name: data.name,
-        pricing_mode: data.pricing_mode,
-        interval: data.interval,
-        unit_price: data.unit_price,
-        currency: data.currency,
-        limits: Object.keys(limits).length > 0 ? limits : undefined,
-        created_at: new Date().toISOString(),
-      };
-      setPricingBundles([...pricingBundles, newBundle]);
+      useCreateBundle.mutate({
+        user_id: user?._id || "",
+        public_key: user?.public_key || "",
+        workspace_id: currentWorkspaceId || "",
+        payload,
+      });
     }
 
     setBundleFormOpen(false);
     setEditingBundle(null);
   };
 
+  const { data: totalIncomeData, status: isLoadingIncome } = useQuery({
+  queryKey: ['incomes', user?._id, currentWorkspaceId],
+  queryFn: () => pricingServices.fetchTotalIncome({
+    user_id: user?._id || '',
+    public_key: user?.public_key || '',
+    workspace_id: currentWorkspaceId || '', // Changed from workspace._id
+  }),
+  enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
+});
+
+ const { data: totalExpenseData, status: isLoadingExpense } = useQuery({
+  queryKey: ['expenses', user?._id, currentWorkspaceId],
+  queryFn: () => pricingServices.fetchTotalExpense({
+    user_id: user?._id || '',
+    public_key: user?.public_key || '',
+    workspace_id: currentWorkspaceId || '', // Changed from workspace._id
+  }),
+  enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
+});
+
+
+console.log("total income", {totalIncomeData, isLoadingIncome});
+console.log("total expense", {totalExpenseData, isLoadingExpense});
+
+  const { data: bundleData, isLoading } = useQuery({
+  queryKey: ['bundles', user?._id, currentWorkspaceId],
+  queryFn: () => pricingServices.fetchBundles({
+    user_id: user?._id || '',
+    public_key: user?.public_key || '',
+    workspace_id: currentWorkspaceId || '', // Changed from workspace._id
+  }),
+  enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
+});
+
+const pricingData = bundleData?.data;
+
+const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_active) || [];
+
   // Calculate stats for bundles
-  const totalBundles = pricingBundles.length;
-  const recurringCount = pricingBundles.filter(p => p.pricing_mode === PricingMode.RECURRING).length;
-  const perRequestCount = pricingBundles.filter(p => p.pricing_mode === PricingMode.PER_REQUEST).length;
-  const oneTimeCount = pricingBundles.filter(p => p.pricing_mode === PricingMode.ONE_TIME).length;
+  const totalBundles = pricingData?.pricings.length;
+  const recurringCount = pricingData?.modeCounts?.recurring;
+  const perRequestCount = pricingData?.modeCounts?.per_request;
+  const oneTimeCount = pricingData?.modeCounts?.one_time;
 
   // Calculate monthly recurring revenue (MRR)
   const mrr = pricingBundles
@@ -1259,7 +1312,7 @@ export default function PricingTabContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pricingBundles.map((bundle) => {
+                    {activePricings.map((bundle) => {
                       const customers = BUNDLE_CUSTOMERS[bundle._id] || [];
                       const isExpanded = expandedBundleId === bundle._id;
 
@@ -1290,8 +1343,8 @@ export default function PricingTabContent() {
                             </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="gap-1.5 text-grey">
-                            {getModeIcon(bundle.pricing_mode)}
-                            {getModeLabel(bundle.pricing_mode)}
+                            {getModeIcon(bundle?.pricing_mode)}
+                            {getModeLabel(bundle?.pricing_mode)}
                           </Badge>
                         </TableCell>
                         <TableCell>
