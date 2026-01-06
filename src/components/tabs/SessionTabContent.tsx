@@ -1,14 +1,79 @@
 import { useState } from 'react';
-import { KeyRound, Clock, Tag, FileJson, Code, Activity } from 'lucide-react';
+import { KeyRound, Clock, Tag, FileJson, Code, Activity, Server, ArrowRight, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
+import { cn } from '@/lib/utils';
+import sessionUsersService from '@/services/sessionUsersService';
 
 interface SessionTabContentProps {
   session: any;
+}
+
+// Component to fetch and display session metrics for a specific environment
+function SessionEnvMetrics({ productTag, sessionTag, env }: { productTag: string; sessionTag: string; env: string }) {
+  const { user, currentWorkspaceId } = useAuth();
+
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['session-env-metrics', productTag, sessionTag, env],
+    queryFn: () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+      return sessionUsersService.fetchSessionDashboard(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          env,
+        }
+      );
+    },
+    enabled: !!productTag && !!sessionTag && !!env && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-3 gap-4 mt-4 p-4 bg-grey-50 rounded-lg border border-grey-400">
+        <div>
+          <p className="text-xs text-grey-600 mb-1">Active Users</p>
+          <p className="text-lg font-semibold text-grey-400">...</p>
+        </div>
+        <div>
+          <p className="text-xs text-grey-600 mb-1">Inactive Users</p>
+          <p className="text-lg font-semibold text-grey-400">...</p>
+        </div>
+        <div>
+          <p className="text-xs text-grey-600 mb-1">Expired Users</p>
+          <p className="text-lg font-semibold text-grey-400">...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-4 mt-4 p-4 bg-grey-50 rounded-lg border border-grey-400">
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Active Users</p>
+        <p className="text-lg font-semibold text-green">{dashboardData?.activeUsers || 0}</p>
+      </div>
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Inactive Users</p>
+        <p className="text-lg font-semibold text-orange-500">{dashboardData?.inactiveUsers || 0}</p>
+      </div>
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Expired Users</p>
+        <p className="text-lg font-semibold text-red">{dashboardData?.expiredUsers || 0}</p>
+      </div>
+    </div>
+  );
 }
 
 export default function SessionTabContent({ session }: SessionTabContentProps) {
@@ -80,6 +145,37 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
         productName: session.productName,
       },
     });
+  };
+
+  const handleViewSessionEnv = (env: any) => {
+    openTab({
+      id: `session-explorer-${session.tag}-${env.slug}`,
+      type: 'session-activity',
+      title: `${session.name} (${env.slug})`,
+      itemId: `${session.tag}-${env.slug}`,
+      data: {
+        session: {
+          ...session,
+          env: env,
+        },
+        sessionTag: session.tag,
+        productTag: session.productTag,
+        productName: session.productName,
+      },
+    });
+  };
+
+  const getEnvBadgeStyle = (env: string) => {
+    switch (env) {
+      case 'production':
+        return 'bg-green/10 text-green border-green/20';
+      case 'staging':
+        return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+      case 'development':
+        return 'bg-blue/10 text-blue border-blue/20';
+      default:
+        return 'bg-grey-400/10 text-grey border-grey-400/20';
+    }
   };
 
   // Generate SDK code examples for session management
@@ -323,33 +419,9 @@ print('Session refreshed:', refreshed_session)
               <KeyRound className="h-6 w-6 text-blue-500" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <h1 className="text-2xl font-bold text-grey">{session?.name}</h1>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleViewActivity}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Activity className="h-4 w-4" />
-                    <span>View Activity</span>
-                  </Button>
-                  <Button
-                    onClick={() => setShowCodeSidebar(true)}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Code className="h-4 w-4" />
-                    <span>Code</span>
-                  </Button>
-                </div>
-              </div>
+              <h1 className="text-2xl font-bold text-grey mb-2">{session?.name}</h1>
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-sm text-grey-600 flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  <span className="font-mono">{session?.tag}</span>
-                </span>
+                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{session?.tag}</span></span>
                 {session?.expiry !== undefined && session?.period && (
                   <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -363,17 +435,65 @@ print('Session refreshed:', refreshed_session)
                 )}
               </div>
               {session?.description && (
-                <div className="text-sm text-grey-600">
-                  <MarkdownViewer content={session?.description} />
-                </div>
+                <p className="text-sm text-grey-600">{session?.description}</p>
               )}
             </div>
           </div>
         </div>
 
+        {/* Session Environments */}
+        {session?.envs && session.envs.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-grey">Environment Sessions</h2>
+            {session.envs.map((env: any, index: number) => (
+              <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-5 w-5 text-primary" />
+                    <h3 className="text-base font-semibold text-grey">{env.slug}</h3>
+                  </div>
+                  <Button
+                    onClick={() => handleViewSessionEnv(env)}
+                    className="gap-2"
+                    size="sm"
+                  >
+                    <Users className="h-4 w-4" />
+                    View Sessions
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {env.description && (
+                  <p className="text-sm text-grey-600 mb-3">{env.description}</p>
+                )}
+
+                {/* Session Metrics */}
+                <SessionEnvMetrics
+                  productTag={session.productTag}
+                  sessionTag={session.tag}
+                  env={env.slug}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Session Configuration */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-grey mb-4">Session Configuration</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-grey">Session Configuration</h2>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowCodeSidebar(true)}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Code className="h-4 w-4" />
+                <span>View Code</span>
+              </Button>
+            </div>
+          </div>
 
           <div className="space-y-4">
             {/* Session Name */}

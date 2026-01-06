@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/store/useAuth";
-import { useDuctape } from "@/hooks/useDuctape";
+import { useSDKProxy } from "@/services/sdkProxy";
 import { MessageBrokerTypes } from "@ductape/sdk/dist/types";
 
 interface InlineMessageBrokerFormProps {
@@ -54,6 +54,7 @@ interface EnvConfig {
   awsRegion: string;
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
+  awsQueueUrl: string;
   // Kafka
   kafkaBrokers: string;
   kafkaClientId: string;
@@ -101,14 +102,18 @@ export default function InlineMessageBrokerForm({
   const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
   const [passwordVisibility, setPasswordVisibility] = useState<Record<string, boolean>>({});
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || "",
-    user_id: user?._id || "",
-    token: user?.auth_token || "",
-    public_key: user?.public_key || "",
-    type: "product",
-  }) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || "",
+        user_id: user._id || "",
+        token: user.auth_token || "",
+        public_key: user.public_key || "",
+      }
+    : null;
+
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   // Initialize environment configs when product is loaded
   useEffect(() => {
@@ -127,6 +132,7 @@ export default function InlineMessageBrokerForm({
         awsRegion: "",
         awsAccessKeyId: "",
         awsSecretAccessKey: "",
+        awsQueueUrl: "",
         // Kafka
         kafkaBrokers: "",
         kafkaClientId: "",
@@ -242,6 +248,7 @@ export default function InlineMessageBrokerForm({
           region: env.awsRegion,
           accessKeyId: env.awsAccessKeyId,
           secretAccessKey: env.awsSecretAccessKey,
+          queueUrl: env.awsQueueUrl,
         };
       case "KAFKA":
         return {
@@ -289,10 +296,8 @@ export default function InlineMessageBrokerForm({
 
   const { mutateAsync: createMessageBroker, isPending: isCreating } = useMutation({
     mutationFn: async (values: { name: string; tag: string; description?: string; envs: EnvConfig[] }) => {
-      if (!ductape) throw new Error("Product not initialized");
+      if (!sdkProxy) throw new Error("SDK proxy not initialized");
       if (!product?.tag) throw new Error("Product tag not found");
-
-      await ductape.init(product.tag);
 
       const payload = {
         name: values.name,
@@ -305,7 +310,7 @@ export default function InlineMessageBrokerForm({
         })),
       };
 
-      const messageBroker = await ductape.messageBrokers.create(payload);
+      const messageBroker = await sdkProxy.messageBrokers.create(product.tag, payload);
       return messageBroker;
     },
     onSuccess: () => {
@@ -535,6 +540,19 @@ export default function InlineMessageBrokerForm({
                           onChange={(e) => updateEnvConfig(index, "awsRegion", e.target.value)}
                           className="mt-2"
                         />
+                      </div>
+                      <div>
+                        <Label htmlFor={`awsQueueUrl-${index}`} className="required">Queue URL</Label>
+                        <Input
+                          id={`awsQueueUrl-${index}`}
+                          placeholder="https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+                          value={env.awsQueueUrl}
+                          onChange={(e) => updateEnvConfig(index, "awsQueueUrl", e.target.value)}
+                          className="mt-2"
+                        />
+                        <p className="text-xs text-grey-600 mt-1">
+                          The full URL of your SQS queue
+                        </p>
                       </div>
                       <div>
                         <Label htmlFor={`awsAccessKeyId-${index}`} className="required">Access Key ID</Label>

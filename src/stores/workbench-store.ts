@@ -566,6 +566,22 @@ export const useWorkbenchStore = create<WorkbenchState>()(
                 slug: (tab.data as any).storage.env.slug,
               } : undefined,
             } : undefined,
+            // For component tabs (cache, broker, session, etc.), persist root-level fields
+            // These are needed for components that have their data at the root of tab.data
+            name: (tab.data as any).name,
+            tag: (tab.data as any).tag,
+            cacheTag: (tab.data as any).cacheTag,
+            brokerTag: (tab.data as any).brokerTag,
+            sessionTag: (tab.data as any).sessionTag,
+            type: (tab.data as any).type,
+            provider: (tab.data as any).provider,
+            // Also preserve nested component objects if they exist
+            cache: (tab.data as any).cache,
+            broker: (tab.data as any).broker,
+            session: (tab.data as any).session,
+            // Environment info if present at root level
+            env: (tab.data as any).env,
+            envs: (tab.data as any).envs,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),

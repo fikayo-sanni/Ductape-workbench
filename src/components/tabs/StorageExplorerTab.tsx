@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   LinkIcon,
   ChevronDownIcon,
@@ -50,7 +50,6 @@ import {
   flexRender,
   ColumnDef,
   createColumnHelper,
-  getPaginationRowModel,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -75,6 +74,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import { SDKProxyService, SDKProxyConfig } from '@/services/sdkProxy';
 import logsServices, { StorageDashboardMetrics } from '@/services/logsServices';
+import { saveTabState, getTabState } from '@/lib/tab-state-manager';
 
 /**
  * Storage file info from SDK - matches IStorageFileInfo from @ductape/sdk
@@ -101,7 +101,25 @@ interface IListFilesResult {
   hasMore: boolean;
 }
 
+/**
+ * Result from SDK storage.stats - matches IStorageStatsResult from @ductape/sdk
+ */
+interface IStorageStatsResult {
+  success: boolean;
+  totalFiles: number;
+  totalSize: number;
+  byType: {
+    image: { count: number; size: number };
+    video: { count: number; size: number };
+    audio: { count: number; size: number };
+    document: { count: number; size: number };
+    archive: { count: number; size: number };
+    other: { count: number; size: number };
+  };
+}
+
 interface StorageExplorerTabProps {
+  tabId: string;
   storage: {
     name: string;
     tag: string;
@@ -117,7 +135,21 @@ interface StorageExplorerTabProps {
   };
 }
 
-type FileTypeFilter = 'all' | 'image' | 'video' | 'audio' | 'document' | 'archive';
+/**
+ * Interface for persisted storage explorer state
+ */
+interface StorageExplorerPersistedState {
+  files: IStorageFileInfo[];
+  hasMore: boolean;
+  nextToken?: string;
+  viewMode: ViewMode;
+  selectedFileType: FileTypeFilter;
+  searchQuery: string;
+  storageStats: IStorageStatsResult | null;
+  dashboardMetrics: StorageDashboardMetrics | null;
+}
+
+type FileTypeFilter = 'all' | 'image' | 'video' | 'audio' | 'document' | 'archive' | 'other';
 
 // File type categorization
 const FILE_TYPES: { value: FileTypeFilter; label: string; icon: React.ReactNode; count: number }[] = [
@@ -127,6 +159,7 @@ const FILE_TYPES: { value: FileTypeFilter; label: string; icon: React.ReactNode;
   { value: 'audio', label: 'Audio', icon: <FileAudio className="h-4 w-4" />, count: 1 },
   { value: 'document', label: 'Documents', icon: <FileText className="h-4 w-4" />, count: 3 },
   { value: 'archive', label: 'Archives', icon: <FileArchive className="h-4 w-4" />, count: 1 },
+  { value: 'other', label: 'Other', icon: <File className="h-4 w-4" />, count: 0 },
 ];
 
 type ViewMode = 'overview' | 'files';
@@ -179,9 +212,10 @@ function getMimeTypeFromFileName(fileName: string): string {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-export default function StorageExplorerTab({ storage }: StorageExplorerTabProps) {
+export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTabProps) {
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+  const hasRestoredStateRef = useRef(false);
 
   // Guard: Check for incomplete storage data (can happen after tab restoration)
   if (!storage?.name || !storage?.tag || !storage?.env?.slug) {
@@ -212,8 +246,7 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
   const [searchQuery, setSearchQuery] = useState('');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(25); // Server-side page size
   const [selectedFileType, setSelectedFileType] = useState<FileTypeFilter>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -224,23 +257,116 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [nextToken, setNextToken] = useState<string | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasFetchedFilesRef = useRef<string | null>(null);
+  const hasFetchedMetricsRef = useRef<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Dashboard metrics from logs endpoint
   const [dashboardMetrics, setDashboardMetrics] = useState<StorageDashboardMetrics | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
 
+  // Storage stats from SDK stats() API - accurate counts across all files
+  const [storageStats, setStorageStats] = useState<IStorageStatsResult | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const hasFetchedStatsRef = useRef<string | null>(null);
+
   // Filter State (read-only for this storage instance)
   const providerFilter = storage.provider || storage.type || 'all';
   const envFilter = storage.env.slug || 'all';
+
+  // Restore state from tab state manager on mount
+  useEffect(() => {
+    if (hasRestoredStateRef.current) return;
+
+    const savedState = getTabState(tabId);
+    if (savedState?.data) {
+      const persistedState = savedState.data as StorageExplorerPersistedState;
+
+      // Restore all persisted state
+      if (persistedState.files && persistedState.files.length > 0) {
+        setFiles(persistedState.files);
+        setHasMore(persistedState.hasMore);
+        setNextToken(persistedState.nextToken);
+        setIsLoading(false);
+
+        // Mark that we've already fetched files so we don't refetch
+        const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+        hasFetchedFilesRef.current = storageKey;
+      }
+
+      if (persistedState.viewMode) {
+        setViewMode(persistedState.viewMode);
+      }
+
+      if (persistedState.selectedFileType) {
+        setSelectedFileType(persistedState.selectedFileType);
+      }
+
+      if (persistedState.searchQuery) {
+        setSearchQuery(persistedState.searchQuery);
+      }
+
+      if (persistedState.storageStats) {
+        setStorageStats(persistedState.storageStats);
+        setIsLoadingStats(false);
+        const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+        hasFetchedStatsRef.current = storageKey;
+      }
+
+      if (persistedState.dashboardMetrics) {
+        setDashboardMetrics(persistedState.dashboardMetrics);
+        setIsLoadingMetrics(false);
+        const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+        hasFetchedMetricsRef.current = storageKey;
+      }
+    }
+
+    hasRestoredStateRef.current = true;
+  }, [tabId, storage.productTag, storage.tag, storage.env.slug]);
+
+  // Save state to tab state manager when data changes
+  useEffect(() => {
+    // Only save after initial load is complete and we have some data
+    if (!hasRestoredStateRef.current) return;
+    if (isLoading && files.length === 0) return;
+
+    const persistedState: StorageExplorerPersistedState = {
+      files,
+      hasMore,
+      nextToken,
+      viewMode,
+      selectedFileType,
+      searchQuery,
+      storageStats,
+      dashboardMetrics,
+    };
+
+    saveTabState(
+      tabId,
+      'storage-explorer',
+      `${storage.name} (${storage.env.slug})`,
+      persistedState,
+      undefined,
+      `${storage.tag}:${storage.env.slug}`
+    );
+  }, [tabId, storage.name, storage.tag, storage.env.slug, files, hasMore, nextToken, viewMode, selectedFileType, searchQuery, storageStats, dashboardMetrics, isLoading]);
 
   useEffect(() => {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
   /**
-   * Fetch files from the SDK proxy
+   * Fetch files from the SDK proxy with server-side pagination and optional file type filtering
    */
-  const fetchFiles = useCallback(async (options?: { refresh?: boolean }) => {
+  const fetchFiles = useCallback(async (options?: {
+    refresh?: boolean;
+    loadMore?: boolean;
+    continuationToken?: string;
+    fileType?: FileTypeFilter;
+  }) => {
     if (!sdkProxyConfig || !storage.productTag) {
       setIsLoading(false);
       setError('Missing SDK configuration or product tag');
@@ -250,41 +376,69 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
     try {
       if (options?.refresh) {
         setIsRefreshing(true);
+      } else if (options?.loadMore) {
+        setIsLoadingMore(true);
       } else {
         setIsLoading(true);
       }
       setError(null);
 
       const sdkProxy = new SDKProxyService(sdkProxyConfig);
-      const result = await sdkProxy.storage.listFiles<IListFilesResult>({
+
+      // Build request params - only include fileType if it's not 'all'
+      const requestParams: Record<string, any> = {
         product: storage.productTag,
         env: storage.env.slug,
         storage: storage.tag,
-        limit: 100, // Fetch more for client-side filtering
-      });
+        limit: pageSize,
+        continuationToken: options?.loadMore ? options.continuationToken : undefined,
+      };
+
+      // Add fileType filter if specified and not 'all'
+      const filterType = options?.fileType;
+      if (filterType && filterType !== 'all') {
+        requestParams.fileType = filterType;
+      }
+
+      const result = await sdkProxy.storage.listFiles<IListFilesResult>(requestParams);
 
       if (result && result.files) {
-        setFiles(result.files);
+        if (options?.loadMore) {
+          // Append to existing files
+          setFiles(prev => [...prev, ...result.files]);
+        } else {
+          // Replace files (initial load or refresh)
+          setFiles(result.files);
+        }
         setHasMore(result.hasMore);
         setNextToken(result.nextToken);
       } else {
-        setFiles([]);
+        if (!options?.loadMore) {
+          setFiles([]);
+        }
         setHasMore(false);
       }
     } catch (err) {
       console.error('[StorageExplorer] Error fetching files:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch files');
-      setFiles([]);
+      if (!options?.loadMore) {
+        setFiles([]);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setIsLoadingMore(false);
     }
-  }, [sdkProxyConfig, storage.productTag, storage.env.slug, storage.tag]);
+  }, [sdkProxyConfig, storage.productTag, storage.env.slug, storage.tag, pageSize]);
 
-  // Fetch files on mount and when dependencies change
+  // Fetch files on mount - only fetch once per storage instance
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+    if (hasFetchedFilesRef.current !== storageKey) {
+      hasFetchedFilesRef.current = storageKey;
+      fetchFiles();
+    }
+  }, [fetchFiles, storage.productTag, storage.tag, storage.env.slug]);
 
   /**
    * Fetch dashboard metrics from logs endpoint
@@ -317,19 +471,115 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
     }
   }, [currentWorkspaceId, user?._id, user?.public_key, storage.productTag, storage.tag, storage.env.slug]);
 
-  // Fetch dashboard metrics on mount
+  // Fetch dashboard metrics on mount - only fetch once per storage instance
   useEffect(() => {
-    fetchDashboardMetrics();
-  }, [fetchDashboardMetrics]);
+    const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+    if (hasFetchedMetricsRef.current !== storageKey) {
+      hasFetchedMetricsRef.current = storageKey;
+      fetchDashboardMetrics();
+    }
+  }, [fetchDashboardMetrics, storage.productTag, storage.tag, storage.env.slug]);
 
-  // Calculate storage metrics from actual files
+  /**
+   * Fetch storage stats from SDK stats() API
+   * This provides accurate total file counts and breakdown by type
+   */
+  const fetchStorageStats = useCallback(async () => {
+    if (!sdkProxyConfig || !storage.productTag) {
+      setIsLoadingStats(false);
+      return;
+    }
+
+    try {
+      setIsLoadingStats(true);
+      const sdkProxy = new SDKProxyService(sdkProxyConfig);
+      const result = await sdkProxy.storage.stats<IStorageStatsResult>({
+        product: storage.productTag,
+        env: storage.env.slug,
+        storage: storage.tag,
+      });
+
+      if (result && result.success) {
+        setStorageStats(result);
+      }
+    } catch (err) {
+      console.error('[StorageExplorer] Error fetching storage stats:', err);
+      // Don't set error state, we have fallback to local calculation
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [sdkProxyConfig, storage.productTag, storage.env.slug, storage.tag]);
+
+  // Fetch storage stats on mount - only fetch once per storage instance
+  useEffect(() => {
+    const storageKey = `${storage.productTag}:${storage.tag}:${storage.env.slug}`;
+    if (hasFetchedStatsRef.current !== storageKey) {
+      hasFetchedStatsRef.current = storageKey;
+      fetchStorageStats();
+    }
+  }, [fetchStorageStats, storage.productTag, storage.tag, storage.env.slug]);
+
+  // Infinite scroll - load more when sentinel element is visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !isLoadingMore && nextToken) {
+          handleLoadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: '100px', // Start loading 100px before reaching the end
+        threshold: 0.1,
+      }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [hasMore, isLoadingMore, nextToken]);
+
+  // Calculate storage metrics - use stats() API when available, fall back to local calculation
   const storageMetrics = useMemo(() => {
-    const totalFiles = files.length;
+    const loadedCount = files.length;
+
+    // If we have stats from the API, use those for accurate counts
+    if (storageStats) {
+      return {
+        totalFiles: storageStats.totalFiles,
+        totalSize: storageStats.totalSize,
+        imageCount: storageStats.byType.image.count,
+        videoCount: storageStats.byType.video.count,
+        audioCount: storageStats.byType.audio.count,
+        documentCount: storageStats.byType.document.count,
+        archiveCount: storageStats.byType.archive.count,
+        otherCount: storageStats.byType.other.count,
+        imageSize: storageStats.byType.image.size,
+        videoSize: storageStats.byType.video.size,
+        audioSize: storageStats.byType.audio.size,
+        documentSize: storageStats.byType.document.size,
+        archiveSize: storageStats.byType.archive.size,
+        otherSize: storageStats.byType.other.size,
+        loadedCount,
+        hasMore,
+        isFromStats: true,
+      };
+    }
+
+    // Fallback: Calculate from loaded files when stats API hasn't loaded yet
     const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
 
     // Helper to get mime type for a file
     const getType = (f: IStorageFileInfo) => (f.mimeType || getMimeTypeFromFileName(f.name)).toLowerCase();
 
+    // Calculate counts from loaded files
     const imageCount = files.filter(f => getType(f).includes('image')).length;
     const videoCount = files.filter(f => getType(f).includes('video')).length;
     const audioCount = files.filter(f => getType(f).includes('audio')).length;
@@ -343,8 +593,9 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
       const type = getType(f);
       return type.includes('zip') || type.includes('rar') || type.includes('tar') || type.includes('gz') || type.includes('7z');
     }).length;
+    const otherCount = loadedCount - imageCount - videoCount - audioCount - documentCount - archiveCount;
 
-    // Size by type
+    // Size by type (can only calculate from loaded files)
     const imageSize = files.filter(f => getType(f).includes('image')).reduce((sum, f) => sum + (f.size || 0), 0);
     const videoSize = files.filter(f => getType(f).includes('video')).reduce((sum, f) => sum + (f.size || 0), 0);
     const audioSize = files.filter(f => getType(f).includes('audio')).reduce((sum, f) => sum + (f.size || 0), 0);
@@ -357,22 +608,28 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
       const type = getType(f);
       return type.includes('zip') || type.includes('rar') || type.includes('tar');
     }).reduce((sum, f) => sum + (f.size || 0), 0);
+    const otherSize = totalSize - imageSize - videoSize - audioSize - documentSize - archiveSize;
 
     return {
-      totalFiles,
+      totalFiles: loadedCount,
       totalSize,
       imageCount,
       videoCount,
       audioCount,
       documentCount,
       archiveCount,
+      otherCount,
       imageSize,
       videoSize,
       audioSize,
       documentSize,
       archiveSize,
+      otherSize,
+      loadedCount,
+      hasMore,
+      isFromStats: false,
     };
-  }, [files]);
+  }, [files, hasMore, storageStats]);
 
   // Activity stats from dashboard metrics (7-day data from logs endpoint)
   const weeklyStats = useMemo(() => {
@@ -451,14 +708,13 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
     };
   }, [dashboardMetrics]);
 
-  // Filter files based on search and filters
+  // Filter files based on search query only
+  // Note: File type filtering is done server-side via the fileType parameter in fetchFiles()
+  // We only apply client-side search filtering here
   const filteredFiles = useMemo(() => {
     let filtered = [...files];
 
-    // Helper to get mime type for a file
-    const getType = (f: IStorageFileInfo) => (f.mimeType || getMimeTypeFromFileName(f.name)).toLowerCase();
-
-    // Apply search filter
+    // Apply search filter (client-side only)
     if (searchQuery) {
       filtered = filtered.filter((file) => {
         const filename = file.name.toLowerCase();
@@ -466,42 +722,134 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
       });
     }
 
-    // Apply file type filter
-    if (selectedFileType !== 'all') {
-      filtered = filtered.filter((file) => {
-        const type = getType(file);
-        switch (selectedFileType) {
-          case 'image':
-            return type.includes('image');
-          case 'video':
-            return type.includes('video');
-          case 'audio':
-            return type.includes('audio');
-          case 'document':
-            return type.includes('pdf') || type.includes('doc') || type.includes('text') ||
-              type.includes('spreadsheet') || type.includes('csv') || type.includes('word') ||
-              type.includes('excel') || type.includes('powerpoint');
-          case 'archive':
-            return type.includes('zip') || type.includes('rar') || type.includes('tar') ||
-              type.includes('gz') || type.includes('7z');
-          default:
-            return true;
-        }
-      });
-    }
-
     return filtered;
-  }, [files, searchQuery, selectedFileType]);
+  }, [files, searchQuery]);
 
   const handleRefresh = async () => {
-    await fetchFiles({ refresh: true });
+    // Refetch both files and stats in parallel (with current file type filter)
+    await Promise.all([
+      fetchFiles({ refresh: true, fileType: selectedFileType }),
+      fetchStorageStats(),
+    ]);
     toast.success('Files refreshed');
+  };
+
+  /**
+   * Load more files (server-side pagination)
+   */
+  const handleLoadMore = async () => {
+    if (!hasMore || isLoadingMore || !nextToken) return;
+    await fetchFiles({ loadMore: true, continuationToken: nextToken, fileType: selectedFileType });
+  };
+
+  /**
+   * Handle file upload
+   * Uses signed URLs for large files (>20MB) to upload directly to cloud storage
+   * Uses base64 encoding for small files (<=20MB) through the proxy
+   */
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!sdkProxyConfig || !storage.productTag) {
+      toast.error('Missing SDK configuration or product tag');
+      return;
+    }
+
+    const TWENTY_MB = 20 * 1024 * 1024;
+    const sdkProxy = new SDKProxyService(sdkProxyConfig);
+
+    try {
+      setIsUploading(true);
+
+      if (file.size > TWENTY_MB) {
+        // Large file: Use signed URL for direct upload to cloud storage
+        try {
+          // Get a signed URL for uploading
+          const signedUrlResult = await sdkProxy.storage.getSignedUrl({
+            product: storage.productTag,
+            env: storage.env.slug,
+            storage: storage.tag,
+            fileName: file.name,
+            action: 'write',
+            expiresIn: 3600, // 1 hour
+            contentType: file.type || 'application/octet-stream',
+          });
+
+          if (!signedUrlResult?.url) {
+            throw new Error('Failed to get signed URL for upload');
+          }
+
+          // Upload directly to cloud storage using the signed URL
+          const uploadResponse = await fetch(signedUrlResult.url, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+            },
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+          }
+
+          toast.success(`Uploaded ${file.name} successfully`);
+          await fetchFiles({ refresh: true });
+        } catch (err) {
+          console.error('[StorageExplorer] Signed URL upload error:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to upload file');
+        } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      } else {
+        // Small file: Use base64 encoding through proxy
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Content = (reader.result as string).split(',')[1]; // Remove data:... prefix
+
+            await sdkProxy.storage.upload({
+              product: storage.productTag,
+              env: storage.env.slug,
+              storage: storage.tag,
+              fileName: file.name,
+              buffer: base64Content,
+              mimeType: file.type || 'application/octet-stream',
+            });
+
+            toast.success(`Uploaded ${file.name} successfully`);
+            await fetchFiles({ refresh: true });
+          } catch (err) {
+            console.error('[StorageExplorer] Upload error:', err);
+            toast.error(err instanceof Error ? err.message : 'Failed to upload file');
+          } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+          }
+        };
+
+        reader.onerror = () => {
+          toast.error('Failed to read file');
+          setIsUploading(false);
+        };
+
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error('[StorageExplorer] Upload error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to upload file');
+      setIsUploading(false);
+    }
   };
 
   const clearFilters = () => {
     setSelectedFileType('all');
     setSearchQuery('');
-    setCurrentPage(1);
   };
 
   const hasActiveFilters =
@@ -706,21 +1054,6 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    state: {
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize,
-      },
-    },
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const newState = updater({ pageIndex: currentPage - 1, pageSize });
-        setCurrentPage(newState.pageIndex + 1);
-        setPageSize(newState.pageSize);
-      }
-    },
-    manualPagination: false,
   });
 
   return (
@@ -860,15 +1193,25 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                 case 'archive':
                   count = storageMetrics.archiveCount;
                   break;
+                case 'other':
+                  count = storageMetrics.otherCount;
+                  break;
               }
+
+              // Show "+" when there are more files to load AND we don't have accurate stats from the API
+              // When storageMetrics.isFromStats is true, we have accurate counts and don't need the "+" indicator
+              const showPlus = !storageMetrics.isFromStats && fileType.value === 'all' && storageMetrics.hasMore;
 
               const isSelected = viewMode === 'files' && selectedFileType === fileType.value;
               return (
                 <button
                   key={fileType.value}
                   onClick={() => {
-                    setSelectedFileType(fileType.value);
+                    const newFileType = fileType.value;
+                    setSelectedFileType(newFileType);
                     setViewMode('files');
+                    // Refetch files with server-side file type filter
+                    fetchFiles({ refresh: true, fileType: newFileType });
                   }}
                   className={cn(
                     'w-full flex items-center gap-2 rounded-md text-sm transition-colors',
@@ -888,14 +1231,25 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                   {!isSidebarCollapsed && (
                     <>
                       <span className="flex-1 text-left">{fileType.label}</span>
-                      <span className={cn(
-                        'text-xs px-1.5 py-0.5 rounded',
-                        isSelected
-                          ? 'bg-purple-500/20 text-purple-600'
-                          : 'bg-background-secondary text-grey-600'
-                      )}>
-                        {count}
-                      </span>
+                      {(isLoading || isLoadingStats) ? (
+                        <span className={cn(
+                          'text-xs px-1.5 py-0.5 rounded',
+                          isSelected
+                            ? 'bg-purple-500/20 text-purple-600'
+                            : 'bg-background-secondary text-grey-600'
+                        )}>
+                          <span className="inline-block w-4 h-3 bg-grey-300 rounded animate-pulse"></span>
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          'text-xs px-1.5 py-0.5 rounded',
+                          isSelected
+                            ? 'bg-purple-500/20 text-purple-600'
+                            : 'bg-background-secondary text-grey-600'
+                        )}>
+                          {count}{showPlus && '+'}
+                        </span>
+                      )}
                     </>
                   )}
                 </button>
@@ -1007,10 +1361,27 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                   <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
                   Refresh
                 </Button>
-                <Button size="sm" variant="outline" className="border-purple-500 text-purple-500 hover:bg-purple-500/10">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload File
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-purple-500 text-purple-500 hover:bg-purple-500/10"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {isUploading ? 'Uploading...' : 'Upload File'}
                 </Button>
+                {/* Hidden file input for upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleUpload}
+                />
               </div>
             </div>
           </div>
@@ -1391,11 +1762,56 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-grey-600">
                     Showing <span className="font-medium text-grey">{filteredFiles.length}</span> files
+                    {/* Show total from stats when filtering and there's a mismatch */}
+                    {selectedFileType !== 'all' && storageMetrics.isFromStats && (() => {
+                      const expectedCount = selectedFileType === 'image' ? storageMetrics.imageCount :
+                        selectedFileType === 'video' ? storageMetrics.videoCount :
+                        selectedFileType === 'audio' ? storageMetrics.audioCount :
+                        selectedFileType === 'document' ? storageMetrics.documentCount :
+                        selectedFileType === 'archive' ? storageMetrics.archiveCount :
+                        selectedFileType === 'other' ? storageMetrics.otherCount : 0;
+
+                      if (expectedCount > filteredFiles.length) {
+                        return (
+                          <span className="text-purple-500 text-sm">
+                            of {expectedCount} total
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </span>
                   {hasActiveFilters && (
                     <span className="text-xs text-grey-500">(filtered)</span>
                   )}
                 </div>
+                {/* Load more button when filtered and more files exist */}
+                {selectedFileType !== 'all' && hasMore && storageMetrics.isFromStats && (() => {
+                  const expectedCount = selectedFileType === 'image' ? storageMetrics.imageCount :
+                    selectedFileType === 'video' ? storageMetrics.videoCount :
+                    selectedFileType === 'audio' ? storageMetrics.audioCount :
+                    selectedFileType === 'document' ? storageMetrics.documentCount :
+                    selectedFileType === 'archive' ? storageMetrics.archiveCount :
+                    selectedFileType === 'other' ? storageMetrics.otherCount : 0;
+
+                  if (expectedCount > filteredFiles.length) {
+                    return (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLoadMore}
+                        disabled={isLoadingMore}
+                        className="text-purple-500 hover:bg-purple-500/10"
+                      >
+                        {isLoadingMore ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        Load More
+                      </Button>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
@@ -1412,8 +1828,46 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                   <div className="w-16 h-16 rounded-full bg-border flex items-center justify-center mb-4">
                     <FolderOpen className="h-8 w-8 text-grey-500" />
                   </div>
-                  <p className="text-grey font-medium">No files found</p>
-                  {hasActiveFilters && (
+                  <p className="text-grey font-medium">No files found in loaded results</p>
+                  {/* Show helpful message when stats indicate files exist but aren't in loaded results */}
+                  {selectedFileType !== 'all' && storageMetrics.isFromStats && (() => {
+                    // Get the expected count from stats for this filter type
+                    const expectedCount = selectedFileType === 'image' ? storageMetrics.imageCount :
+                      selectedFileType === 'video' ? storageMetrics.videoCount :
+                      selectedFileType === 'audio' ? storageMetrics.audioCount :
+                      selectedFileType === 'document' ? storageMetrics.documentCount :
+                      selectedFileType === 'archive' ? storageMetrics.archiveCount :
+                      selectedFileType === 'other' ? storageMetrics.otherCount : 0;
+
+                    if (expectedCount > 0) {
+                      return (
+                        <div className="text-center mt-2">
+                          <p className="text-grey-600 text-sm">
+                            {expectedCount} {selectedFileType} file{expectedCount !== 1 ? 's' : ''} exist{expectedCount === 1 ? 's' : ''} in storage
+                          </p>
+                          <p className="text-grey-500 text-xs mt-1">
+                            {hasMore ? 'Scroll down to load more files, or' : 'The files may be in a different location, or'} try clearing the filter
+                          </p>
+                          {hasMore && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleLoadMore}
+                              disabled={isLoadingMore}
+                              className="mt-3 text-purple-500 border-purple-500 hover:bg-purple-500/10"
+                            >
+                              {isLoadingMore ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : null}
+                              Load More Files
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {hasActiveFilters && !storageMetrics.isFromStats && (
                     <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
                   )}
                 </div>
@@ -1466,56 +1920,38 @@ export default function StorageExplorerTab({ storage }: StorageExplorerTabProps)
                   </TableBody>
                 </Table>
               )}
+              {/* Infinite scroll sentinel - triggers load more when visible */}
+              {hasMore && (
+                <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+                  {isLoadingMore && (
+                    <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
+                  )}
+                </div>
+              )}
               </div>
             </div>
           </>
         ) : null}
 
-        {/* Pagination */}
-        {filteredFiles.length > 0 && (
-          <div className="flex-shrink-0 px-6 py-3 bg-white border-t border-border">
+        {/* Status bar */}
+        {files.length > 0 && (
+          <div className="flex-shrink-0 px-6 py-2">
             <div className="flex items-center justify-between text-sm text-grey-600">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <span>
-                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredFiles.length)} of {filteredFiles.length}
+                  <span className="font-medium text-grey">{files.length}</span> files loaded
+                  {hasMore && <span className="text-purple-500">+</span>}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">Rows:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="h-7 px-2 text-xs border border-grey-400 rounded bg-white"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
+                {isLoadingMore && (
+                  <div className="flex items-center gap-2 text-purple-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span className="text-xs">Loading more...</span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs px-2">
-                  Page {currentPage} of {Math.ceil(filteredFiles.length / pageSize)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= Math.ceil(filteredFiles.length / pageSize)}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </Button>
-              </div>
+              {hasMore && !isLoadingMore && (
+                <span className="text-xs text-grey-500">Scroll to load more</span>
+              )}
             </div>
           </div>
         )}

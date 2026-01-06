@@ -15,12 +15,15 @@ import {
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import SessionDashboard from './SessionDashboard';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
+import sessionUsersService from '@/services/sessionUsersService';
 
 interface SessionActivityTabProps {
   session: any;
@@ -29,358 +32,6 @@ interface SessionActivityTabProps {
   productName?: string;
 }
 
-// Dummy data for session users
-const DUMMY_USERS = [
-  {
-    ductape_user_id: 'usr_1a2b3c4d5e',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'sarah.johnson@enterprise.com',
-    env: 'production',
-    first_seen: '2024-01-10T08:30:00Z',
-    last_seen: '2024-01-23T14:45:00Z',
-    createdAt: '2024-01-10T08:30:00Z',
-    updatedAt: '2024-01-23T14:45:00Z',
-    session_count: 47,
-    status: 'active',
-    session_data: {
-      userId: '191010192-19198829819',
-      details: {
-        username: 'sarah.johnson',
-        email: 'sarah.johnson@enterprise.com',
-        role: 'admin'
-      },
-      preferences: {
-        theme: 'dark',
-        notifications: true
-      }
-    }
-  },
-  {
-    ductape_user_id: 'usr_2b3c4d5e6f',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'john.doe@company.com',
-    env: 'production',
-    first_seen: '2024-01-12T10:15:00Z',
-    last_seen: '2024-01-23T16:20:00Z',
-    createdAt: '2024-01-12T10:15:00Z',
-    updatedAt: '2024-01-23T16:20:00Z',
-    session_count: 32,
-    status: 'active',
-    session_data: {
-      userId: '291929-38291919',
-      details: {
-        username: 'john.doe',
-        email: 'john.doe@company.com',
-        role: 'user'
-      },
-      metadata: {
-        lastLogin: '2024-01-23T16:20:00Z',
-        ipAddress: '192.168.1.100'
-      }
-    }
-  },
-  {
-    ductape_user_id: 'usr_3c4d5e6f7g',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'jane.smith@startup.io',
-    env: 'staging',
-    first_seen: '2024-01-15T09:00:00Z',
-    last_seen: '2024-01-22T11:30:00Z',
-    createdAt: '2024-01-15T09:00:00Z',
-    updatedAt: '2024-01-22T11:30:00Z',
-    session_count: 18,
-    status: 'inactive',
-  },
-  {
-    ductape_user_id: 'usr_4d5e6f7g8h',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'admin@platform.com',
-    env: 'production',
-    first_seen: '2024-01-08T07:00:00Z',
-    last_seen: '2024-01-23T18:00:00Z',
-    createdAt: '2024-01-08T07:00:00Z',
-    updatedAt: '2024-01-23T18:00:00Z',
-    session_count: 89,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_5e6f7g8h9i',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'test.user@demo.com',
-    env: 'development',
-    first_seen: '2024-01-20T12:00:00Z',
-    last_seen: '2024-01-20T15:30:00Z',
-    createdAt: '2024-01-20T12:00:00Z',
-    updatedAt: '2024-01-20T15:30:00Z',
-    session_count: 3,
-    status: 'expired',
-  },
-  {
-    ductape_user_id: 'usr_6f7g8h9i0j',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'michael.chen@techcorp.io',
-    env: 'production',
-    first_seen: '2024-01-11T09:45:00Z',
-    last_seen: '2024-01-23T13:20:00Z',
-    createdAt: '2024-01-11T09:45:00Z',
-    updatedAt: '2024-01-23T13:20:00Z',
-    session_count: 41,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_7g8h9i0j1k',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'emily.rodriguez@agency.co',
-    env: 'production',
-    first_seen: '2024-01-13T11:00:00Z',
-    last_seen: '2024-01-23T10:15:00Z',
-    createdAt: '2024-01-13T11:00:00Z',
-    updatedAt: '2024-01-23T10:15:00Z',
-    session_count: 28,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_8h9i0j1k2l',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'david.kim@saas-company.com',
-    env: 'staging',
-    first_seen: '2024-01-16T14:30:00Z',
-    last_seen: '2024-01-22T16:45:00Z',
-    createdAt: '2024-01-16T14:30:00Z',
-    updatedAt: '2024-01-22T16:45:00Z',
-    session_count: 12,
-    status: 'inactive',
-  },
-  {
-    ductape_user_id: 'usr_9i0j1k2l3m',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'lisa.anderson@consulting.biz',
-    env: 'production',
-    first_seen: '2024-01-09T08:00:00Z',
-    last_seen: '2024-01-23T17:30:00Z',
-    createdAt: '2024-01-09T08:00:00Z',
-    updatedAt: '2024-01-23T17:30:00Z',
-    session_count: 56,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_0j1k2l3m4n',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'robert.martinez@finance.org',
-    env: 'production',
-    first_seen: '2024-01-14T10:20:00Z',
-    last_seen: '2024-01-23T12:40:00Z',
-    createdAt: '2024-01-14T10:20:00Z',
-    updatedAt: '2024-01-23T12:40:00Z',
-    session_count: 23,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_1k2l3m4n5o',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'maria.garcia@ecommerce.shop',
-    env: 'staging',
-    first_seen: '2024-01-17T13:15:00Z',
-    last_seen: '2024-01-21T09:25:00Z',
-    createdAt: '2024-01-17T13:15:00Z',
-    updatedAt: '2024-01-21T09:25:00Z',
-    session_count: 9,
-    status: 'expired',
-  },
-  {
-    ductape_user_id: 'usr_2l3m4n5o6p',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'james.wilson@media.net',
-    env: 'production',
-    first_seen: '2024-01-11T07:30:00Z',
-    last_seen: '2024-01-23T15:50:00Z',
-    createdAt: '2024-01-11T07:30:00Z',
-    updatedAt: '2024-01-23T15:50:00Z',
-    session_count: 38,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_3m4n5o6p7q',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'jennifer.lee@healthcare.med',
-    env: 'development',
-    first_seen: '2024-01-19T11:45:00Z',
-    last_seen: '2024-01-22T14:20:00Z',
-    createdAt: '2024-01-19T11:45:00Z',
-    updatedAt: '2024-01-22T14:20:00Z',
-    session_count: 7,
-    status: 'inactive',
-  },
-  {
-    ductape_user_id: 'usr_4n5o6p7q8r',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'william.brown@logistics.express',
-    env: 'production',
-    first_seen: '2024-01-10T09:10:00Z',
-    last_seen: '2024-01-23T11:35:00Z',
-    createdAt: '2024-01-10T09:10:00Z',
-    updatedAt: '2024-01-23T11:35:00Z',
-    session_count: 44,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_5o6p7q8r9s',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'patricia.davis@education.edu',
-    env: 'staging',
-    first_seen: '2024-01-18T10:05:00Z',
-    last_seen: '2024-01-22T13:50:00Z',
-    createdAt: '2024-01-18T10:05:00Z',
-    updatedAt: '2024-01-22T13:50:00Z',
-    session_count: 11,
-    status: 'inactive',
-  },
-  {
-    ductape_user_id: 'usr_6p7q8r9s0t',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'charles.miller@realestate.properties',
-    env: 'production',
-    first_seen: '2024-01-12T08:25:00Z',
-    last_seen: '2024-01-23T16:05:00Z',
-    createdAt: '2024-01-12T08:25:00Z',
-    updatedAt: '2024-01-23T16:05:00Z',
-    session_count: 35,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_7q8r9s0t1u',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'susan.moore@travel.tours',
-    env: 'production',
-    first_seen: '2024-01-13T12:40:00Z',
-    last_seen: '2024-01-23T09:15:00Z',
-    createdAt: '2024-01-13T12:40:00Z',
-    updatedAt: '2024-01-23T09:15:00Z',
-    session_count: 26,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_8r9s0t1u2v',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'joseph.taylor@automotive.cars',
-    env: 'development',
-    first_seen: '2024-01-21T14:55:00Z',
-    last_seen: '2024-01-22T10:30:00Z',
-    createdAt: '2024-01-21T14:55:00Z',
-    updatedAt: '2024-01-22T10:30:00Z',
-    session_count: 4,
-    status: 'expired',
-  },
-  {
-    ductape_user_id: 'usr_9s0t1u2v3w',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'karen.jackson@retail.store',
-    env: 'production',
-    first_seen: '2024-01-09T11:20:00Z',
-    last_seen: '2024-01-23T14:25:00Z',
-    createdAt: '2024-01-09T11:20:00Z',
-    updatedAt: '2024-01-23T14:25:00Z',
-    session_count: 52,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_0t1u2v3w4x',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'daniel.white@insurance.policy',
-    env: 'staging',
-    first_seen: '2024-01-16T09:35:00Z',
-    last_seen: '2024-01-21T15:10:00Z',
-    createdAt: '2024-01-16T09:35:00Z',
-    updatedAt: '2024-01-21T15:10:00Z',
-    session_count: 14,
-    status: 'inactive',
-  },
-  {
-    ductape_user_id: 'usr_1u2v3w4x5y',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'nancy.harris@marketing.digital',
-    env: 'production',
-    first_seen: '2024-01-11T10:50:00Z',
-    last_seen: '2024-01-23T13:45:00Z',
-    createdAt: '2024-01-11T10:50:00Z',
-    updatedAt: '2024-01-23T13:45:00Z',
-    session_count: 39,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_2v3w4x5y6z',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'thomas.clark@manufacturing.factory',
-    env: 'production',
-    first_seen: '2024-01-14T07:15:00Z',
-    last_seen: '2024-01-23T12:00:00Z',
-    createdAt: '2024-01-14T07:15:00Z',
-    updatedAt: '2024-01-23T12:00:00Z',
-    session_count: 31,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_3w4x5y6z7a',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'betty.lewis@hospitality.hotel',
-    env: 'development',
-    first_seen: '2024-01-20T13:25:00Z',
-    last_seen: '2024-01-22T11:40:00Z',
-    createdAt: '2024-01-20T13:25:00Z',
-    updatedAt: '2024-01-22T11:40:00Z',
-    session_count: 6,
-    status: 'expired',
-  },
-  {
-    ductape_user_id: 'usr_4x5y6z7a8b',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'christopher.walker@gaming.play',
-    env: 'production',
-    first_seen: '2024-01-10T12:05:00Z',
-    last_seen: '2024-01-23T15:20:00Z',
-    createdAt: '2024-01-10T12:05:00Z',
-    updatedAt: '2024-01-23T15:20:00Z',
-    session_count: 48,
-    status: 'active',
-  },
-  {
-    ductape_user_id: 'usr_5y6z7a8b9c',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'sandra.hall@publishing.books',
-    env: 'staging',
-    first_seen: '2024-01-17T08:50:00Z',
-    last_seen: '2024-01-22T12:15:00Z',
-    createdAt: '2024-01-17T08:50:00Z',
-    updatedAt: '2024-01-22T12:15:00Z',
-    session_count: 10,
-    status: 'inactive',
-  },
-];
 
 type UserStatus = 'active' | 'inactive' | 'expired' | 'all';
 
@@ -399,8 +50,8 @@ const getEnvBadgeColor = (env: string) => {
 };
 
 // Format helpers
-const formatTime = (dateStr: string, relative = true) => {
-  const date = new Date(dateStr);
+const formatTime = (dateInput: string | Date, relative = true) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   const now = new Date();
   const diff = now.getTime() - date.getTime();
 
@@ -421,6 +72,7 @@ export default function SessionActivityTab({
   productName,
 }: SessionActivityTabProps) {
   const { openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<UserStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -430,39 +82,129 @@ export default function SessionActivityTab({
 
   const envSlug = session?.env?.slug || session?.env || 'production';
 
+  // Fetch session users
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['session-users', productTag, sessionTag, envSlug],
+    queryFn: () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+      return sessionUsersService.fetchSessionUsers(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          env: envSlug,
+          page: 1,
+          limit: 100,
+        }
+      );
+    },
+    enabled: !!productTag && !!sessionTag && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  // Fetch session dashboard metrics
+  const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery({
+    queryKey: ['session-dashboard', productTag, sessionTag, envSlug],
+    queryFn: () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+      return sessionUsersService.fetchSessionDashboard(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          env: envSlug,
+        }
+      );
+    },
+    enabled: !!productTag && !!sessionTag && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  // Filter and search users locally
   const filteredUsers = useMemo(() => {
-    return DUMMY_USERS.filter((user) => {
-      const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-      const matchesSearch = searchQuery === '' ||
-        user.identifier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.ductape_user_id.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
+    if (!usersData?.users) return [];
+
+    let users = usersData.users;
+
+    // Calculate user status based on last_seen
+    const now = new Date();
+    const activeThreshold = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+    const inactiveThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+
+    users = users.map(user => {
+      const lastSeen = new Date(user.last_seen);
+      let status: 'active' | 'inactive' | 'expired' = 'expired';
+
+      if (lastSeen > activeThreshold) {
+        status = 'active';
+      } else if (lastSeen > inactiveThreshold) {
+        status = 'inactive';
+      }
+
+      return { ...user, status, session_count: user.total_sessions || 0 };
     });
-  }, [statusFilter, searchQuery]);
 
+    // Filter by status
+    if (statusFilter !== 'all') {
+      users = users.filter(user => user.status === statusFilter);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      users = users.filter(user =>
+        user.identifier.toLowerCase().includes(query) ||
+        user.ductape_user_id.toLowerCase().includes(query)
+      );
+    }
+
+    return users;
+  }, [usersData?.users, statusFilter, searchQuery]);
+
+  // Calculate metrics from dashboard data
   const metrics = useMemo(() => {
-    const users = DUMMY_USERS;
-    const total = users.length;
-    const active = users.filter(u => u.status === 'active').length;
-    const inactive = users.filter(u => u.status === 'inactive').length;
-    const expired = users.filter(u => u.status === 'expired').length;
+    if (!dashboardData) {
+      return {
+        total: filteredUsers.length,
+        active: filteredUsers.filter(u => u.status === 'active').length,
+        inactive: filteredUsers.filter(u => u.status === 'inactive').length,
+        expired: filteredUsers.filter(u => u.status === 'expired').length,
+        production: filteredUsers.filter(u => u.env === 'production').length,
+        staging: filteredUsers.filter(u => u.env === 'staging').length,
+        development: filteredUsers.filter(u => u.env === 'development').length,
+      };
+    }
 
-    // Users by environment
-    const production = users.filter(u => u.env === 'production').length;
-    const staging = users.filter(u => u.env === 'staging').length;
-    const development = users.filter(u => u.env === 'development').length;
-
-    return { total, active, inactive, expired, production, staging, development };
-  }, []);
+    return {
+      total: dashboardData.totalUsers || 0,
+      active: dashboardData.activeUsers || 0,
+      inactive: dashboardData.inactiveUsers || 0,
+      expired: dashboardData.expiredUsers || 0,
+      production: filteredUsers.filter(u => u.env === 'production').length,
+      staging: filteredUsers.filter(u => u.env === 'staging').length,
+      development: filteredUsers.filter(u => u.env === 'development').length,
+    };
+  }, [dashboardData, filteredUsers]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise(r => setTimeout(r, 800));
-    setIsRefreshing(false);
-    toast.success('Data refreshed');
+    try {
+      await Promise.all([refetchUsers(), refetchDashboard()]);
+      toast.success('Data refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh data');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
-  const handleOpenUser = (user: typeof DUMMY_USERS[0]) => {
+  const handleOpenUser = (user: any) => {
     openTab({
       id: `session-user-${user.ductape_user_id}`,
       type: 'session-user',
@@ -563,7 +305,7 @@ export default function SessionActivityTab({
 
             <div className="space-y-0.5">
               {([
-                { value: 'all', label: 'All Users', icon: <LayoutGrid className="h-4 w-4" />, count: DUMMY_USERS.length },
+                { value: 'all', label: 'All Users', icon: <LayoutGrid className="h-4 w-4" />, count: metrics.total },
                 { value: 'active', label: 'Active', icon: <UserCheck className="h-4 w-4" />, count: metrics.active },
                 { value: 'inactive', label: 'Inactive', icon: <Clock className="h-4 w-4" />, count: metrics.inactive },
                 { value: 'expired', label: 'Expired', icon: <UserX className="h-4 w-4" />, count: metrics.expired },

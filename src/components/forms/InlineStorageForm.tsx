@@ -8,8 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { HardDrive, Save, ChevronRight, Loader2, CheckCircle, Upload, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
-import { StorageProviders } from '@ductape/sdk/dist/types';
+import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
 
 interface InlineStorageFormProps {
@@ -56,14 +55,18 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product'
-  }) as any;
+  // Proxy configuration
+  const proxyConfig = product?.workspace_id && user?._id
+    ? {
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user._id || '',
+        token: user.auth_token || '',
+        public_key: user.public_key || '',
+      }
+    : null;
+
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -90,17 +93,17 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
           containerName: '',
           connectionString: '',
           gcpBucketName: '',
-          gcpConfigType: '',
+          gcpConfigType: 'service_account',
           gcpProjectId: '',
           gcpPrivateKeyId: '',
           gcpPrivateKey: '',
           gcpClientEmail: '',
           gcpClientId: '',
-          gcpAuthUri: '',
-          gcpTokenUri: '',
-          gcpAuthProviderX509CertUrl: '',
+          gcpAuthUri: 'https://accounts.google.com/o/oauth2/auth',
+          gcpTokenUri: 'https://oauth2.googleapis.com/token',
+          gcpAuthProviderX509CertUrl: 'https://www.googleapis.com/oauth2/v1/certs',
           gcpClientX509CertUrl: '',
-          gcpUniverseDomain: '',
+          gcpUniverseDomain: 'googleapis.com',
         }))
       );
     }
@@ -122,21 +125,25 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
           connectionString: env.connectionString,
         };
       case 'gcp':
+        const gcpConfig: any = {
+          type: env.gcpConfigType,
+          auth_uri: env.gcpAuthUri,
+          token_uri: env.gcpTokenUri,
+          auth_provider_x509_cert_url: env.gcpAuthProviderX509CertUrl,
+          universe_domain: env.gcpUniverseDomain,
+        };
+
+        // Only include optional fields if they have values
+        if (env.gcpProjectId) gcpConfig.project_id = env.gcpProjectId;
+        if (env.gcpPrivateKeyId) gcpConfig.private_key_id = env.gcpPrivateKeyId;
+        if (env.gcpPrivateKey) gcpConfig.private_key = env.gcpPrivateKey;
+        if (env.gcpClientEmail) gcpConfig.client_email = env.gcpClientEmail;
+        if (env.gcpClientId) gcpConfig.client_id = env.gcpClientId;
+        if (env.gcpClientX509CertUrl) gcpConfig.client_x509_cert_url = env.gcpClientX509CertUrl;
+
         return {
           bucketName: env.gcpBucketName,
-          config: {
-            type: env.gcpConfigType,
-            project_id: env.gcpProjectId,
-            private_key_id: env.gcpPrivateKeyId,
-            private_key: env.gcpPrivateKey,
-            client_email: env.gcpClientEmail,
-            client_id: env.gcpClientId,
-            auth_uri: env.gcpAuthUri,
-            token_uri: env.gcpTokenUri,
-            auth_provider_x509_cert_url: env.gcpAuthProviderX509CertUrl,
-            client_x509_cert_url: env.gcpClientX509CertUrl,
-            universe_domain: env.gcpUniverseDomain,
-          },
+          config: gcpConfig,
         };
       default:
         return {};
@@ -146,20 +153,18 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
   // Create storage mutation
   const { mutateAsync: createStorage, isPending: isCreating } = useMutation({
     mutationFn: async (values: { name: string; tag: string; description?: string; envs: Array<{ slug: string; type: string; config: any }> }) => {
-      if (!ductape) throw new Error('Product not initialized');
+      if (!sdkProxy) throw new Error('SDK proxy not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
 
-      await ductape.init(product.tag);
-      const storage = await ductape.storage.create({
+      const data = {
+        product: product.tag,
         name: values.name,
         tag: values.tag,
-        description: values.description || undefined,
-        envs: values.envs.map(env => ({
-          slug: env.slug,
-          type: env.type.toLowerCase() as StorageProviders,
-          config: env.config,
-        })),
-      });
+        description: values.description,
+        envs: values.envs,
+      };
+
+      const storage = await sdkProxy.storage.create(data);
       return storage;
     },
     onSuccess: async () => {
@@ -205,9 +210,16 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
           toast.error(`Please enter container name for ${env.env_name}`);
           return;
         }
-        if (env.type === 'GCP' && !env.gcpBucketName) {
-          toast.error(`Please enter bucket name for ${env.env_name}`);
-          return;
+        if (env.type === 'GCP') {
+          if (!env.gcpBucketName) {
+            toast.error(`Please enter bucket name for ${env.env_name}`);
+            return;
+          }
+          // GCP requires service account credentials - check for essential fields
+          if (!env.gcpProjectId || !env.gcpClientEmail || !env.gcpPrivateKey) {
+            toast.error(`Please upload service account JSON file for ${env.env_name}`);
+            return;
+          }
         }
       }
     }
@@ -263,7 +275,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 pb-24">
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -370,15 +382,15 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                         <SelectValue placeholder="Select storage provider" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="AWS">AWS S3</SelectItem>
-                        <SelectItem value="Azure">Azure Blob Storage</SelectItem>
-                        <SelectItem value="GCP">Google Cloud Storage</SelectItem>
+                        <SelectItem value="aws">AWS S3</SelectItem>
+                        <SelectItem value="azure">Azure Blob Storage</SelectItem>
+                        <SelectItem value="gcp">Google Cloud Storage</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* AWS Configuration */}
-                  {env.type === 'AWS' && (
+                  {env.type === 'aws' && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -442,7 +454,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                   )}
 
                   {/* Azure Configuration */}
-                  {env.type === 'Azure' && (
+                  {env.type === 'azure' && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div>
                         <Label htmlFor={`containerName-${index}`} className="required">Container Name</Label>
@@ -469,7 +481,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                   )}
 
                   {/* GCP Configuration */}
-                  {env.type === 'GCP' && (
+                  {env.type === 'gcp' && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div className="flex items-center justify-between">
                         <h5 className="text-sm font-medium text-grey">Service Account Credentials</h5>
@@ -548,6 +560,17 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                       </div>
 
                       <div>
+                        <Label htmlFor={`gcpPrivateKeyId-${index}`}>Private Key ID</Label>
+                        <Input
+                          id={`gcpPrivateKeyId-${index}`}
+                          placeholder="Private key identifier"
+                          value={env.gcpPrivateKeyId}
+                          onChange={(e) => updateEnvConfig(index, 'gcpPrivateKeyId', e.target.value)}
+                          className="mt-2 bg-white font-mono text-sm"
+                        />
+                      </div>
+
+                      <div>
                         <Label htmlFor={`gcpPrivateKey-${index}`}>Private Key</Label>
                         <Textarea
                           id={`gcpPrivateKey-${index}`}
@@ -579,6 +602,17 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                             className="mt-2 bg-white"
                           />
                         </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor={`gcpClientX509CertUrl-${index}`}>Client x509 Cert URL</Label>
+                        <Input
+                          id={`gcpClientX509CertUrl-${index}`}
+                          placeholder="https://www.googleapis.com/robot/v1/metadata/x509/..."
+                          value={env.gcpClientX509CertUrl}
+                          onChange={(e) => updateEnvConfig(index, 'gcpClientX509CertUrl', e.target.value)}
+                          className="mt-2 bg-white"
+                        />
                       </div>
                     </div>
                   )}

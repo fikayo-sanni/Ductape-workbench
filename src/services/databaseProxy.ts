@@ -203,6 +203,7 @@ export class DatabaseProxyService {
 
     // ==================== TABLE OPERATIONS (matching SDK signatures) ====================
     listTables: <T = any>(connectionConfig?: any) => this.execute<T>('listTables', connectionConfig),
+    listTablesWithInfo: <T = any>(connectionConfig?: any) => this.execute<T>('listTablesWithInfo', connectionConfig),
     createTable: <T = any>(connectionConfig: any, tableDefinition?: any, options?: any) =>
       this.execute<T>('createTable', connectionConfig, tableDefinition, options),
     dropTable: <T = any>(connectionConfig: any, tableName?: string) =>

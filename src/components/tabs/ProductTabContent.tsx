@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { IProduct } from '@/types/product';
 import {
   Database,
@@ -61,8 +61,10 @@ import InlineCacheForm from '@/components/forms/InlineCacheForm';
 import InlineMessageBrokerForm from '@/components/forms/InlineMessageBrokerForm';
 import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
 import CodeSidebar from '@/components/CodeSidebar';
+import { saveTabState, getTabState } from '@/lib/tab-state-manager';
 
 interface ProductTabContentProps {
+  tabId: string;
   product?: IProduct;
   productId?: string;
 }
@@ -102,29 +104,31 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'sessions', label: 'Sessions', icon: KeyRound, color: 'text-blue-600', bgColor: 'bg-blue-600/10', dataKey: 'sessions', componentType: 'session' },
   { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
-  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
-  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
   // Disabled categories (coming soon)
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification', disabled: true },
+  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job', disabled: true },
   { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
   { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
   { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
 ];
 
-export default function ProductTabContent({ product: initialProduct, productId }: ProductTabContentProps) {
+export default function ProductTabContent({ tabId, product: initialProduct, productId }: ProductTabContentProps) {
   const { openTab, updateTab, activeTabId } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+  const hasRestoredStateRef = useRef(false);
 
-  // Persistent state key based on product identifier
-  const stateKey = `product-tab-state-${initialProduct?.tag || productId || initialProduct?._id}`;
-
-  // Load persisted state from localStorage
+  // Load persisted state from tab state manager
   const getPersistedState = () => {
-    try {
-      const saved = localStorage.getItem(stateKey);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
+    const savedState = getTabState(tabId);
+    // UI state is stored in formState, not data (data only has minimal product info)
+    if (savedState?.formState) {
+      return savedState.formState as {
+        activeCategory?: ResourceCategory;
+        searchQuery?: string;
+        isSidebarCollapsed?: boolean;
+      };
     }
+    return null;
   };
 
   const persistedState = getPersistedState();
@@ -151,24 +155,39 @@ export default function ProductTabContent({ product: initialProduct, productId }
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(persistedState?.isSidebarCollapsed || false);
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
 
+  // Mark state as restored after initial load
+  useEffect(() => {
+    hasRestoredStateRef.current = true;
+  }, []);
+
   // Helper to change category and exit inline create mode
   const handleCategoryChange = (category: ResourceCategory) => {
     setInlineCreateMode(null);
     setActiveCategory(category);
   };
 
-  // Persist sidebar state to localStorage
+  // Persist sidebar state to tab state manager
   useEffect(() => {
-    // Don't persist if we don't have a valid stateKey
-    if (!stateKey || stateKey === 'product-tab-state-undefined') return;
+    // Don't persist before initial restoration
+    if (!hasRestoredStateRef.current) return;
 
-    const stateToSave = {
+    const productName = initialProduct?.name || 'Product';
+    const uiState = {
       activeCategory,
       searchQuery,
       isSidebarCollapsed,
     };
-    localStorage.setItem(stateKey, JSON.stringify(stateToSave));
-  }, [stateKey, activeCategory, searchQuery, isSidebarCollapsed]);
+
+    // Store UI state in formState (not data) so it survives minimal data extraction
+    saveTabState(
+      tabId,
+      'product',
+      productName,
+      initialProduct || { _id: productId }, // Pass actual product data
+      uiState, // Pass UI state as formState
+      initialProduct?.tag || productId || initialProduct?._id
+    );
+  }, [tabId, activeCategory, searchQuery, isSidebarCollapsed, initialProduct?.name, initialProduct?.tag, initialProduct?._id, productId, initialProduct]);
 
   // Check if product data is incomplete
   const isProductDataIncomplete = initialProduct && (!initialProduct.envs || initialProduct.envs.length === 0 || !initialProduct.name);
@@ -187,10 +206,10 @@ export default function ProductTabContent({ product: initialProduct, productId }
       });
       return response.data;
     },
-    enabled: (!initialProduct || isProductDataIncomplete) && !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - data is considered fresh
+    enabled: !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
+    staleTime: 30 * 1000, // 30 seconds - data is considered fresh
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
-    refetchOnMount: false, // Don't refetch when component mounts if data is in cache
+    refetchOnMount: 'always', // Always refetch when component mounts to get latest data
   });
 
   const product = fetchedProductData || initialProduct;
@@ -206,9 +225,9 @@ export default function ProductTabContent({ product: initialProduct, productId }
         product_id: product!._id,
       }),
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: false, // Don't refetch when component mounts if data is in cache
+    refetchOnMount: 'always', // Always refetch when component mounts to get latest data
   });
 
   const connectedApps = productAppsRes?.data || [];
@@ -561,9 +580,14 @@ export default function ProductTabContent({ product: initialProduct, productId }
       // These use nested object structure (database/graph/vector key)
       data.database = resourceData;
       data.graph = resourceData;
-      data.vector = resourceData;
+      // VectorExplorerTab expects 'vector' field (not 'tag') to identify the vector config
+      data.vector = {
+        ...resourceData,
+        vector: resource.tag,  // VectorExplorerTab expects vector.vector not vector.tag
+      };
     } else if (resourceType === 'storage') {
       // StorageExplorerTab expects product object with tag, name, and envs
+      // The provider type (AWS, GCP, AZURE) is stored in env.type
       data = {
         product: {
           tag: product?.tag,
@@ -575,7 +599,8 @@ export default function ProductTabContent({ product: initialProduct, productId }
           ...resource,
           name: resource.name,
           tag: resource.tag,
-          type: resource.type,
+          type: env.type, // Provider type from the environment config (AWS, GCP, AZURE)
+          provider: env.type, // Also set as provider for clarity
           env: env,
           productTag: product?.tag,
           productName: product?.name,
