@@ -1,6 +1,6 @@
 export interface PricingPlan {
     pricing_mode: string;
-    interval: string;
+    interval?: string;
     overage_price?: number;
     limits: {
         per_minute?: number;
@@ -11,20 +11,20 @@ export interface PricingPlan {
     };
     unit_price: number;
     name: string;
-    currency: string; 
+    currency: string;
 }
 
 // More strict version with literal types
 export type PricingMode = 'upfront' | 'per_request' | 'one_time' | 'recurring';
-export type IntervalType = 'monthly' | 'bi-weekly' | 'weekly' | 'daily' | 'hourly' | 'minutely';
+export type IntervalType = 'monthly' | 'bi-weekly' | 'weekly' | 'daily' | 'hourly' | 'minutely' | 'yearly' | 'quarterly' | 'one-time';
 
 export interface Pricing {
   limits: {
-    per_minute: number;
-    per_day: number;
-    per_hour: number;
-    per_week: number;
-    per_month: number;
+    per_minute?: number;
+    per_day?: number;
+    per_hour?: number;
+    per_week?: number;
+    per_month?: number;
   };
   _id: string;
   workspace_id: string;
