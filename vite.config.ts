@@ -37,7 +37,6 @@ export default defineConfig({
     preserveSymlinks: true,
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Resolve SDK symlink to actual path for proper bundling
       // Node.js built-ins that need to be stubbed (not polyfilled)
       fs: path.resolve(__dirname, "./empty-module-file.js"),
       net: path.resolve(__dirname, "./empty-module-file.js"),

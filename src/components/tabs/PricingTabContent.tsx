@@ -34,22 +34,38 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+import type { PricingMode as PricingModeType, IntervalType, Pricing } from '@/types/pricing';
 
-enum PricingMode {
-  PER_REQUEST = 'per_request',
-  ONE_TIME = 'one_time',
-  UPFRONT = 'upfront',
-  RECURRING = 'recurring',
-}
+// Const object that can be used as enum for values
+const PricingMode = {
+  PER_REQUEST: 'per_request' as const,
+  ONE_TIME: 'one_time' as const,
+  UPFRONT: 'upfront' as const,
+  RECURRING: 'recurring' as const,
+};
 
-enum PaymentInterval {
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  BI_WEEKLY = 'bi-weekly',
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  YEARLY = 'yearly',
-  ONCE = 'one-time',
+const PaymentInterval = {
+  DAILY: 'daily' as const,
+  WEEKLY: 'weekly' as const,
+  BI_WEEKLY: 'bi-weekly' as const,
+  MONTHLY: 'monthly' as const,
+  QUARTERLY: 'quarterly' as const,
+  YEARLY: 'yearly' as const,
+  HOURLY: 'hourly' as const,
+  MINUTELY: 'minutely' as const,
+  ONCE: 'one-time' as const,
+};
+
+type PaymentInterval = IntervalType;
+
+// Pricing bundle interface that extends Pricing type but makes all properties optional
+interface PricingBundle extends Partial<Omit<Pricing, '__v' | 'is_active' | 'envs' | 'action_id' | 'pricing_tag' | 'workspace_id'>> {
+  _id: string;
+  name: string;
+  pricing_mode: PricingModeType;
+  unit_price: number;
+  currency: string;
+  created_at?: string;
 }
 
 // Bundle customer subscription interface
@@ -615,7 +631,7 @@ const DUMMY_INCOME: IncomeRecord[] = [
   },
 ];
 
-const getModeIcon = (mode: PricingMode) => {
+const getModeIcon = (mode: PricingModeType) => {
   switch (mode) {
     case PricingMode.PER_REQUEST:
       return <Zap className="h-4 w-4" />;
@@ -630,7 +646,7 @@ const getModeIcon = (mode: PricingMode) => {
   }
 };
 
-const getModeLabel = (mode: PricingMode) => {
+const getModeLabel = (mode: PricingModeType) => {
   switch (mode) {
     case PricingMode.PER_REQUEST:
       return 'Per Request';
@@ -650,7 +666,7 @@ const getIntervalLabel = (interval?: PaymentInterval) => {
   return interval.charAt(0).toUpperCase() + interval.slice(1).replace('-', ' ');
 };
 
-const formatPrice = (price: number, currency: string, mode: PricingMode) => {
+const formatPrice = (price: number, currency: string, mode: PricingModeType) => {
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
@@ -891,7 +907,7 @@ export default function PricingTabContent() {
       unit_price: data.unit_price,
       currency: data.currency,
       overage_price: data.overage_price,
-      ...limits,
+      limits: limits,
     };
 
 
@@ -1287,7 +1303,10 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                       border: '1px solid #E5E7EB',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number) => [`${value} subscription${value !== 1 ? 's' : ''}`, '']}
+                    formatter={(value) => {
+                      const numValue = typeof value === 'number' ? value : 0;
+                      return [`${numValue} subscription${numValue !== 1 ? 's' : ''}`, ''];
+                    }}
                   />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]} />
                 </BarChart>
@@ -1947,7 +1966,7 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
                   <Label htmlFor="pricing_mode">Pricing Mode *</Label>
                   <Select
                     value={form.watch('pricing_mode')}
-                    onValueChange={(value) => form.setValue('pricing_mode', value as PricingMode)}
+                    onValueChange={(value) => form.setValue('pricing_mode', value as PricingModeType)}
                   >
                     <SelectTrigger>
                       <SelectValue />
