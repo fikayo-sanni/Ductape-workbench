@@ -69,8 +69,9 @@ const deleteBundle = async (data: {
     _id: string;
     user_id: string;
     public_key: string;
+    workspace_id?: string;
 }): Promise<DeletePricingResponse | null> => {
-    const { user_id, public_key, _id } = data;
+    const { user_id, public_key, _id, workspace_id } = data;
     try {
         const response = await apiClient.delete<DeletePricingResponse>(
             `/pricing/v1/delete/${_id}`,
@@ -78,6 +79,7 @@ const deleteBundle = async (data: {
                 params: {
                     user_id,
                     public_key,
+                    workspace_id,
                 },
             }
         );
@@ -93,9 +95,10 @@ const editBundles = async (data: {
   _id: string;
   user_id: string;
   public_key: string;
+  workspace_id?: string;
   payload: PricingPlan;
 }): Promise<PricingPlan> => {
-  const { user_id, public_key, payload, _id } = data;
+  const { user_id, public_key, payload, _id, workspace_id } = data;
 
   try {
     const response = await apiClient.put<PricingPlan>(
@@ -105,6 +108,7 @@ const editBundles = async (data: {
         params: {
           user_id,
           public_key,
+          workspace_id
         },
       }
     );

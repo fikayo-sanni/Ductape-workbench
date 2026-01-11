@@ -842,6 +842,7 @@ export default function PricingTabContent() {
       _id: string;
       user_id: string;
       public_key: string;
+      workspace_id: string;
     }) => pricingServices.deleteBundle(payload),
 
     onSuccess: () => {
@@ -856,12 +857,13 @@ export default function PricingTabContent() {
   });
 
   const handleDeleteBundle = (bundleId) => {
-    if (!user?._id || !user?.public_key || !bundleId) return;
+    if (!user?._id || !user?.public_key || !currentWorkspaceId || !bundleId) return;
 
     deleteMutation.mutate({
       _id: bundleId || '',
       user_id: user?._id || '',
       public_key: user?.public_key,
+      workspace_id: currentWorkspaceId || '',
     });
   };
 
