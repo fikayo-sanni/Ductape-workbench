@@ -34,23 +34,10 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
+import { Pricing, PricingMode, PaymentInterval } from '@/types/pricing';
 
-enum PricingMode {
-  PER_REQUEST = 'per_request',
-  ONE_TIME = 'one_time',
-  UPFRONT = 'upfront',
-  RECURRING = 'recurring',
-}
+export type PricingBundle = Pricing;
 
-enum PaymentInterval {
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  BI_WEEKLY = 'bi-weekly',
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  YEARLY = 'yearly',
-  ONCE = 'one-time',
-}
 
 // Bundle customer subscription interface
 interface BundleCustomer {
@@ -193,65 +180,6 @@ interface Expenditure {
   usage_count?: number; // For usage-based billing
   created_at: string;
 }
-
-const DUMMY_PRICING_BUNDLES: PricingBundle[] = [
-  {
-    _id: 'price_1',
-    name: 'Starter Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.MONTHLY,
-    unit_price: 29,
-    currency: 'USD',
-    limits: {
-      per_day: 1000,
-      per_month: 30000,
-    },
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_2',
-    name: 'Professional Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.MONTHLY,
-    unit_price: 99,
-    currency: 'USD',
-    limits: {
-      per_day: 5000,
-      per_month: 150000,
-    },
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_3',
-    name: 'Enterprise Plan',
-    pricing_mode: PricingMode.RECURRING,
-    interval: PaymentInterval.YEARLY,
-    unit_price: 999,
-    currency: 'USD',
-    limits: {
-      per_day: 50000,
-      per_month: 1500000,
-    },
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_4',
-    name: 'Pay Per Request',
-    pricing_mode: PricingMode.PER_REQUEST,
-    unit_price: 0.01,
-    currency: 'USD',
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'price_5',
-    name: 'One-Time Setup Fee',
-    pricing_mode: PricingMode.ONE_TIME,
-    interval: PaymentInterval.ONCE,
-    unit_price: 199,
-    currency: 'USD',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
 
 const DUMMY_EXPENDITURES: Expenditure[] = [
   // Ductape Platform Subscription
@@ -759,10 +687,11 @@ const bundleFormSchema = z.object({
 });
 
 type BundleFormValues = z.infer<typeof bundleFormSchema>;
+type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'GHS' | 'ZAR';
 
 export default function PricingTabContent() {
   const {currentWorkspaceId, user} = useAuth();
-  const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>(DUMMY_PRICING_BUNDLES);
+  const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
   const [activeSection, setActiveSection] = useState<'pricing' | 'income' | 'expenditure'>('pricing');
@@ -856,7 +785,7 @@ export default function PricingTabContent() {
     
   });
 
-  const handleDeleteBundle = (bundleId) => {
+  const handleDeleteBundle = (bundleId: string) => {
     if (!user?._id || !user?.public_key || !currentWorkspaceId || !bundleId) return;
 
     deleteMutation.mutate({
@@ -1009,7 +938,7 @@ export default function PricingTabContent() {
 };
 
 // When clicking edit button
-const handleEditClick = (bundle) => {
+const handleEditClick = (bundle: React.SetStateAction<Pricing | null>) => {
   setEditingBundle(bundle); // Set the bundle to edit
   setBundleFormOpen(true); // Open the form modal
 };
@@ -1602,8 +1531,15 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-grey">
-                      {incomeData?.growthRate >= 0 ? '+' : ''}{incomeData?.growthRate.toFixed(1)}%
-                    </p>
+                      {incomeData?.growthRate !== undefined ? (
+                        <>
+                        {incomeData.growthRate >= 0 ? '+' : ''}
+                        {incomeData.growthRate.toFixed(1)}%
+                        </>
+                        ) : (
+                          '0.0%'
+                          )}
+                          </p>
                     <p className="text-sm text-grey-600">Growth Rate</p>
                   </div>
                 </div>
@@ -1957,8 +1893,8 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="gap-1.5 text-grey">
-                            {getCategoryIcon(expenditure?.category)}
-                            {getCategoryLabel(expenditure?.category)}
+                            {getCategoryIcon(expenditure?.category as ExpenditureCategory)}
+                            {getCategoryLabel(expenditure?.category as ExpenditureCategory)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1978,13 +1914,13 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-red">
-                            {formatCurrency(expenditure.amount, expenseData?.currency)}
+                            {formatCurrency(expenditure.amount, expenseData?.currency as CurrencyCode)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {getExpenditureStatusIcon(expenditure.status)}
-                            <Badge variant={getExpenditureStatusBadgeVariant(expenditure.status)}>
+                            {getExpenditureStatusIcon(expenditure?.status as ExpenditureStatus)}
+                            <Badge variant={getExpenditureStatusBadgeVariant(expenditure?.status as ExpenditureStatus)}>
                               {expenditure.status.charAt(0).toUpperCase() + expenditure.status.slice(1)}
                             </Badge>
                           </div>
@@ -2241,7 +2177,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={confirmDeleteBundle}
+                    // onClick={confirmDeleteBundle}
                     className="bg-red-600 hover:bg-red-700"
                   >
                     Delete Bundle

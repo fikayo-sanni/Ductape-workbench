@@ -15,8 +15,23 @@ export interface PricingPlan {
 }
 
 // More strict version with literal types
-export type PricingMode = 'upfront' | 'per_request' | 'one_time' | 'recurring';
-export type IntervalType = 'monthly' | 'bi-weekly' | 'weekly' | 'daily' | 'hourly' | 'minutely';
+export enum PricingMode {
+  UPFRONT = 'upfront',
+  PER_REQUEST = 'per_request',
+  ONE_TIME = 'one_time',
+  RECURRING = 'recurring'
+}
+
+export enum PaymentInterval {
+  MONTHLY = 'monthly',
+  BI_WEEKLY = 'bi-weekly',
+  WEEKLY = 'weekly',
+  DAILY = 'daily',
+  HOURLY = 'hourly',
+  MINUTELY = 'minutely',
+  QUARTERLY = 'quarterly',
+  YEARLY = 'yearly'
+}
 
 export interface Pricing {
   limits: {
@@ -31,7 +46,7 @@ export interface Pricing {
   pricing_tag: string;
   action_id: string;
   pricing_mode: PricingMode;
-  interval: IntervalType;
+  interval: PaymentInterval;
   unit_price: number;
   overage_price: number;
   name: string;
@@ -94,7 +109,7 @@ export interface TotalExpenseRecord {
                 details: string;
                 amount: number;
                 status: string;
-                ussage_count?: number;
+                usage_count?: number;
                 bundle_name?: string;
                 date?: string;
             }
