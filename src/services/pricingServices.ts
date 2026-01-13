@@ -1,5 +1,6 @@
 import apiClient from "@/config/axiosinstance";
-import { PricingApiResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord } from "@/types/pricing";
+import { PricingApiResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse } from "@/types/pricing";
+import toast from "react-hot-toast";
 
 const createBundle = async (data: {
   user_id: string;
@@ -64,12 +65,75 @@ const fetchTotalExpense = async (data: {
   return response.data;
 }
 
+const deleteBundle = async (data: {
+    _id: string;
+    user_id: string;
+    public_key: string;
+    workspace_id?: string;
+}): Promise<DeletePricingResponse | null> => {
+    const { user_id, public_key, _id, workspace_id } = data;
+    try {
+        const response = await apiClient.delete<DeletePricingResponse>(
+            `/pricing/v1/delete/${_id}`,
+            {
+                params: {
+                    user_id,
+                    public_key,
+                    workspace_id,
+                },
+            }
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting bundle:", error);
+        return null;
+    }
+};
+
+const editBundles = async (data: {
+  _id: string;
+  user_id: string;
+  public_key: string;
+  workspace_id?: string;
+  payload: PricingPlan;
+}): Promise<PricingPlan> => {
+  const { user_id, public_key, payload, _id, workspace_id } = data;
+
+  try {
+    const response = await apiClient.put<PricingPlan>(
+      `/pricing/v1/update/${_id}`,
+      payload, 
+      {
+        params: {
+          user_id,
+          public_key,
+          workspace_id
+        },
+      }
+    );
+
+    if (!response.data) {
+      toast.error('Something went wrong');
+      throw new Error("Failed to edit bundle");
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error editing bundle:", error);
+    toast.error('This bundle cannot be edited');
+    throw error;
+  }
+};
+
 
 const pricingServices = {
   createBundle,
   fetchBundles,
   fetchTotalIncome,
   fetchTotalExpense,
+  deleteBundle,
+  editBundles,
 };
 
 export default pricingServices;

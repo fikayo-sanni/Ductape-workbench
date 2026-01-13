@@ -31,7 +31,7 @@ export interface Pricing {
   pricing_tag: string;
   action_id: string;
   pricing_mode: PricingMode;
-  interval: IntervalType;
+  interval: PaymentInterval;
   unit_price: number;
   overage_price: number;
   name: string;
@@ -94,7 +94,16 @@ export interface TotalExpenseRecord {
                 details: string;
                 amount: number;
                 status: string;
+                usage_count?: number;
+                bundle_name?: string;
+                date?: string;
             }
         ]
     }
+}
+
+export interface DeletePricingResponse {
+  status: boolean,
+  meta: object,
+  data: boolean
 }
