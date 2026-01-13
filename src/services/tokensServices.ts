@@ -35,9 +35,24 @@ const postTwoFA = async (data: {
   return response.data;
 };
 
+const regenerateAccessKey = async (data: {
+  user_id: string;
+  public_key: string;
+  workspace_id: string;
+}): Promise<TokenResponse> => {
+  const { user_id, public_key, workspace_id } = data;
+  const response = await apiClient.post<TokenResponse>(
+    `/users/v1/regenerate/access-key`,
+    {},
+    { params: { user_id, public_key, workspace_id } }
+  );
+  return response.data;
+};
+
 const tokensServices = {
   getTwoFA,
   postTwoFA,
+  regenerateAccessKey,
 };
 
 export default tokensServices;

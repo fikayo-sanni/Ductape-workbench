@@ -32,6 +32,8 @@ import {
   Copy,
   Settings,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -46,8 +48,19 @@ interface RequestBuilderProps {
   tabId: string;
   data?: {
     productId?: string;
+    app?: any;
     appId?: string;
+    appTag?: string;
+    appName?: string;
+    version?: string;
+    folderId?: string | null;
+    envs?: any[];
+    variables?: any[];
+    constants?: any[];
+    auths?: any[];
     isNew?: boolean;
+    onSaveSuccess?: () => void;
+    onCancel?: () => void;
   };
 }
 
@@ -127,6 +140,9 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     request_type: DataFormats.JSON,
   });
 
+  // Collapsible details section state (collapsed by default)
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState<boolean>(false);
+
   const [fullUrl, setFullUrl] = useState(savedState?.fullUrl || "");
   const [baseUrl, setBaseUrl] = useState(savedState?.baseUrl || "");
   const [resource, setResource] = useState(savedState?.resource || "");
@@ -188,7 +204,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
   // Initialize Ductape SDK with app tag when available
   useEffect(() => {
-    if (app?.tag) {
+    if (app?.tag && ductape) {
       ductape.init(app.tag);
     }
   }, [app?.tag, ductape]);
@@ -1093,12 +1109,18 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       // Clear saved state from localStorage after successful save
       deleteTabState(tabId);
 
-      // Close current tab
-      const { closeTab, openTab } = useWorkbenchStore.getState();
-      closeTab(tabId);
-
       // Invalidate app query cache
       queryClient.invalidateQueries({ queryKey: ['app', data?.appId] });
+
+      // If we have an onSaveSuccess callback (inline mode), call it instead of managing tabs
+      if (data?.onSaveSuccess) {
+        data.onSaveSuccess();
+        return;
+      }
+
+      // Tab mode: Close current tab and reopen app tab
+      const { closeTab, openTab } = useWorkbenchStore.getState();
+      closeTab(tabId);
 
       // Fetch fresh app data and reopen app tab
       try {
@@ -1166,121 +1188,136 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-grey-100 flex">
-      {/* Left Panel - URL & Environments */}
-      <div className="w-2/5 border-r border-grey-400 bg-white overflow-auto">
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
-                <Globe className="h-6 w-6 text-blue" />
-              </div>
-              <div className="flex-1">
+    <div className="h-full overflow-hidden bg-grey-100 flex flex-col relative">
+      {/* Top Section - Collapsible Request Details */}
+      <div className="bg-white border-b border-grey-400 flex-shrink-0">
+        {/* Header Bar - Always Visible */}
+        <div className="px-4 py-3 flex items-center gap-3">
+          {/* Collapse Toggle */}
+          <button
+            onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+            className="p-1 hover:bg-grey-100 rounded transition-colors"
+          >
+            {isDetailsExpanded ? (
+              <ChevronDown className="h-4 w-4 text-grey-600" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-grey-600" />
+            )}
+          </button>
+
+          {/* Method Badge */}
+          <span className={cn('px-2 py-1 rounded text-xs font-bold', getMethodColor(formData.method))}>
+            {formData.method}
+          </span>
+
+          {/* Request Name */}
+          <h2 className="text-lg font-semibold text-grey truncate flex-1">
+            {formData.name || 'New Request'}
+          </h2>
+
+          {/* Tag Badge */}
+          <span className="text-xs text-grey-600 bg-grey-100 px-2 py-1 rounded font-mono hidden sm:inline">
+            {formData.tag || 'auto-generated'}
+          </span>
+
+          {/* Cancel Button (inline mode) */}
+          {data?.onCancel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={data.onCancel}
+              disabled={isSaving}
+              className="h-8 px-3 text-xs"
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+
+        {/* Collapsible Details Section */}
+        {isDetailsExpanded && (
+          <div className="px-4 pb-4 space-y-4 border-t border-grey-200 pt-4">
+            {/* Name and Description */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Request Name</Label>
                 <Input
                   placeholder="Request Name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="text-xl font-bold border-none p-0 h-auto focus-visible:ring-0"
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Tag</Label>
+                <Input
+                  value={formData.tag}
+                  readOnly
+                  className="h-9 bg-grey-50 font-mono text-sm"
+                  placeholder="auto-generated"
                 />
               </div>
             </div>
 
-            <div className="text-xs text-grey-600 bg-grey-100 px-3 py-1.5 rounded inline-block">
-              Tag:{" "}
-              <span className="font-mono">
-                {formData.tag || "auto-generated"}
-              </span>
+            <div>
+              <Label className="text-sm font-medium text-grey-700 mb-1.5 block">Description</Label>
+              <Textarea
+                placeholder="Description (optional)"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev: any) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                className="text-sm resize-none"
+                rows={2}
+              />
             </div>
 
-            <Textarea
-              placeholder="Description (optional)"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((prev: any) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              className="text-sm resize-none"
-              rows={2}
-            />
+            {/* App Context - Compact */}
+            {app && (
+              <div className="flex items-center gap-3 p-3 bg-grey-50 rounded-lg border border-grey-200">
+                <div className="w-8 h-8 rounded-lg bg-green/10 flex items-center justify-center text-green text-xs font-semibold flex-shrink-0">
+                  {app.logo ? (
+                    <img
+                      src={app.logo}
+                      alt={app.app_name}
+                      className="w-full h-full rounded-lg object-cover"
+                    />
+                  ) : (
+                    app.app_name
+                      ?.split(" ")
+                      .map((word: string) => word[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-grey truncate">{app.app_name}</p>
+                  <p className="text-xs text-grey-500 truncate">{app.tag}</p>
+                </div>
+                {app.status && (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded text-xs font-medium',
+                    app.status === 'active' ? 'bg-green/10 text-green' : 'bg-grey-200 text-grey-600'
+                  )}>
+                    {app.status}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
+        )}
+      </div>
 
-          {/* App Information */}
-          {data?.appId && (
-            <div className="pt-4 border-t border-grey-400">
-              <Label className="text-sm font-semibold text-grey flex items-center gap-2 mb-3">
-                <Server className="h-4 w-4 text-primary" />
-                Adding to App
-              </Label>
-
-              {app ? (
-                <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">
-                  <div className="flex items-center gap-3">
-                    {/* App Logo */}
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center text-green text-sm font-semibold flex-shrink-0">
-                      {app.logo ? (
-                        <img
-                          src={app.logo}
-                          alt={app.app_name}
-                          className="w-full h-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        app.app_name
-                          .split(" ")
-                          .map((word) => word[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)
-                      )}
-                    </div>
-
-                    {/* App Info */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-grey truncate">
-                        {app.app_name}
-                      </h4>
-                      <p className="text-xs text-grey-600 truncate">
-                        {app.tag}
-                      </p>
-                      {app.status && (
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1",
-                            app.status === "active"
-                              ? "bg-green/10 text-green"
-                              : "bg-grey-400 text-grey-600"
-                          )}
-                        >
-                          {app.status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-grey-400/20 flex items-center justify-center flex-shrink-0">
-                      <Server className="h-5 w-5 text-grey-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-grey-400/30 rounded animate-pulse mb-1"></div>
-                      <div className="h-3 bg-grey-400/20 rounded animate-pulse w-2/3"></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* URL Builder */}
-          <div className="space-y-3 pt-4 border-t border-grey-400">
-            <Label className="text-sm font-semibold text-grey">
-              Request URL
-            </Label>
-
+      {/* Main Content Area - Vertical Layout */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* URL & Environment Bar */}
+        <div className="bg-white border-b border-grey-400 p-4 flex-shrink-0">
+          <div className="flex flex-col lg:flex-row gap-3">
+            {/* Method + Send Button */}
             <div className="flex items-center gap-2">
               <Select
                 value={formData.method}
@@ -1288,18 +1325,13 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   setFormData((prev: any) => ({ ...prev, method: value }))
                 }
               >
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-24">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {["GET", "POST", "PUT", "PATCH", "DELETE"].map((method) => (
                     <SelectItem key={method} value={method}>
-                      <span
-                        className={cn(
-                          "px-2 py-1 rounded text-xs font-bold",
-                          getMethodColor(method)
-                        )}
-                      >
+                      <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(method))}>
                         {method}
                       </span>
                     </SelectItem>
@@ -1318,153 +1350,96 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-grey flex items-center gap-2">
-                <Globe className="h-4 w-4 text-primary" />
-                Full URL
-              </Label>
+            {/* URL Display */}
+            <div className="flex-1">
               <Input
                 placeholder="https://api.example.com/v1/users"
                 value={fullUrl}
                 onChange={(e) => setFullUrl(e.target.value)}
-                className="font-mono text-lg h-12 border-grey-400 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                className="font-mono text-sm bg-grey-50 h-9"
                 autoFocus
               />
             </div>
 
-            {baseUrl && (
-              <div className="p-3 bg-grey-100 rounded-lg border border-grey-400">
-                <Label className="text-xs font-medium text-grey-600 mb-2 flex items-center gap-2">
-                  <Hash className="h-3 w-3" />
-                  Resource Path
-                </Label>
-                <Input
-                  placeholder="/api/v1/endpoint"
-                  value={resource}
-                  onChange={(e) => setResource(e.target.value)}
-                  className="font-mono text-xs h-8"
-                />
+            {/* Environment Selector */}
+            {environments.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-grey-600 whitespace-nowrap">Env:</Label>
+                <div className="flex gap-1">
+                  {customEnvs.map((env) => {
+                    const originalEnv = environments.find((e: any) => e.slug === env.slug);
+                    const isUpdating = updatingEnvSlugs.has(env.slug);
+
+                    return (
+                      <button
+                        key={env.slug}
+                        onClick={() => handleEnvSelect(env.slug)}
+                        className={cn(
+                          'px-3 py-1.5 rounded text-xs font-medium transition-all',
+                          isUpdating && 'animate-pulse',
+                          env.active
+                            ? 'bg-primary text-white'
+                            : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
+                        )}
+                      >
+                        {originalEnv?.env_name || env.slug}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Environments */}
-          {environments.length > 0 && (
-            <div className="pt-4 border-t border-grey-400">
-              <Label className="text-sm font-semibold text-grey flex items-center gap-2 mb-3">
-                <Server className="h-4 w-4 text-primary" />
-                Environments
+          {/* Resource Path - Compact */}
+          {baseUrl && (
+            <div className="mt-3 flex items-center gap-2">
+              <Label className="text-xs text-grey-600 flex items-center gap-1 whitespace-nowrap">
+                <Hash className="h-3 w-3" />
+                Resource:
               </Label>
-
-              <div className="space-y-2">
-                {customEnvs.map((env) => {
-                  const originalEnv = environments.find(
-                    (e: any) => e.slug === env.slug
-                  );
-                  const isModified = env.base_url !== originalEnv?.base_url;
-                  const isUpdating = updatingEnvSlugs.has(env.slug);
-
-                  return (
-                    <div key={env.slug} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => handleEnvSelect(env.slug)}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-all duration-300 flex-1",
-                            isUpdating &&
-                              "animate-pulse ring-4 ring-yellow-400 ring-opacity-75 shadow-lg",
-                            env.active
-                              ? isUpdating
-                                ? "bg-yellow-400 text-yellow-900 shadow-xl transform scale-105"
-                                : "bg-primary text-white"
-                              : isUpdating
-                              ? "bg-yellow-200 text-yellow-900 shadow-xl transform scale-105"
-                              : "bg-grey-100 text-grey-700 hover:bg-grey-200"
-                          )}
-                        >
-                          <span>{originalEnv?.env_name || env.slug}</span>
-                          {isModified && !isUpdating && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-orange-500"
-                              title="Modified"
-                            />
-                          )}
-                          {isUpdating && (
-                            <span
-                              className="w-2 h-2 rounded-full bg-yellow-600 animate-ping"
-                              title="Updating..."
-                            />
-                          )}
-                        </button>
-
-                        {isModified && !isUpdating && (
-                          <Button
-                            onClick={() => handleResetEnv(env.slug)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            title="Reset to default"
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {env.active && (
-                        <div className="pl-3 text-xs text-grey-600">
-                          <code
-                            className={cn(
-                              "px-2 py-1 rounded border block transition-all duration-300",
-                              isUpdating
-                                ? "bg-yellow-100 border-yellow-400 text-yellow-800 shadow-md"
-                                : "bg-grey-100 border-grey-400"
-                            )}
-                          >
-                            {env.base_url || "Not set"}
-                          </code>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <Input
+                placeholder="/api/v1/endpoint"
+                value={resource}
+                onChange={(e) => setResource(e.target.value)}
+                className="font-mono text-xs h-8 flex-1"
+              />
             </div>
           )}
         </div>
-      </div>
 
-      {/* Right Panel - Request/Response */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Request/Response Tabs */}
+        <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex-1 flex flex-col overflow-hidden"
         >
-          <div className="border-b border-grey-400 bg-white px-6 flex-shrink-0">
-            <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto">
+          <div className="border-b border-grey-400 bg-white px-4 lg:px-6 flex-shrink-0">
+            <TabsList className="w-full justify-start rounded-none bg-transparent p-0 h-auto overflow-x-auto">
               <TabsTrigger
                 value="params"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
               >
                 Params
               </TabsTrigger>
               <TabsTrigger
                 value="headers"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
               >
                 Headers
               </TabsTrigger>
               {["POST", "PUT", "PATCH"].includes(formData.method) && (
                 <TabsTrigger
                   value="body"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
                 >
                   Body
                 </TabsTrigger>
               )}
               <TabsTrigger
                 value="response"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 lg:px-4 py-3 text-sm lg:text-base whitespace-nowrap"
                 disabled={!response}
               >
                 Response
@@ -1982,9 +1957,19 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
             </TabsContent>
           </div>
         </Tabs>
+        </div>
 
-        {/* Save Button */}
-        <div className="border-t border-grey-400 bg-white p-4 flex justify-end">
+        {/* Action Buttons */}
+        <div className="border-t border-grey-400 bg-white p-4 flex justify-end gap-3">
+          {data?.onCancel && (
+            <Button
+              variant="outline"
+              onClick={data.onCancel}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+          )}
           <Button
             onClick={handleSave}
             className="bg-primary text-white hover:bg-primary/90"

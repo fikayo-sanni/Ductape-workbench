@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import WorkbenchLayout from './components/WorkbenchLayout';
+import LoginModal from './components/LoginModal';
 import { useThemeStore } from './stores/theme-store';
+import { useLoginModalStore } from './stores/login-modal-store';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -17,6 +19,7 @@ const queryClient = new QueryClient({
 
 function App() {
   const theme = useThemeStore((state) => state.theme);
+  const { isOpen: isLoginModalOpen, closeLoginModal } = useLoginModalStore();
 
   // Initialize theme on mount
   useEffect(() => {
@@ -32,6 +35,18 @@ function App() {
           <Route path="/" element={<WorkbenchLayout />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
+        {/* Login Modal - shown on 401 unauthorized */}
+        {isLoginModalOpen && (
+          <LoginModal
+            onSuccess={() => {
+              closeLoginModal();
+              // Reload to refresh data with new auth
+              window.location.reload();
+            }}
+            onClose={closeLoginModal}
+          />
+        )}
       </Router>
     </QueryClientProvider>
   );

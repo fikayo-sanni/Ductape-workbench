@@ -1,4 +1,4 @@
-import { Zap, Clock, Tag, Layers } from 'lucide-react';
+import { Zap, Clock, Tag, Layers, Server, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,12 +10,13 @@ interface CacheTabContentProps {
 
 export default function CacheTabContent({ cache }: CacheTabContentProps) {
   const { openTab } = useWorkbenchStore();
+
   // Show error if cache data is incomplete and can't be fetched
   if (!cache?.name && !cache?.tag) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete cache data</p>
           <p className="text-grey-500 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
@@ -34,11 +35,30 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
     tag: cache.productTag,
     logo: cache.productLogo,
   } : null;
+
+  // Get environments from productEnvironments
+  const environments = cache?.productEnvironments || [];
+
   const formatExpiry = (seconds: number) => {
     if (seconds < 60) return `${seconds} seconds`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
     return `${Math.floor(seconds / 86400)} days`;
+  };
+
+  const handleViewCache = (env: any) => {
+    openTab({
+      id: `cache-values-${cache.tag}-${env.slug}`,
+      type: 'cache-values',
+      title: `${cache.name} (${env.slug})`,
+      itemId: `${cache._id}-${env.slug}`,
+      data: {
+        ...cache,
+        cacheTag: cache.tag,
+        productTag: cache.productTag,
+        env: { slug: env.slug },
+      },
+    });
   };
 
   return (
@@ -67,7 +87,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
                   </span>
                 </div>
                 <p className="text-sm text-grey-600">
-                  This cache is connected to your product and configured for its environments
+                  This cache is connected to your product and available across all environments
                 </p>
               </div>
             </div>
@@ -77,52 +97,70 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-red/10 flex items-center justify-center flex-shrink-0">
-              <Layers className="h-6 w-6 text-red" />
+            <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+              <Layers className="h-6 w-6 text-orange-500" />
             </div>
             <div className="flex-1">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h1 className="text-2xl font-bold text-grey mb-2">{cache.name}</h1>
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-sm text-grey-600 flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      <span className="font-mono">{cache.tag}</span>
-                    </span>
-                    {cache.expiry !== undefined && (
-                      <span className="px-2 py-1 rounded text-xs font-medium bg-red/10 text-red flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatExpiry(cache.expiry)}
-                      </span>
-                    )}
-                  </div>
-                  {cache.description && (
-                    <p className="text-sm text-grey-600">{cache.description}</p>
-                  )}
-                </div>
-                <Button
-                  onClick={() => {
-                    openTab({
-                      id: `cache-values-${cache.tag}-${Date.now()}`,
-                      type: 'cache-values',
-                      title: `${cache.name} - Values`,
-                      itemId: cache._id,
-                      data: {
-                        ...cache,
-                        cacheTag: cache.tag,
-                        productTag: cache.productTag,
-                      },
-                    });
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Layers className="h-4 w-4" />
-                  View Values
-                </Button>
+              <h1 className="text-2xl font-bold text-grey mb-2">{cache.name}</h1>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{cache.tag}</span></span>
+                {cache.expiry !== undefined && (
+                  <span className="px-3 py-1 rounded text-xs font-medium bg-orange-500/10 text-orange-500 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    TTL: {formatExpiry(cache.expiry)}
+                  </span>
+                )}
               </div>
+              {cache.description && (
+                <p className="text-sm text-grey-600">{cache.description}</p>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Environment Connections */}
+        {environments.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-grey">Environment Connections</h2>
+            {environments.map((env: any, index: number) => (
+              <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-5 w-5 text-primary" />
+                    <h3 className="text-base font-semibold text-grey">{env.slug}</h3>
+                  </div>
+                  <Button
+                    onClick={() => handleViewCache(env)}
+                    className="gap-2"
+                    size="sm"
+                  >
+                    <Layers className="h-4 w-4" />
+                    View Cache Values
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {env.name && env.name !== env.slug && (
+                  <p className="text-sm text-grey-600 mb-3">{env.name}</p>
+                )}
+
+                {/* Cache Info for this env */}
+                <div className="p-3 rounded-lg bg-grey-50 border border-grey-400">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1.5 text-grey-600">
+                      <Clock className="h-4 w-4 text-orange-500" />
+                      <span>TTL: <strong className="text-grey">{formatExpiry(cache.expiry || 0)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-grey-600">
+                      <Tag className="h-4 w-4 text-primary" />
+                      <span>Cache Key Prefix: <strong className="font-mono text-grey">{cache.tag}:{env.slug}</strong></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Cache Configuration */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
@@ -220,7 +258,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-5 w-5 text-red" />
+              <Zap className="h-5 w-5 text-orange-500" />
               <h3 className="text-sm font-semibold text-grey">Faster Response</h3>
             </div>
             <p className="text-xs text-grey-600">
@@ -248,6 +286,17 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
             </p>
           </div>
         </div>
+
+        {/* Empty State for no environments */}
+        {environments.length === 0 && (
+          <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
+            <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-grey mb-2">No Environments Available</h3>
+            <p className="text-sm text-grey-600">
+              Configure environments in your product to view cache values per environment.
+            </p>
+          </div>
+        )}
 
         {/* Info Box */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

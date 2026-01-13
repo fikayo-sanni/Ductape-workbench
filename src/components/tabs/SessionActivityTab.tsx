@@ -1,12 +1,29 @@
-import { useState } from 'react';
-import { Activity, Users, Clock, Calendar, ChevronLeft, ChevronRight, BarChart3, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  Users,
+  Clock,
+  ChevronRight,
+  BarChart3,
+  Search,
+  RefreshCw,
+  LayoutGrid,
+  Globe,
+  Key,
+  UserCheck,
+  UserX,
+  LayoutDashboard,
+  PanelLeftClose,
+  PanelLeft,
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 import SessionDashboard from './SessionDashboard';
-import { format } from 'date-fns';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useAuth } from '@/store/useAuth';
+import sessionUsersService from '@/services/sessionUsersService';
 
 interface SessionActivityTabProps {
   session: any;
@@ -15,412 +32,8 @@ interface SessionActivityTabProps {
   productName?: string;
 }
 
-// Dummy data for session users
-const DUMMY_USERS = [
-  {
-    ductape_user_id: 'usr_1a2b3c4d5e',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'sarah.johnson@enterprise.com',
-    env: 'production',
-    first_seen: '2024-01-10T08:30:00Z',
-    last_seen: '2024-01-23T14:45:00Z',
-    createdAt: '2024-01-10T08:30:00Z',
-    updatedAt: '2024-01-23T14:45:00Z',
-    session_count: 47,
-    session_data: {
-      userId: '191010192-19198829819',
-      details: {
-        username: 'sarah.johnson',
-        email: 'sarah.johnson@enterprise.com',
-        role: 'admin'
-      },
-      preferences: {
-        theme: 'dark',
-        notifications: true
-      }
-    }
-  },
-  {
-    ductape_user_id: 'usr_2b3c4d5e6f',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'john.doe@company.com',
-    env: 'production',
-    first_seen: '2024-01-12T10:15:00Z',
-    last_seen: '2024-01-23T16:20:00Z',
-    createdAt: '2024-01-12T10:15:00Z',
-    updatedAt: '2024-01-23T16:20:00Z',
-    session_count: 32,
-    session_data: {
-      userId: '291929-38291919',
-      details: {
-        username: 'john.doe',
-        email: 'john.doe@company.com',
-        role: 'user'
-      },
-      metadata: {
-        lastLogin: '2024-01-23T16:20:00Z',
-        ipAddress: '192.168.1.100'
-      }
-    }
-  },
-  {
-    ductape_user_id: 'usr_3c4d5e6f7g',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'jane.smith@startup.io',
-    env: 'staging',
-    first_seen: '2024-01-15T09:00:00Z',
-    last_seen: '2024-01-22T11:30:00Z',
-    createdAt: '2024-01-15T09:00:00Z',
-    updatedAt: '2024-01-22T11:30:00Z',
-    session_count: 18,
-  },
-  {
-    ductape_user_id: 'usr_4d5e6f7g8h',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'admin@platform.com',
-    env: 'production',
-    first_seen: '2024-01-08T07:00:00Z',
-    last_seen: '2024-01-23T18:00:00Z',
-    createdAt: '2024-01-08T07:00:00Z',
-    updatedAt: '2024-01-23T18:00:00Z',
-    session_count: 89,
-  },
-  {
-    ductape_user_id: 'usr_5e6f7g8h9i',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'test.user@demo.com',
-    env: 'development',
-    first_seen: '2024-01-20T12:00:00Z',
-    last_seen: '2024-01-20T15:30:00Z',
-    createdAt: '2024-01-20T12:00:00Z',
-    updatedAt: '2024-01-20T15:30:00Z',
-    session_count: 3,
-  },
-  {
-    ductape_user_id: 'usr_6f7g8h9i0j',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'michael.chen@techcorp.io',
-    env: 'production',
-    first_seen: '2024-01-11T09:45:00Z',
-    last_seen: '2024-01-23T13:20:00Z',
-    createdAt: '2024-01-11T09:45:00Z',
-    updatedAt: '2024-01-23T13:20:00Z',
-    session_count: 41,
-  },
-  {
-    ductape_user_id: 'usr_7g8h9i0j1k',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'emily.rodriguez@agency.co',
-    env: 'production',
-    first_seen: '2024-01-13T11:00:00Z',
-    last_seen: '2024-01-23T10:15:00Z',
-    createdAt: '2024-01-13T11:00:00Z',
-    updatedAt: '2024-01-23T10:15:00Z',
-    session_count: 28,
-  },
-  {
-    ductape_user_id: 'usr_8h9i0j1k2l',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'david.kim@saas-company.com',
-    env: 'staging',
-    first_seen: '2024-01-16T14:30:00Z',
-    last_seen: '2024-01-22T16:45:00Z',
-    createdAt: '2024-01-16T14:30:00Z',
-    updatedAt: '2024-01-22T16:45:00Z',
-    session_count: 12,
-  },
-  {
-    ductape_user_id: 'usr_9i0j1k2l3m',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'lisa.anderson@consulting.biz',
-    env: 'production',
-    first_seen: '2024-01-09T08:00:00Z',
-    last_seen: '2024-01-23T17:30:00Z',
-    createdAt: '2024-01-09T08:00:00Z',
-    updatedAt: '2024-01-23T17:30:00Z',
-    session_count: 56,
-  },
-  {
-    ductape_user_id: 'usr_0j1k2l3m4n',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'robert.martinez@finance.org',
-    env: 'production',
-    first_seen: '2024-01-14T10:20:00Z',
-    last_seen: '2024-01-23T12:40:00Z',
-    createdAt: '2024-01-14T10:20:00Z',
-    updatedAt: '2024-01-23T12:40:00Z',
-    session_count: 23,
-  },
-  {
-    ductape_user_id: 'usr_1k2l3m4n5o',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'maria.garcia@ecommerce.shop',
-    env: 'staging',
-    first_seen: '2024-01-17T13:15:00Z',
-    last_seen: '2024-01-21T09:25:00Z',
-    createdAt: '2024-01-17T13:15:00Z',
-    updatedAt: '2024-01-21T09:25:00Z',
-    session_count: 9,
-  },
-  {
-    ductape_user_id: 'usr_2l3m4n5o6p',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'james.wilson@media.net',
-    env: 'production',
-    first_seen: '2024-01-11T07:30:00Z',
-    last_seen: '2024-01-23T15:50:00Z',
-    createdAt: '2024-01-11T07:30:00Z',
-    updatedAt: '2024-01-23T15:50:00Z',
-    session_count: 38,
-  },
-  {
-    ductape_user_id: 'usr_3m4n5o6p7q',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'jennifer.lee@healthcare.med',
-    env: 'development',
-    first_seen: '2024-01-19T11:45:00Z',
-    last_seen: '2024-01-22T14:20:00Z',
-    createdAt: '2024-01-19T11:45:00Z',
-    updatedAt: '2024-01-22T14:20:00Z',
-    session_count: 7,
-  },
-  {
-    ductape_user_id: 'usr_4n5o6p7q8r',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'william.brown@logistics.express',
-    env: 'production',
-    first_seen: '2024-01-10T09:10:00Z',
-    last_seen: '2024-01-23T11:35:00Z',
-    createdAt: '2024-01-10T09:10:00Z',
-    updatedAt: '2024-01-23T11:35:00Z',
-    session_count: 44,
-  },
-  {
-    ductape_user_id: 'usr_5o6p7q8r9s',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'patricia.davis@education.edu',
-    env: 'staging',
-    first_seen: '2024-01-18T10:05:00Z',
-    last_seen: '2024-01-22T13:50:00Z',
-    createdAt: '2024-01-18T10:05:00Z',
-    updatedAt: '2024-01-22T13:50:00Z',
-    session_count: 11,
-  },
-  {
-    ductape_user_id: 'usr_6p7q8r9s0t',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'charles.miller@realestate.properties',
-    env: 'production',
-    first_seen: '2024-01-12T08:25:00Z',
-    last_seen: '2024-01-23T16:05:00Z',
-    createdAt: '2024-01-12T08:25:00Z',
-    updatedAt: '2024-01-23T16:05:00Z',
-    session_count: 35,
-  },
-  {
-    ductape_user_id: 'usr_7q8r9s0t1u',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'susan.moore@travel.tours',
-    env: 'production',
-    first_seen: '2024-01-13T12:40:00Z',
-    last_seen: '2024-01-23T09:15:00Z',
-    createdAt: '2024-01-13T12:40:00Z',
-    updatedAt: '2024-01-23T09:15:00Z',
-    session_count: 26,
-  },
-  {
-    ductape_user_id: 'usr_8r9s0t1u2v',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'joseph.taylor@automotive.cars',
-    env: 'development',
-    first_seen: '2024-01-21T14:55:00Z',
-    last_seen: '2024-01-22T10:30:00Z',
-    createdAt: '2024-01-21T14:55:00Z',
-    updatedAt: '2024-01-22T10:30:00Z',
-    session_count: 4,
-  },
-  {
-    ductape_user_id: 'usr_9s0t1u2v3w',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'karen.jackson@retail.store',
-    env: 'production',
-    first_seen: '2024-01-09T11:20:00Z',
-    last_seen: '2024-01-23T14:25:00Z',
-    createdAt: '2024-01-09T11:20:00Z',
-    updatedAt: '2024-01-23T14:25:00Z',
-    session_count: 52,
-  },
-  {
-    ductape_user_id: 'usr_0t1u2v3w4x',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'daniel.white@insurance.policy',
-    env: 'staging',
-    first_seen: '2024-01-16T09:35:00Z',
-    last_seen: '2024-01-21T15:10:00Z',
-    createdAt: '2024-01-16T09:35:00Z',
-    updatedAt: '2024-01-21T15:10:00Z',
-    session_count: 14,
-  },
-  {
-    ductape_user_id: 'usr_1u2v3w4x5y',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'nancy.harris@marketing.digital',
-    env: 'production',
-    first_seen: '2024-01-11T10:50:00Z',
-    last_seen: '2024-01-23T13:45:00Z',
-    createdAt: '2024-01-11T10:50:00Z',
-    updatedAt: '2024-01-23T13:45:00Z',
-    session_count: 39,
-  },
-  {
-    ductape_user_id: 'usr_2v3w4x5y6z',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'thomas.clark@manufacturing.factory',
-    env: 'production',
-    first_seen: '2024-01-14T07:15:00Z',
-    last_seen: '2024-01-23T12:00:00Z',
-    createdAt: '2024-01-14T07:15:00Z',
-    updatedAt: '2024-01-23T12:00:00Z',
-    session_count: 31,
-  },
-  {
-    ductape_user_id: 'usr_3w4x5y6z7a',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'betty.lewis@hospitality.hotel',
-    env: 'development',
-    first_seen: '2024-01-20T13:25:00Z',
-    last_seen: '2024-01-22T11:40:00Z',
-    createdAt: '2024-01-20T13:25:00Z',
-    updatedAt: '2024-01-22T11:40:00Z',
-    session_count: 6,
-  },
-  {
-    ductape_user_id: 'usr_4x5y6z7a8b',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'christopher.walker@gaming.play',
-    env: 'production',
-    first_seen: '2024-01-10T12:05:00Z',
-    last_seen: '2024-01-23T15:20:00Z',
-    createdAt: '2024-01-10T12:05:00Z',
-    updatedAt: '2024-01-23T15:20:00Z',
-    session_count: 48,
-  },
-  {
-    ductape_user_id: 'usr_5y6z7a8b9c',
-    product_tag: 'my-product',
-    session_tag: 'user-session',
-    identifier: 'sandra.hall@publishing.books',
-    env: 'staging',
-    first_seen: '2024-01-17T08:50:00Z',
-    last_seen: '2024-01-22T12:15:00Z',
-    createdAt: '2024-01-17T08:50:00Z',
-    updatedAt: '2024-01-22T12:15:00Z',
-    session_count: 10,
-  },
-];
 
-// Dummy logs data
-const DUMMY_LOGS = [
-  {
-    _id: 'log_1',
-    timestamp: '2024-01-20T14:30:15Z',
-    process_id: 'proc_abc123',
-    app_env: 'production',
-    env: 'production',
-    name: 'session-validate',
-    type: 'session',
-    message: 'Session validated successfully',
-    parent_tag: 'user-session',
-    child_tag: 'validate',
-    status: 'success',
-    successful_execution: true,
-    data: JSON.stringify({ user_id: 'usr_1a2b3c4d5e', session_token: 'tok_***', validated: true }),
-  },
-  {
-    _id: 'log_2',
-    timestamp: '2024-01-20T14:15:42Z',
-    process_id: 'proc_def456',
-    app_env: 'production',
-    env: 'production',
-    name: 'session-create',
-    type: 'session',
-    message: 'New session created',
-    parent_tag: 'user-session',
-    child_tag: 'create',
-    status: 'success',
-    successful_execution: true,
-    data: JSON.stringify({ user_id: 'usr_1a2b3c4d5e', session_id: 'sess_789', created_at: '2024-01-20T14:15:42Z' }),
-  },
-  {
-    _id: 'log_3',
-    timestamp: '2024-01-20T13:45:20Z',
-    process_id: 'proc_ghi789',
-    app_env: 'production',
-    env: 'production',
-    name: 'session-refresh',
-    type: 'session',
-    message: 'Session refreshed',
-    parent_tag: 'user-session',
-    child_tag: 'refresh',
-    status: 'success',
-    successful_execution: true,
-    data: JSON.stringify({ user_id: 'usr_1a2b3c4d5e', new_token: 'tok_***', expires_at: '2024-01-21T13:45:20Z' }),
-  },
-  {
-    _id: 'log_4',
-    timestamp: '2024-01-20T12:30:10Z',
-    process_id: 'proc_jkl012',
-    app_env: 'production',
-    env: 'production',
-    name: 'session-validate',
-    type: 'session',
-    message: 'Session validation failed',
-    parent_tag: 'user-session',
-    child_tag: 'validate',
-    status: 'fail',
-    successful_execution: false,
-    data: JSON.stringify({ user_id: 'usr_1a2b3c4d5e', error: 'Token expired', timestamp: '2024-01-20T12:30:10Z' }),
-  },
-  {
-    _id: 'log_5',
-    timestamp: '2024-01-20T11:20:33Z',
-    process_id: 'proc_mno345',
-    app_env: 'production',
-    env: 'production',
-    name: 'session-create',
-    type: 'session',
-    message: 'Session created',
-    parent_tag: 'user-session',
-    child_tag: 'create',
-    status: 'success',
-    successful_execution: true,
-    data: JSON.stringify({ user_id: 'usr_1a2b3c4d5e', session_id: 'sess_456', ip_address: '192.168.1.100' }),
-  },
-];
+type UserStatus = 'active' | 'inactive' | 'expired' | 'all';
 
 // Helper function for environment badge colors
 const getEnvBadgeColor = (env: string) => {
@@ -436,482 +49,543 @@ const getEnvBadgeColor = (env: string) => {
   }
 };
 
-// Helper function to flatten nested objects into dot notation
-const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
-  const flattened: Record<string, any> = {};
+// Format helpers
+const formatTime = (dateInput: string | Date, relative = true) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
 
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const newKey = prefix ? `${prefix}.${key}` : key;
-
-      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-        // Recursively flatten nested objects
-        Object.assign(flattened, flattenObject(obj[key], newKey));
-      } else {
-        // Add the value directly
-        flattened[newKey] = obj[key];
-      }
-    }
+  if (relative) {
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 172800000) return 'Yesterday';
   }
 
-  return flattened;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-// Simplified User Logs Component
-function UserLogsTable({ logs }: { logs: typeof DUMMY_LOGS }) {
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
-  const toggleRow = (id: string) => {
-    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  if (logs.length === 0) {
-    return (
-      <div className="text-center py-12 bg-white rounded-lg border border-grey-400">
-        <Activity className="h-12 w-12 mx-auto mb-3 text-grey-400" />
-        <p className="text-sm text-grey-600">No logs found for this user</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {logs.map((log) => (
-        <div key={log._id} className="bg-white rounded-lg border border-grey-400 overflow-hidden hover:border-primary/50 transition-colors">
-          {/* Log Header */}
-          <div
-            className="p-3 cursor-pointer"
-            onClick={() => toggleRow(log._id)}
-          >
-            <div className="flex items-start gap-3">
-              {/* Status Indicator */}
-              <div className="flex-shrink-0 mt-1">
-                {log.successful_execution || log.status === 'success' ? (
-                  <div className="w-2 h-2 rounded-full bg-green" />
-                ) : log.status === 'fail' ? (
-                  <div className="w-2 h-2 rounded-full bg-red" />
-                ) : (
-                  <div className="w-2 h-2 rounded-full bg-orange-500" />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0 space-y-2">
-                {/* Top Row: Timestamp & Expand */}
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-grey">
-                    {format(new Date(log.timestamp), 'MMM dd, yyyy HH:mm:ss')}
-                  </p>
-                  <button className="flex-shrink-0 text-grey-600 hover:text-grey">
-                    {expandedRows[log._id] ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Details Row */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Process ID */}
-                  <span className="text-xs font-mono text-grey-600 bg-grey-100 px-2 py-0.5 rounded">
-                    {log.process_id}
-                  </span>
-
-                  {/* Environment */}
-                  <span className={cn(
-                    'px-2 py-0.5 rounded text-xs font-medium border',
-                    getEnvBadgeColor(log.app_env || log.env)
-                  )}>
-                    {log.app_env || log.env}
-                  </span>
-
-                  {/* Operation */}
-                  <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
-                    {log.child_tag ? `${log.parent_tag}:${log.child_tag}` : log.parent_tag}
-                  </span>
-
-                  {/* Name */}
-                  <span className="text-xs text-grey-600">
-                    {log.name}
-                  </span>
-                </div>
-
-                {/* Message */}
-                <p className="text-sm text-grey-600">{log.message}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Expanded Details */}
-          {expandedRows[log._id] && (
-            <div className="border-t border-grey-400 bg-grey-50 p-4">
-              <p className="text-xs text-grey-600 mb-2 font-medium">Request Data</p>
-              <pre className="bg-white border border-grey-400 rounded-md p-3 overflow-x-auto">
-                <code className="text-xs font-mono text-grey">
-                  {JSON.stringify(JSON.parse(log.data), null, 2)}
-                </code>
-              </pre>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function SessionActivityTab({
+  session,
   sessionTag,
+  productTag,
   productName,
 }: SessionActivityTabProps) {
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<UserStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedEnv, setSelectedEnv] = useState<string>('all');
-  const itemsPerPage = 10;
+  const [viewMode, setViewMode] = useState<'overview' | 'users'>('overview');
+  const [listViewMode, setListViewMode] = useState<'list' | 'grid'>('list');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // Get unique environments from users
-  const environments = ['all', ...Array.from(new Set(DUMMY_USERS.map(user => user.env)))];
+  const envSlug = session?.env?.slug || session?.env || 'production';
 
-  // Filter users based on search and environment
-  const filteredUsers = DUMMY_USERS.filter(user => {
-    const matchesSearch = user.identifier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.ductape_user_id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesEnv = selectedEnv === 'all' || user.env === selectedEnv;
-    return matchesSearch && matchesEnv;
+  // Fetch session users
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['session-users', productTag, sessionTag, envSlug],
+    queryFn: () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+      return sessionUsersService.fetchSessionUsers(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          env: envSlug,
+          page: 1,
+          limit: 100,
+        }
+      );
+    },
+    enabled: !!productTag && !!sessionTag && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
   });
 
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentUsers = filteredUsers.slice(startIndex, endIndex);
+  // Fetch session dashboard metrics
+  const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery({
+    queryKey: ['session-dashboard', productTag, sessionTag, envSlug],
+    queryFn: () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+      return sessionUsersService.fetchSessionDashboard(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          env: envSlug,
+        }
+      );
+    },
+    enabled: !!productTag && !!sessionTag && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+  // Filter and search users locally
+  const filteredUsers = useMemo(() => {
+    if (!usersData?.users) return [];
+
+    let users = usersData.users;
+
+    // Calculate user status based on last_seen
+    const now = new Date();
+    const activeThreshold = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+    const inactiveThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+
+    users = users.map(user => {
+      const lastSeen = new Date(user.last_seen);
+      let status: 'active' | 'inactive' | 'expired' = 'expired';
+
+      if (lastSeen > activeThreshold) {
+        status = 'active';
+      } else if (lastSeen > inactiveThreshold) {
+        status = 'inactive';
+      }
+
+      return { ...user, status, session_count: user.total_sessions || 0 };
+    });
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      users = users.filter(user => user.status === statusFilter);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      users = users.filter(user =>
+        user.identifier.toLowerCase().includes(query) ||
+        user.ductape_user_id.toLowerCase().includes(query)
+      );
+    }
+
+    return users;
+  }, [usersData?.users, statusFilter, searchQuery]);
+
+  // Calculate metrics from dashboard data
+  const metrics = useMemo(() => {
+    if (!dashboardData) {
+      return {
+        total: filteredUsers.length,
+        active: filteredUsers.filter(u => u.status === 'active').length,
+        inactive: filteredUsers.filter(u => u.status === 'inactive').length,
+        expired: filteredUsers.filter(u => u.status === 'expired').length,
+        production: filteredUsers.filter(u => u.env === 'production').length,
+        staging: filteredUsers.filter(u => u.env === 'staging').length,
+        development: filteredUsers.filter(u => u.env === 'development').length,
+      };
+    }
+
+    return {
+      total: dashboardData.totalUsers || 0,
+      active: dashboardData.activeUsers || 0,
+      inactive: dashboardData.inactiveUsers || 0,
+      expired: dashboardData.expiredUsers || 0,
+      production: filteredUsers.filter(u => u.env === 'production').length,
+      staging: filteredUsers.filter(u => u.env === 'staging').length,
+      development: filteredUsers.filter(u => u.env === 'development').length,
+    };
+  }, [dashboardData, filteredUsers]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchUsers(), refetchDashboard()]);
+      toast.success('Data refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleOpenUser = (user: any) => {
+    openTab({
+      id: `session-user-${user.ductape_user_id}`,
+      type: 'session-user',
+      title: user.identifier,
+      itemId: user.ductape_user_id,
+      data: {
+        user,
+        sessionTag,
+        productTag,
+        productName,
+        sessionName: session?.name || 'User Sessions'
+      },
     });
   };
 
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { icon: any; color: string; bg: string; border: string; label: string; dotColor: string }> = {
+      active: { icon: UserCheck, color: 'text-green', bg: 'bg-green/10', border: 'border-green/30', label: 'Active', dotColor: 'bg-green' },
+      inactive: { icon: Clock, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', label: 'Inactive', dotColor: 'bg-orange-500' },
+      expired: { icon: UserX, color: 'text-red', bg: 'bg-red/10', border: 'border-red/30', label: 'Expired', dotColor: 'bg-red' },
+    };
+    return configs[status] || configs.inactive;
+  };
+
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
-        {/* Header - Fixed */}
-        <div className="flex-shrink-0 p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Activity className="h-5 w-5 dark:text-grey" />
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-grey text-sm truncate">Session Activity</h2>
-              <p className="text-xs text-grey-600 truncate">{sessionTag}</p>
-            </div>
-          </div>
-
-          {/* View Tabs */}
-          <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
-            <button
-              onClick={() => {
-                setShowDashboard(true);
-                setSelectedUser(null);
-              }}
-              className={cn(
-                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
-                showDashboard
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-grey-600 hover:text-grey'
-              )}
-            >
-              <BarChart3 className="h-3 w-3 inline mr-1" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => {
-                setShowDashboard(false);
-                setSelectedUser(null);
-              }}
-              className={cn(
-                'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
-                !showDashboard
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-grey-600 hover:text-grey'
-              )}
-            >
-              <Users className="h-3 w-3 inline mr-1" />
-              Users
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-            <Input
-              type="text"
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
-
-          {/* Environment Filter */}
-          <div>
-            <Label className="text-xs font-medium text-grey-600 mb-1.5 block">
-              Environment
-            </Label>
-            <Select
-              value={selectedEnv}
-              onValueChange={(value) => {
-                setSelectedEnv(value);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-full h-9 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {environments.map((env) => (
-                  <SelectItem key={env} value={env}>
-                    {env === 'all' ? 'All Environments' : env.charAt(0).toUpperCase() + env.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* List - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-0">
-          <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-              Users ({filteredUsers.length})
-            </div>
-          </div>
-
-          {/* User List */}
-          <div className="space-y-1">
-            {currentUsers.length > 0 ? (
-              <>
-                {currentUsers.map((user) => (
-                  <button
-                    key={user.ductape_user_id}
-                    onClick={() => {
-                      setSelectedUser(user);
-                      setShowDashboard(false);
-                    }}
-                    className={cn(
-                      'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
-                      selectedUser?.ductape_user_id === user.ductape_user_id && !showDashboard
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-grey hover:bg-grey-100'
-                    )}
-                  >
-                    <div className="flex items-start gap-2 min-w-0 flex-1">
-                      <Users className="h-4 w-4 flex-shrink-0" />
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="text-sm text-grey truncate leading-tight">{user.identifier}</div>
-                        <div>
-                          <span className={cn(
-                            'inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase',
-                            getEnvBadgeColor(user.env)
-                          )}>
-                            {user.env}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-grey-600 flex-shrink-0 ml-2">
-                      {user.session_count}
-                    </span>
-                  </button>
-                ))}
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-32 px-3">
-                <div className="text-center">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-grey-400" />
-                  <p className="text-sm text-grey-600">No users found</p>
-                </div>
+      <div className={cn(
+        "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300",
+        isSidebarCollapsed ? "w-14" : "w-64"
+      )}>
+        {/* Header */}
+        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-4")}>
+          <div className={cn("flex items-center gap-2", !isSidebarCollapsed && "mb-3")}>
+            <Key className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-grey text-sm truncate">{session?.name || 'User Sessions'}</h2>
+                <p className="text-xs text-grey-600 truncate">{envSlug}</p>
               </div>
             )}
           </div>
+
+          {/* Search */}
+          {!isSidebarCollapsed && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+              <Input
+                type="text"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+          )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex-shrink-0 p-4 border-t border-grey-400">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-grey-600 font-medium">
-                Page {currentPage} of {totalPages}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="flex-1 h-8 disabled:opacity-50"
+          {/* Navigation - independently scrollable */}
+          <div className="flex-1 overflow-y-auto p-2 min-h-0">
+            {/* Overview Link */}
+            <div className="mb-4">
+              <button
+                onClick={() => setViewMode('overview')}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'overview'
+                    ? 'bg-blue-500/10 text-blue-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'Overview' : undefined}
               >
-                <ChevronLeft className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="flex-1 h-8 disabled:opacity-50"
-              >
-                <ChevronRight className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main Content - User Activity or Dashboard */}
-      <div className="flex-1 overflow-y-auto">
-        {showDashboard ? (
-          <SessionDashboard
-            session={null}
-            sessionTag={sessionTag}
-            productTag=""
-            productName={productName}
-          />
-        ) : selectedUser ? (
-          <div className="p-6 space-y-6">
-            {/* User Details Header */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h1 className="text-2xl font-bold text-grey mb-2">{selectedUser.identifier}</h1>
-                  <div className="flex flex-wrap gap-3">
-                    <span className="text-sm text-grey-600">
-                      <strong>User ID:</strong> <span className="font-mono text-xs">{selectedUser.ductape_user_id}</span>
-                    </span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getEnvBadgeColor(selectedUser.env)}`}>
-                      {selectedUser.env}
-                    </span>
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/10 text-blue-600">
-                      {selectedUser.session_count} Sessions
-                    </span>
-                  </div>
-                </div>
-              </div>
+                <LayoutDashboard className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'overview' ? 'text-blue-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && <span className="flex-1 text-left font-medium">Overview</span>}
+              </button>
             </div>
 
-            {/* User Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-5 w-5 text-green" />
-                  <h3 className="text-sm font-semibold text-grey">First Seen</h3>
+            {/* Status Filters */}
+            {!isSidebarCollapsed && (
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                  Status
                 </div>
-                <p className="text-sm text-grey-600">{formatDate(selectedUser.first_seen)}</p>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="text-grey-600 hover:text-blue-600 transition-colors"
+                  title="Refresh users"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+                </button>
               </div>
+            )}
 
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-5 w-5 text-orange-500" />
-                  <h3 className="text-sm font-semibold text-grey">Last Seen</h3>
-                </div>
-                <p className="text-sm text-grey-600">{formatDate(selectedUser.last_seen)}</p>
-              </div>
-
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="h-5 w-5 text-blue-500" />
-                  <h3 className="text-sm font-semibold text-grey">Total Sessions</h3>
-                </div>
-                <p className="text-2xl font-bold text-grey">{selectedUser.session_count}</p>
-              </div>
+            <div className="space-y-0.5">
+              {([
+                { value: 'all', label: 'All Users', icon: <LayoutGrid className="h-4 w-4" />, count: metrics.total },
+                { value: 'active', label: 'Active', icon: <UserCheck className="h-4 w-4" />, count: metrics.active },
+                { value: 'inactive', label: 'Inactive', icon: <Clock className="h-4 w-4" />, count: metrics.inactive },
+                { value: 'expired', label: 'Expired', icon: <UserX className="h-4 w-4" />, count: metrics.expired },
+              ] as const).map((status) => (
+                <button
+                  key={status.value}
+                  onClick={() => {
+                    setStatusFilter(status.value);
+                    setViewMode('users');
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                    viewMode === 'users' && statusFilter === status.value
+                      ? 'bg-blue-500/10 text-blue-600'
+                      : 'text-grey hover:bg-background-secondary',
+                    isSidebarCollapsed && 'justify-center px-2'
+                  )}
+                  title={isSidebarCollapsed ? status.label : undefined}
+                >
+                  <span className={cn(
+                    'flex-shrink-0',
+                    viewMode === 'users' && statusFilter === status.value ? 'text-blue-600' : 'text-grey-600'
+                  )}>
+                    {status.icon}
+                  </span>
+                  {!isSidebarCollapsed && (
+                    <>
+                      <span className="flex-1 text-left">{status.label}</span>
+                      <span className={cn(
+                        'text-xs px-1.5 py-0.5 rounded',
+                        viewMode === 'users' && statusFilter === status.value
+                          ? 'bg-blue-500/20 text-blue-600'
+                          : 'bg-background-secondary text-grey-600'
+                      )}>
+                        {status.count}
+                      </span>
+                    </>
+                  )}
+                </button>
+              ))}
             </div>
 
-            {/* User Info */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-4">User Information</h2>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-grey-600 font-medium mb-1">Product Tag</p>
-                    <p className="text-sm text-grey font-mono">{selectedUser.product_tag}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-grey-600 font-medium mb-1">Session Tag</p>
-                    <p className="text-sm text-grey font-mono">{selectedUser.session_tag}</p>
-                  </div>
+            {/* Environment Filter */}
+            {!isSidebarCollapsed && (
+              <div className="mt-4 px-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
+                  Environment
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-grey-600 font-medium mb-1">Created At</p>
-                    <p className="text-sm text-grey">{formatDate(selectedUser.createdAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-grey-600 font-medium mb-1">Updated At</p>
-                    <p className="text-sm text-grey">{formatDate(selectedUser.updatedAt)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Session Data */}
-            {selectedUser.session_data && (
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-grey mb-4">Session Data</h2>
-                <p className="text-xs text-grey-600 mb-4">
-                  The following data is encrypted to generate the session token
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                  {Object.entries(flattenObject(selectedUser.session_data)).map(([key, value]) => (
-                    <div key={key} className="flex items-start justify-between gap-4 py-2 border-b border-grey-300">
-                      <span className="text-sm font-mono text-grey-600 break-all">{key}:</span>
-                      <span className="text-sm text-grey font-medium text-right break-all">
-                        {typeof value === 'boolean' ? value.toString() : value}
+                <div className="space-y-0.5">
+                  {[
+                    { value: 'production', label: 'Production', count: metrics.production },
+                    { value: 'staging', label: 'Staging', count: metrics.staging },
+                    { value: 'development', label: 'Development', count: metrics.development },
+                  ].map(option => (
+                    <div
+                      key={option.value}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-grey"
+                    >
+                      <Globe className="h-4 w-4 text-grey-600" />
+                      <span className="flex-1 text-left">{option.label}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
+                        {option.count}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
+          </div>
 
-            {/* User Logs */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-grey">Session Logs</h2>
-              <div className="max-h-[600px] overflow-y-auto">
-                <UserLogsTable logs={DUMMY_LOGS} />
+          {/* Collapse Toggle Button */}
+          <div className="flex-shrink-0 p-2 border-t border-grey-400">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-blue-600 transition-colors"
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeft className="h-4 w-4" />
+              ) : (
+                <>
+                  <PanelLeftClose className="h-4 w-4" />
+                  <span>Collapse</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-border bg-white">
+          <div className="px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Key className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-grey">{session?.name || 'User Sessions'}</h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <code className="text-sm text-grey-600 font-mono">{sessionTag}</code>
+                    <span className={cn(
+                      'px-2 py-0.5 text-xs font-semibold rounded-full',
+                      envSlug === 'production' ? 'bg-red/10 text-red' :
+                      envSlug === 'staging' ? 'bg-yellow/10 text-yellow' :
+                      'bg-blue-500/10 text-blue-500'
+                    )}>
+                      {envSlug}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="border-grey-400 text-grey-600 hover:text-grey hover:bg-grey-100"
+                >
+                  <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+                  Refresh
+                </Button>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Info Box */}
-            <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-grey mb-2">About Session Activity</h3>
-              <p className="text-xs text-grey-600">
-                This shows detailed information for the selected user including their session count and activity history.
-                The session count represents the total number of session records for this user.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center text-grey-600 max-w-md">
-              <Users className="h-12 w-12 mx-auto mb-4 text-grey-400" />
-              <p className="text-lg font-medium mb-2">No User Selected</p>
-              <p className="text-sm">
-                Select a user from the sidebar to view their session activity and details
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+        {viewMode === 'overview' ? (
+            /* Overview Content - Use SessionDashboard */
+            <SessionDashboard
+              session={session}
+              sessionTag={sessionTag}
+              productTag={productTag}
+              productName={productName}
+            />
+          ) : (
+            /* Users List View */
+            <>
+              {/* Toolbar */}
+              <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-grey-600">
+                      Showing <span className="font-medium text-grey">{filteredUsers.length}</span> users
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-background-secondary rounded-lg p-1 border border-border">
+                      <button
+                        onClick={() => setListViewMode('list')}
+                        className={cn(
+                          'p-1.5 rounded transition-colors',
+                          listViewMode === 'list' ? 'bg-white text-grey shadow-sm' : 'text-grey-600 hover:text-grey'
+                        )}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setListViewMode('grid')}
+                        className={cn(
+                          'p-1.5 rounded transition-colors',
+                          listViewMode === 'grid' ? 'bg-white text-grey shadow-sm' : 'text-grey-600 hover:text-grey'
+                        )}
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="flex-1 overflow-auto p-4">
+                <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+                  {/* Table header */}
+                  <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
+                    <div className="grid grid-cols-[1fr,120px,140px,140px,100px,100px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
+                      <div>User</div>
+                      <div>Status</div>
+                      <div>Environment</div>
+                      <div>Last Seen</div>
+                      <div>Sessions</div>
+                      <div>First Seen</div>
+                      <div></div>
+                    </div>
+                  </div>
+
+                  {/* Table body */}
+                  <div className="divide-y divide-border">
+                    {filteredUsers.map((user) => {
+                      const statusConfig = getStatusConfig(user.status || 'inactive');
+                      const StatusIcon = statusConfig.icon;
+
+                      return (
+                        <div
+                          key={user.ductape_user_id}
+                          className={cn(
+                            'grid grid-cols-[1fr,120px,140px,140px,100px,100px,40px] gap-4 px-6 py-4 items-center cursor-pointer transition-colors',
+                            'hover:bg-background-secondary',
+                            user.status === 'active' && 'bg-green/5',
+                            user.status === 'expired' && 'bg-red/5',
+                          )}
+                          onClick={() => handleOpenUser(user)}
+                        >
+                          {/* User info */}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={cn('w-2 h-2 rounded-full flex-shrink-0', statusConfig.dotColor)} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-grey truncate">{user.identifier}</span>
+                              </div>
+                              <p className="text-xs text-grey-500 truncate max-w-[300px] font-mono">{user.ductape_user_id}</p>
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div>
+                            <div className={cn(
+                              'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium',
+                              statusConfig.bg,
+                              statusConfig.border,
+                              'border'
+                            )}>
+                              <StatusIcon className={cn('h-3 w-3', statusConfig.color)} />
+                              <span className={statusConfig.color}>{statusConfig.label}</span>
+                            </div>
+                          </div>
+
+                          {/* Environment */}
+                          <div>
+                            <span className={cn(
+                              'inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border',
+                              getEnvBadgeColor(user.env)
+                            )}>
+                              {user.env}
+                            </span>
+                          </div>
+
+                          {/* Last Seen */}
+                          <div className="text-sm text-grey-600">
+                            {formatTime(user.last_seen)}
+                          </div>
+
+                          {/* Sessions */}
+                          <div className="text-sm font-medium text-grey">
+                            {user.session_count}
+                          </div>
+
+                          {/* First Seen */}
+                          <div className="text-sm text-grey-600">
+                            {formatTime(user.first_seen, false)}
+                          </div>
+
+                          {/* Arrow */}
+                          <div className="flex justify-end">
+                            <ChevronRight className="h-4 w-4 text-grey-400" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {filteredUsers.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-grey-500" />
+                      </div>
+                      <p className="text-grey font-medium">No users found</p>
+                      <p className="text-grey-500 text-sm mt-1">Try adjusting your filters</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
     </div>
   );
 }

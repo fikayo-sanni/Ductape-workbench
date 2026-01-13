@@ -30,6 +30,14 @@ import {
   Copy,
   Edit2,
   Zap,
+  Clock,
+  Shield,
+  Smartphone,
+  Database,
+  HardDrive,
+  Bell,
+  MessageSquare,
+  Settings,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import productServicesReal from '@/services/productServicesReal';
@@ -512,7 +520,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('app')}
                   >
-                    <div className="text-lg">📱</div>
+                    <Smartphone className="h-5 w-5 text-purple-500" />
                     <span className="text-xs">Applications</span>
                   </Button>
                   <Button
@@ -520,7 +528,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('database')}
                   >
-                    <div className="text-lg">🗄️</div>
+                    <Database className="h-5 w-5 text-blue" />
                     <span className="text-xs">Databases</span>
                   </Button>
                   <Button
@@ -528,7 +536,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('storage')}
                   >
-                    <div className="text-lg">💾</div>
+                    <HardDrive className="h-5 w-5 text-red" />
                     <span className="text-xs">Storage</span>
                   </Button>
                   <Button
@@ -536,7 +544,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('notification')}
                   >
-                    <div className="text-lg">🔔</div>
+                    <Bell className="h-5 w-5 text-yellow" />
                     <span className="text-xs">Notifications</span>
                   </Button>
                   <Button
@@ -544,15 +552,15 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('message-broker')}
                   >
-                    <div className="text-lg">📨</div>
-                    <span className="text-xs">Message Brokers</span>
+                    <MessageSquare className="h-5 w-5 text-green" />
+                    <span className="text-xs">Messaging</span>
                   </Button>
                   <Button
                     variant="outline"
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('job')}
                   >
-                    <div className="text-lg">⚙️</div>
+                    <Settings className="h-5 w-5 text-grey-600" />
                     <span className="text-xs">Jobs</span>
                   </Button>
                   <Button
@@ -560,7 +568,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('quota')}
                   >
-                    <div className="text-lg">⏱️</div>
+                    <Clock className="h-5 w-5 text-orange-500" />
                     <span className="text-xs">Quotas</span>
                   </Button>
                   <Button
@@ -568,7 +576,7 @@ export default function FeatureBuilder({ tabId, data }: FeatureBuilderProps) {
                     className="h-auto py-3 flex-col gap-1"
                     onClick={() => handleOpenComponentPicker('fallback')}
                   >
-                    <div className="text-lg">🛡️</div>
+                    <Shield className="h-5 w-5 text-blue" />
                     <span className="text-xs">Fallbacks</span>
                   </Button>
                 </div>

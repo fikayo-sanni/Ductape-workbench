@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { TrendingUp, TrendingDown, Users, Activity, Clock, Calendar, BarChart3, PieChart } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { TrendingUp, TrendingDown, Users, Activity, Clock, BarChart3, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Select,
   SelectContent,
@@ -7,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAuth } from '@/store/useAuth';
+import { fetchSessionDashboard, SessionDashboardMetrics } from '@/services/logsServices';
 
 interface SessionDashboardProps {
   session: any;
@@ -15,101 +18,121 @@ interface SessionDashboardProps {
   productName?: string;
 }
 
-// Dummy analytics data
-const ANALYTICS_DATA = {
-  dau: {
-    current: 1234,
-    previous: 1156,
-    change: 6.7,
-  },
-  wau: {
-    current: 5678,
-    previous: 5234,
-    change: 8.5,
-  },
-  mau: {
-    current: 18456,
-    previous: 17234,
-    change: 7.1,
-  },
-  avgSessionDuration: {
-    current: '24m 32s',
-    previous: '22m 15s',
-    change: 10.2,
-  },
-  totalSessions: {
-    current: 45678,
-    previous: 42134,
-    change: 8.4,
-  },
-  newUsers: {
-    current: 892,
-    previous: 745,
-    change: 19.7,
-  },
-  peakHours: [
-    { hour: '9 AM', count: 234 },
-    { hour: '12 PM', count: 456 },
-    { hour: '3 PM', count: 389 },
-    { hour: '6 PM', count: 512 },
-    { hour: '9 PM', count: 298 },
-  ],
-  environmentBreakdown: [
-    { env: 'production', count: 12345, percentage: 67 },
-    { env: 'staging', count: 4567, percentage: 25 },
-    { env: 'development', count: 1544, percentage: 8 },
-  ],
-  activityTimeline: [
-    { date: 'Mon', sessions: 3456 },
-    { date: 'Tue', sessions: 3789 },
-    { date: 'Wed', sessions: 4123 },
-    { date: 'Thu', sessions: 3912 },
-    { date: 'Fri', sessions: 4567 },
-    { date: 'Sat', sessions: 2345 },
-    { date: 'Sun', sessions: 2123 },
-  ],
-};
-
 export default function SessionDashboard({
   sessionTag,
+  productTag,
   productName,
 }: SessionDashboardProps) {
   const [timeRange, setTimeRange] = useState('7d');
+  const { user, currentWorkspaceId } = useAuth();
 
-  const getEnvBadgeColor = (env: string) => {
-    switch (env) {
-      case 'production':
-        return 'bg-green/10 text-green border-green/20';
-      case 'staging':
-        return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      case 'development':
-        return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+  // Calculate date range based on time selection
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    const ago = new Date();
+    let groupBy: 'hour' | 'day' | 'week' | 'month' = 'day';
+
+    switch (timeRange) {
+      case '24h':
+        ago.setDate(today.getDate() - 1);
+        groupBy = 'hour';
+        break;
+      case '7d':
+        ago.setDate(today.getDate() - 7);
+        groupBy = 'day';
+        break;
+      case '30d':
+        ago.setDate(today.getDate() - 30);
+        groupBy = 'day';
+        break;
+      case '90d':
+        ago.setDate(today.getDate() - 90);
+        groupBy = 'week';
+        break;
       default:
-        return 'bg-grey-100 text-grey-600 border-grey-300';
+        ago.setDate(today.getDate() - 7);
     }
+
+    return {
+      start_date: ago.toISOString().split('T')[0],
+      end_date: today.toISOString().split('T')[0],
+      groupBy,
+    };
+  }, [timeRange]);
+
+  // Fetch session dashboard metrics
+  const { data: metrics, isLoading, error } = useQuery({
+    queryKey: ['session-dashboard', currentWorkspaceId, productTag, sessionTag, dateRange],
+    queryFn: async () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key || !productTag || !sessionTag) {
+        throw new Error('Missing required parameters');
+      }
+      return fetchSessionDashboard(
+        currentWorkspaceId,
+        user._id,
+        user.public_key,
+        {
+          product_tag: productTag,
+          session_tag: sessionTag,
+          ...dateRange,
+        }
+      );
+    },
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key && !!productTag && !!sessionTag,
+  });
+
+  // Format duration in seconds to human-readable format
+  const formatDuration = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${mins}m`;
   };
 
   const renderMetricCard = (
     title: string,
     value: string | number,
-    change: number,
     icon: React.ReactNode,
-    iconBg: string
+    iconBg: string,
+    subtitle?: string
   ) => (
     <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center`}>
           {icon}
         </div>
-        <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-green' : 'text-red-500'}`}>
-          {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          {Math.abs(change).toFixed(1)}%
-        </div>
       </div>
       <div className="text-2xl font-bold text-grey mb-1">{value}</div>
       <div className="text-xs text-grey-600 font-medium">{title}</div>
+      {subtitle && <div className="text-xs text-grey-500 mt-1">{subtitle}</div>}
     </div>
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-grey-600">Loading session analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-50">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Failed to load session analytics</p>
+          <p className="text-grey-500 text-sm">Please try again later</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto bg-grey-50 p-6">
@@ -155,100 +178,106 @@ export default function SessionDashboard({
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {renderMetricCard(
-            'Daily Active Users',
-            ANALYTICS_DATA.dau.current.toLocaleString(),
-            ANALYTICS_DATA.dau.change,
-            <Users className="h-5 w-5 text-blue-600" />,
+            'Total Sessions',
+            (metrics?.totalSessions ?? 0).toLocaleString(),
+            <Activity className="h-5 w-5 text-blue-600" />,
             'bg-blue-500/10'
           )}
           {renderMetricCard(
-            'Weekly Active Users',
-            ANALYTICS_DATA.wau.current.toLocaleString(),
-            ANALYTICS_DATA.wau.change,
+            'Active Sessions',
+            (metrics?.activeSessions ?? 0).toLocaleString(),
+            <CheckCircle className="h-5 w-5 text-green" />,
+            'bg-green/10'
+          )}
+          {renderMetricCard(
+            'Expired Sessions',
+            (metrics?.expiredSessions ?? 0).toLocaleString(),
+            <XCircle className="h-5 w-5 text-orange-600" />,
+            'bg-orange-500/10'
+          )}
+          {renderMetricCard(
+            'Total Users',
+            (metrics?.totalUsers ?? 0).toLocaleString(),
             <Users className="h-5 w-5 text-purple-600" />,
             'bg-purple-500/10'
           )}
           {renderMetricCard(
-            'Monthly Active Users',
-            ANALYTICS_DATA.mau.current.toLocaleString(),
-            ANALYTICS_DATA.mau.change,
-            <Users className="h-5 w-5 text-green" />,
-            'bg-green/10'
-          )}
-          {renderMetricCard(
-            'Total Sessions',
-            ANALYTICS_DATA.totalSessions.current.toLocaleString(),
-            ANALYTICS_DATA.totalSessions.change,
-            <Activity className="h-5 w-5 text-orange-600" />,
-            'bg-orange-500/10'
+            'Active Users',
+            (metrics?.activeUsers ?? 0).toLocaleString(),
+            <Users className="h-5 w-5 text-teal-600" />,
+            'bg-teal-500/10'
           )}
           {renderMetricCard(
             'Avg. Session Duration',
-            ANALYTICS_DATA.avgSessionDuration.current,
-            ANALYTICS_DATA.avgSessionDuration.change,
+            formatDuration(metrics?.averageSessionDuration ?? 0),
             <Clock className="h-5 w-5 text-indigo-600" />,
             'bg-indigo-500/10'
           )}
-          {renderMetricCard(
-            'New Users',
-            ANALYTICS_DATA.newUsers.current.toLocaleString(),
-            ANALYTICS_DATA.newUsers.change,
-            <Calendar className="h-5 w-5 text-teal-600" />,
-            'bg-teal-500/10'
-          )}
         </div>
 
-        {/* Activity Timeline */}
-        <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline</h2>
-          <div className="space-y-3">
-            {ANALYTICS_DATA.activityTimeline.map((day) => {
-              const maxSessions = Math.max(...ANALYTICS_DATA.activityTimeline.map(d => d.sessions));
-              const percentage = (day.sessions / maxSessions) * 100;
-
-              return (
-                <div key={day.date} className="flex items-center gap-3">
-                  <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                  <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-center px-3">
-                      <span className="text-xs font-semibold text-white dark:text-grey">
-                        {day.sessions.toLocaleString()} sessions
-                      </span>
-                    </div>
-                  </div>
+        {/* Success/Error Rates */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-green" />
                 </div>
-              );
-            })}
+                <div>
+                  <div className="text-2xl font-bold text-grey">{(metrics?.successRate ?? 0).toFixed(1)}%</div>
+                  <div className="text-xs text-grey-600 font-medium">Success Rate</div>
+                </div>
+              </div>
+            </div>
+            <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green rounded-full transition-all duration-500"
+                style={{ width: `${metrics?.successRate ?? 0}%` }}
+              ></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <TrendingDown className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-grey">{(metrics?.errorRate ?? 0).toFixed(1)}%</div>
+                  <div className="text-xs text-grey-600 font-medium">Error Rate</div>
+                </div>
+              </div>
+            </div>
+            <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-500 rounded-full transition-all duration-500"
+                style={{ width: `${metrics?.errorRate ?? 0}%` }}
+              ></div>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Peak Hours */}
-          <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <h2 className="text-lg font-semibold text-grey">Peak Activity Hours</h2>
-            </div>
+        {/* Activity Timeline (7 Days) - Simplified View */}
+        <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+          {metrics?.sessionsOverTime && metrics.sessionsOverTime.length > 0 ? (
             <div className="space-y-3">
-              {ANALYTICS_DATA.peakHours.map((hour) => {
-                const maxCount = Math.max(...ANALYTICS_DATA.peakHours.map(h => h.count));
-                const percentage = (hour.count / maxCount) * 100;
+              {metrics.sessionsOverTime.slice(0, 7).map((period) => {
+                const maxActivity = Math.max(...metrics.sessionsOverTime.slice(0, 7).map(p => p.created + p.expired));
+                const total = period.created + period.expired;
+                const percentage = maxActivity > 0 ? (total / maxActivity) * 100 : 0;
 
                 return (
-                  <div key={hour.hour} className="flex items-center gap-3">
-                    <div className="w-16 text-sm font-medium text-grey-600">{hour.hour}</div>
-                    <div className="flex-1 h-6 bg-grey-100 rounded overflow-hidden relative">
+                  <div key={period.period} className="flex items-center gap-3">
+                    <div className="w-12 text-xs font-medium text-grey-600">{period.period}</div>
+                    <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                       <div
-                        className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg transition-all duration-500"
                         style={{ width: `${percentage}%` }}
                       ></div>
-                      <div className="absolute inset-0 flex items-center px-2">
-                        <span className="text-xs font-semibold text-white dark:text-grey">
-                          {hour.count}
+                      <div className="absolute inset-0 flex items-center px-3">
+                        <span className="text-xs font-semibold text-white">
+                          {period.created.toLocaleString()} created, {period.expired.toLocaleString()} expired
                         </span>
                       </div>
                     </div>
@@ -256,41 +285,151 @@ export default function SessionDashboard({
                 );
               })}
             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+              <p className="text-sm text-grey-600 font-medium mb-1">No session activity data available</p>
+              <p className="text-xs text-grey-500">Activity charts will appear once sessions are created</p>
+            </div>
+          )}
+        </div>
+
+        {/* Peak Activity Hours & Operations Over Time - Side by Side (45-55) */}
+        <div className="grid grid-cols-[45%_55%] gap-4">
+          {/* Peak Activity Hours */}
+          <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-grey mb-4">Peak Activity Hours</h2>
+            {metrics?.hourlyActivity && metrics.hourlyActivity.length > 0 ? (
+              <div className="space-y-2">
+                {(() => {
+                  // Use backend hourly activity data
+                  const hourlyData = metrics.hourlyActivity.map((data: any) => ({
+                    hour: data.hour,
+                    count: data.totalOperations,
+                  }));
+
+                  const maxActivity = Math.max(...hourlyData.map(h => h.count));
+                  const topHours = hourlyData
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 8);
+
+                  return topHours.map(({ hour, count }) => {
+                    const percentage = maxActivity > 0 ? (count / maxActivity) * 100 : 0;
+                    const hourLabel = `${hour.toString().padStart(2, '0')}:00`;
+
+                    return (
+                      <div key={hour} className="flex items-center gap-3">
+                        <div className="w-14 text-xs font-medium text-grey-600">{hourLabel}</div>
+                        <div className="flex-1 h-6 bg-grey-100 rounded overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center px-2">
+                            <span className="text-[10px] font-semibold text-white">
+                              {count} ops
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Clock className="h-12 w-12 text-grey-300 mb-3" />
+                <p className="text-sm text-grey-600 font-medium mb-1">No activity data available</p>
+                <p className="text-xs text-grey-500">Peak hours will appear once sessions are active</p>
+              </div>
+            )}
           </div>
 
-          {/* Environment Breakdown */}
+          {/* Operations Over Time */}
           <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <PieChart className="h-5 w-5 text-blue-500" />
-              <h2 className="text-lg font-semibold text-grey">Environment Distribution</h2>
-            </div>
-            <div className="space-y-4">
-              {ANALYTICS_DATA.environmentBreakdown.map((env) => (
-                <div key={env.env} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide border ${getEnvBadgeColor(env.env)}`}>
-                      {env.env}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-grey-600 font-medium">{env.count.toLocaleString()}</span>
-                      <span className="text-grey-700 font-bold min-w-[3rem] text-right">{env.percentage}%</span>
+          <h2 className="text-lg font-semibold text-grey mb-4">Operations Over Time</h2>
+          {metrics?.operationsOverTime && metrics.operationsOverTime.length > 0 ? (
+            <>
+              <div className="space-y-3">
+                {metrics.operationsOverTime.map((period) => {
+                  const total = period.create + period.verify + period.refresh + period.revoke;
+                  const maxOps = Math.max(...metrics.operationsOverTime.map(p => p.create + p.verify + p.refresh + p.revoke));
+                  const percentage = maxOps > 0 ? (total / maxOps) * 100 : 0;
+
+                  return (
+                    <div key={period.period} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-grey-600">{period.period}</span>
+                        <span className="text-grey-500">{total.toLocaleString()} ops</span>
+                      </div>
+                      <div className="flex h-6 bg-grey-100 rounded overflow-hidden">
+                        {period.create > 0 && (
+                          <div
+                            className="bg-green h-full flex items-center justify-center"
+                            style={{ width: `${(period.create / total) * percentage}%` }}
+                            title={`Create: ${period.create}`}
+                          >
+                            {period.create > 5 && <span className="text-[10px] text-white font-medium">C</span>}
+                          </div>
+                        )}
+                        {period.verify > 0 && (
+                          <div
+                            className="bg-blue-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.verify / total) * percentage}%` }}
+                            title={`Verify: ${period.verify}`}
+                          >
+                            {period.verify > 5 && <span className="text-[10px] text-white font-medium">V</span>}
+                          </div>
+                        )}
+                        {period.refresh > 0 && (
+                          <div
+                            className="bg-purple-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.refresh / total) * percentage}%` }}
+                            title={`Refresh: ${period.refresh}`}
+                          >
+                            {period.refresh > 5 && <span className="text-[10px] text-white font-medium">R</span>}
+                          </div>
+                        )}
+                        {period.revoke > 0 && (
+                          <div
+                            className="bg-red-500 h-full flex items-center justify-center"
+                            style={{ width: `${(period.revoke / total) * percentage}%` }}
+                            title={`Revoke: ${period.revoke}`}
+                          >
+                            {period.revoke > 5 && <span className="text-[10px] text-white font-medium">X</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        env.env === 'production'
-                          ? 'bg-green'
-                          : env.env === 'staging'
-                          ? 'bg-orange-500'
-                          : 'bg-blue-500'
-                      }`}
-                      style={{ width: `${env.percentage}%` }}
-                    ></div>
-                  </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-4 mt-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green"></div>
+                  <span className="text-grey-600">Create</span>
                 </div>
-              ))}
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-blue-500"></div>
+                  <span className="text-grey-600">Verify</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-purple-500"></div>
+                  <span className="text-grey-600">Refresh</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-500"></div>
+                  <span className="text-grey-600">Revoke</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Activity className="h-12 w-12 text-grey-300 mb-3" />
+              <p className="text-sm text-grey-600 font-medium mb-1">No operations data available</p>
+              <p className="text-xs text-grey-500">Operation charts will appear once session operations are performed</p>
             </div>
+          )}
           </div>
         </div>
 
@@ -298,8 +437,8 @@ export default function SessionDashboard({
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-grey mb-2">About Session Analytics</h3>
           <p className="text-xs text-grey-600">
-            This dashboard provides real-time analytics for the <strong>{sessionTag}</strong> session.
-            Data is updated every 5 minutes and shows aggregated metrics across all environments.
+            This dashboard provides analytics for the <strong>{sessionTag}</strong> session.
+            Data shows aggregated metrics across all environments for the selected time range.
             Use the time range selector to view different periods.
           </p>
         </div>

@@ -315,49 +315,116 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
           {/* Environments */}
           {webhook.envs && webhook.envs.length > 0 && (
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-1">
-                Registration Endpoints
-              </h2>
-              <p className="text-xs text-grey-600 mb-4">
-                Partners can register their webhook endpoint using these URLs to
-                receive event notifications
-              </p>
-              <div className="space-y-3">
-                {webhook.envs.map((env, index) => (
-                  <div
-                    key={index}
-                    className="border border-grey-300 rounded-lg p-4"
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="font-medium text-grey">
-                        {env.slug.toUpperCase()}
-                      </span>
-                      <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
-                        {env.method}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded">
-                        {env.registration_url}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleCopy(env.registration_url, "Registration URL")
-                        }
-                        className="h-8 w-8 p-0 flex-shrink-0"
+              {/* Check if this is a "Generate a link" type webhook (no registration_url) or direct registration type */}
+              {webhook.envs.some((env: any) => env.registration_url) ? (
+                <>
+                  <h2 className="text-lg font-semibold text-grey mb-1">
+                    Registration Endpoints
+                  </h2>
+                  <p className="text-xs text-grey-600 mb-4">
+                    Partners can register their webhook endpoint using these URLs to
+                    receive event notifications
+                  </p>
+                  <div className="space-y-3">
+                    {webhook.envs.map((env, index) => (
+                      <div
+                        key={index}
+                        className="border border-grey-300 rounded-lg p-4"
                       >
-                        {copiedText === env.registration_url ? (
-                          <Check className="h-3 w-3 text-green" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="font-medium text-grey">
+                            {env.slug.toUpperCase()}
+                          </span>
+                          {env.method && (
+                            <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
+                              {env.method}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded">
+                            {env.registration_url}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleCopy(env.registration_url, "Registration URL")
+                            }
+                            className="h-8 w-8 p-0 flex-shrink-0"
+                          >
+                            {copiedText === env.registration_url ? (
+                              <Check className="h-3 w-3 text-green" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-semibold text-grey mb-1">
+                    Webhook Endpoints
+                  </h2>
+                  <p className="text-xs text-grey-600 mb-4">
+                    Generated webhook URLs for each environment. Share these URLs with your partners
+                    so they can receive event notifications.
+                  </p>
+                  <div className="space-y-3">
+                    {webhook.envs.map((env, index) => {
+                      // Generate the webhook URL based on environment
+                      // The actual URL format depends on your Ductape setup
+                      const webhookUrl = (env as any).webhook_url ||
+                        (webhook as any).webhook_url?.[env.slug] ||
+                        `https://api.ductape.app/webhooks/${appTag}/${webhook.tag}/${env.slug}`;
+
+                      return (
+                        <div
+                          key={index}
+                          className="border border-grey-300 rounded-lg p-4"
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="font-medium text-grey">
+                              {env.slug.toUpperCase()}
+                            </span>
+                            <span className="px-2 py-1 bg-green/10 text-green rounded text-xs font-medium">
+                              POST
+                            </span>
+                            <span className="px-2 py-1 bg-blue/10 text-blue rounded text-xs font-medium ml-auto">
+                              Generated URL
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded">
+                              {webhookUrl}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleCopy(webhookUrl, "Webhook URL")
+                              }
+                              className="h-8 w-8 p-0 flex-shrink-0"
+                            >
+                              {copiedText === webhookUrl ? (
+                                <Check className="h-3 w-3 text-green" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-grey-500 mt-2">
+                            Partners send POST requests to this URL to trigger webhook events
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

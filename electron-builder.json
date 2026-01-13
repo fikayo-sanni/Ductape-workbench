@@ -1,6 +1,6 @@
 {
-  "appId": "com.ductape.workbench",
-  "productName": "Ductape Workbench",
+  "appId": "com.ductape.app",
+  "productName": "Ductape",
   "directories": {
     "output": "release"
   },

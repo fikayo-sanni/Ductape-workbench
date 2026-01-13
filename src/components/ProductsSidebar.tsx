@@ -45,8 +45,7 @@ export default function ProductsSidebar() {
         public_key: user?.public_key || '',
         status: 'all',
       }),
-    // Always enabled
-    enabled: true,
+    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
   });
 
   const products = productsData?.data || [];

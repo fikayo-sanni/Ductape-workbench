@@ -1,4 +1,4 @@
-import { Share2, Server, Link, Copy, Check, Eye, EyeOff, Loader2, CheckCircle, ArrowRight, Network } from 'lucide-react';
+import { Share2, Server, Link, Copy, Check, Eye, EyeOff, Loader2, CheckCircle, ArrowRight, Network, User, Key as KeyIcon, Database as DatabaseIcon, Globe } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useGraphProxy } from '@/services/graphProxy';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -17,31 +17,34 @@ interface GraphTabContentProps {
 export default function GraphTabContent({ graph }: GraphTabContentProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConnections, setShowConnections] = useState<Record<number, boolean>>({});
+  const [showPasswords, setShowPasswords] = useState<Record<number, boolean>>({});
   const { user, currentWorkspaceId } = useAuth();
   const { openTab } = useWorkbenchStore();
 
-  // Initialize SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product',
-  });
+  // Initialize Graph Proxy
+  const graphProxy = useGraphProxy(
+    graph?.productTag && user?._id
+      ? {
+          workspace_id: currentWorkspaceId || '',
+          user_id: user._id || '',
+          token: user.auth_token || '',
+          public_key: user.public_key || '',
+        }
+      : null
+  );
 
-  // Fetch graph details from SDK
+  // Fetch graph details from Graph Proxy
   const { data: graphData, isLoading } = useQuery({
-    queryKey: ['graph', graph?.tag],
+    queryKey: ['graph', graph?.productTag, graph?.tag],
     queryFn: async () => {
-      if (!ductape || !graph?.tag) {
+      if (!graphProxy || !graph?.tag || !graph?.productTag) {
         return graph;
       }
 
-      const sdk = ductape as any;
-      const result = await sdk.graphs.fetch(graph.tag);
+      const result = await graphProxy.graph.fetch(graph.productTag, graph.tag);
       return result;
     },
-    enabled: !!ductape && !!graph?.tag,
+    enabled: !!graphProxy && !!graph?.tag && !!graph?.productTag,
   });
 
   const displayData = graphData || graph;
@@ -283,27 +286,119 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
                       </div>
                     </div>
 
+                    {/* Connection credentials (username/password) */}
+                    {(env.username || env.password) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {env.username && (
+                          <div>
+                            <Label className="text-sm font-semibold text-grey mb-2 flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Username
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={env.username}
+                                readOnly
+                                className="font-mono text-sm flex-1"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => copyToClipboard(env.username, `username-${index}`)}
+                              >
+                                {copiedKey === `username-${index}` ? (
+                                  <Check className="h-4 w-4" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {env.password && (
+                          <div>
+                            <Label className="text-sm font-semibold text-grey mb-2 flex items-center gap-2">
+                              <KeyIcon className="h-4 w-4" />
+                              Password
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <Input
+                                  type={showPasswords[index] ? 'text' : 'password'}
+                                  value={env.password}
+                                  readOnly
+                                  className="font-mono text-sm pr-10"
+                                />
+                                <button
+                                  onClick={() => setShowPasswords(prev => ({ ...prev, [index]: !prev[index] }))}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey"
+                                >
+                                  {showPasswords[index] ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => copyToClipboard(env.password, `password-${index}`)}
+                              >
+                                {copiedKey === `password-${index}` ? (
+                                  <Check className="h-4 w-4" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Additional graph-specific fields */}
                     {(env.database || env.graphName || env.region) && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                         {env.database && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
-                            <p className="text-xs text-grey-500 mb-1">Database</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <DatabaseIcon className="h-3 w-3 text-grey-500" />
+                              <p className="text-xs text-grey-500">Database</p>
+                            </div>
                             <p className="text-sm font-medium text-grey">{env.database}</p>
                           </div>
                         )}
                         {env.graphName && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
-                            <p className="text-xs text-grey-500 mb-1">Graph Name</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Network className="h-3 w-3 text-grey-500" />
+                              <p className="text-xs text-grey-500">Graph Name</p>
+                            </div>
                             <p className="text-sm font-medium text-grey">{env.graphName}</p>
                           </div>
                         )}
                         {env.region && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
-                            <p className="text-xs text-grey-500 mb-1">Region</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Globe className="h-3 w-3 text-grey-500" />
+                              <p className="text-xs text-grey-500">Region</p>
+                            </div>
                             <p className="text-sm font-medium text-grey">{env.region}</p>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* IAM Auth indicator for Neptune */}
+                    {env.iamAuth !== undefined && (
+                      <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className={cn("h-4 w-4", env.iamAuth ? "text-green" : "text-grey-400")} />
+                          <p className="text-sm font-medium text-grey">
+                            IAM Authentication: {env.iamAuth ? 'Enabled' : 'Disabled'}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
