@@ -2,7 +2,7 @@ export interface PricingPlan {
     pricing_mode: string;
     interval?: string;
     overage_price?: number;
-    limits: {
+    limits?: {
         per_minute?: number;
         per_hour?: number;
         per_day?: number;
@@ -14,8 +14,26 @@ export interface PricingPlan {
     currency: string;
 }
 
-// More strict version with literal types
-export type PricingMode = 'upfront' | 'per_request' | 'one_time' | 'recurring';
+// Enums for pricing
+export enum PricingMode {
+  UPFRONT = 'upfront',
+  PER_REQUEST = 'per_request',
+  ONE_TIME = 'one_time',
+  RECURRING = 'recurring'
+}
+
+export enum PaymentInterval {
+  MONTHLY = 'monthly',
+  BI_WEEKLY = 'bi-weekly',
+  WEEKLY = 'weekly',
+  DAILY = 'daily',
+  HOURLY = 'hourly',
+  MINUTELY = 'minutely',
+  YEARLY = 'yearly',
+  QUARTERLY = 'quarterly',
+  ONE_TIME = 'one-time'
+}
+
 export type IntervalType = 'monthly' | 'bi-weekly' | 'weekly' | 'daily' | 'hourly' | 'minutely' | 'yearly' | 'quarterly' | 'one-time';
 
 export interface Pricing {
@@ -30,8 +48,8 @@ export interface Pricing {
   workspace_id: string;
   pricing_tag: string;
   action_id: string;
-  pricing_mode: PricingMode;
-  interval: PaymentInterval;
+  pricing_mode: string;
+  interval: string;
   unit_price: number;
   overage_price: number;
   name: string;
@@ -52,7 +70,7 @@ export interface PricingApiResponse {
       total: number;
       pages: number;
     };
-    modeCounts: Record<PricingMode, number>;
+    modeCounts: Record<string, number>;
   };
 }
 
