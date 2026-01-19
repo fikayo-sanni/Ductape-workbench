@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -223,18 +223,22 @@ export default function ConditionalModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-primary" />
-            Configure Condition for {componentName}
-          </DialogTitle>
-          <DialogDescription>
-            Add conditional logic to control when and how this event executes
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-primary" />
+              Configure Condition for {componentName}
+            </DialogTitle>
+            <DialogDescription>
+              Add conditional logic to control when and how this event executes
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-4">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* Condition Type */}
           <div>
             <Label className="required">Condition Type</Label>
@@ -729,7 +733,8 @@ export default function ConditionalModal({
           )}
         </div>
 
-        <DialogFooter>
+        {/* Footer - Fixed */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-grey-400 bg-grey-50">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={handleSave}
@@ -742,7 +747,7 @@ export default function ConditionalModal({
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Save Condition
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

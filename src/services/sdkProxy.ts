@@ -208,14 +208,14 @@ export class SDKProxyService {
 
     actions: {
       create: <T = any>(appTag: string, data: any) =>
-        this.execute<T>('app', 'actions.create', appTag, data),
-      list: <T = any>(appTag: string) => this.execute<T>('app', 'actions.list', appTag),
+        this.execute<T>('actions', 'create', appTag, data),
+      list: <T = any>(appTag: string) => this.execute<T>('actions', 'list', appTag),
       fetch: <T = any>(appTag: string, tag: string) =>
-        this.execute<T>('app', 'actions.fetch', appTag, tag),
+        this.execute<T>('actions', 'fetch', appTag, tag),
       update: <T = any>(appTag: string, tag: string, data: any) =>
-        this.execute<T>('app', 'actions.update', appTag, tag, data),
+        this.execute<T>('actions', 'update', appTag, tag, data),
       delete: <T = any>(appTag: string, tag: string) =>
-        this.execute<T>('app', 'actions.delete', appTag, tag),
+        this.execute<T>('actions', 'delete', appTag, tag),
     },
 
     auths: {
@@ -269,8 +269,6 @@ export class SDKProxyService {
       this.execute<T>('sessions', 'fetch', product, tag),
     delete: <T = any>(product: string, tag: string) =>
       this.execute<T>('sessions', 'delete', product, tag),
-    users: <T = any>(product: string, data: any) =>
-      this.execute<T>('sessions', 'users', product, data),
 
     // Session lifecycle
     start: <T = any>(data: any) => this.execute<T>('sessions', 'start', data),
@@ -281,6 +279,16 @@ export class SDKProxyService {
     revokeAll: <T = any>(data: any) => this.execute<T>('sessions', 'revokeAll', data),
     updateData: <T = any>(data: any) => this.execute<T>('sessions', 'updateData', data),
     extendSession: <T = any>(data: any) => this.execute<T>('sessions', 'extendSession', data),
+
+    // Session users and dashboard
+    fetchUsers: <T = any>(data: { product: string; session: string; env?: string; page?: number; limit?: number }) =>
+      this.execute<T>('sessions', 'fetchUsers', data),
+    fetchUserDetails: <T = any>(data: { product: string; session: string; identifier: string; env?: string }) =>
+      this.execute<T>('sessions', 'fetchUserDetails', data),
+    fetchDashboard: <T = any>(data: { product: string; session: string; env?: string }) =>
+      this.execute<T>('sessions', 'fetchDashboard', data),
+    fetchUserDashboard: <T = any>(data: { product: string; session: string; identifier: string; env?: string }) =>
+      this.execute<T>('sessions', 'fetchUserDashboard', data),
   };
 
   // ==================== STORAGE MODULE ====================
@@ -355,6 +363,22 @@ export class SDKProxyService {
     publish: <T = any>(data: any) => this.execute<T>('messageBrokers', 'publish', data),
     subscribe: <T = any>(data: any) => this.execute<T>('messageBrokers', 'subscribe', data),
     dispatch: <T = any>(data: any) => this.execute<T>('messageBrokers', 'dispatch', data),
+
+    // Message tracking methods
+    messages: {
+      query: <T = any>(data: { product: string; env: string; brokerTag: string; topicTag?: string; producerTag?: string; consumerTag?: string; status?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
+        this.execute<T>('messageBrokers', 'messages.query', data),
+      getProducers: <T = any>(data: { product: string; env: string; brokerTag: string; topicTag?: string; page?: number; limit?: number }) =>
+        this.execute<T>('messageBrokers', 'messages.getProducers', data),
+      getConsumers: <T = any>(data: { product: string; env: string; brokerTag: string; topicTag?: string; page?: number; limit?: number }) =>
+        this.execute<T>('messageBrokers', 'messages.getConsumers', data),
+      getDeadLetters: <T = any>(data: { product: string; env: string; brokerTag: string; topicTag?: string; consumerTag?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
+        this.execute<T>('messageBrokers', 'messages.getDeadLetters', data),
+      getStats: <T = any>(data: { product: string; env: string; brokerTag: string }) =>
+        this.execute<T>('messageBrokers', 'messages.getStats', data),
+      getDashboard: <T = any>(data: { product: string; env: string; brokerTag: string }) =>
+        this.execute<T>('messageBrokers', 'messages.getDashboard', data),
+    },
   };
 
   // ==================== CACHES MODULE ====================
@@ -584,6 +608,69 @@ export class SDKProxyService {
 
     // Service access
     getService: <T = any>() => this.execute<T>('vector', 'getService'),
+
+    // Vector Actions - CRUD operations for reusable vector actions
+    actions: {
+      create: <T = any>(options: {
+        product: string;
+        vector: string;
+        name: string;
+        actionTag: string;
+        operation: string;
+        description?: string;
+        template: Record<string, any>;
+        parameters?: Array<{
+          name: string;
+          path: string;
+          type: string;
+          defaultValue?: any;
+          required?: boolean;
+          description?: string;
+        }>;
+      }) => this.execute<T>('vector', 'actions.create', options),
+
+      update: <T = any>(options: {
+        product: string;
+        vector: string;
+        actionTag: string;
+        name?: string;
+        description?: string;
+        template?: Record<string, any>;
+        parameters?: Array<{
+          name: string;
+          path: string;
+          type: string;
+          defaultValue?: any;
+          required?: boolean;
+          description?: string;
+        }>;
+      }) => this.execute<T>('vector', 'actions.update', options),
+
+      fetch: <T = any>(options: {
+        product: string;
+        vector: string;
+        actionTag: string;
+      }) => this.execute<T>('vector', 'actions.fetch', options),
+
+      fetchAll: <T = any>(options: {
+        product: string;
+        vector: string;
+      }) => this.execute<T>('vector', 'actions.fetchAll', options),
+
+      delete: <T = any>(options: {
+        product: string;
+        vector: string;
+        actionTag: string;
+      }) => this.execute<T>('vector', 'actions.delete', options),
+
+      execute: <T = any>(options: {
+        product: string;
+        env: string;
+        vector: string;
+        action: string;
+        input: Record<string, any>;
+      }) => this.execute<T>('vector', 'actions.execute', options),
+    },
   };
 
   // ==================== LOGS MODULE ====================

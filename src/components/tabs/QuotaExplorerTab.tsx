@@ -292,9 +292,7 @@ export default function QuotaExplorerTab({ product }: QuotaExplorerTabProps) {
           code: `${importStatement}
 
 const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  private_key: 'your-private-key'
+  accessKey: 'your-access-key',
 });`
         },
         {

@@ -258,22 +258,26 @@ export default function CreateConstantModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileCode className="h-5 w-5 text-primary" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileCode className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className='text-grey'>{constant ? 'Update Constant' : 'Create Constant'}</DialogTitle>
+                <DialogDescription>
+                  {constant ? 'Update the constant configuration' : 'Add a new constant to store fixed configuration values'}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className='text-grey'>{constant ? 'Update Constant' : 'Create Constant'}</DialogTitle>
-              <DialogDescription>
-                {constant ? 'Update the constant configuration' : 'Add a new constant to store fixed configuration values'}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-4 mt-4">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div>
             <Label htmlFor="key" className="required">
               Constant Key
@@ -431,55 +435,56 @@ export default function CreateConstantModal({
                 : 'The fixed value for this constant'}
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-grey-400">
-            {constant && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isDeleting || isCreating}
-                className="gap-2"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" />
-                    Delete Constant
-                  </>
-                )}
-              </Button>
-            )}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isCreating || isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isCreating || isDeleting}
-                className="gap-2"
-              >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {constant ? 'Updating...' : 'Creating...'}
-                  </>
-                ) : (
-                  <>
-                    <FileCode className="h-4 w-4" />
-                    {constant ? 'Update Constant' : 'Create Constant'}
-                  </>
-                )}
-              </Button>
-            </div>
+        {/* Footer - Fixed */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-grey-400 bg-grey-50">
+          {constant && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting || isCreating}
+              className="gap-2"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Delete Constant
+                </>
+              )}
+            </Button>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isCreating || isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isCreating || isDeleting}
+              className="gap-2"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {constant ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  <FileCode className="h-4 w-4" />
+                  {constant ? 'Update Constant' : 'Create Constant'}
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </DialogContent>

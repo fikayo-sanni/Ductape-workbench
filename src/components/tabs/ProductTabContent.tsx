@@ -104,12 +104,11 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'sessions', label: 'Sessions', icon: KeyRound, color: 'text-blue-600', bgColor: 'bg-blue-600/10', dataKey: 'sessions', componentType: 'session' },
   { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
-  // Disabled categories (coming soon)
-  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification', disabled: true },
-  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job', disabled: true },
-  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
-  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
-  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
+  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
+  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow' },
+  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence' },
+  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience' },
 ];
 
 export default function ProductTabContent({ tabId, product: initialProduct, productId }: ProductTabContentProps) {
@@ -351,26 +350,34 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   if ((isFetchingProduct && !product) || (product && !product.name)) {
     return (
       <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+        {/* Sidebar skeleton */}
         <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-grey-400">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-grey-300 rounded-lg animate-pulse" />
+              <div className="w-9 h-9 bg-grey-200 rounded-lg animate-pulse" />
               <div className="flex-1">
-                <div className="h-4 w-24 bg-grey-300 rounded animate-pulse mb-1" />
-                <div className="h-3 w-16 bg-grey-300 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-grey-200 rounded animate-pulse mb-1.5" />
+                <div className="h-3 w-16 bg-grey-200 rounded animate-pulse" />
               </div>
             </div>
-            <div className="h-9 bg-grey-300 rounded animate-pulse" />
+            <div className="h-9 bg-grey-200 rounded animate-pulse" />
           </div>
-          <div className="flex-1 p-2 space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-8 bg-grey-200 rounded animate-pulse" />
+          <div className="flex-1 p-2 space-y-1">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="h-10 bg-grey-100 rounded animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
             ))}
           </div>
+          <div className="p-3 border-t border-grey-400">
+            <div className="h-8 bg-grey-200 rounded animate-pulse" />
+          </div>
         </div>
-        <div className="flex-1 p-6">
-          <div className="h-32 bg-grey-200 rounded-lg animate-pulse mb-4" />
-          <div className="h-64 bg-grey-200 rounded-lg animate-pulse" />
+        {/* Main content skeleton with loading indicator */}
+        <div className="flex-1 flex flex-col items-center justify-center bg-grey-50">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-sm font-medium text-grey-700">Loading product...</p>
+            <p className="text-xs text-grey-500 mt-1">Fetching product details and components</p>
+          </div>
         </div>
       </div>
     );
@@ -1073,7 +1080,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
               <p className="text-xs text-grey-500 mt-1.5">{detailText}</p>
             )}
 
-            {/* Environment Quick Access Buttons */}
+            {/* Environment Buttons - Click to open explorer */}
             {hasEnvs && !excludeEnvButtons && (
               <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                 <ItemIcon className="h-3.5 w-3.5 text-grey-400 flex-shrink-0" />
@@ -1081,11 +1088,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                   <button
                     key={env.slug}
                     onClick={(e) => handleOpenResourceExplorer(item, resourceType, env, e)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
-                    title={`Open ${resourceType} explorer for ${env.slug}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                    title={`Open ${env.slug} in explorer`}
                   >
-                    <ExternalLink className="h-3 w-3" />
                     {env.slug}
+                    <ExternalLink className="h-3 w-3" />
                   </button>
                 ))}
               </div>
@@ -1121,6 +1128,14 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     const count = getResourceCount(category);
     const Icon = category.icon;
 
+    // Check if the category is loading
+    // Apps use a separate query, other resources come from the product data
+    // For non-apps categories, check if we're still fetching or if we only have initial (incomplete) product data
+    const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
+    const isCategoryLoading = category.id === 'apps'
+      ? productAppsStatus === 'pending'
+      : isProductResourcesLoading;
+
     // Filter by search if present
     const filteredResources = searchQuery
       ? resources.filter(
@@ -1149,7 +1164,14 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                 <div>
                   <h1 className="text-xl font-bold text-grey">{category.label}</h1>
                   <p className="text-sm text-grey-500">
-                    {count} {count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()} configured
+                    {isCategoryLoading ? (
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading...
+                      </span>
+                    ) : (
+                      `${count} ${count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()} configured`
+                    )}
                   </p>
                 </div>
               </div>
@@ -1181,7 +1203,28 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
         {/* Content Section */}
         <div className="max-w-6xl mx-auto px-6 py-6">
-          {filteredResources.length > 0 ? (
+          {isCategoryLoading ? (
+            /* Loading State */
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div
+                  key={i}
+                  className="bg-white border border-grey-300 rounded-lg p-4 animate-pulse"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-grey-200" />
+                    <div className="flex-1">
+                      <div className="h-4 w-24 bg-grey-200 rounded mb-2" />
+                      <div className="h-3 w-16 bg-grey-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-3 w-full bg-grey-100 rounded mb-2" />
+                  <div className="h-3 w-2/3 bg-grey-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : filteredResources.length > 0 ? (
             <>
               {/* Results count when searching */}
               {searchQuery && (
@@ -1432,10 +1475,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                       const isStaging = envSlug.includes('stag') || envSlug.includes('uat');
 
                       return (
-                        <button
+                        <Button
                           key={env._id}
                           onClick={() => handleEditEnvironment(env)}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-grey-200 hover:border-primary hover:bg-grey-50 transition-all group"
+                          variant="outline"
+                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-grey-50 transition-all group"
                         >
                           {/* Status dot */}
                           <div className={cn(
@@ -1475,7 +1519,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                           )}>
                             {env.active ? "Active" : "Inactive"}
                           </span>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1700,6 +1744,12 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                 const Icon = category.icon;
                 const isActive = activeCategory === category.id;
                 const isDisabled = category.disabled;
+                // Apps use separate query, other resources use product loading state
+                // Also show loading during sidebar refresh
+                const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
+                const isCatLoading = isSidebarRefreshing || (category.id === 'apps'
+                  ? productAppsStatus === 'pending'
+                  : isProductResourcesLoading);
 
                 return (
                   <button
@@ -1723,7 +1773,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                         isDisabled ? 'bg-grey-100 text-grey-400' : isActive ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600'
                       )}
                     >
-                      {count}
+                      {isCatLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin mx-auto" />
+                      ) : (
+                        count
+                      )}
                     </span>
                   </button>
                 );
@@ -1778,6 +1832,12 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                 const Icon = category.icon;
                 const isActive = activeCategory === category.id;
                 const isDisabled = category.disabled;
+                // Apps use separate query, other resources use product loading state
+                // Also show loading during sidebar refresh
+                const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
+                const isCatLoading = isSidebarRefreshing || (category.id === 'apps'
+                  ? productAppsStatus === 'pending'
+                  : isProductResourcesLoading);
 
                 return (
                   <button
@@ -1797,14 +1857,18 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                           ? 'bg-primary/10 text-primary'
                           : 'text-grey hover:bg-grey-100'
                     )}
-                    title={`${category.label} (${count})`}
+                    title={isCatLoading ? `${category.label} (Loading...)` : `${category.label} (${count})`}
                   >
                     <Icon className={cn('h-5 w-5', isDisabled ? 'text-grey-400' : isActive ? 'text-primary' : 'text-grey-600')} />
-                    {count > 0 && !isDisabled && (
+                    {isCatLoading ? (
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-grey-200 rounded-full flex items-center justify-center">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin text-grey-500" />
+                      </span>
+                    ) : count > 0 && !isDisabled ? (
                       <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
                         {count > 9 ? '9+' : count}
                       </span>
-                    )}
+                    ) : null}
                   </button>
                 );
               })}
@@ -1852,7 +1916,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       <Dialog open={showDatabaseTypeDialog} onOpenChange={setShowDatabaseTypeDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>What type of database would you like to add?</DialogTitle>
+            <DialogTitle className="text-grey">What type of database would you like to add?</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-4">
             <button

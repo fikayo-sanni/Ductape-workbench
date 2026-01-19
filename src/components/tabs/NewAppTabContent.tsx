@@ -183,10 +183,18 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       return;
     }
 
-    // Check if at least one environment is active with a base URL
-    const activeEnvs = environments.filter((env: any) => env.active && env.base_url.trim());
+    // Check if at least one environment is active
+    const activeEnvs = environments.filter((env: any) => env.active);
     if (activeEnvs.length === 0) {
-      toast.error('Please configure at least one environment with a base URL');
+      toast.error('Please enable at least one environment');
+      return;
+    }
+
+    // Check that ALL active environments have base URLs
+    const activeEnvsWithoutBaseUrl = activeEnvs.filter((env: any) => !env.base_url.trim());
+    if (activeEnvsWithoutBaseUrl.length > 0) {
+      const envNames = activeEnvsWithoutBaseUrl.map((env: any) => env.env_name || env.slug).join(', ');
+      toast.error(`Please provide base URLs for all active environments: ${envNames}`);
       return;
     }
 

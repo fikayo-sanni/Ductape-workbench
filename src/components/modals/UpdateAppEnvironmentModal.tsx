@@ -29,6 +29,7 @@ interface UpdateAppEnvironmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appTag?: string;
+  appId?: string;
   environment: any;
   onSuccess?: () => void;
 }
@@ -37,6 +38,7 @@ export default function UpdateAppEnvironmentModal({
   open,
   onOpenChange,
   appTag,
+  appId,
   environment,
   onSuccess,
 }: UpdateAppEnvironmentModalProps) {
@@ -115,11 +117,20 @@ export default function UpdateAppEnvironmentModal({
       };
 
       delete (payload as any).slug;
-      await ductape.environments.update(environment.slug, payload);
+      await ductape.environments.update(appTag, environment.slug, payload);
       return payload;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['app', appTag] });
+      // Invalidate app query using appId (used by AppTabContent)
+      if (appId) {
+        queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      }
+      // Also invalidate by appTag for backwards compatibility
+      if (appTag) {
+        queryClient.invalidateQueries({ queryKey: ['app', appTag] });
+      }
+      // Invalidate apps list
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
       toast.success('Environment updated successfully!');
       onSuccess?.();
       onOpenChange(false);
@@ -153,23 +164,28 @@ export default function UpdateAppEnvironmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Settings2 className="h-5 w-5 text-primary" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Settings2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className='text-grey'>Update Environment</DialogTitle>
+                <DialogDescription>
+                  Modify environment settings for this app
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className='text-grey'>Update Environment</DialogTitle>
-              <DialogDescription>
-                Modify environment settings for this app
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
             <Label htmlFor="env_name" className="required">
               Environment Name
             </Label>
@@ -285,8 +301,10 @@ export default function UpdateAppEnvironmentModal({
               </p>
             </div>
           </div>
+          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
+          {/* Footer - Fixed */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-grey-400 bg-grey-50">
             <Button
               type="button"
               variant="outline"

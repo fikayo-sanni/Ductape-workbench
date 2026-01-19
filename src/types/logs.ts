@@ -144,10 +144,12 @@ export interface FetchLogsOptions {
   parent_tag?: string;
   child_tag?: string;
   session_tag?: string;
+  session_user_id?: string;
   app_id?: string;
   env?: string;
   action?: string;
   process_id?: string;
+  search?: string;
   status?: string;
   tag?: string;
   page?: number;
@@ -160,4 +162,131 @@ export interface FetchLogsData {
   public_key: string;
   workspace_id: string;
   user_id: string;
+}
+
+// ==================== REUSABLE DASHBOARD TYPES ====================
+
+/**
+ * Common dashboard query parameters - reusable across all component types
+ */
+export interface BaseDashboardQuery {
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
+}
+
+/**
+ * App-specific dashboard query parameters
+ */
+export interface AppDashboardQuery extends BaseDashboardQuery {
+  app_id: string;
+  version?: string;
+  app_env?: string;
+}
+
+/**
+ * Product-specific dashboard query parameters
+ */
+export interface ProductDashboardQuery extends BaseDashboardQuery {
+  product_tag: string;
+  env?: string;
+}
+
+/**
+ * Common metric structure for trend display
+ */
+export interface TrendMetric {
+  current: number;
+  previous: number;
+  change: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+/**
+ * Time series data point
+ */
+export interface TimeSeriesPoint {
+  period: string;
+  date?: string;
+  value: number;
+}
+
+/**
+ * Request activity data point
+ */
+export interface ActivityPoint {
+  date: string;
+  day?: string;
+  requests: number;
+  success?: number;
+  failures?: number;
+}
+
+/**
+ * Endpoint/Action performance metrics
+ */
+export interface EndpointMetrics {
+  name: string;
+  tag: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  calls: number;
+  avgLatency: number;
+  successRate: number;
+}
+
+/**
+ * Request distribution by HTTP method
+ */
+export interface MethodDistribution {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  count: number;
+  percentage: number;
+}
+
+/**
+ * App Dashboard Metrics - comprehensive metrics for app overview
+ */
+export interface AppDashboardMetrics {
+  // Core metrics
+  totalRequests: TrendMetric;
+  successRate: TrendMetric;
+  errorRate: TrendMetric;
+  avgLatency: TrendMetric;
+  activeEndpoints: TrendMetric;
+  webhookEvents: TrendMetric;
+
+  // Distribution data
+  requestsByMethod: MethodDistribution[];
+
+  // Time series data
+  dailyActivity: ActivityPoint[];
+
+  // Top performers
+  topEndpoints: EndpointMetrics[];
+
+  // Raw totals for calculations
+  totals: {
+    successCount: number;
+    failureCount: number;
+    totalCount: number;
+  };
+}
+
+/**
+ * Generic component dashboard metrics - reusable base structure
+ */
+export interface ComponentDashboardMetrics {
+  totalOperations: TrendMetric;
+  successRate: TrendMetric;
+  errorRate: TrendMetric;
+  avgLatency: TrendMetric;
+  dailyActivity: ActivityPoint[];
+}
+
+/**
+ * API response wrapper for dashboard metrics
+ */
+export interface DashboardResponse<T> {
+  success: boolean;
+  data: T;
 }

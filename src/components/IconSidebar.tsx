@@ -1,7 +1,6 @@
 import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Key, Users, Store, MessageCircle, Handshake, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { getDummyWorkspacePartnerships } from '@/data/partnerships.dummy';
 
 type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
 
@@ -13,23 +12,11 @@ interface IconSidebarProps {
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
   const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openPricingTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
 
-  // Calculate unread messages count
-  const currentWorkspaceId = 'ws_001';
-  const { data: partnershipsData } = getDummyWorkspacePartnerships(currentWorkspaceId);
-  const allPartnerships = [
-    ...partnershipsData.myClients,
-    ...partnershipsData.myServiceProviders,
-  ];
-
-  const unreadCount = allPartnerships.reduce((count, partnership) => {
-    const unreadMessages = partnership.messages.filter(msg => !msg.read).length;
-    return count + unreadMessages;
-  }, 0);
-
   const menuItems: Array<{
     id: SidebarView;
     icon: typeof Package;
     label: string;
+    disabled?: boolean;
   }> = [
     {
       id: 'products',
@@ -60,6 +47,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
       id: 'partnership',
       icon: Handshake,
       label: 'Partnerships',
+      disabled: true,
     },
   ];
 
@@ -69,11 +57,15 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         const Icon = item.icon;
         // Check if this icon is the active sidebar icon
         const isActive = activeIconSidebar === item.id;
+        const isDisabled = item.disabled;
 
         return (
           <button
             key={item.id}
+            disabled={isDisabled}
             onClick={() => {
+              if (isDisabled) return;
+
               // Set this as the active icon
               setActiveIconSidebar(item.id);
 
@@ -100,24 +92,26 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
             }}
             className={cn(
               'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
-              isActive
-                ? 'bg-primary text-white'
-                : 'text-grey-600 hover:bg-grey-100 hover:text-grey dark:hover:bg-grey-400/30'
+              isDisabled
+                ? 'text-grey-400 cursor-not-allowed opacity-50'
+                : isActive
+                  ? 'bg-primary text-white'
+                  : 'text-grey-600 hover:bg-grey-100 hover:text-grey dark:hover:bg-grey-400/30'
             )}
             aria-label={item.label}
           >
             <Icon className="h-5 w-5" />
 
-            {/* Unread Badge for Partnerships */}
-            {item.id === 'partnership' && unreadCount > 0 && (
+            {/* Badge for Partnerships */}
+            {item.id === 'partnership' && (
               <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                0
               </div>
             )}
 
             {/* Tooltip on hover */}
             <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-              {item.label}
+              {item.label}{isDisabled ? ' (Coming Soon)' : ''}
             </div>
           </button>
         );

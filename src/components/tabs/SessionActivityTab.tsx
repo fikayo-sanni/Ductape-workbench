@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Users,
   Clock,
@@ -7,13 +7,12 @@ import {
   Search,
   RefreshCw,
   LayoutGrid,
-  Globe,
   Key,
   UserCheck,
-  UserX,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeft,
+  Loader2,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -24,16 +23,26 @@ import SessionDashboard from './SessionDashboard';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import sessionUsersService from '@/services/sessionUsersService';
+import { saveTabState, getTabState } from '@/lib/tab-state-manager';
 
 interface SessionActivityTabProps {
   session: any;
   sessionTag: string;
   productTag: string;
   productName?: string;
+  tabId?: string;
+}
+
+interface SessionActivityTabState {
+  viewMode: 'overview' | 'users';
+  statusFilter: UserStatus;
+  searchQuery: string;
+  listViewMode: 'list' | 'grid';
+  isSidebarCollapsed: boolean;
 }
 
 
-type UserStatus = 'active' | 'inactive' | 'expired' | 'all';
+type UserStatus = 'active' | 'inactive' | 'all';
 
 // Helper function for environment badge colors
 const getEnvBadgeColor = (env: string) => {
@@ -70,15 +79,74 @@ export default function SessionActivityTab({
   sessionTag,
   productTag,
   productName,
+  tabId,
 }: SessionActivityTabProps) {
   const { openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<UserStatus>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'overview' | 'users'>('overview');
-  const [listViewMode, setListViewMode] = useState<'list' | 'grid'>('list');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Initialize state from persisted tab state or defaults
+  const getInitialState = useCallback((): SessionActivityTabState => {
+    if (tabId) {
+      const savedState = getTabState(tabId);
+      if (savedState?.formState) {
+        return {
+          viewMode: savedState.formState.viewMode || 'overview',
+          statusFilter: savedState.formState.statusFilter || 'all',
+          searchQuery: savedState.formState.searchQuery || '',
+          listViewMode: savedState.formState.listViewMode || 'list',
+          isSidebarCollapsed: savedState.formState.isSidebarCollapsed || false,
+        };
+      }
+    }
+    return {
+      viewMode: 'overview',
+      statusFilter: 'all',
+      searchQuery: '',
+      listViewMode: 'list',
+      isSidebarCollapsed: false,
+    };
+  }, [tabId]);
+
+  const [tabState, setTabState] = useState<SessionActivityTabState>(getInitialState);
+
+  // Destructure for easier access
+  const { viewMode, statusFilter, searchQuery, listViewMode, isSidebarCollapsed } = tabState;
+
+  // Update individual state fields
+  const setViewMode = useCallback((value: 'overview' | 'users') => {
+    setTabState(prev => ({ ...prev, viewMode: value }));
+  }, []);
+
+  const setStatusFilter = useCallback((value: UserStatus) => {
+    setTabState(prev => ({ ...prev, statusFilter: value }));
+  }, []);
+
+  const setSearchQuery = useCallback((value: string) => {
+    setTabState(prev => ({ ...prev, searchQuery: value }));
+  }, []);
+
+  const setListViewMode = useCallback((value: 'list' | 'grid') => {
+    setTabState(prev => ({ ...prev, listViewMode: value }));
+  }, []);
+
+  const setIsSidebarCollapsed = useCallback((value: boolean) => {
+    setTabState(prev => ({ ...prev, isSidebarCollapsed: value }));
+  }, []);
+
+  // Save state to localStorage when it changes
+  useEffect(() => {
+    if (tabId) {
+      saveTabState(
+        tabId,
+        'session-activity',
+        `${sessionTag} Activity`,
+        { session, sessionTag, productTag, productName },
+        tabState, // formState
+        sessionTag // itemId
+      );
+    }
+  }, [tabId, tabState, session, sessionTag, productTag, productName]);
 
   const envSlug = session?.env?.slug || session?.env || 'production';
 
@@ -135,16 +203,13 @@ export default function SessionActivityTab({
     // Calculate user status based on last_seen
     const now = new Date();
     const activeThreshold = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
-    const inactiveThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
     users = users.map(user => {
       const lastSeen = new Date(user.last_seen);
-      let status: 'active' | 'inactive' | 'expired' = 'expired';
+      let status: 'active' | 'inactive' = 'inactive';
 
       if (lastSeen > activeThreshold) {
         status = 'active';
-      } else if (lastSeen > inactiveThreshold) {
-        status = 'inactive';
       }
 
       return { ...user, status, session_count: user.total_sessions || 0 };
@@ -174,7 +239,6 @@ export default function SessionActivityTab({
         total: filteredUsers.length,
         active: filteredUsers.filter(u => u.status === 'active').length,
         inactive: filteredUsers.filter(u => u.status === 'inactive').length,
-        expired: filteredUsers.filter(u => u.status === 'expired').length,
         production: filteredUsers.filter(u => u.env === 'production').length,
         staging: filteredUsers.filter(u => u.env === 'staging').length,
         development: filteredUsers.filter(u => u.env === 'development').length,
@@ -185,7 +249,6 @@ export default function SessionActivityTab({
       total: dashboardData.totalUsers || 0,
       active: dashboardData.activeUsers || 0,
       inactive: dashboardData.inactiveUsers || 0,
-      expired: dashboardData.expiredUsers || 0,
       production: filteredUsers.filter(u => u.env === 'production').length,
       staging: filteredUsers.filter(u => u.env === 'staging').length,
       development: filteredUsers.filter(u => u.env === 'development').length,
@@ -224,10 +287,12 @@ export default function SessionActivityTab({
     const configs: Record<string, { icon: any; color: string; bg: string; border: string; label: string; dotColor: string }> = {
       active: { icon: UserCheck, color: 'text-green', bg: 'bg-green/10', border: 'border-green/30', label: 'Active', dotColor: 'bg-green' },
       inactive: { icon: Clock, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', label: 'Inactive', dotColor: 'bg-orange-500' },
-      expired: { icon: UserX, color: 'text-red', bg: 'bg-red/10', border: 'border-red/30', label: 'Expired', dotColor: 'bg-red' },
     };
     return configs[status] || configs.inactive;
   };
+
+  // Check if data is loading
+  const isLoading = usersLoading && !usersData;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">
@@ -237,20 +302,49 @@ export default function SessionActivityTab({
         isSidebarCollapsed ? "w-14" : "w-64"
       )}>
         {/* Header */}
-        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-4")}>
-          <div className={cn("flex items-center gap-2", !isSidebarCollapsed && "mb-3")}>
-            <Key className="h-5 w-5 text-blue-600 flex-shrink-0" />
+        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-3")}>
+          <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2")}>
+            {/* Session Icon - clickable to expand when collapsed */}
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                } else {
+                  setViewMode('overview');
+                }
+              }}
+              className={cn(
+                "rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 flex-shrink-0 transition-all hover:ring-2 hover:ring-blue-500/50",
+                isSidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Return to overview"}
+            >
+              <Key className="h-5 w-5" />
+            </button>
             {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-grey text-sm truncate">{session?.name || 'User Sessions'}</h2>
-                <p className="text-xs text-grey-600 truncate">{envSlug}</p>
-              </div>
+              <>
+                <button
+                  onClick={() => setViewMode('overview')}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  title="Return to overview"
+                >
+                  <h2 className="font-semibold text-grey text-sm truncate">{session?.name || 'User Sessions'}</h2>
+                  <p className="text-xs text-grey-600 truncate">{envSlug}</p>
+                </button>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
 
           {/* Search */}
           {!isSidebarCollapsed && (
-            <div className="relative">
+            <div className="relative mt-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
               <Input
                 type="text"
@@ -308,7 +402,6 @@ export default function SessionActivityTab({
                 { value: 'all', label: 'All Users', icon: <LayoutGrid className="h-4 w-4" />, count: metrics.total },
                 { value: 'active', label: 'Active', icon: <UserCheck className="h-4 w-4" />, count: metrics.active },
                 { value: 'inactive', label: 'Inactive', icon: <Clock className="h-4 w-4" />, count: metrics.inactive },
-                { value: 'expired', label: 'Expired', icon: <UserX className="h-4 w-4" />, count: metrics.expired },
               ] as const).map((status) => (
                 <button
                   key={status.value}
@@ -335,12 +428,16 @@ export default function SessionActivityTab({
                     <>
                       <span className="flex-1 text-left">{status.label}</span>
                       <span className={cn(
-                        'text-xs px-1.5 py-0.5 rounded',
+                        'text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center',
                         viewMode === 'users' && statusFilter === status.value
                           ? 'bg-blue-500/20 text-blue-600'
                           : 'bg-background-secondary text-grey-600'
                       )}>
-                        {status.count}
+                        {isLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin mx-auto" />
+                        ) : (
+                          status.count
+                        )}
                       </span>
                     </>
                   )}
@@ -348,51 +445,20 @@ export default function SessionActivityTab({
               ))}
             </div>
 
-            {/* Environment Filter */}
-            {!isSidebarCollapsed && (
-              <div className="mt-4 px-2">
-                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
-                  Environment
-                </div>
-                <div className="space-y-0.5">
-                  {[
-                    { value: 'production', label: 'Production', count: metrics.production },
-                    { value: 'staging', label: 'Staging', count: metrics.staging },
-                    { value: 'development', label: 'Development', count: metrics.development },
-                  ].map(option => (
-                    <div
-                      key={option.value}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-grey"
-                    >
-                      <Globe className="h-4 w-4 text-grey-600" />
-                      <span className="flex-1 text-left">{option.label}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
-                        {option.count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Collapse Toggle Button */}
-          <div className="flex-shrink-0 p-2 border-t border-grey-400">
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-blue-600 transition-colors"
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isSidebarCollapsed ? (
+          {/* Expand button - only shown when collapsed */}
+          {isSidebarCollapsed && (
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                title="Expand sidebar"
+              >
                 <PanelLeft className="h-4 w-4" />
-              ) : (
-                <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
       {/* Main Content */}
@@ -444,6 +510,8 @@ export default function SessionActivityTab({
               sessionTag={sessionTag}
               productTag={productTag}
               productName={productName}
+              dashboardData={dashboardData}
+              isLoading={dashboardLoading}
             />
           ) : (
             /* Users List View */
@@ -453,7 +521,14 @@ export default function SessionActivityTab({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-grey-600">
-                      Showing <span className="font-medium text-grey">{filteredUsers.length}</span> users
+                      {isLoading ? (
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading...
+                        </span>
+                      ) : (
+                        <>Showing <span className="font-medium text-grey">{filteredUsers.length}</span> users</>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -510,7 +585,6 @@ export default function SessionActivityTab({
                             'grid grid-cols-[1fr,120px,140px,140px,100px,100px,40px] gap-4 px-6 py-4 items-center cursor-pointer transition-colors',
                             'hover:bg-background-secondary',
                             user.status === 'active' && 'bg-green/5',
-                            user.status === 'expired' && 'bg-red/5',
                           )}
                           onClick={() => handleOpenUser(user)}
                         >

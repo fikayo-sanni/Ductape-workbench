@@ -31,6 +31,7 @@ import AgentExplorerTab from './tabs/AgentExplorerTab';
 import AgentRunTab from './tabs/AgentRunTab';
 import CacheTabContent from './tabs/CacheTabContent';
 import WebhookTabContent from './tabs/WebhookTabContent';
+import WebhookExplorerTab from './tabs/WebhookExplorerTab';
 import NewWebhookTabContent from './tabs/NewWebhookTabContent';
 import HealthcheckTabContent from './tabs/HealthcheckTabContent';
 import NewHealthcheckTabContent from './tabs/NewHealthcheckTabContent';
@@ -368,6 +369,9 @@ export default function TabContent() {
         }
         return <WebhookTabContent key={activeTab.id} webhook={activeTab.data} />;
 
+      case 'webhook-explorer':
+        return <WebhookExplorerTab key={activeTab.id} tabId={activeTab.id} webhook={activeTab.data} />;
+
       case 'healthcheck':
         // Check if this is a new healthcheck creation tab
         if (activeTab.isDirty && activeTab.data?.isNew) {
@@ -455,7 +459,7 @@ export default function TabContent() {
         return <SessionTabContent key={activeTab.id} session={activeTab.data} />;
 
       case 'session-activity':
-        return <SessionActivityTab key={activeTab.id} {...activeTab.data} />;
+        return <SessionActivityTab key={activeTab.id} tabId={activeTab.id} {...activeTab.data} />;
 
       case 'session-dashboard':
         return <SessionDashboard key={activeTab.id} {...activeTab.data} />;

@@ -372,6 +372,11 @@ export class AutomationService {
         canFillForms: true,
         canTriggerActions: false,
       },
+      'webhook-explorer': {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
       auth: {
         canInspectForms: true,
         canFillForms: true,
@@ -845,6 +850,7 @@ export class AutomationService {
       quota: 'Quota',
       job: 'Job',
       webhook: 'Webhook',
+      'webhook-explorer': 'Webhook Explorer',
       auth: 'Auth',
       logs: 'Logs',
       dashboard: 'Dashboard',

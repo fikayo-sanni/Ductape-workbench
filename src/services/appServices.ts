@@ -91,9 +91,10 @@ const updateApp = async <T extends Record<string, any>>(data: {
   user_id: string;
   public_key: string;
   payload: T;
+  component?: string;
 }): Promise<AppResponse> => {
-  const { app_id, user_id, public_key, payload } = data;
-  const response = await apiClient.put<AppResponse>(`/apps/v1/${app_id}`, payload, {
+  const { app_id, user_id, public_key, component, payload } = data;
+  const response = await apiClient.put<AppResponse>(`/apps/v1/${app_id}`, {...payload, component }, {
     params: { user_id, public_key },
   });
   return response.data;

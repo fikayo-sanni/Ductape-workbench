@@ -63,13 +63,6 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
       data: app,
     });
 
-    // Open a new request tab for this app
-    openTab({
-      id: `request-${Date.now()}`,
-      type: 'request',
-      title: 'New Request',
-    });
-
     setShowInternalAppModal(false);
   };
 
@@ -109,22 +102,26 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Plus className="h-5 w-5 text-primary" />
+      <DialogContent className="max-w-md max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Plus className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className='text-grey'>Add App to Product</DialogTitle>
+                <DialogDescription>
+                  Choose how you'd like to add an app to this product
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className='text-grey'>Add App to Product</DialogTitle>
-              <DialogDescription>
-                Choose how you'd like to add an app to this product
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        </div>
 
-        <div className="py-6 space-y-3">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
           {options.map((option) => {
             const Icon = option.icon;
             return (
@@ -146,7 +143,8 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
           })}
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-grey-200">
+        {/* Footer - Fixed */}
+        <div className="flex justify-end px-6 py-4 border-t border-grey-400 bg-grey-50">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

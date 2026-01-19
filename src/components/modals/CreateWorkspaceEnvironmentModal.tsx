@@ -39,6 +39,7 @@ export default function CreateWorkspaceEnvironmentModal({
     description: '',
   });
   const [isDescriptionManuallyEdited, setIsDescriptionManuallyEdited] = useState(false);
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   useEffect(() => {
     if (editingEnv) {
@@ -48,6 +49,7 @@ export default function CreateWorkspaceEnvironmentModal({
         description: editingEnv.description || '',
       });
       setIsDescriptionManuallyEdited(true); // Don't auto-generate when editing
+      setIsSlugManuallyEdited(true); // Don't auto-generate slug when editing
     } else {
       setFormData({
         env_name: '',
@@ -55,8 +57,29 @@ export default function CreateWorkspaceEnvironmentModal({
         description: '',
       });
       setIsDescriptionManuallyEdited(false); // Allow auto-generation for new environments
+      setIsSlugManuallyEdited(false); // Allow auto-generation for new environments
     }
   }, [editingEnv, open]);
+
+  const generateSlug = (name: string): string => {
+    const lowerName = name.toLowerCase().trim();
+
+    // Common environment name patterns and their standard slugs
+    if (lowerName.includes('prod') || lowerName === 'live') return 'prd';
+    if (lowerName.includes('stag') || lowerName === 'stg') return 'stg';
+    if (lowerName.includes('dev') || lowerName === 'development') return 'dev';
+    if (lowerName.includes('test') || lowerName === 'qa') return 'tst';
+    if (lowerName.includes('sandbox') || lowerName === 'sbx') return 'sbx';
+    if (lowerName.includes('demo')) return 'dmo';
+    if (lowerName.includes('local')) return 'lcl';
+    if (lowerName.includes('uat')) return 'uat';
+    if (lowerName.includes('preview')) return 'prv';
+    if (lowerName.includes('integration') || lowerName === 'int') return 'int';
+
+    // Default: take first 3 letters
+    const sanitized = lowerName.replace(/[^a-z]/g, '').slice(0, 3).padEnd(3, 'x');
+    return sanitized;
+  };
 
   const generateDescription = (name: string): string => {
     const lowerName = name.toLowerCase().trim();
@@ -106,9 +129,15 @@ export default function CreateWorkspaceEnvironmentModal({
       ? generateDescription(value)
       : formData.description;
 
+    // Only auto-generate slug if user hasn't manually edited it
+    const newSlug = !isSlugManuallyEdited
+      ? generateSlug(value)
+      : formData.slug;
+
     setFormData({
       ...formData,
       env_name: value,
+      slug: newSlug,
       description: newDescription,
     });
   };
@@ -119,6 +148,8 @@ export default function CreateWorkspaceEnvironmentModal({
   };
 
   const handleSlugChange = (value: string) => {
+    // Mark as manually edited when user types
+    setIsSlugManuallyEdited(true);
     // Restrict to 3 characters exactly
     const sanitized = value.toLowerCase().slice(0, 3).replace(/[^a-z]/g, '');
     setFormData({ ...formData, slug: sanitized });
@@ -223,22 +254,27 @@ export default function CreateWorkspaceEnvironmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Settings2 className="h-5 w-5 text-primary" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Settings2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className='text-grey'>{editingEnv ? 'Edit Environment' : 'Create Environment'}</DialogTitle>
+                <DialogDescription>
+                  {editingEnv ? 'Update workspace environment' : 'Add a new workspace environment'}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className='text-grey'>{editingEnv ? 'Edit Environment' : 'Create Environment'}</DialogTitle>
-              <DialogDescription>
-                {editingEnv ? 'Update workspace environment' : 'Add a new workspace environment'}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div>
             <Label htmlFor="env_name" className="required">
               Environment Name
@@ -299,8 +335,10 @@ export default function CreateWorkspaceEnvironmentModal({
               className="mt-2"
             />
           </div>
+          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
+          {/* Footer - Fixed */}
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-grey-400 bg-grey-50">
             <Button
               type="button"
               variant="outline"

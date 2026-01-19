@@ -37,6 +37,7 @@ export type TabType =
   | 'jobs-explorer'
   | 'new-healthcheck'
   | 'webhook'
+  | 'webhook-explorer'
   | 'auth'
   | 'logs'
   | 'dashboard'

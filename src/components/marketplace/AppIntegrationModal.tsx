@@ -17,8 +17,6 @@ import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import StepOne from './StepOne';
 import StepTwo from './StepTwo';
-import StepThree from './StepThree';
-import StepFour from './StepFour';
 
 interface MarketplaceApp {
   _id: string;
@@ -57,33 +55,19 @@ export default function AppIntegrationModal({
   const [appDetails, setAppDetails] = useState<any>(null);
 
   const handleStepComplete = () => {
-    // Skip step 3 if app has no variables
-    const latestVersion = appDetails?.versions?.find((v: any) => v.latest);
-    const hasVariables = latestVersion?.variables && latestVersion.variables.length > 0;
-
-    if (integrationStep === 2 && !hasVariables) {
-      // Skip step 3 (variables) and go directly to step 4 (auth)
-      setIntegrationStep(4);
-    } else if (integrationStep < 4) {
+    if (integrationStep < 2) {
       setIntegrationStep(integrationStep + 1);
     }
   };
 
   const handleStepBack = () => {
-    // Skip step 3 backwards if app has no variables
-    const latestVersion = appDetails?.versions?.find((v: any) => v.latest);
-    const hasVariables = latestVersion?.variables && latestVersion.variables.length > 0;
-
-    if (integrationStep === 4 && !hasVariables) {
-      // Skip step 3 (variables) and go back to step 2 (environments)
-      setIntegrationStep(2);
-    } else if (integrationStep > 1) {
+    if (integrationStep > 1) {
       setIntegrationStep(integrationStep - 1);
     }
   };
 
   const handleFinish = async () => {
-    setIntegrationStep(5); // success step
+    setIntegrationStep(3); // success step
 
     // Invalidate product queries to refresh data
     await queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -175,29 +159,13 @@ export default function AppIntegrationModal({
 
           {integrationStep === 2 && appDetails && (
             <StepTwo
-              goToNextStep={handleStepComplete}
-              goToPreviousStep={handleStepBack}
-              app={appDetails}
-            />
-          )}
-
-          {integrationStep === 3 && appDetails && (
-            <StepThree
-              goToNextStep={handleStepComplete}
-              goToPreviousStep={handleStepBack}
-              app={appDetails}
-            />
-          )}
-
-          {integrationStep === 4 && appDetails && (
-            <StepFour
               goToPreviousStep={handleStepBack}
               handleFinish={handleFinish}
               app={appDetails}
             />
           )}
 
-          {integrationStep === 5 && (
+          {integrationStep === 3 && (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto rounded-full bg-green/10 flex items-center justify-center mb-4">
                 <CheckCircle className="h-8 w-8 text-green" />

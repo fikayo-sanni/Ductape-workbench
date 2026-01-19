@@ -44,15 +44,17 @@ export default function InternalAppSelectionModal({
         user_id: user?._id || '',
         public_key: user?.public_key || '',
         workspace_id: currentWorkspaceId || '',
-        status: 'active',
+        status: 'all',
       }),
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId,
   });
 
   const apps = appsData?.data || [];
   const filteredApps = apps.filter((app: any) =>
-    app.app_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.tag?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Exclude draft apps
+    app.status !== 'draft' &&
+    (app.app_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.tag?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleAppSelect = (app: any) => {
@@ -92,22 +94,26 @@ export default function InternalAppSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Grid3x3 className="h-5 w-5 text-primary" />
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Grid3x3 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className='text-grey'>Select Internal App</DialogTitle>
+                <DialogDescription>
+                  Choose an existing app from your workspace or create a new one
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className='text-grey'>Select Internal App</DialogTitle>
-              <DialogDescription>
-                Choose an existing app from your workspace or create a new one
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        </div>
 
-        <div className="py-6 space-y-6">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* Create New App Button */}
           <Button
             onClick={handleCreateNewApp}
@@ -146,7 +152,7 @@ export default function InternalAppSelectionModal({
                 <div
                   key={app._id}
                   onClick={() => handleAppSelect(app)}
-                  className="p-4 rounded-lg border border-grey-200 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                  className="p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

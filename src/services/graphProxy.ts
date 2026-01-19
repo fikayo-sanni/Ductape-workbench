@@ -22,6 +22,16 @@ export interface GraphProxyConfig {
 }
 
 /**
+ * Graph context for auto-reconnection
+ * Passed with every request so the backend can ensure the correct graph is connected
+ */
+export interface GraphContext {
+  graph: string;
+  env: string;
+  product: string;
+}
+
+/**
  * Response from the graph proxy endpoint
  */
 interface GraphProxyResponse<T = any> {
@@ -41,9 +51,25 @@ interface GraphProxyResponse<T = any> {
  */
 export class GraphProxyService {
   private config: GraphProxyConfig;
+  private graphContext: GraphContext | null = null;
 
   constructor(config: GraphProxyConfig) {
     this.config = config;
+  }
+
+  /**
+   * Set the graph context for auto-reconnection
+   * Called after a successful connect() or can be set directly
+   */
+  setGraphContext(context: GraphContext): void {
+    this.graphContext = context;
+  }
+
+  /**
+   * Get the current graph context
+   */
+  getGraphContext(): GraphContext | null {
+    return this.graphContext;
   }
 
   /**
@@ -51,22 +77,36 @@ export class GraphProxyService {
    * Encrypts the sensitive payload before transmission
    */
   private async execute<T = any>(method: string, ...params: any[]): Promise<T> {
-    // Encrypt sensitive data (method, params, user_id) using public_key
-    const sensitiveData = {
+    // Build sensitive data - only include graph_context if it's set
+    const sensitiveData: any = {
       method,
       params,
       user_id: this.config.user_id,
     };
+
+    // Only include graph_context if it exists (avoid sending null)
+    if (this.graphContext) {
+      sensitiveData.graph_context = this.graphContext;
+    }
+
     const encryptedPayload = encryptProxyPayload(sensitiveData, this.config.public_key);
+
+    // Build request body - only include graph_context if it's set
+    const requestBody: any = {
+      encrypted_payload: encryptedPayload,
+      workspace_id: this.config.workspace_id,
+      user_id: this.config.user_id,
+      public_key: this.config.public_key,
+    };
+
+    // Only include graph_context if it exists (avoid sending null)
+    if (this.graphContext) {
+      requestBody.graph_context = this.graphContext;
+    }
 
     const response = await apiClient.post<GraphProxyResponse<T>>(
       '/proxy/v1/graph-proxy/execute',
-      {
-        encrypted_payload: encryptedPayload,
-        workspace_id: this.config.workspace_id,
-        user_id: this.config.user_id,
-        public_key: this.config.public_key,
-      },
+      requestBody,
       {
         headers: {
           'x-access-token': this.config.token,
@@ -87,7 +127,15 @@ export class GraphProxyService {
    */
   graph = {
     // ==================== CONNECTION MANAGEMENT ====================
-    connect: <T = any>(config: any) => this.execute<T>('connect', config),
+    connect: async <T = any>(config: { graph: string; env: string; product: string; [key: string]: any }) => {
+      // Store the context for auto-reconnection in subsequent requests
+      this.setGraphContext({
+        graph: config.graph,
+        env: config.env,
+        product: config.product,
+      });
+      return this.execute<T>('connect', config);
+    },
     testConnection: <T = any>(config: any) => this.execute<T>('testConnection', config),
     disconnect: () => this.execute('disconnect'),
     disconnectAll: () => this.execute('disconnectAll'),

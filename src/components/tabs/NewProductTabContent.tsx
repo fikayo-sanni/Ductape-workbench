@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,10 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Save, Upload } from 'lucide-react';
+import { Package, Save, Upload, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
+import productServices from '@/services/productServices';
+import workspaceServices from '@/services/workspaceServices';
 
 interface NewProductTabContentProps {
   tabId: string;
@@ -23,7 +26,32 @@ interface NewProductTabContentProps {
 
 export default function NewProductTabContent({ tabId }: NewProductTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
-  const { currentWorkspaceId } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState<string>('workspace');
+
+  // Fetch workspace details to get workspace name
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces', user?._id],
+    queryFn: () => workspaceServices.fetchWorkspaces({
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+    }),
+    enabled: !!user?._id,
+  });
+
+  // Update workspace name when data is available
+  useEffect(() => {
+    if (workspacesData?.data && currentWorkspaceId) {
+      const currentWorkspace = workspacesData.data.find(
+        (ws: any) => ws.workspace_id === currentWorkspaceId || ws._id === currentWorkspaceId
+      );
+      if (currentWorkspace) {
+        setWorkspaceName(currentWorkspace.workspace_name || 'workspace');
+      }
+    }
+  }, [workspacesData, currentWorkspaceId]);
 
   // Restore saved state
   const savedTabState = getInitialTabState(tabId, null as any);
@@ -66,22 +94,21 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
     }
 
     try {
-      // TODO: Implement actual API call to create product
-      // const response = await productServices.createProduct({
-      //   workspace_id: currentWorkspaceId,
-      //   user_id: user?.user_id || '',
-      //   public_key: user?.public_key || '',
-      //   ...formData,
-      // });
-
-      // For now, simulate success
-      const newProduct = {
-        _id: `product-${Date.now()}`,
-        ...formData,
+      const payload = {
         workspace_id: currentWorkspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        ...formData,
       };
+
+      const response = await productServices.createProduct({
+        workspace_id: currentWorkspaceId,
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        payload,
+      });
+
+      const newProduct = response.data;
 
       // Close the new product tab
       closeTab(tabId);
@@ -90,7 +117,7 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
       openTab({
         id: `product-${newProduct._id}-${Date.now()}`,
         type: 'product',
-        title: formData.name,
+        title: newProduct.name || formData.name,
         itemId: newProduct._id,
         data: newProduct,
       });
@@ -107,11 +134,70 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
 
   const generateTag = () => {
     if (formData.name) {
-      const tag = formData.name
+      const productName = formData.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
+      const workspaceTag = workspaceName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      const tag = `${workspaceTag}:${productName}`;
       setFormData({ ...formData, tag });
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload an image file (PNG, JPEG, GIF, WebP, or SVG)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Step 1: Get pre-signed upload URL
+      const uploadResponse = await workspaceServices.createUploadUrl({
+        file,
+        fileType: file.type,
+        visibility: 'public',
+        id: `product-logo-${Date.now()}`,
+      });
+
+      const { url, key } = uploadResponse.data;
+
+      // Step 2: Upload file to the pre-signed URL
+      await workspaceServices.uploadFileToUrl({ url, file });
+
+      // Step 3: For public files, the 'key' is already the public URL
+      // No need to call GET /upload (that's for private files only)
+      setFormData({ ...formData, logo: key });
+      toast.success('Logo uploaded successfully');
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      toast.error(error.message || 'Failed to upload logo');
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -167,7 +253,7 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
             <div className="flex gap-2 mt-2">
               <Input
                 id="tag"
-                placeholder="e.g., my-api-service"
+                placeholder="e.g., my-workspace:my-api-service"
                 value={formData.tag}
                 onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
               />
@@ -176,7 +262,7 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
               </Button>
             </div>
             <p className="text-xs text-grey-600 mt-1">
-              A unique identifier (lowercase, alphanumeric, and hyphens only)
+              Format: workspace-name:product-name (auto-generated from product name)
             </p>
           </div>
 
@@ -216,9 +302,26 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
                 value={formData.logo}
                 onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
               />
-              <Button variant="outline" size="sm" className="gap-2">
-                <Upload className="h-4 w-4" />
-                Upload
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleUploadClick}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {isUploading ? 'Uploading...' : 'Upload'}
               </Button>
             </div>
             {formData.logo && (

@@ -29,7 +29,16 @@ import {
   BarChart3,
   Link2,
   ChevronRight,
+  ChevronLeft,
+  ChevronUp,
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
   Hash,
+  Edit3,
+  MoreVertical,
+  Eye,
+  List,
 } from 'lucide-react';
 // Import SDK types for graph operations
 import type {
@@ -63,6 +72,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
@@ -70,6 +86,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeGraph } from '@/hooks/useDuctapeGraph';
 import { useAuth } from '@/store/useAuth';
+import logsServices, { GraphDashboardMetrics } from '@/services/logsServices';
 
 interface GraphExplorerTabProps {
   graph: {
@@ -88,7 +105,7 @@ interface GraphExplorerTabProps {
   };
 }
 
-type SidebarView = 'labels' | 'relationships' | 'constraints' | 'indexes' | 'actions';
+type SidebarView = 'labels' | 'relationships' | 'actions';
 
 // Graph operation types based on SDK BaseGraphAdapter
 type GraphOperation =
@@ -315,8 +332,15 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     persistedState?.selectedRelTypeName || null
   );
   const [resultsView, setResultsView] = useState<'table' | 'graph'>(persistedState?.resultsView || 'table');
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(20);
+  const [lastExecutedQuery, setLastExecutedQuery] = useState<any>(null); // Track for pagination
   const [graphZoom, setGraphZoom] = useState(1);
+  const [graphPan, setGraphPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [isQueryEditorCollapsed, setIsQueryEditorCollapsed] = useState(true);
 
   // Modal states
   const [showAddNodeModal, setShowAddNodeModal] = useState(false);
@@ -488,6 +512,55 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     staleTime: 30000,
   });
 
+  // Fetch graph statistics (node and relationship counts)
+  const { data: sdkStatistics, isLoading: isLoadingStatistics, refetch: refetchStatistics } = useQuery({
+    queryKey: ['graph-statistics', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graphService || !graph.productTag) return null;
+      try {
+        const result = await graphService.getStatistics({});
+        console.log('[Graph-Explorer] Statistics result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching statistics:', error);
+        return null;
+      }
+    },
+    enabled: !!graphService && !!graph.productTag && isConnected,
+    staleTime: 30000,
+  });
+
+  // Query for fetching graph activity metrics from logs service
+  const { data: graphActivityData, isLoading: isLoadingActivity } = useQuery<GraphDashboardMetrics | null>({
+    queryKey: ['graph-activity', graph.productTag, graph.tag, graph.env.slug],
+    queryFn: async () => {
+      if (!graph.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
+        return null;
+      }
+      try {
+        const result = await logsServices.fetchGraphDashboard(
+          currentWorkspaceId,
+          user._id,
+          user.public_key,
+          {
+            product_tag: graph.productTag,
+            graph_tag: graph.tag,
+            env: graph.env.slug,
+          }
+        );
+        return result;
+      } catch (error) {
+        console.error('Error fetching graph activity data:', error);
+        return null;
+      }
+    },
+    enabled: !!graph.productTag && !!currentWorkspaceId && !!user?._id,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // Sidebar collapsed state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   // Use SDK data only - no fallback to dummy data
   // SDK returns { labels: [...] }, { types: [...] }, { indexes: [...] }, { constraints: [...] }, { actions: [...] }
   const labels: IGraphLabel[] = sdkLabels?.labels || [];
@@ -524,6 +597,40 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const setSelectedAction = useCallback((action: IGraphAction | null) => {
     setSelectedActionTag(action?.tag || null);
   }, []);
+
+  // Memoized table data processing (server-side pagination - data already paginated)
+  const tableData = useMemo(() => {
+    const rawData = queryResult?.data || [];
+
+    // Robust detection functions (same as in table rendering)
+    const isRelationship = (item: any) => {
+      const hasType = typeof item.type === 'string' && item.type.length > 0;
+      const hasStartEnd = (item.startNode && item.endNode) ||
+                         (item.start && item.end) ||
+                         (item.source && item.target) ||
+                         (item.startNodeId && item.endNodeId) ||
+                         (item.from && item.to);
+      const looksLikeRelationship = hasType && !Array.isArray(item.labels);
+      return hasType && (hasStartEnd || looksLikeRelationship);
+    };
+
+    const isNode = (item: any) => {
+      if (isRelationship(item)) return false;
+      return Array.isArray(item.labels) && item.labels.length > 0;
+    };
+
+    const allRelationships = rawData.filter(isRelationship);
+    const allNodes = rawData.filter(isNode);
+
+    // Calculate start index based on current page (for row numbering)
+    const startIndex = (tablePage - 1) * tablePageSize;
+
+    return {
+      allRelationships,
+      allNodes,
+      startIndex,
+    };
+  }, [queryResult?.data, tablePage, tablePageSize]);
 
   // ==================== MUTATIONS ====================
 
@@ -735,6 +842,8 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
   // CodeSidebar state
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [showGraphCodeSidebar, setShowGraphCodeSidebar] = useState(false);
+  const [selectedGraphOperation, setSelectedGraphOperation] = useState<string>('findNodes');
 
   // Save action form state
   const [actionName, setActionName] = useState('');
@@ -749,6 +858,51 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
 
   // Execute action form state (parameter values)
   const [actionParamValues, setActionParamValues] = useState<Record<string, any>>({});
+
+  // Compute smart row count - separates relationships from nodes in mixed data
+  const smartRowCount = useMemo(() => {
+    if (!queryResult?.data) return { count: 0, type: 'empty' as const };
+
+    const rawData = queryResult.data;
+
+    // Robust detection functions (same as table rendering)
+    // Relationship: has type (string) AND (startNode/endNode OR start/end OR source/target OR from/to)
+    // Different drivers/databases use different naming conventions
+    const isRelationship = (item: any) => {
+      const hasType = typeof item.type === 'string' && item.type.length > 0;
+      const hasStartEnd = (item.startNode && item.endNode) ||
+                         (item.start && item.end) ||
+                         (item.source && item.target) ||
+                         (item.startNodeId && item.endNodeId) ||
+                         (item.from && item.to);
+      // Also check if it explicitly has relationship-like structure (has type but no labels)
+      const looksLikeRelationship = hasType && !Array.isArray(item.labels);
+      return hasType && (hasStartEnd || looksLikeRelationship);
+    };
+    // Node: has labels (array) - if it also matches relationship criteria, it's a relationship
+    const isNode = (item: any) => {
+      if (isRelationship(item)) return false;
+      return Array.isArray(item.labels) && item.labels.length > 0;
+    };
+
+    const relationships = rawData.filter(isRelationship);
+    const nodes = rawData.filter(isNode);
+
+    // Priority: If we have relationships, count them (nodes are just for enrichment)
+    if (relationships.length > 0) {
+      return {
+        count: relationships.length,
+        type: 'relationships' as const,
+        nodesIncluded: nodes.length > 0 ? nodes.length : undefined,
+      };
+    }
+    // If only nodes
+    if (nodes.length > 0) {
+      return { count: nodes.length, type: 'nodes' as const };
+    }
+    // Fallback to original count
+    return { count: queryResult.count || rawData.length, type: 'raw' as const };
+  }, [queryResult]);
 
   // Extract all parameterizable values from an object
   const extractParameterizableValues = useCallback((obj: any, path = ''): Array<{
@@ -905,6 +1059,243 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   input: ${inputString}
 });`,
         },
+        {
+          title: 'Initialize Ductape (collapsible)',
+          code: `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspaceId: 'your-workspace-id',
+  publicKey: 'your-public-key',
+  secretKey: 'your-secret-key',
+});
+
+await ductape.init();`,
+        },
+      ];
+    }
+
+    return [];
+  };
+
+  // Generate code sections for Graph CodeSidebar (main view - graph operations)
+  const generateGraphCodeSections = (language: string, env?: string) => {
+    const envSlug = env || graph.env.slug;
+    const productTag = graph.tag.split(':')[0] || 'your-product';
+    const labelName = selectedLabel?.name || 'Person';
+    const relTypeName = selectedRelType?.type || 'KNOWS';
+
+    // Generate sample properties based on selected label
+    const sampleProperties = selectedLabel?.properties?.length
+      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(',\n      ')
+      : "name: 'value'";
+
+    if (language === 'typescript' || language === 'javascript') {
+      const operations: Record<string, { title: string; code: string }[]> = {
+        findNodes: [
+          {
+            title: 'Find Nodes',
+            code: `const nodes = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'findNodes',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${sampleProperties} },
+    limit: 100,
+  },
+});`,
+          },
+        ],
+        findNodeById: [
+          {
+            title: 'Find Node by ID',
+            code: `const node = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'findNodeById',
+  options: {
+    id: 'node-id',
+  },
+});`,
+          },
+        ],
+        createNode: [
+          {
+            title: 'Create Node',
+            code: `const node = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'createNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: {
+      ${sampleProperties},
+      createdAt: new Date().toISOString(),
+    },
+  },
+});`,
+          },
+        ],
+        updateNode: [
+          {
+            title: 'Update Node',
+            code: `const node = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'updateNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${sampleProperties} },
+    updates: { ${sampleProperties} },
+  },
+});`,
+          },
+        ],
+        deleteNode: [
+          {
+            title: 'Delete Node',
+            code: `await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'deleteNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${sampleProperties} },
+    detach: true, // Also delete connected relationships
+  },
+});`,
+          },
+        ],
+        countNodes: [
+          {
+            title: 'Count Nodes',
+            code: `const count = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'countNodes',
+  options: {
+    labels: ['${labelName}'],
+    // Optional: filter by properties
+    // properties: { ${sampleProperties} },
+  },
+});`,
+          },
+        ],
+        findRelationships: [
+          {
+            title: 'Find Relationships',
+            code: `const relationships = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'findRelationships',
+  options: {
+    type: '${relTypeName}',
+    direction: 'outgoing',
+    includeNodes: true,
+    // Optional: filter by source/target nodes
+    // fromNode: { labels: ['${labelName}'] },
+    // toNode: { labels: ['${labelName}'] },
+  },
+});`,
+          },
+        ],
+        createRelationship: [
+          {
+            title: 'Create Relationship',
+            code: `const relationship = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'createRelationship',
+  options: {
+    type: '${relTypeName}',
+    fromNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    toNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    properties: { since: new Date().toISOString() },
+  },
+});`,
+          },
+        ],
+        countRelationships: [
+          {
+            title: 'Count Relationships',
+            code: `const count = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'countRelationships',
+  options: {
+    type: '${relTypeName}',
+    direction: 'outgoing',
+    // Optional: filter by source/target nodes
+    // fromNode: { labels: ['${labelName}'] },
+  },
+});`,
+          },
+        ],
+        traverse: [
+          {
+            title: 'Traverse Graph',
+            code: `const result = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'traverse',
+  options: {
+    startNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    direction: 'outgoing',
+    maxDepth: 3,
+    // Optional: filter by relationship type
+    // relationshipTypes: ['${relTypeName}'],
+  },
+});`,
+          },
+        ],
+        shortestPath: [
+          {
+            title: 'Find Shortest Path',
+            code: `const path = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'shortestPath',
+  options: {
+    startNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    endNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    maxDepth: 10,
+    // Optional: filter by relationship type
+    // relationshipTypes: ['${relTypeName}'],
+  },
+});`,
+          },
+        ],
+        rawCypher: [
+          {
+            title: 'Raw Cypher Query',
+            code: `const result = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graph.tag}',
+  operation: 'rawQuery',
+  options: {
+    cypher: 'MATCH (n:${labelName})-[r:${relTypeName}]->(m) RETURN n, r, m LIMIT 10',
+  },
+});`,
+          },
+        ],
+      };
+
+      const selectedOps = operations[selectedGraphOperation] || operations.findNodes;
+
+      return [
+        ...selectedOps,
         {
           title: 'Initialize Ductape (collapsible)',
           code: `import Ductape from '@ductape/sdk';
@@ -1245,7 +1636,7 @@ await ductape.init();`,
     }
   };
 
-  const handleExecuteQuery = async () => {
+  const handleExecuteQuery = async (paginationOverride?: { page: number; pageSize: number }) => {
     if (!queryInput.trim()) {
       toast.error('Please enter a query');
       return;
@@ -1259,9 +1650,28 @@ await ductape.init();`,
       return;
     }
 
+    // Apply pagination to the query options
+    const page = paginationOverride?.page ?? 1;
+    const pageSize = paginationOverride?.pageSize ?? tablePageSize;
+
+    // Add limit and skip to the query options for server-side pagination
+    if (parsedQuery.options) {
+      parsedQuery.options.limit = pageSize;
+      parsedQuery.options.skip = (page - 1) * pageSize;
+    } else if (parsedQuery.operation) {
+      parsedQuery.options = {
+        ...parsedQuery.options,
+        limit: pageSize,
+        skip: (page - 1) * pageSize,
+      };
+    }
+
     setIsExecuting(true);
     setQueryError(null);
-    setQueryResult(null);
+    if (!paginationOverride) {
+      setQueryResult(null);
+      setTablePage(1); // Reset pagination on new query
+    }
 
     const startTime = Date.now();
 
@@ -1269,6 +1679,10 @@ await ductape.init();`,
       if (!graphService) {
         throw new Error('Graph service not available. Please check your connection.');
       }
+
+      // Save the base query (without pagination) for future pagination requests
+      const baseQuery = JSON.parse(queryInput);
+      setLastExecutedQuery(baseQuery);
 
       // Execute through the graph service proxy
       const result = await graphService.query(parsedQuery);
@@ -1279,6 +1693,7 @@ await ductape.init();`,
         executionTime,
         ...result,
       });
+      setIsQueryEditorCollapsed(true); // Hide query editor once results show
       toast.success(`Query executed in ${executionTime}ms`);
     } catch (error: any) {
       setQueryError(error.message || 'Failed to execute query');
@@ -1286,6 +1701,131 @@ await ductape.init();`,
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  // Execute paginated query
+  const handlePageChange = async (newPage: number) => {
+    if (!lastExecutedQuery || isExecuting) return;
+
+    setTablePage(newPage);
+
+    // Build paginated query from last executed query
+    const paginatedQuery = JSON.parse(JSON.stringify(lastExecutedQuery));
+    if (paginatedQuery.options) {
+      paginatedQuery.options.limit = tablePageSize;
+      paginatedQuery.options.skip = (newPage - 1) * tablePageSize;
+    } else {
+      paginatedQuery.options = {
+        limit: tablePageSize,
+        skip: (newPage - 1) * tablePageSize,
+      };
+    }
+
+    setIsExecuting(true);
+    const startTime = Date.now();
+
+    try {
+      if (!graphService) {
+        throw new Error('Graph service not available.');
+      }
+
+      const result = await graphService.query(paginatedQuery);
+      const executionTime = Date.now() - startTime;
+
+      setQueryResult({
+        success: true,
+        executionTime,
+        ...result,
+      });
+    } catch (error: any) {
+      setQueryError(error.message || 'Failed to fetch page');
+      toast.error('Failed to fetch page');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Handle page size change
+  const handlePageSizeChange = async (newPageSize: number) => {
+    setTablePageSize(newPageSize);
+    setTablePage(1);
+
+    if (lastExecutedQuery) {
+      const paginatedQuery = JSON.parse(JSON.stringify(lastExecutedQuery));
+      if (paginatedQuery.options) {
+        paginatedQuery.options.limit = newPageSize;
+        paginatedQuery.options.skip = 0;
+      } else {
+        paginatedQuery.options = {
+          limit: newPageSize,
+          skip: 0,
+        };
+      }
+
+      setIsExecuting(true);
+      const startTime = Date.now();
+
+      try {
+        if (!graphService) {
+          throw new Error('Graph service not available.');
+        }
+
+        const result = await graphService.query(paginatedQuery);
+        const executionTime = Date.now() - startTime;
+
+        setQueryResult({
+          success: true,
+          executionTime,
+          ...result,
+        });
+      } catch (error: any) {
+        setQueryError(error.message || 'Failed to change page size');
+      } finally {
+        setIsExecuting(false);
+      }
+    }
+  };
+
+  // Graph pan handlers with heavily reduced sensitivity
+  const handlePanStart = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    setIsPanning(true);
+    setPanStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePanMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    // Calculate movement delta
+    const deltaX = e.clientX - panStart.x;
+    const deltaY = e.clientY - panStart.y;
+    // Require minimum movement threshold before panning (reduces jitter)
+    const threshold = 3;
+    if (Math.abs(deltaX) < threshold && Math.abs(deltaY) < threshold) return;
+    // Apply heavy damping factor of 0.25 for much slower panning
+    setGraphPan(prev => ({
+      x: prev.x + deltaX * 0.25,
+      y: prev.y + deltaY * 0.25,
+    }));
+    // Update pan start for next move event
+    setPanStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    // Very reduced sensitivity for zoom
+    // Cap the effect and apply heavy damping to prevent sudden jumps
+    const normalizedDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50) / 100;
+    const delta = normalizedDelta * -0.02; // Very gentle: 0.01 max per tick
+    setGraphZoom(prev => Math.min(3, Math.max(0.25, prev + delta)));
+  };
+
+  const resetGraphView = () => {
+    setGraphZoom(1);
+    setGraphPan({ x: 0, y: 0 });
   };
 
   const handleSidebarRefresh = async () => {
@@ -1306,11 +1846,66 @@ await ductape.init();`,
     }
   };
 
+  // Helper to set query and auto-execute it
+  const setQueryAndExecute = useCallback(async (queryJson: string) => {
+    setQueryInput(queryJson);
+    // Show the query editor/results view
+    setShowQueryEditor(true);
+
+    // Check if graph is connected before executing
+    if (!isConnected) {
+      // Just set the query, don't execute yet - let user manually execute after connection
+      return;
+    }
+
+    // Parse and execute the query directly
+    let parsedQuery: any;
+    try {
+      parsedQuery = JSON.parse(queryJson);
+    } catch {
+      toast.error('Invalid JSON query format');
+      return;
+    }
+
+    setIsExecuting(true);
+    setQueryError(null);
+    setQueryResult(null);
+    setTablePage(1); // Reset pagination on new query
+
+    const startTime = Date.now();
+
+    try {
+      if (!graphService) {
+        throw new Error('Graph service not available. Please check your connection.');
+      }
+
+      const result = await graphService.query(parsedQuery);
+      const executionTime = Date.now() - startTime;
+
+      setQueryResult({
+        success: true,
+        executionTime,
+        ...result,
+      });
+      setIsQueryEditorCollapsed(true);
+      toast.success(`Query executed in ${executionTime}ms`);
+    } catch (error: any) {
+      setQueryError(error.message || 'Failed to execute query');
+      toast.error('Failed to execute query');
+    } finally {
+      setIsExecuting(false);
+    }
+  }, [graphService, isConnected]);
+
   const handleViewChange = (view: SidebarView) => {
     setSidebarView(view);
     setSearchQuery('');
+    // Clear selections when switching tabs to show Overview
     setSelectedLabel(null);
     setSelectedRelType(null);
+    // Close query editor to show Overview when switching sidebar tabs
+    setShowQueryEditor(false);
+    setQueryResult(null);
   };
 
   const filteredLabels = labels.filter(l =>
@@ -1318,7 +1913,7 @@ await ductape.init();`,
   );
 
   const filteredRelationships = relationshipTypes.filter(r =>
-    r.type.toLowerCase().includes(searchQuery.toLowerCase())
+    r.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredConstraints = constraints.filter(c =>
@@ -1401,38 +1996,196 @@ await ductape.init();`,
     if (!queryResult?.data) return { nodes: [], edges: [] };
 
     const nodesMap = new Map<string, any>();
+    // nodeIdAliases maps alternative IDs to canonical node IDs
+    // This handles cases like ArangoDB where relationship uses "collection/key" but node has "key"
+    const nodeIdAliases = new Map<string, string>();
     const edges: any[] = [];
 
-    queryResult.data.forEach((row: any) => {
-      Object.values(row).forEach((value: any) => {
-        if (value?.labels && value?.id) {
-          // It's a node
-          if (!nodesMap.has(value.id)) {
-            nodesMap.set(value.id, {
-              id: value.id,
-              labels: value.labels,
-              properties: value.properties,
-              label: value.labels[0] || 'Node',
-              displayName: value.properties?.name || value.properties?.title || value.id,
+    // Helper to extract key portion from ArangoDB-style IDs (e.g., "Users/123" -> "123")
+    const extractShortId = (fullId: string): string | null => {
+      if (fullId && fullId.includes('/')) {
+        return fullId.split('/').pop() || null;
+      }
+      return null;
+    };
+
+    // Helper to process a potential node or relationship
+    const processItem = (item: any) => {
+      if (!item || typeof item !== 'object') return;
+
+      // Check if it's a node (has labels array and id)
+      if (item.labels && Array.isArray(item.labels) && (item.id || item.elementId)) {
+        const nodeId = item.id || item.elementId;
+        const elementId = item.elementId || item.id;
+
+        if (!nodesMap.has(nodeId)) {
+          nodesMap.set(nodeId, {
+            id: nodeId,
+            elementId: elementId,
+            labels: item.labels,
+            properties: item.properties || {},
+            label: item.labels[0] || 'Node',
+            displayName: item.properties?.name || item.properties?.title || nodeId,
+          });
+
+          // Create aliases for different ID formats
+          // This handles ArangoDB where relationships use "collection/key" format
+          // but nodes might have just "key" as their id
+          if (elementId && elementId !== nodeId) {
+            nodeIdAliases.set(elementId, nodeId);
+          }
+
+          // For ArangoDB: if node has a label and short ID, create alias for "label/id"
+          const shortId = extractShortId(nodeId);
+          if (shortId) {
+            nodeIdAliases.set(shortId, nodeId);
+          }
+          const shortElementId = extractShortId(elementId);
+          if (shortElementId && shortElementId !== shortId) {
+            nodeIdAliases.set(shortElementId, nodeId);
+          }
+
+          // Also create aliases for full format if we have labels
+          // e.g., if node has id="123" and label="Users", create alias "Users/123"
+          if (item.labels.length > 0 && !nodeId.includes('/')) {
+            item.labels.forEach((label: string) => {
+              nodeIdAliases.set(`${label}/${nodeId}`, nodeId);
             });
           }
-        } else if (value?.type && value?.startNode && value?.endNode) {
-          // It's a relationship
+        }
+      }
+      // Check if it's a relationship (has type and start/end node references)
+      // Handle multiple naming conventions: startNode/endNode, start/end, source/target, from/to, startNodeId/endNodeId
+      else if (item.type && typeof item.type === 'string') {
+        const startNode = item.startNodeId || item.startNode || item.startNodeElementId || item.start || item.source || item.from;
+        const endNode = item.endNodeId || item.endNode || item.endNodeElementId || item.end || item.target || item.to;
+
+        // Only add as edge if we have both start and end references
+        // OR if it looks like a relationship (has type but no labels - meaning it's not a node)
+        if (startNode && endNode) {
           edges.push({
-            id: value.id || `${value.startNode}-${value.type}-${value.endNode}`,
-            source: value.startNode,
-            target: value.endNode,
-            type: value.type,
-            properties: value.properties,
+            id: item.id || item.elementId || `${startNode}-${item.type}-${endNode}`,
+            source: startNode,
+            target: endNode,
+            type: item.type,
+            properties: item.properties || {},
+          });
+        } else if (!Array.isArray(item.labels)) {
+          // This is a relationship without resolved node references
+          // Store it anyway - the edges won't render but we track them
+          console.log('[GraphExplorer] Relationship without node refs:', item);
+        }
+      }
+    };
+
+    if (Array.isArray(queryResult.data)) {
+      queryResult.data.forEach((row: any) => {
+        // First, check if row itself is a node or relationship (flat array format)
+        processItem(row);
+
+        // Also check nested values (for queries that return {n: node, r: relationship} format)
+        if (row && typeof row === 'object' && !row.labels && !row.type) {
+          Object.values(row).forEach((value: any) => {
+            processItem(value);
           });
         }
       });
+    }
+
+    // Resolve edge source/target IDs using aliases
+    const resolvedEdges = edges.map(edge => {
+      let resolvedSource = edge.source;
+      let resolvedTarget = edge.target;
+
+      // Try to find the node by direct ID match
+      if (!nodesMap.has(resolvedSource)) {
+        // Try alias lookup
+        const aliasedSource = nodeIdAliases.get(resolvedSource);
+        if (aliasedSource) {
+          resolvedSource = aliasedSource;
+        } else {
+          // Try extracting short ID from edge source (for ArangoDB)
+          const shortSource = extractShortId(edge.source);
+          if (shortSource && nodesMap.has(shortSource)) {
+            resolvedSource = shortSource;
+          }
+        }
+      }
+
+      if (!nodesMap.has(resolvedTarget)) {
+        // Try alias lookup
+        const aliasedTarget = nodeIdAliases.get(resolvedTarget);
+        if (aliasedTarget) {
+          resolvedTarget = aliasedTarget;
+        } else {
+          // Try extracting short ID from edge target (for ArangoDB)
+          const shortTarget = extractShortId(edge.target);
+          if (shortTarget && nodesMap.has(shortTarget)) {
+            resolvedTarget = shortTarget;
+          }
+        }
+      }
+
+      return {
+        ...edge,
+        source: resolvedSource,
+        target: resolvedTarget,
+      };
     });
 
-    return {
+    // Create placeholder nodes for any missing source/target nodes referenced by edges
+    // This allows the graph to show relationships even when full node data isn't returned
+    resolvedEdges.forEach(edge => {
+      if (!nodesMap.has(edge.source) && !nodesMap.has(String(edge.source))) {
+        const nodeId = String(edge.source);
+        nodesMap.set(nodeId, {
+          id: nodeId,
+          elementId: nodeId,
+          labels: ['Unknown'],
+          properties: {},
+          label: 'Unknown',
+          displayName: `Node ${nodeId}`,
+          isPlaceholder: true,
+        });
+      }
+      if (!nodesMap.has(edge.target) && !nodesMap.has(String(edge.target))) {
+        const nodeId = String(edge.target);
+        nodesMap.set(nodeId, {
+          id: nodeId,
+          elementId: nodeId,
+          labels: ['Unknown'],
+          properties: {},
+          label: 'Unknown',
+          displayName: `Node ${nodeId}`,
+          isPlaceholder: true,
+        });
+      }
+    });
+
+    const result = {
       nodes: Array.from(nodesMap.values()),
-      edges,
+      edges: resolvedEdges,
     };
+
+    // Debug alert to show visualization data
+    if (result.nodes.length > 0 || result.edges.length > 0) {
+      const debugInfo = {
+        rawDataLength: queryResult.data?.length || 0,
+        nodesFound: result.nodes.length,
+        edgesFound: result.edges.length,
+        nodeIds: result.nodes.map(n => n.id),
+        edgeConnections: result.edges.map(e => ({
+          type: e.type,
+          source: e.source,
+          target: e.target,
+          sourceFound: result.nodes.some(n => n.id === e.source),
+          targetFound: result.nodes.some(n => n.id === e.target),
+        })),
+      };
+      console.log(`Graph Visualization Data:\n${JSON.stringify(debugInfo, null, 2)}`);
+    }
+
+    return result;
   }, [queryResult]);
 
   // Get color for node based on label
@@ -1448,21 +2201,111 @@ await ductape.init();`,
     return colors[label] || { bg: '#6B7280', border: '#4B5563', text: '#fff' };
   };
 
-  // Simple circular layout calculation
-  const calculateNodePositions = (nodes: any[], _edges: any[], width: number, height: number) => {
+  // Force-directed layout calculation
+  const calculateNodePositions = (nodes: any[], edges: any[], width: number, height: number) => {
+    if (nodes.length === 0) return [];
+
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(width, height) * 0.35;
 
-    return nodes.map((node, i) => {
-      const angle = (2 * Math.PI * i) / nodes.length;
+    // Initialize positions - spread nodes more for better initial layout
+    const positions = nodes.map((node, i) => {
+      // Start with a grid-based layout for better initial distribution
+      const cols = Math.ceil(Math.sqrt(nodes.length));
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const spacing = Math.min(width, height) / (cols + 1);
+
       return {
         ...node,
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
+        x: spacing * (col + 1) + (Math.random() - 0.5) * 20,
+        y: spacing * (row + 1) + (Math.random() - 0.5) * 20,
+        vx: 0,
+        vy: 0,
       };
     });
+
+    // Build adjacency for edge-based forces
+    const nodeIndex = new Map(nodes.map((n, i) => [n.id, i]));
+
+    // Simple force simulation (few iterations for performance)
+    const iterations = 50;
+    const repulsion = 5000;
+    const attraction = 0.05;
+    const damping = 0.9;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // Repulsion between all nodes
+      for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+          const dx = positions[j].x - positions[i].x;
+          const dy = positions[j].y - positions[i].y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = repulsion / (dist * dist);
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+
+          positions[i].vx -= fx;
+          positions[i].vy -= fy;
+          positions[j].vx += fx;
+          positions[j].vy += fy;
+        }
+      }
+
+      // Attraction along edges
+      for (const edge of edges) {
+        const sourceIdx = nodeIndex.get(edge.source);
+        const targetIdx = nodeIndex.get(edge.target);
+        if (sourceIdx === undefined || targetIdx === undefined) continue;
+
+        const dx = positions[targetIdx].x - positions[sourceIdx].x;
+        const dy = positions[targetIdx].y - positions[sourceIdx].y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const force = dist * attraction;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+
+        positions[sourceIdx].vx += fx;
+        positions[sourceIdx].vy += fy;
+        positions[targetIdx].vx -= fx;
+        positions[targetIdx].vy -= fy;
+      }
+
+      // Center gravity (keep nodes from flying away)
+      for (const pos of positions) {
+        const dx = centerX - pos.x;
+        const dy = centerY - pos.y;
+        pos.vx += dx * 0.01;
+        pos.vy += dy * 0.01;
+      }
+
+      // Apply velocities and damping
+      for (const pos of positions) {
+        pos.vx *= damping;
+        pos.vy *= damping;
+        pos.x += pos.vx;
+        pos.y += pos.vy;
+
+        // Keep within bounds with padding
+        const padding = 50;
+        pos.x = Math.max(padding, Math.min(width - padding, pos.x));
+        pos.y = Math.max(padding, Math.min(height - padding, pos.y));
+      }
+    }
+
+    return positions.map(({ vx, vy, ...rest }) => rest);
   };
+
+  // Memoize positioned nodes to avoid recalculation on every render
+  const positionedNodes = useMemo(() => {
+    // Use larger dimensions for better spread
+    return calculateNodePositions(graphData.nodes, graphData.edges, 800, 600);
+  }, [graphData.nodes, graphData.edges]);
+
+  // Pre-compute node positions map for edge rendering
+  const nodePositionsMap = useMemo(() => {
+    return new Map(positionedNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+  }, [positionedNodes]);
 
   // Show loading state while initializing the graph service
   if (!graphService) {
@@ -1632,142 +2475,157 @@ await ductape.init();`,
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
+      <div className={cn(
+        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
+        isSidebarCollapsed ? 'w-14' : 'w-64'
+      )}>
         {/* Header - Fixed */}
-        <div className="flex-shrink-0 p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', getGraphTypeColor(graph.type))}>
-              <Share2 className="h-4 w-4 text-grey" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-grey text-sm truncate">{graph.name}</h2>
-              <p className="text-xs text-grey truncate">{graph.env.slug}</p>
-            </div>
-          </div>
-
-          {/* View Tabs */}
-          <div className="space-y-1 mb-3">
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                onClick={() => handleViewChange('labels')}
-                className={cn(
-                  'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
-                  sidebarView === 'labels'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-grey hover:bg-grey-100'
-                )}
-              >
-                <Database className="h-3 w-3" />
-                Labels
-              </button>
-              <button
-                onClick={() => handleViewChange('relationships')}
-                className={cn(
-                  'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
-                  sidebarView === 'relationships'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-grey hover:bg-grey-100'
-                )}
-              >
-                <GitBranch className="h-3 w-3" />
-                Rels
-              </button>
-              <button
-                onClick={() => handleViewChange('constraints')}
-                className={cn(
-                  'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
-                  sidebarView === 'constraints'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-grey hover:bg-grey-100'
-                )}
-              >
-                <Key className="h-3 w-3" />
-                Constraints
-              </button>
-              <button
-                onClick={() => handleViewChange('indexes')}
-                className={cn(
-                  'px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
-                  sidebarView === 'indexes'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-grey hover:bg-grey-100'
-                )}
-              >
-                <Zap className="h-3 w-3" />
-                Indexes
-              </button>
-            </div>
+        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
             <button
-              onClick={() => handleViewChange('actions')}
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                }
+              }}
               className={cn(
-                'w-full px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1',
-                sidebarView === 'actions'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-grey hover:bg-grey-100'
+                'flex items-center justify-center rounded-lg flex-shrink-0',
+                getGraphTypeColor(graph.type),
+                isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
               )}
+              title={isSidebarCollapsed ? 'Expand sidebar' : graph.name}
             >
-              <Bookmark className="h-3 w-3" />
-              Actions
-              {actions.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-grey-100 rounded text-xs">
-                  {actions.length}
-                </span>
-              )}
+              <Share2 className="h-5 w-5 text-grey" />
             </button>
+            {!isSidebarCollapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-grey text-sm truncate">{graph.name}</h2>
+                  <p className="text-xs text-grey-600 truncate">{graph.env.slug}</p>
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey" />
-            <Input
-              type="text"
-              placeholder={`Search ${sidebarView}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
+          {/* View Tabs - Only show when expanded */}
+          {!isSidebarCollapsed && (
+            <>
+              <div className="flex gap-1 mb-3 bg-grey-100 p-1 rounded">
+                <button
+                  onClick={() => handleViewChange('labels')}
+                  className={cn(
+                    'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    sidebarView === 'labels'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-grey-600 hover:text-grey'
+                  )}
+                >
+                  <Database className="h-3 w-3 inline mr-1" />
+                  Labels
+                </button>
+                <button
+                  onClick={() => handleViewChange('relationships')}
+                  className={cn(
+                    'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    sidebarView === 'relationships'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-grey-600 hover:text-grey'
+                  )}
+                >
+                  <GitBranch className="h-3 w-3 inline mr-1" />
+                  Rels
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+                <Input
+                  type="text"
+                  placeholder={`Search ${sidebarView}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* List - Scrollable */}
         <div className="flex-1 overflow-y-auto p-2 min-h-0">
+          {/* Collapsed view - Icon buttons only */}
+          {isSidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => {
+                  setIsSidebarCollapsed(false);
+                  handleViewChange('labels');
+                }}
+                className={cn(
+                  'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
+                  sidebarView === 'labels'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+                )}
+                title="Node Labels"
+              >
+                <Database className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => {
+                  setIsSidebarCollapsed(false);
+                  handleViewChange('relationships');
+                }}
+                className={cn(
+                  'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
+                  sidebarView === 'relationships'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+                )}
+                title="Relationships"
+              >
+                <GitBranch className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+          <>
           <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey uppercase tracking-wide">
+            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
               {sidebarView === 'labels' && `Node Labels (${filteredLabels.length})`}
               {sidebarView === 'relationships' && `Relationship Types (${filteredRelationships.length})`}
-              {sidebarView === 'constraints' && `Constraints (${filteredConstraints.length})`}
-              {sidebarView === 'indexes' && `Indexes (${filteredIndexes.length})`}
               {sidebarView === 'actions' && `Saved Actions (${filteredActions.length})`}
             </div>
             <div className="flex gap-1">
-              {sidebarView !== 'actions' ? (
-                <>
-                  <button
-                    onClick={handleSidebarRefresh}
-                    disabled={isSidebarRefreshing}
-                    className="text-grey hover:text-primary transition-colors"
-                    title="Refresh schema"
-                  >
-                    <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
-                  </button>
-                  <button
-                    className="text-grey hover:text-primary transition-colors"
-                    title="Add new"
-                    onClick={() => {
-                      if (sidebarView === 'labels') setShowAddNodeModal(true);
-                      else if (sidebarView === 'relationships') setShowAddRelationshipModal(true);
-                      else if (sidebarView === 'constraints') setShowAddConstraintModal(true);
-                      else if (sidebarView === 'indexes') setShowAddIndexModal(true);
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              ) : (
+              <button
+                onClick={handleSidebarRefresh}
+                disabled={isSidebarRefreshing}
+                className="text-grey-600 hover:text-primary transition-colors"
+                title="Refresh list"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+              </button>
+              {sidebarView === 'labels' && (
                 <button
-                  className="text-grey hover:text-primary transition-colors"
-                  title="Create new action"
-                  onClick={handleOpenQueryBuilder}
+                  onClick={() => setShowAddNodeModal(true)}
+                  className="text-grey-600 hover:text-primary transition-colors"
+                  title="Create new node"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {sidebarView === 'relationships' && (
+                <button
+                  onClick={() => setShowAddRelationshipModal(true)}
+                  className="text-grey-600 hover:text-primary transition-colors"
+                  title="Create new relationship"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -1775,15 +2633,37 @@ await ductape.init();`,
             </div>
           </div>
 
+          {/* Loading States */}
+          {(sidebarView === 'labels' && isLoadingLabels) && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+              <span className="ml-2 text-sm text-grey-500">Loading labels...</span>
+            </div>
+          )}
+          {(sidebarView === 'relationships' && isLoadingRelTypes) && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+              <span className="ml-2 text-sm text-grey-500">Loading relationships...</span>
+            </div>
+          )}
+          {(sidebarView === 'actions' && isLoadingActions) && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+              <span className="ml-2 text-sm text-grey-500">Loading actions...</span>
+            </div>
+          )}
+
           {/* Labels List */}
-          {sidebarView === 'labels' && (
+          {sidebarView === 'labels' && !isLoadingLabels && (
             <div className="space-y-1">
               {filteredLabels.map((label) => (
                 <button
                   key={label.name}
                   onClick={() => {
                     setSelectedLabel(label);
-                    setQueryInput(getFindNodesQuery(label.name));
+                    setSelectedRelType(null);
+                    // Execute query and show results in table/graph view
+                    setQueryAndExecute(getFindNodesQuery(label.name));
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
@@ -1805,14 +2685,16 @@ await ductape.init();`,
           )}
 
           {/* Relationships List */}
-          {sidebarView === 'relationships' && (
+          {sidebarView === 'relationships' && !isLoadingRelTypes && (
             <div className="space-y-1">
               {filteredRelationships.map((rel) => (
                 <button
                   key={rel.type}
                   onClick={() => {
                     setSelectedRelType(rel);
-                    setQueryInput(getFindRelationshipsQuery(rel.type));
+                    setSelectedLabel(null);
+                    // Execute query and show results in table/graph view
+                    setQueryAndExecute(getFindRelationshipsQuery(rel.type));
                   }}
                   className={cn(
                     'w-full px-2 py-2 rounded text-sm transition-colors text-left',
@@ -1835,65 +2717,8 @@ await ductape.init();`,
             </div>
           )}
 
-          {/* Constraints List */}
-          {sidebarView === 'constraints' && (
-            <div className="space-y-1">
-              {filteredConstraints.map((constraint) => (
-                <div
-                  key={constraint.name}
-                  className="px-2 py-2 rounded text-sm hover:bg-grey-100 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-grey truncate">{constraint.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className={cn('px-1.5 py-0.5 rounded text-xs', getConstraintTypeColor(constraint.type))}>
-                      {constraint.type.replace(/_/g, ' ')}
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                      :{constraint.label}
-                    </span>
-                  </div>
-                  <div className="text-xs text-grey mt-1">
-                    {constraint.property}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Indexes List */}
-          {sidebarView === 'indexes' && (
-            <div className="space-y-1">
-              {filteredIndexes.map((index) => (
-                <div
-                  key={index.name}
-                  className="px-2 py-2 rounded text-sm hover:bg-grey-100 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-grey truncate">{index.name}</span>
-                    <span className={cn('text-xs', getIndexStateColor(index.state))}>
-                      {index.state}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className={cn('px-1.5 py-0.5 rounded text-xs', getIndexTypeColor(index.type))}>
-                      {index.type}
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                      :{index.labelOrType}
-                    </span>
-                  </div>
-                  <div className="text-xs text-grey mt-1">
-                    {index.properties.join(', ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Actions List */}
-          {sidebarView === 'actions' && (
+          {sidebarView === 'actions' && !isLoadingActions && (
             <div className="space-y-1">
               {filteredActions.length === 0 ? (
                 <div className="px-2 py-4 text-center">
@@ -1960,21 +2785,22 @@ await ductape.init();`,
               )}
             </div>
           )}
+          </>
+          )}
         </div>
 
-        {/* Stats Footer */}
-        <div className="flex-shrink-0 p-3 border-t border-grey-400 bg-grey-50">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="text-center">
-              <div className="font-semibold text-grey">14,127</div>
-              <div className="text-grey">Nodes</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-grey">27,045</div>
-              <div className="text-grey">Relationships</div>
-            </div>
+        {/* Footer - Expand button when collapsed */}
+        {isSidebarCollapsed && (
+          <div className="flex-shrink-0 border-t border-grey-400 bg-grey-50 p-2">
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              title="Expand sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Main Content */}
@@ -2004,16 +2830,7 @@ await ductape.init();`,
                     )}
                     Test Query
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveQueryBuilderAction}
-                    disabled={!generatedQuery || !queryTestResult?.success}
-                    className="gap-2"
-                    title={!queryTestResult?.success ? 'Test the query successfully before saving' : undefined}
-                  >
-                    <Save className="h-4 w-4" />
-                    Save as Action
-                  </Button>
+{/* Save as Action button hidden for now */}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2749,7 +3566,118 @@ await ductape.init();`,
           </div>
         ) : showQueryEditor ? (
           <>
-            {/* Query Editor - Fixed */}
+            {/* Graph Explorer Header - Like DatabaseExplorer */}
+            <div className="flex-shrink-0 bg-white border-b border-grey-400 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Share2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-grey">{graph.name}</h2>
+                    <p className="text-xs text-grey-600">
+                      {queryResult ? `${smartRowCount.count} ${smartRowCount.type === 'relationships' ? 'relationships' : smartRowCount.type === 'nodes' ? 'nodes' : 'results'}` : 'Graph Explorer'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowGraphCodeSidebar(true)}
+                    className="gap-2"
+                  >
+                    <Code className="h-4 w-4" />
+                    Code
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSidebarRefresh}
+                    disabled={isSidebarRefreshing}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={cn('h-4 w-4', isSidebarRefreshing && 'animate-spin')} />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowQueryEditor(false);
+                      setQueryResult(null);
+                      setQueryInput('');
+                    }}
+                    className="gap-2 text-grey"
+                    title="Back to Overview"
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+
+                  {/* Search Bar - Focus to expand query editor */}
+                  <div className="relative w-48">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-400" />
+                    <Input
+                      type="text"
+                      placeholder="Query..."
+                      onFocus={() => setIsQueryEditorCollapsed(false)}
+                      className="pl-9 h-9 cursor-text"
+                    />
+                  </div>
+
+                  {/* Insert Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Insert
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowAddNodeModal(true)}>
+                        <Circle className="h-4 w-4" />
+                        New Node
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowAddRelationshipModal(true)}>
+                        <ArrowRight className="h-4 w-4" />
+                        New Relationship
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Advanced Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-9 w-9">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowAddConstraintModal(true)}>
+                        <Key className="h-4 w-4" />
+                        Add Constraint
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowAddIndexModal(true)}>
+                        <Zap className="h-4 w-4" />
+                        Add Index
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="gap-2" onClick={() => refetchConstraints()}>
+                        <Eye className="h-4 w-4" />
+                        View Constraints ({constraints.length})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2" onClick={() => refetchIndexes()}>
+                        <List className="h-4 w-4" />
+                        View Indexes ({indexes.length})
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+
+            {/* Query Editor - Collapsible (Shows below header when not collapsed) */}
+            {!isQueryEditorCollapsed && (
             <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
               {/* Code Editor Container */}
               <div className="rounded-lg overflow-hidden border border-grey-300 dark:border-[#2a2a2a] shadow-sm">
@@ -2783,17 +3711,8 @@ await ductape.init();`,
                       Reset
                     </Button>
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={handleOpenSaveActionModal}
-                      className="gap-2 text-grey hover:text-grey dark:hover:text-white"
-                    >
-                      <Save className="h-4 w-4" />
-                      Save as Action
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleExecuteQuery}
+                      onClick={() => handleExecuteQuery()}
                       disabled={isExecuting}
                       className="gap-2 bg-green-600 hover:bg-green-700 text-white"
                     >
@@ -2808,6 +3727,15 @@ await ductape.init();`,
                           Run
                         </>
                       )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsQueryEditorCollapsed(true)}
+                      className="gap-1.5 text-grey-500 hover:text-grey"
+                      title="Collapse query editor"
+                    >
+                      <ChevronUp className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -2838,7 +3766,10 @@ await ductape.init();`,
                 <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-100 dark:bg-[#1a1a1a] rounded-lg border border-grey-300 dark:border-[#2a2a2a]">
                   <div className="flex items-center gap-4">
                     <span className="text-xs text-grey">
-                      <span className="font-semibold text-grey">{queryResult.count}</span> rows in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
+                      <span className="font-semibold text-grey">{smartRowCount.count}</span> {smartRowCount.type === 'relationships' ? 'relationships' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
+                      {'nodesIncluded' in smartRowCount && (
+                        <span className="text-grey-400 ml-1">(+{smartRowCount.nodesIncluded} nodes enriched)</span>
+                      )}
                     </span>
                     {queryResult.statistics && (
                       <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-300 border-l border-grey-400 dark:border-grey-600 pl-4">
@@ -2876,20 +3807,76 @@ await ductape.init();`,
                 </div>
               )}
             </div>
+            )}
+
+            {/* Collapsed Query Editor - Compact Bar (when results exist but editor is collapsed) */}
+            {isQueryEditorCollapsed && queryResult && (
+              <div className="flex-shrink-0 bg-grey-50 dark:bg-[#1a1a1a] border-b border-grey-400 px-4 py-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Code className="h-4 w-4 text-grey-500" />
+                    <span className="text-sm font-medium text-grey">Query Results</span>
+                    <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
+                      {graph.type}
+                    </span>
+                    <span className="text-xs text-grey-500">
+                      • {smartRowCount.count} {smartRowCount.type === 'relationships' ? 'rels' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in {queryResult.executionTime}ms
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExecuteQuery()}
+                      disabled={isExecuting}
+                      className="gap-1.5 h-7"
+                    >
+                      {isExecuting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
+                      {isExecuting ? 'Running' : 'Re-run'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsQueryEditorCollapsed(false)}
+                      className="gap-1.5 h-7 text-grey-500 hover:text-grey"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Edit
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Results Area - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 min-h-0">
-              {queryError && (
-            <div className="bg-red/10 border border-red/20 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 text-red">
-                <AlertCircle className="h-5 w-5" />
-                <span className="font-medium">Query Error</span>
-              </div>
-              <p className="text-sm text-red mt-2 font-mono">{queryError}</p>
-            </div>
-          )}
+              {/* Loading State */}
+              {isExecuting && (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+                    <p className="text-sm font-medium text-grey">Executing query...</p>
+                    <p className="text-xs text-grey-500 mt-1">Fetching data from graph database</p>
+                  </div>
+                </div>
+              )}
 
-          {queryResult && (
+              {!isExecuting && queryError && (
+                <div className="bg-red/10 border border-red/20 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-red">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Query Error</span>
+                  </div>
+                  <p className="text-sm text-red mt-2 font-mono">{queryError}</p>
+                </div>
+              )}
+
+              {!isExecuting && queryResult && (
             <div className="h-full flex flex-col">
               {/* View Toggle Header */}
               <div className="flex items-center justify-between mb-3">
@@ -2947,8 +3934,9 @@ await ductape.init();`,
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setGraphZoom(1)}
+                      onClick={resetGraphView}
                       className="h-7 w-7 p-0"
+                      title="Reset view (zoom & pan)"
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
                     </Button>
@@ -2960,45 +3948,663 @@ await ductape.init();`,
               {resultsView === 'table' && (
                 <div className="bg-white rounded-lg border border-grey-400 overflow-hidden flex-1">
                   <div className="overflow-x-auto h-full">
-                    <table className="w-full">
-                      <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
-                            #
-                          </th>
-                          {queryResult.columns?.map((col: string) => (
-                            <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                              {col}
+                    {(() => {
+                      // Use memoized table data - server returns paginated data directly
+                      const { allRelationships, allNodes, startIndex } = tableData;
+
+                      // Data is already paginated from server
+                      const relationships = allRelationships;
+                      const nodes = allRelationships.length > 0 ? [] : allNodes;
+
+                      // Build node lookup map by ID for quick access
+                      const nodeMap = new Map<string, any>();
+                      allNodes.forEach((node: any) => {
+                        if (node.id) {
+                          nodeMap.set(node.id, node);
+                        }
+                      });
+
+                      // Determine what to display based on data composition
+                      const hasRelationships = allRelationships.length > 0;
+                      const hasOnlyNodes = allNodes.length > 0 && allRelationships.length === 0;
+
+                      // If we have relationships, show relationship table (enriched with node data if available)
+                      if (hasRelationships) {
+                        // Get relationship properties
+                        const relProps = Array.from(new Set(relationships.flatMap((r: any) => Object.keys(r.properties || {})))) as string[];
+
+                        return (
+                          <div className="flex h-full">
+                            <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
+                              <table className="w-full">
+                                <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                                      #
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                      Type
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                      From Node
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                      To Node
+                                    </th>
+                                    {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop) => (
+                                      <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                        {prop}
+                                      </th>
+                                    ))}
+                                    {selectedNode && relProps.length > 2 && (
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                        ...
+                                      </th>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-400">
+                                  {relationships.map((rel: any, idx: number) => {
+                                    // Get the start/end node IDs (handle all naming conventions)
+                                    const startNodeId = rel.startNode || rel.start || rel.source || rel.startNodeId || rel.from;
+                                    const endNodeId = rel.endNode || rel.end || rel.target || rel.endNodeId || rel.to;
+
+                                    // Get enriched node data if available
+                                    const startNode = nodeMap.get(startNodeId);
+                                    const endNode = nodeMap.get(endNodeId);
+
+                                    // Check if this relationship is selected
+                                    const isSelected = selectedNode?.isRelationship && selectedNode?.id === rel.id;
+
+                                    // Helper to render node info
+                                    const renderNodeCell = (nodeId: string, nodeData: any, onClick?: () => void) => {
+                                      if (nodeData) {
+                                        // Show enriched node data with label and key properties
+                                        const displayName = nodeData.properties?.name || nodeData.properties?.title || nodeData.properties?.id || nodeId?.split(':').pop();
+                                        const labels = nodeData.labels || [];
+                                        return (
+                                          <div
+                                            className={cn("space-y-1", onClick && "cursor-pointer hover:bg-grey-100 -m-2 p-2 rounded")}
+                                            onClick={(e) => {
+                                              if (onClick) {
+                                                e.stopPropagation();
+                                                onClick();
+                                              }
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {labels.map((label: string) => (
+                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                  {label}
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <div className="text-sm font-medium text-grey">
+                                              {displayName}
+                                            </div>
+                                            {!selectedNode && nodeData.properties && Object.keys(nodeData.properties).length > 0 && (
+                                              <div className="text-xs text-grey-500 max-w-[200px]">
+                                                {Object.entries(nodeData.properties)
+                                                  .filter(([key]) => !['name', 'title', 'id'].includes(key))
+                                                  .slice(0, 2)
+                                                  .map(([key, val]) => (
+                                                    <span key={key} className="mr-2">
+                                                      <span className="text-grey-400">{key}:</span> {String(val).substring(0, 20)}{String(val).length > 20 ? '...' : ''}
+                                                    </span>
+                                                  ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      // Fallback to just showing the ID
+                                      return (
+                                        <span className="text-sm text-grey font-mono">
+                                          {nodeId?.split(':').pop() || nodeId}
+                                        </span>
+                                      );
+                                    };
+
+                                    return (
+                                      <tr
+                                        key={rel.id || idx}
+                                        className={cn(
+                                          "hover:bg-grey-50 transition-colors cursor-pointer",
+                                          isSelected && "bg-primary/5 hover:bg-primary/10"
+                                        )}
+                                        onClick={() => setSelectedNode(isSelected ? null : {
+                                          ...rel,
+                                          isRelationship: true,
+                                          startNodeData: startNode,
+                                          endNodeData: endNode,
+                                        })}
+                                      >
+                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                          {startIndex + idx + 1}
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                          <span className="px-2 py-1 bg-blue/10 text-blue text-xs rounded-full font-medium">
+                                            {rel.type}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                          {renderNodeCell(startNodeId, startNode, startNode ? () => setSelectedNode({
+                                            ...startNode,
+                                            label: startNode.labels?.[0] || 'Node',
+                                            displayName: startNode.properties?.name || startNode.properties?.title || startNode.id
+                                          }) : undefined)}
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                          {renderNodeCell(endNodeId, endNode, endNode ? () => setSelectedNode({
+                                            ...endNode,
+                                            label: endNode.labels?.[0] || 'Node',
+                                            displayName: endNode.properties?.name || endNode.properties?.title || endNode.id
+                                          }) : undefined)}
+                                        </td>
+                                        {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop: string) => (
+                                          <td key={prop} className="px-4 py-3 text-sm text-grey align-top">
+                                            {rel.properties?.[prop] !== undefined ? (
+                                              typeof rel.properties[prop] === 'object'
+                                                ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(rel.properties[prop], null, 2)}</pre>
+                                                : typeof rel.properties[prop] === 'boolean'
+                                                  ? <span className={cn('px-2 py-0.5 rounded text-xs', rel.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(rel.properties[prop])}</span>
+                                                  : String(rel.properties[prop]).substring(0, 30) + (String(rel.properties[prop]).length > 30 ? '...' : '')
+                                            ) : (
+                                              <span className="text-grey-400">—</span>
+                                            )}
+                                          </td>
+                                        ))}
+                                        {selectedNode && relProps.length > 2 && (
+                                          <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                            +{relProps.length - 2} more
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Details Sidebar for Relationships */}
+                            {selectedNode && (
+                              <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
+                                <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
+                                      <Eye className="h-4 w-4" />
+                                      {selectedNode.isRelationship ? 'Relationship Details' : 'Node Details'}
+                                    </h4>
+                                    <button
+                                      onClick={() => setSelectedNode(null)}
+                                      className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 space-y-4">
+                                  {selectedNode.isRelationship ? (
+                                    <>
+                                      {/* Relationship Type */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">Relationship Type</div>
+                                        <span className="px-3 py-1.5 bg-blue/10 text-blue text-sm rounded font-medium">
+                                          {selectedNode.type}
+                                        </span>
+                                      </div>
+
+                                      {/* Relationship ID */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">Relationship ID</div>
+                                        <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
+                                          {selectedNode.id}
+                                        </div>
+                                      </div>
+
+                                      {/* Start Node */}
+                                      {selectedNode.startNodeData && (
+                                        <div>
+                                          <div className="text-xs font-medium text-grey mb-2">From Node</div>
+                                          <div
+                                            className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
+                                            onClick={() => setSelectedNode({
+                                              ...selectedNode.startNodeData,
+                                              label: selectedNode.startNodeData.labels?.[0] || 'Node',
+                                              displayName: selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id
+                                            })}
+                                          >
+                                            <div className="flex flex-wrap gap-1 mb-1">
+                                              {selectedNode.startNodeData.labels?.map((label: string) => (
+                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                  :{label}
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <div className="text-sm font-medium text-grey">
+                                              {selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id}
+                                            </div>
+                                            <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* End Node */}
+                                      {selectedNode.endNodeData && (
+                                        <div>
+                                          <div className="text-xs font-medium text-grey mb-2">To Node</div>
+                                          <div
+                                            className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
+                                            onClick={() => setSelectedNode({
+                                              ...selectedNode.endNodeData,
+                                              label: selectedNode.endNodeData.labels?.[0] || 'Node',
+                                              displayName: selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id
+                                            })}
+                                          >
+                                            <div className="flex flex-wrap gap-1 mb-1">
+                                              {selectedNode.endNodeData.labels?.map((label: string) => (
+                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                  :{label}
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <div className="text-sm font-medium text-grey">
+                                              {selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id}
+                                            </div>
+                                            <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Relationship Properties */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">
+                                          Properties ({Object.keys(selectedNode.properties || {}).length})
+                                        </div>
+                                        <div className="space-y-2">
+                                          {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                            <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
+                                              <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
+                                                <span className="text-xs font-medium text-grey">{key}</span>
+                                              </div>
+                                              <div className="px-3 py-2">
+                                                {typeof value === 'object' ? (
+                                                  <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
+                                                    {JSON.stringify(value, null, 2)}
+                                                  </pre>
+                                                ) : typeof value === 'boolean' ? (
+                                                  <span className={cn(
+                                                    'px-2 py-0.5 rounded text-xs font-medium',
+                                                    value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
+                                                  )}>
+                                                    {String(value)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-sm text-grey break-all">
+                                                    {String(value)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {Object.keys(selectedNode.properties || {}).length === 0 && (
+                                            <div className="text-xs text-grey-400 italic">No properties</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {/* Node Labels */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">Labels</div>
+                                        <div className="flex flex-wrap gap-1">
+                                          {selectedNode.labels?.map((label: string) => (
+                                            <span
+                                              key={label}
+                                              className="px-2 py-1 bg-blue/10 text-blue text-xs rounded font-medium"
+                                            >
+                                              :{label}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      {/* Node ID */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">Node ID</div>
+                                        <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
+                                          {selectedNode.id}
+                                        </div>
+                                      </div>
+
+                                      {/* Node Properties */}
+                                      <div>
+                                        <div className="text-xs font-medium text-grey mb-2">
+                                          Properties ({Object.keys(selectedNode.properties || {}).length})
+                                        </div>
+                                        <div className="space-y-2">
+                                          {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                            <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
+                                              <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
+                                                <span className="text-xs font-medium text-grey">{key}</span>
+                                              </div>
+                                              <div className="px-3 py-2">
+                                                {typeof value === 'object' ? (
+                                                  <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
+                                                    {JSON.stringify(value, null, 2)}
+                                                  </pre>
+                                                ) : typeof value === 'boolean' ? (
+                                                  <span className={cn(
+                                                    'px-2 py-0.5 rounded text-xs font-medium',
+                                                    value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
+                                                  )}>
+                                                    {String(value)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-sm text-grey break-all">
+                                                    {String(value)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {Object.keys(selectedNode.properties || {}).length === 0 && (
+                                            <div className="text-xs text-grey-400 italic">No properties</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // For nodes only, show node table
+                      if (hasOnlyNodes) {
+                        const nodeProps = Array.from(new Set(nodes.flatMap((n: any) => Object.keys(n.properties || {})))) as string[];
+                        return (
+                          <div className="flex h-full">
+                            <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
+                              <table className="w-full">
+                                <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                                      #
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                      ID
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                      Labels
+                                    </th>
+                                    {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop) => (
+                                      <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                        {prop}
+                                      </th>
+                                    ))}
+                                    {selectedNode && nodeProps.length > 3 && (
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                        ...
+                                      </th>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-grey-400">
+                                  {nodes.map((node: any, idx: number) => {
+                                    const isSelected = selectedNode?.id === node.id;
+                                    return (
+                                      <tr
+                                        key={node.id || idx}
+                                        className={cn(
+                                          "hover:bg-grey-50 transition-colors cursor-pointer",
+                                          isSelected && "bg-primary/5 hover:bg-primary/10"
+                                        )}
+                                        onClick={() => setSelectedNode(isSelected ? null : {
+                                          ...node,
+                                          label: node.labels?.[0] || 'Node',
+                                          displayName: node.properties?.name || node.properties?.title || node.id
+                                        })}
+                                      >
+                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                          {startIndex + idx + 1}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top max-w-[200px] truncate" title={node.id}>
+                                          {node.id?.split(':').pop() || node.id}
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                          <div className="flex flex-wrap gap-1">
+                                            {node.labels?.map((label: string) => (
+                                              <span key={label} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                                                {label}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </td>
+                                        {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop: string) => (
+                                          <td key={prop} className="px-4 py-3 text-sm text-grey align-top max-w-[300px]">
+                                            {node.properties?.[prop] !== undefined ? (
+                                              typeof node.properties[prop] === 'object'
+                                                ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(node.properties[prop], null, 2)}</pre>
+                                                : typeof node.properties[prop] === 'boolean'
+                                                  ? <span className={cn('px-2 py-0.5 rounded text-xs', node.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(node.properties[prop])}</span>
+                                                  : String(node.properties[prop]).substring(0, 50) + (String(node.properties[prop]).length > 50 ? '...' : '')
+                                            ) : (
+                                              <span className="text-grey-400">—</span>
+                                            )}
+                                          </td>
+                                        ))}
+                                        {selectedNode && nodeProps.length > 3 && (
+                                          <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                            +{nodeProps.length - 3} more
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Node Details Sidebar */}
+                            {selectedNode && (
+                              <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
+                                <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
+                                      <Eye className="h-4 w-4" />
+                                      Node Details
+                                    </h4>
+                                    <button
+                                      onClick={() => setSelectedNode(null)}
+                                      className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 space-y-4">
+                                  {/* Labels */}
+                                  <div>
+                                    <div className="text-xs font-medium text-grey mb-2">Labels</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {selectedNode.labels?.map((label: string) => (
+                                        <span
+                                          key={label}
+                                          className="px-2 py-1 bg-blue/10 text-blue text-xs rounded font-medium"
+                                        >
+                                          :{label}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Node ID */}
+                                  <div>
+                                    <div className="text-xs font-medium text-grey mb-2">Node ID</div>
+                                    <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
+                                      {selectedNode.id}
+                                    </div>
+                                  </div>
+
+                                  {/* Properties */}
+                                  <div>
+                                    <div className="text-xs font-medium text-grey mb-2">
+                                      Properties ({Object.keys(selectedNode.properties || {}).length})
+                                    </div>
+                                    <div className="space-y-2">
+                                      {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                        <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
+                                          <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
+                                            <span className="text-xs font-medium text-grey">{key}</span>
+                                          </div>
+                                          <div className="px-3 py-2">
+                                            {typeof value === 'object' ? (
+                                              <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
+                                                {JSON.stringify(value, null, 2)}
+                                              </pre>
+                                            ) : typeof value === 'boolean' ? (
+                                              <span className={cn(
+                                                'px-2 py-0.5 rounded text-xs font-medium',
+                                                value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
+                                              )}>
+                                                {String(value)}
+                                              </span>
+                                            ) : (
+                                              <span className="text-sm text-grey break-all">
+                                                {String(value)}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {Object.keys(selectedNode.properties || {}).length === 0 && (
+                                        <div className="text-xs text-grey-400 italic">No properties</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // Fallback for column-based format or raw data
+                      return null;
+                    })() || (queryResult.columns?.length > 0 ? (
+                      // Column-based format (original format)
+                      <table className="w-full">
+                        <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                              #
                             </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-grey-400">
-                        {queryResult.data.map((row: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-grey-50 transition-colors">
-                            <td className="px-4 py-3 text-sm text-grey font-mono align-top">
-                              {idx + 1}
-                            </td>
-                            {queryResult.columns?.map((col: string) => (
-                              <td key={col} className="px-4 py-3 align-top">
-                                {row[col]?.labels ? (
-                                  renderNodeValue(row[col])
-                                ) : row[col]?.type && row[col]?.startNode ? (
-                                  renderRelationshipValue(row[col])
-                                ) : (
-                                  <span className="text-sm text-grey">
-                                    {typeof row[col] === 'object'
-                                      ? JSON.stringify(row[col], null, 2)
-                                      : String(row[col])}
-                                  </span>
-                                )}
-                              </td>
+                            {queryResult.columns.map((col: string) => (
+                              <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                {col}
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-grey-400">
+                          {queryResult.data.map((row: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-grey-50 transition-colors">
+                              <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                {idx + 1}
+                              </td>
+                              {queryResult.columns.map((col: string) => (
+                                <td key={col} className="px-4 py-3 align-top">
+                                  {row[col]?.labels ? (
+                                    renderNodeValue(row[col])
+                                  ) : row[col]?.type && row[col]?.startNode ? (
+                                    renderRelationshipValue(row[col])
+                                  ) : (
+                                    <span className="text-sm text-grey">
+                                      {typeof row[col] === 'object'
+                                        ? JSON.stringify(row[col], null, 2)
+                                        : String(row[col] ?? '')}
+                                    </span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      // Raw JSON fallback
+                      <div className="p-4">
+                        <pre className="text-xs text-grey overflow-auto max-h-[500px] bg-grey-50 p-4 rounded">
+                          {JSON.stringify(queryResult.data, null, 2)}
+                        </pre>
+                      </div>
+                    ))}
                   </div>
+
+                  {/* Pagination Controls - Server-side pagination */}
+                  {queryResult?.data?.length > 0 && lastExecutedQuery && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-grey-400 bg-grey-50">
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-grey">
+                          Showing {queryResult.data.length} results (Page {tablePage})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-grey">Rows per page:</span>
+                          <Select
+                            value={String(tablePageSize)}
+                            onValueChange={(v) => handlePageSizeChange(Number(v))}
+                            disabled={isExecuting}
+                          >
+                            <SelectTrigger className="w-[70px] h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(1)}
+                          disabled={tablePage === 1 || isExecuting}
+                        >
+                          First
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(Math.max(1, tablePage - 1))}
+                          disabled={tablePage === 1 || isExecuting}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-grey px-2">
+                          Page {tablePage}
+                          {isExecuting && <Loader2 className="h-3 w-3 animate-spin inline ml-2" />}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(tablePage + 1)}
+                          disabled={isExecuting || queryResult.data.length < tablePageSize}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3018,10 +4624,23 @@ await ductape.init();`,
                   ) : (
                     <div className="flex-1 flex">
                       {/* Graph Canvas */}
-                      <div className="flex-1 relative overflow-hidden">
+                      <div
+                        className="flex-1 relative overflow-hidden"
+                        onMouseDown={handlePanStart}
+                        onMouseMove={handlePanMove}
+                        onMouseUp={handlePanEnd}
+                        onMouseLeave={handlePanEnd}
+                        onWheel={handleWheel}
+                        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+                      >
                         <svg
                           className="w-full h-full"
-                          style={{ transform: `scale(${graphZoom})`, transformOrigin: 'center center' }}
+                          viewBox="0 0 800 600"
+                          preserveAspectRatio="xMidYMid meet"
+                          style={{
+                            transform: `translate(${graphPan.x}px, ${graphPan.y}px) scale(${graphZoom})`,
+                            transformOrigin: 'center center',
+                          }}
                         >
                           <defs>
                             <marker
@@ -3036,45 +4655,40 @@ await ductape.init();`,
                             </marker>
                           </defs>
 
-                          {/* Edges */}
-                          {(() => {
-                            const positionedNodes = calculateNodePositions(graphData.nodes, graphData.edges, 600, 400);
-                            const nodePositions = new Map(positionedNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+                          {/* Edges - use memoized positions */}
+                          {graphData.edges.map((edge, i) => {
+                            const source = nodePositionsMap.get(edge.source);
+                            const target = nodePositionsMap.get(edge.target);
+                            if (!source || !target) return null;
 
-                            return graphData.edges.map((edge, i) => {
-                              const source = nodePositions.get(edge.source);
-                              const target = nodePositions.get(edge.target);
-                              if (!source || !target) return null;
+                            const midX = (source.x + target.x) / 2;
+                            const midY = (source.y + target.y) / 2;
 
-                              const midX = (source.x + target.x) / 2;
-                              const midY = (source.y + target.y) / 2;
+                            return (
+                              <g key={edge.id || i}>
+                                <line
+                                  x1={source.x}
+                                  y1={source.y}
+                                  x2={target.x}
+                                  y2={target.y}
+                                  stroke="#D1D5DB"
+                                  strokeWidth="2"
+                                  markerEnd="url(#arrowhead)"
+                                />
+                                <text
+                                  x={midX}
+                                  y={midY - 5}
+                                  textAnchor="middle"
+                                  className="text-[10px] fill-grey"
+                                >
+                                  {edge.type}
+                                </text>
+                              </g>
+                            );
+                          })}
 
-                              return (
-                                <g key={edge.id || i}>
-                                  <line
-                                    x1={source.x}
-                                    y1={source.y}
-                                    x2={target.x}
-                                    y2={target.y}
-                                    stroke="#D1D5DB"
-                                    strokeWidth="2"
-                                    markerEnd="url(#arrowhead)"
-                                  />
-                                  <text
-                                    x={midX}
-                                    y={midY - 5}
-                                    textAnchor="middle"
-                                    className="text-[10px] fill-grey"
-                                  >
-                                    {edge.type}
-                                  </text>
-                                </g>
-                              );
-                            });
-                          })()}
-
-                          {/* Nodes */}
-                          {calculateNodePositions(graphData.nodes, graphData.edges, 600, 400).map((node) => {
+                          {/* Nodes - use memoized positioned nodes */}
+                          {positionedNodes.map((node) => {
                             const colors = getNodeColor(node.label);
                             const isSelected = selectedNode?.id === node.id;
 
@@ -3082,7 +4696,10 @@ await ductape.init();`,
                               <g
                                 key={node.id}
                                 className="cursor-pointer"
-                                onClick={() => setSelectedNode(isSelected ? null : node)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNode(isSelected ? null : node);
+                                }}
                               >
                                 <circle
                                   cx={node.x}
@@ -3198,7 +4815,7 @@ await ductape.init();`,
         ) : (
           /* Graph Overview - Default view when no query editor or builder is active */
           <div className="flex-1 overflow-auto p-6 space-y-6">
-            {/* Stats Cards */}
+            {/* Stats Cards - Top Row: Actual Counts */}
             <div className="grid grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-grey-400 p-4">
                 <div className="flex items-center gap-3 mb-2">
@@ -3206,8 +4823,14 @@ await ductape.init();`,
                     <Circle className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-grey">{labels.length}</div>
-                    <div className="text-xs text-grey-500">Node Labels</div>
+                    {isLoadingStatistics ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">
+                        {sdkStatistics?.nodeCount?.toLocaleString() ?? '—'}
+                      </div>
+                    )}
+                    <div className="text-xs text-grey-500">Total Nodes</div>
                   </div>
                 </div>
               </div>
@@ -3217,26 +4840,100 @@ await ductape.init();`,
                     <ArrowRight className="h-5 w-5 text-blue" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-grey">{relationshipTypes.length}</div>
-                    <div className="text-xs text-grey-500">Relationship Types</div>
+                    {isLoadingStatistics ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">
+                        {sdkStatistics?.relationshipCount?.toLocaleString() ?? '—'}
+                      </div>
+                    )}
+                    <div className="text-xs text-grey-500">Total Relationships</div>
                   </div>
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-grey-400 p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                    <Bookmark className="h-5 w-5 text-purple-600" />
+                    <Database className="h-5 w-5 text-purple-600" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-grey">{actions.length}</div>
-                    <div className="text-xs text-grey-500">Saved Actions</div>
+                    {isLoadingLabels ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">{labels.length}</div>
+                    )}
+                    <div className="text-xs text-grey-500">Node Labels</div>
                   </div>
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-grey-400 p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                    <Network className="h-5 w-5 text-green" />
+                    <GitBranch className="h-5 w-5 text-green" />
+                  </div>
+                  <div>
+                    {isLoadingRelTypes ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">{relationshipTypes.length}</div>
+                    )}
+                    <div className="text-xs text-grey-500">Relationship Types</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Cards - Second Row: Schema & Config */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    {isLoadingIndexes ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">{indexes.length}</div>
+                    )}
+                    <div className="text-xs text-grey-500">Indexes</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <Key className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    {isLoadingConstraints ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">{constraints.length}</div>
+                    )}
+                    <div className="text-xs text-grey-500">Constraints</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <Bookmark className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    {isLoadingActions ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                    ) : (
+                      <div className="text-2xl font-bold text-grey">{actions.length}</div>
+                    )}
+                    <div className="text-xs text-grey-500">Saved Actions</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-grey-400 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center">
+                    <Network className="h-5 w-5 text-cyan-600" />
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey capitalize">{graph.type || 'Neo4j'}</div>
@@ -3248,12 +4945,50 @@ await ductape.init();`,
 
             {/* Activity Timeline (7 Days) */}
             <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-                <p className="text-sm text-grey-600 font-medium mb-1">No graph activity data available</p>
-                <p className="text-xs text-grey-500">Activity charts will appear once graph operations are logged</p>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
+              {isLoadingActivity ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : graphActivityData?.activityTimeline && graphActivityData.activityTimeline.length > 0 ? (
+                <div className="space-y-3">
+                  {graphActivityData.activityTimeline.map((day) => {
+                    const maxOperations = Math.max(...graphActivityData.activityTimeline.map(d => d.sessions), 1);
+                    const percentage = maxOperations > 0 ? (day.sessions / maxOperations) * 100 : 0;
+
+                    return (
+                      <div key={day.date} className="flex items-center gap-3">
+                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center px-3">
+                            <span className="text-xs font-semibold text-white drop-shadow-sm">
+                              {day.sessions.toLocaleString()} operations
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+                  <p className="text-sm text-grey-600 font-medium mb-1">No graph activity data available</p>
+                  <p className="text-xs text-grey-500">Activity charts will appear once graph operations are logged</p>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions */}
@@ -3337,6 +5072,74 @@ await ductape.init();`,
                   </button>
                 ))}
               </div>
+              {labels.length > 6 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarView('labels')}
+                  className="mt-3 w-full text-grey-600"
+                >
+                  View all {labels.length} labels
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+
+            {/* Relationship Types Overview */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-grey">Relationship Types</h3>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarView('relationships')}>
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {relationshipTypes.slice(0, 6).map((relType) => (
+                  <button
+                    key={relType.type}
+                    onClick={() => {
+                      setSelectedRelType(relType);
+                      setQueryInput(JSON.stringify({
+                        operation: 'findRelationships',
+                        options: { type: relType.type, includeNodes: true, limit: 50 }
+                      }, null, 2));
+                      setShowQueryEditor(true);
+                    }}
+                    className="bg-white rounded-lg border border-grey-400 p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <ArrowRight className="h-4 w-4 text-blue" />
+                        <span className="font-medium text-grey">{relType.type}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                      <span className="flex items-center gap-1">
+                        <GitBranch className="h-3 w-3" />
+                        {relType.count?.toLocaleString() || 0} rels
+                      </span>
+                      {relType.properties && (
+                        <span className="flex items-center gap-1">
+                          <Hash className="h-3 w-3" />
+                          {relType.properties.length} props
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {relationshipTypes.length > 6 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarView('relationships')}
+                  className="mt-3 w-full text-grey-600"
+                >
+                  View all {relationshipTypes.length} relationship types
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
             </div>
 
             {/* Saved Actions */}
@@ -3385,16 +5188,25 @@ await ductape.init();`,
               <Label className="text-xs text-grey mb-2 block">Labels</Label>
               {nodeLabels.map((label, i) => (
                 <div key={i} className="flex gap-2 mb-2">
-                  <Input
+                  <Select
                     value={label}
-                    onChange={(e) => {
+                    onValueChange={(value) => {
                       const newLabels = [...nodeLabels];
-                      newLabels[i] = e.target.value;
+                      newLabels[i] = value;
                       setNodeLabels(newLabels);
                     }}
-                    placeholder="Label name"
-                    className="flex-1"
-                  />
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select label..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {labels.map((l) => (
+                        <SelectItem key={l.name} value={l.name}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {nodeLabels.length > 1 && (
                     <Button
                       variant="outline"
@@ -3429,21 +5241,48 @@ await ductape.init();`,
                     placeholder="Key"
                     className="flex-1"
                   />
-                  <Input
-                    value={prop.value}
-                    onChange={(e) => {
-                      const newProps = [...nodeProperties];
-                      newProps[i].value = e.target.value;
-                      setNodeProperties(newProps);
-                    }}
-                    placeholder="Value"
-                    className="flex-1"
-                  />
+                  {prop.type === 'boolean' ? (
+                    <Select
+                      value={prop.value}
+                      onValueChange={(value) => {
+                        const newProps = [...nodeProperties];
+                        newProps[i].value = value;
+                        setNodeProperties(newProps);
+                      }}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">true</SelectItem>
+                        <SelectItem value="false">false</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      type={prop.type === 'integer' || prop.type === 'float' ? 'number' : 'text'}
+                      step={prop.type === 'float' ? '0.01' : prop.type === 'integer' ? '1' : undefined}
+                      value={prop.value}
+                      onChange={(e) => {
+                        const newProps = [...nodeProperties];
+                        newProps[i].value = e.target.value;
+                        setNodeProperties(newProps);
+                      }}
+                      placeholder={prop.type === 'integer' ? '0' : prop.type === 'float' ? '0.00' : 'Value'}
+                      className="flex-1"
+                    />
+                  )}
                   <Select
                     value={prop.type}
                     onValueChange={(value) => {
                       const newProps = [...nodeProperties];
                       newProps[i].type = value;
+                      // Reset value when type changes
+                      if (value === 'boolean') {
+                        newProps[i].value = 'true';
+                      } else if (value === 'integer' || value === 'float') {
+                        newProps[i].value = '';
+                      }
                       setNodeProperties(newProps);
                     }}
                   >
@@ -3482,6 +5321,7 @@ await ductape.init();`,
               Cancel
             </Button>
             <Button
+              variant="outline"
               onClick={() => {
                 const query = {
                   operation: 'createNode',
@@ -3489,16 +5329,57 @@ await ductape.init();`,
                     labels: nodeLabels.filter(l => l),
                     properties: nodeProperties
                       .filter(p => p.key)
-                      .reduce((acc, p) => ({ ...acc, [p.key]: p.value }), {}),
+                      .reduce((acc, p) => {
+                        let value: any = p.value;
+                        if (p.type === 'integer') value = parseInt(p.value, 10) || 0;
+                        else if (p.type === 'float') value = parseFloat(p.value) || 0;
+                        else if (p.type === 'boolean') value = p.value === 'true';
+                        return { ...acc, [p.key]: value };
+                      }, {}),
                     returnNode: true,
                   },
                 };
                 setQueryInput(JSON.stringify(query, null, 2));
                 setShowAddNodeModal(false);
+                setShowQueryEditor(true);
                 toast.success('Query generated - click Execute to run');
               }}
             >
               Generate Query
+            </Button>
+            <Button
+              onClick={() => {
+                const query = {
+                  operation: 'createNode',
+                  options: {
+                    labels: nodeLabels.filter(l => l),
+                    properties: nodeProperties
+                      .filter(p => p.key)
+                      .reduce((acc, p) => {
+                        let value: any = p.value;
+                        if (p.type === 'integer') value = parseInt(p.value, 10) || 0;
+                        else if (p.type === 'float') value = parseFloat(p.value) || 0;
+                        else if (p.type === 'boolean') value = p.value === 'true';
+                        return { ...acc, [p.key]: value };
+                      }, {}),
+                    returnNode: true,
+                  },
+                };
+                setQueryInput(JSON.stringify(query, null, 2));
+                executeQueryMutation.mutate(query);
+                setShowAddNodeModal(false);
+                setShowQueryEditor(true);
+              }}
+              disabled={executeQueryMutation.isPending || nodeLabels.filter(l => l).length === 0}
+            >
+              {executeQueryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                'Create Node'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3523,19 +5404,33 @@ await ductape.init();`,
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-grey mb-2 block">From Node Label</Label>
-                <Input
-                  value={relFromLabel}
-                  onChange={(e) => setRelFromLabel(e.target.value)}
-                  placeholder="Person"
-                />
+                <Select value={relFromLabel} onValueChange={setRelFromLabel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select label..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {labels.map((label) => (
+                      <SelectItem key={label.name} value={label.name}>
+                        {label.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs text-grey mb-2 block">To Node Label</Label>
-                <Input
-                  value={relToLabel}
-                  onChange={(e) => setRelToLabel(e.target.value)}
-                  placeholder="Company"
-                />
+                <Select value={relToLabel} onValueChange={setRelToLabel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select label..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {labels.map((label) => (
+                      <SelectItem key={label.name} value={label.name}>
+                        {label.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -4017,7 +5912,7 @@ await ductape.init();`,
         </DialogContent>
       </Dialog>
 
-      {/* Code Sidebar */}
+      {/* Code Sidebar for Actions */}
       {showCodeSidebar && selectedAction && (
         <CodeSidebar
           title={selectedAction.name}
@@ -4026,6 +5921,44 @@ await ductape.init();`,
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
           environments={[{ slug: graph.env.slug, env_name: graph.env.slug.toUpperCase() }]}
+        />
+      )}
+
+      {/* Code Sidebar for Graph Operations */}
+      {showGraphCodeSidebar && (
+        <CodeSidebar
+          title={`Graph Operations - ${graph.name}`}
+          subtitle={selectedLabel ? `Using label: ${selectedLabel.name}` : selectedRelType ? `Using relationship: ${selectedRelType.type}` : `Code examples for ${graph.name} graph operations`}
+          tag={graph.tag}
+          onClose={() => setShowGraphCodeSidebar(false)}
+          generateCodeSections={generateGraphCodeSections}
+          environments={[{ slug: graph.env.slug, env_name: graph.env.slug.toUpperCase() }]}
+          additionalControls={
+            <div>
+              <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+                Operation Type
+              </Label>
+              <Select value={selectedGraphOperation} onValueChange={setSelectedGraphOperation}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="findNodes">Find Nodes</SelectItem>
+                  <SelectItem value="findNodeById">Find Node by ID</SelectItem>
+                  <SelectItem value="createNode">Create Node</SelectItem>
+                  <SelectItem value="updateNode">Update Node</SelectItem>
+                  <SelectItem value="deleteNode">Delete Node</SelectItem>
+                  <SelectItem value="countNodes">Count Nodes</SelectItem>
+                  <SelectItem value="findRelationships">Find Relationships</SelectItem>
+                  <SelectItem value="createRelationship">Create Relationship</SelectItem>
+                  <SelectItem value="countRelationships">Count Relationships</SelectItem>
+                  <SelectItem value="traverse">Traverse</SelectItem>
+                  <SelectItem value="shortestPath">Shortest Path</SelectItem>
+                  <SelectItem value="rawCypher">Raw Cypher</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          }
         />
       )}
     </div>
