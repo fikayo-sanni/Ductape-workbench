@@ -34,7 +34,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { Pricing, PricingMode, PaymentInterval } from '@/types/pricing';
+import { Pricing, PricingMode, PaymentInterval, PricingPlan } from '@/types/pricing';
 
 export type PricingBundle = Pricing;
 
@@ -543,7 +543,7 @@ const DUMMY_INCOME: IncomeRecord[] = [
   },
 ];
 
-const getModeIcon = (mode: PricingMode) => {
+const getModeIcon = (mode: string) => {
   switch (mode) {
     case PricingMode.PER_REQUEST:
       return <Zap className="h-4 w-4" />;
@@ -558,7 +558,7 @@ const getModeIcon = (mode: PricingMode) => {
   }
 };
 
-const getModeLabel = (mode: PricingMode) => {
+const getModeLabel = (mode: string) => {
   switch (mode) {
     case PricingMode.PER_REQUEST:
       return 'Per Request';
@@ -573,12 +573,12 @@ const getModeLabel = (mode: PricingMode) => {
   }
 };
 
-const getIntervalLabel = (interval?: PaymentInterval) => {
+const getIntervalLabel = (interval?: string) => {
   if (!interval) return '';
   return interval.charAt(0).toUpperCase() + interval.slice(1).replace('-', ' ');
 };
 
-const formatPrice = (price: number, currency: string, mode: PricingMode) => {
+const formatPrice = (price: number, currency: string, mode: string) => {
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
@@ -732,11 +732,11 @@ export default function PricingTabContent() {
   };
 
   const editMutation = useMutation({
-  mutationFn: (payload: {
+  mutationFn: (data: {
     _id: string;
     user_id: string;
     public_key: string;
-    workspace_id: string; // Add this if needed
+    workspace_id: string;
     name: string;
     pricing_mode: string;
     interval: string;
@@ -750,7 +750,16 @@ export default function PricingTabContent() {
       per_week?: number;
       per_month?: number;
     };
-  }) => pricingServices.editBundles(payload),
+  }) => {
+    const { _id, user_id, public_key, workspace_id, ...pricingPlan } = data;
+    return pricingServices.editBundles({
+      _id,
+      user_id,
+      public_key,
+      workspace_id,
+      payload: pricingPlan as PricingPlan,
+    });
+  },
 
   onSuccess: (data) => {
     if (!data) return;
@@ -814,8 +823,8 @@ export default function PricingTabContent() {
     if (editingBundle) {
       form.reset({
         name: editingBundle.name,
-        pricing_mode: editingBundle.pricing_mode,
-        interval: editingBundle.interval,
+        pricing_mode: editingBundle.pricing_mode as PricingMode,
+        interval: editingBundle.interval as PaymentInterval,
         unit_price: editingBundle.unit_price,
         currency: editingBundle.currency,
         per_minute: editingBundle.limits?.per_minute,
@@ -893,11 +902,11 @@ export default function PricingTabContent() {
       public_key: user.public_key,
       workspace_id: currentWorkspaceId || '',
       name: bundleData.name,
-      pricing_mode: bundleData.pricing_mode,
-      interval: bundleData.interval,
+      pricing_mode: bundleData.pricing_mode as string,
+      interval: (bundleData.interval as string) || '',
       unit_price: bundleData.unit_price,
       currency: bundleData.currency,
-      overage_price: bundleData.overage_price,
+      overage_price: bundleData.overage_price || 0,
       ...(Object.keys(limits).length > 0 && { limits }),
     };
 
