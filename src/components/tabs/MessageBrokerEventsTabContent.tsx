@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
   MessageSquare,
   Search,
@@ -122,17 +123,23 @@ const statusOptions = [
 
 export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerEventsTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const { activeTabId, updateTab, tabs } = useWorkbenchStore();
+
+  // Get current tab to access persisted state
+  const currentTab = tabs.find(tab => tab.id === activeTabId);
+  const tabState = currentTab?.data?.tabState || {};
+
+  const [searchQuery, setSearchQuery] = useState(tabState.searchQuery || '');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(tabState.statusFilter || 'all');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set(tabState.expandedRows || []));
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [viewMode, setViewMode] = useState<ViewMode>('overview');
+  const [viewMode, setViewMode] = useState<ViewMode>(tabState.viewMode || 'overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [listViewMode, setListViewMode] = useState<'list' | 'grid'>('list');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [selectedConsumer, setSelectedConsumer] = useState<ConsumerInstance | null>(null);
-  const [selectedProducer, setSelectedProducer] = useState<ProducerInstance | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [listViewMode, setListViewMode] = useState<'list' | 'grid'>(tabState.listViewMode || 'list');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(tabState.isSidebarCollapsed || false);
+  const [selectedConsumer, setSelectedConsumer] = useState<ConsumerInstance | null>(tabState.selectedConsumer || null);
+  const [selectedProducer, setSelectedProducer] = useState<ProducerInstance | null>(tabState.selectedProducer || null);
+  const [showFilters, setShowFilters] = useState(tabState.showFilters || false);
 
   // Calculate active filter count
   const activeFilterCount = [
@@ -157,6 +164,47 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Persist state to tab data whenever it changes
+  useEffect(() => {
+    if (activeTabId && currentTab) {
+      const newTabState = {
+        searchQuery,
+        statusFilter,
+        expandedRows: Array.from(expandedRows),
+        viewMode,
+        listViewMode,
+        isSidebarCollapsed,
+        selectedConsumer,
+        selectedProducer,
+        showFilters,
+      };
+
+      // Only update if the state actually changed
+      const currentTabState = currentTab.data?.tabState;
+      const hasChanged = JSON.stringify(currentTabState) !== JSON.stringify(newTabState);
+
+      if (hasChanged) {
+        updateTab(activeTabId, {
+          data: {
+            ...currentTab.data,
+            tabState: newTabState,
+          },
+        });
+      }
+    }
+  }, [
+    searchQuery,
+    statusFilter,
+    expandedRows,
+    viewMode,
+    listViewMode,
+    isSidebarCollapsed,
+    selectedConsumer,
+    selectedProducer,
+    showFilters,
+    activeTabId,
+  ]);
 
   // Get env from broker - handle both env object and envs array formats
   const brokerEnv = broker.env?.slug || broker.envs?.[0]?.slug || 'live';
@@ -537,20 +585,55 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
         isSidebarCollapsed ? "w-14" : "w-64"
       )}>
         {/* Header */}
-        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-4")}>
-          <div className={cn("flex items-center gap-2", !isSidebarCollapsed && "mb-3")}>
-            <MessageSquare className="h-5 w-5 text-cyan-600 flex-shrink-0" />
+        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-3")}>
+          <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2")}>
+            {/* Broker Icon - clickable to expand when collapsed */}
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                } else {
+                  setViewMode('overview');
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }
+              }}
+              className={cn(
+                "rounded-lg bg-cyan-600/10 flex items-center justify-center text-cyan-600 flex-shrink-0 transition-all hover:ring-2 hover:ring-cyan-500/50",
+                isSidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Return to overview"}
+            >
+              <MessageSquare className="h-5 w-5" />
+            </button>
             {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-grey text-sm truncate">{broker.name}</h2>
-                <p className="text-xs text-grey-600 truncate">{broker.brokerTag || broker.tag}</p>
-              </div>
+              <>
+                <button
+                  onClick={() => {
+                    setViewMode('overview');
+                    setSelectedConsumer(null);
+                    setSelectedProducer(null);
+                  }}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  title="Return to overview"
+                >
+                  <h2 className="font-semibold text-grey text-sm truncate">{broker.name}</h2>
+                  <p className="text-xs text-grey-600 truncate">{broker.brokerTag || broker.tag}</p>
+                </button>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
 
           {/* Search */}
           {!isSidebarCollapsed && (
-            <div className="relative">
+            <div className="relative mt-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
               <Input
                 type="text"
@@ -762,23 +845,18 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
             </div>
           </div>
 
-          {/* Collapse Toggle Button */}
-          <div className="flex-shrink-0 p-2 border-t border-grey-400">
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-cyan-600 transition-colors"
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isSidebarCollapsed ? (
+          {/* Expand button - only shown when collapsed */}
+          {isSidebarCollapsed && (
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                title="Expand sidebar"
+              >
                 <PanelLeft className="h-4 w-4" />
-              ) : (
-                <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
       {/* Main Content */}

@@ -62,8 +62,8 @@ import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
 import CreateFolderModal from '@/components/modals/CreateFolderModal';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useDuctape } from '@/hooks/useDuctape';
+import PublishAppModal from '@/components/modals/PublishAppModal';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppDashboard } from '@/hooks/useAnalytics';
 import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
@@ -128,6 +128,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
   const [showCreateSharedVariableModal, setShowCreateSharedVariableModal] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
   const [newFolderParentName, setNewFolderParentName] = useState<string | undefined>(undefined);
 
@@ -222,35 +223,6 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
 
   // Check if the selected version is unpublished (draft or private)
   const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private' || !selectedVersion?.status;
-
-  // Initialize Ductape SDK for publishing
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'app',
-  }) as any;
-
-  // Publish app mutation
-  const { mutate: publishApp, isPending: isPublishing } = useMutation({
-    mutationFn: async () => {
-      if (!ductape || !currentApp?.tag) throw new Error('Unable to publish');
-      await ductape.init(currentApp.tag);
-      await ductape.update(currentApp.tag, {
-        status: 'public',
-        version: selectedVersion?.tag,
-      });
-    },
-    onSuccess: () => {
-      toast.success('App version published successfully');
-      queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
-      queryClient.invalidateQueries({ queryKey: ['apps'] });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to publish app');
-    },
-  });
 
   // Build folder tree structure with actions
   const folderTree = useMemo((): FolderTreeNode[] => {
@@ -1293,17 +1265,12 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 )}
                 {selectedVersion && isInternalApp && isVersionUnpublished && (
                   <Button
-                    onClick={() => publishApp()}
+                    onClick={() => setShowPublishModal(true)}
                     size="sm"
                     className="w-36"
-                    disabled={isPublishing}
                   >
-                    {isPublishing ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Rocket className="h-4 w-4 mr-1" />
-                    )}
-                    {isPublishing ? 'Publishing...' : 'Publish'}
+                    <Rocket className="h-4 w-4 mr-1" />
+                    Publish
                   </Button>
                 )}
                 {selectedVersion && (
@@ -1980,6 +1947,29 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
             onOpenChange={setShowIntegrationModal}
           />
         </IntegrationProvider>
+      )}
+
+      {showPublishModal && currentApp && selectedVersion && (
+        <PublishAppModal
+          open={showPublishModal}
+          onOpenChange={setShowPublishModal}
+          app={{
+            _id: currentApp._id,
+            tag: currentApp.tag,
+            app_name: currentApp.app_name,
+            description: currentApp.description,
+            logo: currentApp.logo,
+            domains: currentApp.domains,
+          }}
+          version={{
+            tag: selectedVersion.tag,
+            status: selectedVersion.status,
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
+            queryClient.invalidateQueries({ queryKey: ['apps'] });
+          }}
+        />
       )}
     </div>
   );

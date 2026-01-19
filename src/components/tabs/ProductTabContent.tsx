@@ -104,12 +104,11 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'sessions', label: 'Sessions', icon: KeyRound, color: 'text-blue-600', bgColor: 'bg-blue-600/10', dataKey: 'sessions', componentType: 'session' },
   { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
-  // Disabled categories (coming soon)
-  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification', disabled: true },
-  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job', disabled: true },
-  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
-  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
-  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
+  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
+  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow' },
+  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence' },
+  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience' },
 ];
 
 export default function ProductTabContent({ tabId, product: initialProduct, productId }: ProductTabContentProps) {

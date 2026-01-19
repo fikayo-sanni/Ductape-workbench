@@ -58,7 +58,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import DetailsSidebar from '@/components/DetailsSidebar';
 import CodeSidebar from '@/components/CodeSidebar';
 import { fetchLogs } from '@/services/logsServices';
-import * as appServices from '@/services/appServices';
+import appServices from '@/services/appServices';
 import { saveTabState, getTabState } from '@/lib/tab-state-manager';
 
 interface WebhookExplorerTabProps {
@@ -125,7 +125,7 @@ function WebhookEnvMetrics({
       );
 
       // Calculate metrics from logs
-      const logs = response.logs || [];
+      const logs = response.data?.logs?.data || [];
       const successCount = logs.filter((l: any) => l.status === 'success').length;
       const failedCount = logs.filter((l: any) => l.status === 'fail').length;
       const totalCount = logs.length;
@@ -219,7 +219,7 @@ function WebhookGlobalMetrics({
       );
 
       // Calculate metrics from logs
-      const logs = response.logs || [];
+      const logs = response.data?.logs?.data || [];
       const successCount = logs.filter((l: any) => l.status === 'success').length;
       const failedCount = logs.filter((l: any) => l.status === 'fail').length;
       const totalCount = logs.length;
@@ -227,7 +227,7 @@ function WebhookGlobalMetrics({
       // Calculate daily activity for last 7 days
       const now = new Date();
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const dailyActivity = [];
+      const dailyActivity: Array<{ day: string; requests: number; successful: number; failed: number }> = [];
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
@@ -323,8 +323,9 @@ export default function WebhookExplorerTab({ tabId, webhook }: WebhookExplorerTa
 
   // Get the current app and its version
   const currentApp = appData?.data || app;
-  const selectedVersion = currentApp?.versions?.find((v: any) => v.latest) ||
-    (currentApp?.versions && currentApp.versions.length > 0 ? currentApp.versions[0] : null);
+  const versions = (currentApp && 'versions' in currentApp) ? (currentApp as any).versions : null;
+  const selectedVersion = versions?.find((v: any) => v.latest) ||
+    (versions && versions.length > 0 ? versions[0] : null);
 
   // Get environments from the app version (not from webhook)
   const appEnvironments = selectedVersion?.envs || [];

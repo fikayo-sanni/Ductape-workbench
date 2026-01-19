@@ -1086,7 +1086,7 @@ await ductape.init();`,
 
     // Generate sample properties based on selected label
     const sampleProperties = selectedLabel?.properties?.length
-      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'STRING' ? 'value' : p.type === 'INTEGER' ? '1' : 'true'}'`).join(',\n      ')
+      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(',\n      ')
       : "name: 'value'";
 
     if (language === 'typescript' || language === 'javascript') {
@@ -3605,7 +3605,7 @@ await ductape.init();`,
                     onClick={() => {
                       setShowQueryEditor(false);
                       setQueryResult(null);
-                      setQuery('');
+                      setQueryInput('');
                     }}
                     className="gap-2 text-grey"
                     title="Back to Overview"
@@ -3712,7 +3712,7 @@ await ductape.init();`,
                     </Button>
                     <Button
                       size="sm"
-                      onClick={handleExecuteQuery}
+                      onClick={() => handleExecuteQuery()}
                       disabled={isExecuting}
                       className="gap-2 bg-green-600 hover:bg-green-700 text-white"
                     >
@@ -3827,7 +3827,7 @@ await ductape.init();`,
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleExecuteQuery}
+                      onClick={() => handleExecuteQuery()}
                       disabled={isExecuting}
                       className="gap-1.5 h-7"
                     >

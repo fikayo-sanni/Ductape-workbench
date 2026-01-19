@@ -201,25 +201,29 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
 
   return (
     <Dialog open={open} onOpenChange={isImporting ? undefined : onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {!showImportView ? (
           // Main view
           <>
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-green" />
+            {/* Header - Fixed */}
+            <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-green" />
+                  </div>
+                  <div>
+                    <DialogTitle className='text-grey'>App Created Successfully!</DialogTitle>
+                    <DialogDescription>
+                      Your app "{app?.app_name || app?.name}" has been created and is now open. What would you like to do next?
+                    </DialogDescription>
+                  </div>
                 </div>
-                <div>
-                  <DialogTitle className='text-grey'>App Created Successfully!</DialogTitle>
-                  <DialogDescription>
-                    Your app "{app?.app_name || app?.name}" has been created and is now open. What would you like to do next?
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
+              </DialogHeader>
+            </div>
 
-            <div className="py-6 space-y-4">
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <div className="space-y-3">
                 <Button
                   onClick={handleImportContent}
@@ -249,44 +253,50 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                   </div>
                 </Button>
               </div>
+            </div>
 
-              <div className="pt-4 border-t border-grey-400">
-                <Button
-                  variant="outline"
-                  onClick={handleSkip}
-                  className="w-full"
-                >
-                  Skip for now
-                </Button>
-              </div>
+            {/* Footer - Fixed */}
+            <div className="px-6 py-4 border-t border-grey-400 bg-grey-50">
+              <Button
+                variant="outline"
+                onClick={handleSkip}
+                className="w-full"
+              >
+                Skip for now
+              </Button>
             </div>
           </>
         ) : (
           // Import view
           <>
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                {!isImporting && (
-                  <Button
-                    onClick={handleBackToMain}
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                )}
-                <div>
-                  <DialogTitle className='text-grey'>Import to App</DialogTitle>
-                  <DialogDescription>
-                    Import Postman collections or OpenAPI specifications to populate your app with actions and configurations
-                  </DialogDescription>
+            {/* Header - Fixed */}
+            <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  {!isImporting && (
+                    <Button
+                      onClick={handleBackToMain}
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <div>
+                    <DialogTitle className='text-grey'>Import to App</DialogTitle>
+                    <DialogDescription>
+                      Import Postman collections or OpenAPI specifications to populate your app with actions and configurations
+                    </DialogDescription>
+                  </div>
                 </div>
-              </div>
-            </DialogHeader>
+              </DialogHeader>
+            </div>
 
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             {/* Import Type Selection */}
-            <div className="space-y-3 mt-4">
+            <div className="space-y-3">
               <Label className="text-sm font-semibold text-grey">Select Import Type</Label>
               <div className="space-y-2">
                 <label
@@ -396,9 +406,10 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
                 </div>
               </div>
             </div>
+            </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-2 mt-6">
+            {/* Actions - Fixed Footer */}
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-grey-400 bg-grey-50">
               {!isImporting && (
                 <Button variant="outline" onClick={handleBackToMain}>
                   Cancel

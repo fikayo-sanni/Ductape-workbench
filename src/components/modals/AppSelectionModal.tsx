@@ -63,15 +63,19 @@ export default function AppSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle className='text-grey'>{title}</DialogTitle>
-          {description && (
-            <p className="text-sm text-grey-600 mt-1">{description}</p>
-          )}
-        </DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="px-6 pt-6 pb-4 border-b border-grey-400">
+          <DialogHeader>
+            <DialogTitle className='text-grey'>{title}</DialogTitle>
+            {description && (
+              <p className="text-sm text-grey-600 mt-1">{description}</p>
+            )}
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-4">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Create New App Button */}
           <Button
             onClick={onCreateNew}
@@ -100,7 +104,7 @@ export default function AppSelectionModal({
           </div>
 
           {/* Apps List */}
-          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          <div className="space-y-2">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -110,7 +114,7 @@ export default function AppSelectionModal({
                 <Grid3x3 className="h-12 w-12 mx-auto mb-2 text-grey-400" />
                 <p className="text-sm">
                   {relevantApps.length === 0
-                    ? productId 
+                    ? productId
                       ? 'No apps in this product yet'
                       : 'No apps in this workspace yet'
                     : 'No apps found'}
@@ -155,13 +159,13 @@ export default function AppSelectionModal({
               ))
             )}
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-grey-400">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
+        {/* Actions - Fixed Footer */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-grey-400 bg-grey-50">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

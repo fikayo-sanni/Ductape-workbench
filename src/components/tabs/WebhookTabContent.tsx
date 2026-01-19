@@ -92,7 +92,7 @@ function WebhookEnvMetrics({
       );
 
       // Calculate metrics from logs
-      const logs = response.logs || [];
+      const logs = response.data?.logs?.data || [];
       const successCount = logs.filter((l: any) => l.status === 'success').length;
       const failedCount = logs.filter((l: any) => l.status === 'fail').length;
       const totalCount = logs.length;

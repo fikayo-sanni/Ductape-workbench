@@ -302,20 +302,49 @@ export default function SessionActivityTab({
         isSidebarCollapsed ? "w-14" : "w-64"
       )}>
         {/* Header */}
-        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-4")}>
-          <div className={cn("flex items-center gap-2", !isSidebarCollapsed && "mb-3")}>
-            <Key className="h-5 w-5 text-blue-600 flex-shrink-0" />
+        <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-3")}>
+          <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2")}>
+            {/* Session Icon - clickable to expand when collapsed */}
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                } else {
+                  setViewMode('overview');
+                }
+              }}
+              className={cn(
+                "rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 flex-shrink-0 transition-all hover:ring-2 hover:ring-blue-500/50",
+                isSidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Return to overview"}
+            >
+              <Key className="h-5 w-5" />
+            </button>
             {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-grey text-sm truncate">{session?.name || 'User Sessions'}</h2>
-                <p className="text-xs text-grey-600 truncate">{envSlug}</p>
-              </div>
+              <>
+                <button
+                  onClick={() => setViewMode('overview')}
+                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                  title="Return to overview"
+                >
+                  <h2 className="font-semibold text-grey text-sm truncate">{session?.name || 'User Sessions'}</h2>
+                  <p className="text-xs text-grey-600 truncate">{envSlug}</p>
+                </button>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
 
           {/* Search */}
           {!isSidebarCollapsed && (
-            <div className="relative">
+            <div className="relative mt-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
               <Input
                 type="text"
@@ -418,23 +447,18 @@ export default function SessionActivityTab({
 
           </div>
 
-          {/* Collapse Toggle Button */}
-          <div className="flex-shrink-0 p-2 border-t border-grey-400">
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-blue-600 transition-colors"
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isSidebarCollapsed ? (
+          {/* Expand button - only shown when collapsed */}
+          {isSidebarCollapsed && (
+            <div className="px-2 mt-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                title="Expand sidebar"
+              >
                 <PanelLeft className="h-4 w-4" />
-              ) : (
-                <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
       {/* Main Content */}

@@ -570,16 +570,19 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             } : undefined,
             // For component tabs (cache, broker, session, etc.), persist root-level fields
             // These are needed for components that have their data at the root of tab.data
-            name: (tab.data as any).name,
-            tag: (tab.data as any).tag,
-            cacheTag: (tab.data as any).cacheTag,
-            brokerTag: (tab.data as any).brokerTag,
-            sessionTag: (tab.data as any).sessionTag,
-            productTag: (tab.data as any).productTag,
-            productName: (tab.data as any).productName,
-            sessionName: (tab.data as any).sessionName,
-            type: (tab.data as any).type,
-            provider: (tab.data as any).provider,
+            // Only include if not already present in nested objects
+            ...(!(tab.data as any).storage && !(tab.data as any).vector ? {
+              name: (tab.data as any).name,
+              tag: (tab.data as any).tag,
+              cacheTag: (tab.data as any).cacheTag,
+              brokerTag: (tab.data as any).brokerTag,
+              sessionTag: (tab.data as any).sessionTag,
+              productTag: (tab.data as any).productTag,
+              productName: (tab.data as any).productName,
+              sessionName: (tab.data as any).sessionName,
+              type: (tab.data as any).type,
+              provider: (tab.data as any).provider,
+            } : {}),
             // Also preserve nested component objects if they exist
             cache: (tab.data as any).cache,
             broker: (tab.data as any).broker,
