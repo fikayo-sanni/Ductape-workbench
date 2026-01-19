@@ -722,9 +722,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
 import Ductape from '@ductape/sdk';
 
 const ductape = new Ductape({
-  user_id: 'your-user-id',
-  workspace_id: 'your-workspace-id',
-  private_key: 'your-private-key',
+  accessKey: 'your-access-key',
 });
 
 // Run agent

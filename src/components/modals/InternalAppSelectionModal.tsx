@@ -44,15 +44,17 @@ export default function InternalAppSelectionModal({
         user_id: user?._id || '',
         public_key: user?.public_key || '',
         workspace_id: currentWorkspaceId || '',
-        status: 'active',
+        status: 'all',
       }),
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId,
   });
 
   const apps = appsData?.data || [];
   const filteredApps = apps.filter((app: any) =>
-    app.app_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.tag?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Exclude draft apps
+    app.status !== 'draft' &&
+    (app.app_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.tag?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleAppSelect = (app: any) => {
@@ -146,7 +148,7 @@ export default function InternalAppSelectionModal({
                 <div
                   key={app._id}
                   onClick={() => handleAppSelect(app)}
-                  className="p-4 rounded-lg border border-grey-200 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                  className="p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

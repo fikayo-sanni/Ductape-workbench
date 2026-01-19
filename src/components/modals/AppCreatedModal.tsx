@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Buffer } from 'buffer';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
   Dialog,
@@ -94,7 +93,16 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
 
     try {
       const content = await file.text();
-      const blob = new Blob([content], { type: 'application/json' });
+
+      // Parse and validate the JSON content
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(content);
+      } catch (e) {
+        toast.error('Invalid JSON file. Please check the file format.');
+        setIsImporting(false);
+        return;
+      }
 
       // Initialize the full Ductape SDK instance for import operations
       const ductape = connectDuctapeWorkspace({
@@ -114,8 +122,9 @@ export default function AppCreatedModal({ open, onOpenChange, app }: AppCreatedM
       }
 
       // Import using SDK actions.import
+      // Pass the parsed JSON object - the SDK/proxy will convert it to Buffer
       await ductape.actions.import({
-        file: blob as unknown as Buffer,
+        file: parsedContent,
         type: importType === 'postman' ? ImportDocsTypes.postmanV21 : ImportDocsTypes.openApiV30,
         version: version,
         appTag: app.tag,

@@ -105,7 +105,7 @@ export default function StepOne({
       setProductTag(values.product_tag);
 
       // Connect app to product
-      const { access_tag } = await productBuilder.apps.connect(appTag);
+      const { access_tag } = await productBuilder.apps.connect(values.product_tag, appTag);
       console.log('Setting accessTag:', access_tag);
       setAccessTag(access_tag);
 

@@ -3,13 +3,23 @@ import {
   Webhook,
   Copy,
   Check,
-  Info,
   Zap,
   Plus,
   Save,
   Loader2,
   CheckCircle,
   XCircle,
+  Globe,
+  Code,
+  ArrowRight,
+  Activity,
+  TrendingUp,
+  Clock,
+  Filter,
+  BarChart3,
+  Send,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,18 +45,117 @@ import { IWebhook, IWebhookEvent } from "@/types/webhook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDuctape } from "@/hooks/useDuctape";
 import { useAuth } from "@/store/useAuth";
+import { useWorkbenchStore } from "@/stores/workbench-store";
 import DetailsSidebar from "@/components/DetailsSidebar";
+import CodeSidebar from "@/components/CodeSidebar";
+import { fetchLogs } from "@/services/logsServices";
 
 interface WebhookTabContentProps {
   webhook: IWebhook;
 }
 
+// Component to fetch and display webhook metrics for a specific environment
+function WebhookEnvMetrics({
+  webhookTag,
+  appTag,
+  env,
+  productTag
+}: {
+  webhookTag: string;
+  appTag: string;
+  env: string;
+  productTag?: string;
+}) {
+  const { user, currentWorkspaceId } = useAuth();
+
+  const { data: metricsData, isLoading } = useQuery({
+    queryKey: ['webhook-env-metrics', webhookTag, appTag, env],
+    queryFn: async () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+        throw new Error('Missing auth parameters');
+      }
+
+      // Fetch webhook logs for this environment
+      const response = await fetchLogs(
+        {
+          workspace_id: currentWorkspaceId,
+          user_id: user._id,
+          public_key: user.public_key,
+        },
+        {
+          type: 'webhook',
+          parent_tag: webhookTag,
+          app_env: env,
+          groupBy: 'week',
+          limit: 100,
+        }
+      );
+
+      // Calculate metrics from logs
+      const logs = response.logs || [];
+      const successCount = logs.filter((l: any) => l.status === 'success').length;
+      const failedCount = logs.filter((l: any) => l.status === 'fail').length;
+      const totalCount = logs.length;
+
+      return {
+        totalRequests: totalCount,
+        successfulRequests: successCount,
+        failedRequests: failedCount,
+        successRate: totalCount > 0 ? Math.round((successCount / totalCount) * 100) : 0,
+      };
+    },
+    enabled: !!webhookTag && !!env && !!currentWorkspaceId && !!user?._id && !!user?.public_key,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-4 gap-4 mt-4 p-4 bg-grey-50 rounded-lg border border-grey-200">
+        {[...Array(4)].map((_, i) => (
+          <div key={i}>
+            <p className="text-xs text-grey-600 mb-1">{['Total', 'Success', 'Failed', 'Rate'][i]}</p>
+            <p className="text-lg font-semibold text-grey-400">...</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-4 gap-4 mt-4 p-4 bg-grey-50 rounded-lg border border-grey-200">
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Total Requests</p>
+        <p className="text-lg font-semibold text-grey">{metricsData?.totalRequests || 0}</p>
+      </div>
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Successful</p>
+        <p className="text-lg font-semibold text-green">{metricsData?.successfulRequests || 0}</p>
+      </div>
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Failed</p>
+        <p className="text-lg font-semibold text-red">{metricsData?.failedRequests || 0}</p>
+      </div>
+      <div>
+        <p className="text-xs text-grey-600 mb-1">Success Rate</p>
+        <p className={cn(
+          "text-lg font-semibold",
+          (metricsData?.successRate || 0) >= 90 ? "text-green" :
+          (metricsData?.successRate || 0) >= 70 ? "text-orange-500" : "text-red"
+        )}>
+          {metricsData?.successRate || 0}%
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
+  const { openTab } = useWorkbenchStore();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [showNewEventDialog, setShowNewEventDialog] = useState(false);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
 
   // New event form state
   const [eventName, setEventName] = useState("");
@@ -74,14 +183,12 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
   // Auto-generate tag and description from name
   const handleEventNameChange = (value: string) => {
     setEventName(value);
-    // Auto-generate tag
     const sanitized = value
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_|_$/g, "");
     setEventTag(sanitized);
-    // Auto-generate description
     setEventDescription(value);
   };
 
@@ -94,9 +201,8 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
     setEventSample("{}");
   };
 
-  // Parse sample payload and extract selector options with aggressive validation
+  // Parse sample payload and extract selector options
   const sampleValidation = useMemo(() => {
-    // Skip validation for empty or default JSON
     if (!eventSample || eventSample.trim() === '' || eventSample.trim() === '{}') {
       return { isValid: true, error: null, selectorOptions: [] as string[] };
     }
@@ -105,27 +211,19 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
       const sample = JSON.parse(eventSample);
       const options: string[] = [];
 
-      const traverse = (
-        obj: any,
-        path: string = "",
-        parentIsArray: boolean = false
-      ) => {
+      const traverse = (obj: any, path: string = "", parentIsArray: boolean = false) => {
         if (typeof obj !== "object" || obj === null) return;
-        // Skip array children
         if (parentIsArray) return;
 
         for (const [key, value] of Object.entries(obj)) {
           const currentPath = path ? `${path}.${key}` : key;
           const isArray = Array.isArray(value);
-          const isObject =
-            typeof value === "object" && value !== null && !isArray;
+          const isObject = typeof value === "object" && value !== null && !isArray;
 
-          // Only add non-object, non-array keys
           if (!isObject && !isArray) {
             options.push(currentPath);
           }
 
-          // Traverse nested objects
           if (isObject && !isArray) {
             traverse(value, currentPath, false);
           }
@@ -148,7 +246,6 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
     mutationFn: async (payload: any) => {
       if (!ductape) throw new Error("Ductape not initialized");
 
-      // Parse sample JSON
       let parsedSample;
       try {
         parsedSample = JSON.parse(payload.sample);
@@ -156,18 +253,14 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
         throw new Error("Invalid JSON in sample payload");
       }
 
-      // Format selector: convert "field.subfield" to "$Event{field}{subfield}"
       const formattedSelector = payload.selector
         ? `$Event{${payload.selector.split(".").join("}{")}}`
         : "";
 
-      // Assuming we have app context from webhook
-      const appTag = (webhook as any)?.appTag || (webhook as any)?.app?.tag;
-      if (!appTag) throw new Error("App tag not found");
+      const appTagValue = (webhook as any)?.appTag || (webhook as any)?.app?.tag;
+      if (!appTagValue) throw new Error("App tag not found");
 
-      await (ductape as any).init(appTag);
-
-      const eventData = await (ductape as any).webhooks.events.create({
+      const eventData = await (ductape as any).webhooks.events.create(appTagValue,{
         name: payload.name,
         tag: `${webhook.tag}:${payload.tag}`,
         description: payload.description,
@@ -178,9 +271,15 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
       return eventData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
-      queryClient.invalidateQueries({ queryKey: ["webhook", webhook.tag] });
-      queryClient.invalidateQueries({ queryKey: ["webhook-events", webhook.tag] });
+      const appTagValue = (webhook as any)?.appTag || (webhook as any)?.app?.tag;
+      const appId = (webhook as any)?.app?._id;
+      if (appId) {
+        queryClient.invalidateQueries({ queryKey: ["app", appId] });
+      }
+      if (appTagValue) {
+        queryClient.invalidateQueries({ queryKey: ["app", appTagValue] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["apps"] });
       toast.success("Event created successfully!");
       setShowNewEventDialog(false);
       resetForm();
@@ -205,302 +304,421 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
     });
   };
 
-  // Fetch events using SDK
-  const { data: events = [] } = useQuery({
-    queryKey: ["webhook-events", webhook.tag],
-    queryFn: async () => {
-      if (!ductape) throw new Error("Ductape not initialized");
+  // Use events from webhook prop
+  const events: IWebhookEvent[] = (webhook as any)?.events || [];
 
-      const appTag = (webhook as any)?.appTag || (webhook as any)?.app?.tag;
-      if (!appTag) throw new Error("App tag not found");
+  // Find selected event
+  const selectedEvent = events?.find((event) => event._id === selectedEventId);
 
-      await (ductape as any).init(appTag);
-      const eventsData = await (ductape as any).webhooks.events.fetchAll(webhook.tag);
-
-      return eventsData as IWebhookEvent[];
-    },
-    enabled: !!ductape && !!webhook.tag,
-  });
-
-  // Find selected event from fetched events
-  const selectedEvent = events?.find(
-    (event) => event._id === selectedEventId
-  );
-
-  // Extract app/product info for context header
+  // Extract app/product info
   const app = (webhook as any)?.app;
   const appName = (webhook as any)?.appName || app?.app_name;
   const appTag = (webhook as any)?.appTag || app?.tag;
   const appLogo = (webhook as any)?.appLogo || app?.logo;
+  const productTag = (webhook as any)?.productTag;
+
+  // Count events with single vs multi selectors
+  const selectorStats = useMemo(() => {
+    let singleSelector = 0;
+    let multiSelector = 0;
+    events.forEach((event) => {
+      const selectorStr = (event as any).selector || '';
+      const selectors = selectorStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (selectors.length > 1) {
+        multiSelector++;
+      } else if (selectors.length === 1) {
+        singleSelector++;
+      }
+    });
+    return { singleSelector, multiSelector };
+  }, [events]);
+
+  // Format selector for display
+  const formatSelector = (sel: string) => {
+    const matches = sel.match(/\{([^}]+)\}/g);
+    if (!matches) return sel;
+    return matches.map(m => m.slice(1, -1)).join('.');
+  };
+
+  // Open event in new tab
+  const handleViewEvent = (event: IWebhookEvent) => {
+    setSelectedEventId(event._id);
+  };
+
+  // View webhook activity/logs
+  const handleViewActivity = () => {
+    openTab({
+      id: `logs-webhook-${webhook.tag}-${Date.now()}`,
+      type: 'logs',
+      title: `${webhook.name} - Logs`,
+      itemId: webhook.tag,
+      data: {
+        type: 'webhook',
+        parent_tag: webhook.tag,
+        app_tag: appTag,
+      },
+    });
+  };
+
+  // Open in explorer tab
+  const handleOpenInExplorer = () => {
+    openTab({
+      id: `webhook-explorer-${webhook.tag}-${Date.now()}`,
+      type: 'webhook-explorer',
+      title: `${webhook.name}`,
+      itemId: webhook.tag,
+      data: {
+        ...webhook,
+        appTag,
+        appName,
+        appLogo,
+        productTag,
+        app,
+      },
+    });
+  };
+
+  // Generate SDK code examples
+  const generateCodeSections = (language: string, env: string = 'production') => {
+    const sections: Array<{ title: string; code: string }> = [];
+
+    if (language === 'typescript') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `import { Ductape } from '@ductape/sdk';
+
+const ductape = new Ductape({
+  workspace_id: 'your_workspace_id',
+  user_id: 'your_user_id',
+  token: 'your_auth_token',
+  public_key: 'your_public_key'
+});
+
+// Initialize app
+await ductape.app.init('${appTag}');`,
+      });
+
+      sections.push({
+        title: 'Register Webhook Endpoint',
+        code: `// Register your endpoint to receive webhook events
+const registration = await ductape.webhooks.register({
+  tag: '${webhook.tag}',
+  env: '${env}',
+  url: 'https://your-api.com/webhooks/receive',
+  method: 'POST'
+});
+
+console.log('Webhook registered:', registration);`,
+      });
+
+      sections.push({
+        title: 'Handle Incoming Webhooks',
+        code: `// Example Express.js handler for incoming webhooks
+app.post('/webhooks/receive', async (req, res) => {
+  const payload = req.body;
+  const eventType = payload.event; // Use your selector field
+
+  switch(eventType) {
+${events.slice(0, 3).map(e => `    case '${e.tag}':\n      // Handle ${e.name}\n      break;`).join('\n')}
+    default:
+      console.log('Unknown event:', eventType);
+  }
+
+  res.status(200).json({ received: true });
+});`,
+      });
+    } else if (language === 'javascript') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `const { Ductape } = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  workspace_id: 'your_workspace_id',
+  user_id: 'your_user_id',
+  token: 'your_auth_token',
+  public_key: 'your_public_key'
+});
+
+// Initialize app
+await ductape.app.init('${appTag}');`,
+      });
+
+      sections.push({
+        title: 'Register Webhook Endpoint',
+        code: `// Register your endpoint to receive webhook events
+const registration = await ductape.webhooks.register({
+  tag: '${webhook.tag}',
+  env: '${env}',
+  url: 'https://your-api.com/webhooks/receive',
+  method: 'POST'
+});
+
+console.log('Webhook registered:', registration);`,
+      });
+    } else if (language === 'python') {
+      sections.push({
+        title: 'Initialize SDK',
+        code: `from ductape import Ductape
+
+ductape = Ductape(
+    workspace_id='your_workspace_id',
+    user_id='your_user_id',
+    token='your_auth_token',
+    public_key='your_public_key'
+)
+
+# Initialize app
+ductape.app.init('${appTag}')`,
+      });
+
+      sections.push({
+        title: 'Register Webhook Endpoint',
+        code: `# Register your endpoint to receive webhook events
+registration = ductape.webhooks.register({
+    'tag': '${webhook.tag}',
+    'env': '${env}',
+    'url': 'https://your-api.com/webhooks/receive',
+    'method': 'POST'
+})
+
+print('Webhook registered:', registration)`,
+      });
+    }
+
+    return sections;
+  };
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* App Context Header */}
-          {(appName || app) && (
-            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
-                  {appLogo ? (
-                    <img
-                      src={appLogo}
-                      alt={appName}
-                      className="w-full h-full rounded-lg object-cover"
-                    />
-                  ) : (
-                    appName?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h2 className="text-xl font-bold text-grey">Webhook Channel for {appName}</h2>
-                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">
-                      {appTag}
-                    </span>
-                  </div>
-                  <p className="text-sm text-grey-600">
-                    This webhook channel is connected to your app and configured for its environments
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-grey-600">
-                  <CheckCircle className="h-4 w-4 text-green" />
-                  <span>Auto-connect enabled</span>
-                </div>
-              </div>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-lg bg-blue/10 flex items-center justify-center flex-shrink-0">
+              <Webhook className="h-6 w-6 text-blue" />
             </div>
-          )}
-
-          {/* Header */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                <Webhook className="h-6 w-6 text-purple-500" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <h1 className="text-2xl font-bold text-grey">{webhook.name}</h1>
+                <div className="flex gap-2">
+                  <Button onClick={handleOpenInExplorer} variant="outline" size="sm" className="gap-2" disabled>
+                    <ExternalLink className="h-4 w-4" />
+                    Open in Explorer
+                  </Button>
+                  <Button onClick={() => setShowCodeSidebar(true)} variant="outline" size="sm" className="gap-2" disabled>
+                    <Code className="h-4 w-4" />
+                    View Code
+                  </Button>
+                  <Button onClick={handleViewActivity} variant="outline" size="sm" className="gap-2" disabled>
+                    <Activity className="h-4 w-4" />
+                    View Logs
+                  </Button>
+                </div>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <h1 className="text-2xl font-bold text-grey">{webhook.name}</h1>
-                  
-                </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-sm text-grey-600">
-                    Tag: <span className="font-mono">{webhook.tag}</span>
-                  </span>
-                  {webhook.active !== undefined && (
-                    <>
-                      <span className="text-grey-400">•</span>
-                      <span
-                        className={cn(
-                          "text-sm font-medium flex items-center gap-1.5",
-                          webhook.active ? "text-green" : "text-grey-600"
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "w-2 h-2 rounded-full",
-                            webhook.active ? "bg-green" : "bg-grey-400"
-                          )}
-                        />
-                        {webhook.active ? "Active" : "Inactive"}
-                      </span>
-                    </>
-                  )}
-                </div>
-                {webhook.description && (
-                  <p className="text-sm text-grey-600">{webhook.description}</p>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-sm text-grey-600">Tag: <span className="font-mono">{webhook.tag}</span></span>
+                {webhook.active !== undefined && (
+                  <>
+                    <span className="text-grey-400">•</span>
+                    <span className={cn(
+                      "text-sm font-medium flex items-center gap-1.5",
+                      webhook.active ? "text-green" : "text-grey-600"
+                    )}>
+                      <div className={cn("w-2 h-2 rounded-full", webhook.active ? "bg-green" : "bg-grey-400")} />
+                      {webhook.active ? "Active" : "Inactive"}
+                    </span>
+                  </>
                 )}
               </div>
+              {webhook.description && (
+                <p className="text-sm text-grey-600">{webhook.description}</p>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Environments */}
-          {webhook.envs && webhook.envs.length > 0 && (
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              {/* Check if this is a "Generate a link" type webhook (no registration_url) or direct registration type */}
-              {webhook.envs.some((env: any) => env.registration_url) ? (
-                <>
-                  <h2 className="text-lg font-semibold text-grey mb-1">
-                    Registration Endpoints
-                  </h2>
-                  <p className="text-xs text-grey-600 mb-4">
-                    Partners can register their webhook endpoint using these URLs to
-                    receive event notifications
-                  </p>
-                  <div className="space-y-3">
-                    {webhook.envs.map((env, index) => (
-                      <div
-                        key={index}
-                        className="border border-grey-300 rounded-lg p-4"
-                      >
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="font-medium text-grey">
-                            {env.slug.toUpperCase()}
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold text-grey">Events</h3>
+            </div>
+            <p className="text-2xl font-bold text-grey">{events.length}</p>
+            <p className="text-xs text-grey-500">Total configured</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Filter className="h-5 w-5 text-blue" />
+              <h3 className="text-sm font-semibold text-grey">Single Selector</h3>
+            </div>
+            <p className="text-2xl font-bold text-grey">{selectorStats.singleSelector}</p>
+            <p className="text-xs text-grey-500">Simple events</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="h-5 w-5 text-purple-500" />
+              <h3 className="text-sm font-semibold text-grey">Multi Selector</h3>
+            </div>
+            <p className="text-2xl font-bold text-grey">{selectorStats.multiSelector}</p>
+            <p className="text-xs text-grey-500">Complex events</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="h-5 w-5 text-green" />
+              <h3 className="text-sm font-semibold text-grey">Environments</h3>
+            </div>
+            <p className="text-2xl font-bold text-grey">{webhook.envs?.length || 0}</p>
+            <p className="text-xs text-grey-500">Configured</p>
+          </div>
+        </div>
+
+        {/* Environment Endpoints with Metrics */}
+        {webhook.envs && webhook.envs.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-grey">Environment Endpoints</h2>
+            {webhook.envs.map((env, index) => {
+              const webhookUrl = (env as any).registration_url ||
+                (env as any).webhook_url ||
+                `https://api.ductape.app/webhooks/${appTag}/${webhook.tag}/${env.slug}`;
+
+              return (
+                <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-primary" />
+                      <h3 className="text-base font-semibold text-grey">{env.slug.toUpperCase()}</h3>
+                      <span className="px-2 py-0.5 bg-green/10 text-green rounded text-xs font-medium">
+                        {env.method || 'POST'}
+                      </span>
+                    </div>
+                    <Button
+                      onClick={() => handleCopy(webhookUrl, "URL")}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      {copiedText === webhookUrl ? (
+                        <Check className="h-3 w-3 text-green" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      Copy URL
+                    </Button>
+                  </div>
+
+                  <code className="block text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded border border-grey-200 mb-4">
+                    {webhookUrl}
+                  </code>
+
+                  {/* Environment Metrics */}
+                  <WebhookEnvMetrics
+                    webhookTag={webhook.tag}
+                    appTag={appTag}
+                    env={env.slug}
+                    productTag={productTag}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Events Section */}
+        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-grey">Webhook Events ({events.length})</h2>
+            <Button onClick={() => setShowNewEventDialog(true)} size="sm" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Event
+            </Button>
+          </div>
+
+          {events.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="relative mb-6">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center bg-primary/10">
+                  <Zap className="h-10 w-10 text-primary" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
+                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
+              </div>
+              <h3 className="text-lg font-semibold text-grey mb-2">No events yet</h3>
+              <p className="text-sm text-grey-500 text-center max-w-sm mb-6">
+                Events define how incoming webhook payloads are identified and routed.
+              </p>
+              <Button onClick={() => setShowNewEventDialog(true)} className="gap-2 shadow-sm">
+                <Plus className="h-4 w-4" />
+                Create your first event
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event) => {
+                const selectorStr = (event as any).selector || '';
+                const selectors = selectorStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+                const isMultiSelector = selectors.length > 1;
+                const selectorValue = (event as any).selectorValue;
+
+                return (
+                  <div
+                    key={event._id}
+                    onClick={() => handleViewEvent(event)}
+                    className="flex items-center gap-4 p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer"
+                  >
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10">
+                      <Zap className="h-5 w-5 text-primary" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-sm font-medium text-grey truncate">{event.name}</h3>
+                        {isMultiSelector && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue/10 text-blue">
+                            {selectors.length} selectors
                           </span>
-                          {env.method && (
-                            <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
-                              {env.method}
+                        )}
+                      </div>
+                      <p className="text-xs text-grey-500 font-mono">{webhook.tag}:{event.tag}</p>
+                      {selectorStr && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {selectors.slice(0, 2).map((sel: string, idx: number) => (
+                            <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600 font-mono">
+                              {formatSelector(sel)}
+                              {!isMultiSelector && selectorValue && typeof selectorValue !== 'object' && (
+                                <span className="text-green ml-1">= {String(selectorValue)}</span>
+                              )}
+                            </span>
+                          ))}
+                          {selectors.length > 2 && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600">
+                              +{selectors.length - 2} more
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <code className="flex-1 text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded">
-                            {env.registration_url}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleCopy(env.registration_url, "Registration URL")
-                            }
-                            className="h-8 w-8 p-0 flex-shrink-0"
-                          >
-                            {copiedText === env.registration_url ? (
-                              <Check className="h-3 w-3 text-green" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-lg font-semibold text-grey mb-1">
-                    Webhook Endpoints
-                  </h2>
-                  <p className="text-xs text-grey-600 mb-4">
-                    Generated webhook URLs for each environment. Share these URLs with your partners
-                    so they can receive event notifications.
-                  </p>
-                  <div className="space-y-3">
-                    {webhook.envs.map((env, index) => {
-                      // Generate the webhook URL based on environment
-                      // The actual URL format depends on your Ductape setup
-                      const webhookUrl = (env as any).webhook_url ||
-                        (webhook as any).webhook_url?.[env.slug] ||
-                        `https://api.ductape.app/webhooks/${appTag}/${webhook.tag}/${env.slug}`;
+                      )}
+                    </div>
 
-                      return (
-                        <div
-                          key={index}
-                          className="border border-grey-300 rounded-lg p-4"
-                        >
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="font-medium text-grey">
-                              {env.slug.toUpperCase()}
-                            </span>
-                            <span className="px-2 py-1 bg-green/10 text-green rounded text-xs font-medium">
-                              POST
-                            </span>
-                            <span className="px-2 py-1 bg-blue/10 text-blue rounded text-xs font-medium ml-auto">
-                              Generated URL
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <code className="flex-1 text-xs text-grey font-mono break-all bg-grey-50 px-3 py-2 rounded">
-                              {webhookUrl}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleCopy(webhookUrl, "Webhook URL")
-                              }
-                              className="h-8 w-8 p-0 flex-shrink-0"
-                            >
-                              {copiedText === webhookUrl ? (
-                                <Check className="h-3 w-3 text-green" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                          <p className="text-xs text-grey-500 mt-2">
-                            Partners send POST requests to this URL to trigger webhook events
-                          </p>
-                        </div>
-                      );
-                    })}
+                    <ArrowRight className="h-4 w-4 text-grey-400" />
                   </div>
-                </>
-              )}
+                );
+              })}
             </div>
           )}
-
-          {/* Events List */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">
-                Events ({events.length})
-              </h2>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowNewEventDialog(true)}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            </div>
-
-            {events.length === 0 ? (
-              <div className="text-center py-8">
-                <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-                <p className="text-sm text-grey-600 mb-1">
-                  No events configured yet
-                </p>
-                <p className="text-xs text-grey-500">
-                  Events will appear here once configured
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {events.map((event) => (
-                  <div
-                    key={event._id}
-                    className="w-full p-3 rounded-lg border border-grey-400 hover:border-primary hover:bg-primary/5 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Zap className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-grey text-sm">
-                          {event.name}
-                        </span>
-                        <code className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono">
-                          {`${webhook.tag}:${event.tag}`}
-                        </code>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setSelectedEventId(event._id)}
-                        className="flex items-center gap-1.5 text-grey hover:text-primary"
-                      >
-                        <Info className="h-3.5 w-3.5" />
-                        <span className="text-xs">Details</span>
-                      </Button>
-                    </div>
-                    {event.description && (
-                      <p className="text-xs text-grey-600 mt-2 ml-6">
-                        {event.description}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">ℹ️ About Webhook Channels</h3>
-            <p className="text-xs text-blue-800">
-              Webhook channels provide a single point of registration for multiple events. Partners can register their endpoint once and receive notifications for all configured events. Events are identified using the <code className="bg-blue-100 px-1 rounded">webhook:event</code> tag format and routed based on event selectors.
-            </p>
-          </div>
         </div>
+
+
+        {/* Info Box */}
+        <div className="bg-blue/5 border border-blue/20 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-grey mb-2">About Webhook Channels</h3>
+          <p className="text-xs text-grey-600">
+            Webhook channels provide a single point of registration for multiple events. Partners can register their endpoint once and receive notifications for all configured events. Events are identified using the <code className="bg-blue/10 px-1 rounded">webhook:event</code> tag format and routed based on event selectors.
+          </p>
+        </div>
+      </div>
 
       {/* Event Details Sidebar */}
       {selectedEvent && (
@@ -511,108 +729,90 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
           onClose={() => setSelectedEventId(null)}
         >
           <div className="space-y-6">
-              <div>
-                <Label className="text-sm font-semibold text-grey mb-2 block">
-                  Event Name
-                </Label>
-                <p className="text-sm text-grey">
-                  {selectedEvent.name}
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-semibold text-grey">
-                    Event Tag
-                  </Label>
-                  <Button
-                    onClick={() =>
-                      handleCopy(
-                        `${webhook.tag}:${selectedEvent.tag}`,
-                        "Event tag"
-                      )
-                    }
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 h-7 px-2 text-xs"
-                  >
-                    <Copy className="h-3 w-3" />
-                    Copy
-                  </Button>
-                </div>
-                <Input
-                  value={`${webhook.tag}:${selectedEvent.tag}`}
-                  readOnly
-                  className="font-mono text-sm bg-grey-50"
-                />
-                <p className="text-xs text-grey-500 mt-2">
-                  Use this tag to identify the event in your code
-                </p>
-              </div>
-
-              <div>
-                <Label className="text-sm font-semibold text-grey mb-2 block">
-                  Description
-                </Label>
-                <p className="text-sm text-grey">{selectedEvent.description}</p>
-              </div>
-
-              <div>
-                <Label className="text-sm font-semibold text-grey mb-2 block">
-                  Event Selector
-                </Label>
-                <Input
-                  value={`${selectedEvent.selector}${selectedEvent.selectorValue ? ` = ${selectedEvent.selectorValue}` : ''}`}
-                  readOnly
-                  className="font-mono text-sm bg-grey-50"
-                />
-                <p className="text-xs text-grey-500 mt-2">
-                  The key path used to identify this event type from incoming
-                  payloads. Example:{" "}
-                  <code className="text-primary">$Event&#123;event&#125;</code>{" "}
-                  maps to the "event" field.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-semibold text-grey">
-                    Sample Payload
-                  </Label>
-                  <Button
-                    onClick={() =>
-                      handleCopy(
-                        typeof selectedEvent.sample === "string"
-                          ? selectedEvent.sample
-                          : JSON.stringify(selectedEvent.sample, null, 2),
-                        "Sample payload"
-                      )
-                    }
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 h-7 px-2 text-xs"
-                  >
-                    <Copy className="h-3 w-3" />
-                    Copy
-                  </Button>
-                </div>
-                <Textarea
-                  value={typeof selectedEvent.sample === "string"
-                    ? selectedEvent.sample
-                    : JSON.stringify(selectedEvent.sample, null, 2)}
-                  readOnly
-                  className="font-mono text-sm bg-grey-50 resize-none"
-                  rows={(typeof selectedEvent.sample === "string"
-                    ? selectedEvent.sample
-                    : JSON.stringify(selectedEvent.sample, null, 2)).split('\n').length}
-                />
-                <p className="text-xs text-grey-500 mt-2">
-                  Example payload structure that will be sent when this event is
-                  triggered
-                </p>
-              </div>
+            <div>
+              <Label className="text-sm font-semibold text-grey mb-2 block">Event Name</Label>
+              <p className="text-sm text-grey">{selectedEvent.name}</p>
             </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold text-grey">Event Tag</Label>
+                <Button
+                  onClick={() => handleCopy(`${webhook.tag}:${selectedEvent.tag}`, "Event tag")}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-7 px-2 text-xs"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <Input
+                value={`${webhook.tag}:${selectedEvent.tag}`}
+                readOnly
+                className="font-mono text-sm bg-grey-50"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-grey mb-2 block">Description</Label>
+              <p className="text-sm text-grey">{selectedEvent.description || 'No description'}</p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-grey mb-2 block">Event Selector</Label>
+              <Input
+                value={`${selectedEvent.selector}${selectedEvent.selectorValue ? ` = ${typeof selectedEvent.selectorValue === 'object' ? JSON.stringify(selectedEvent.selectorValue) : selectedEvent.selectorValue}` : ''}`}
+                readOnly
+                className="font-mono text-sm bg-grey-50"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold text-grey">Sample Payload</Label>
+                <Button
+                  onClick={() =>
+                    handleCopy(
+                      typeof selectedEvent.sample === "string"
+                        ? selectedEvent.sample
+                        : JSON.stringify(selectedEvent.sample, null, 2),
+                      "Sample payload"
+                    )
+                  }
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-7 px-2 text-xs"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <Textarea
+                value={
+                  typeof selectedEvent.sample === "string"
+                    ? selectedEvent.sample
+                    : JSON.stringify(selectedEvent.sample, null, 2)
+                }
+                readOnly
+                className="bg-grey-50 resize-none"
+                rows={Math.min(10, (typeof selectedEvent.sample === "string" ? selectedEvent.sample : JSON.stringify(selectedEvent.sample, null, 2)).split('\n').length)}
+              />
+            </div>
+          </div>
         </DetailsSidebar>
+      )}
+
+      {/* Code Sidebar */}
+      {showCodeSidebar && (
+        <CodeSidebar
+          title={webhook.name}
+          subtitle={`Integrate the ${webhook.tag} webhook`}
+          tag={webhook.tag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateCodeSections}
+          environments={webhook.envs?.map(e => ({ slug: e.slug })) || []}
+        />
       )}
 
       {/* New Event Dialog */}
@@ -620,17 +820,12 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create New Event</DialogTitle>
-            <DialogDescription>
-              Add a new event to the {webhook.name} webhook channel
-            </DialogDescription>
+            <DialogDescription>Add a new event to the {webhook.name} channel</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Event Name */}
             <div>
-              <Label htmlFor="event-name" className="required">
-                Event Name
-              </Label>
+              <Label htmlFor="event-name" className="required">Event Name</Label>
               <Input
                 id="event-name"
                 placeholder="e.g., New Transaction"
@@ -639,39 +834,24 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
                 className="mt-2"
                 autoFocus
               />
-              <p className="text-xs text-grey-600 mt-1">
-                A descriptive name for this event
-              </p>
             </div>
 
-            {/* Event Tag */}
             <div>
-              <Label htmlFor="event-tag" className="required">
-                Event Tag
-              </Label>
+              <Label htmlFor="event-tag" className="required">Event Tag</Label>
               <Input
                 id="event-tag"
                 placeholder="e.g., new_transaction"
                 value={eventTag}
                 onChange={(e) =>
-                  setEventTag(
-                    e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9_]/g, "_")
-                      .replace(/_+/g, "_")
-                  )
+                  setEventTag(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_"))
                 }
                 className="mt-2 font-mono"
               />
               <p className="text-xs text-grey-600 mt-1">
-                Will be combined with webhook tag:{" "}
-                <code className="text-primary">
-                  {webhook.tag}:{eventTag || "event_tag"}
-                </code>
+                Combined tag: <code className="text-primary">{webhook.tag}:{eventTag || "event_tag"}</code>
               </p>
             </div>
 
-            {/* Description */}
             <div>
               <Label htmlFor="event-description">Description</Label>
               <Textarea
@@ -684,23 +864,20 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
               />
             </div>
 
-            {/* Sample Payload */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="event-sample" className="required">
-                  Sample Payload (JSON)
-                </Label>
+                <Label htmlFor="event-sample" className="required">Sample Payload (JSON)</Label>
                 {eventSample && eventSample.trim() !== '{}' && eventSample.trim() !== '' && (
                   <div className="flex items-center gap-1.5">
                     {sampleValidation.isValid ? (
                       <>
                         <Check className="h-4 w-4 text-green" />
-                        <span className="text-xs text-green font-medium">Valid JSON</span>
+                        <span className="text-xs text-green font-medium">Valid</span>
                       </>
                     ) : (
                       <>
                         <XCircle className="h-4 w-4 text-red" />
-                        <span className="text-xs text-red font-medium">Invalid JSON</span>
+                        <span className="text-xs text-red font-medium">Invalid</span>
                       </>
                     )}
                   </div>
@@ -712,92 +889,48 @@ export default function WebhookTabContent({ webhook }: WebhookTabContentProps) {
                 value={eventSample}
                 onChange={(e) => setEventSample(e.target.value)}
                 className={cn(
-                  "mt-2 font-mono text-xs min-h-[150px]",
+                  "mt-2 min-h-[150px]",
                   eventSample && eventSample.trim() !== '{}' && eventSample.trim() !== ''
                     ? sampleValidation.isValid
-                      ? 'border-green focus:border-green focus:ring-green'
-                      : 'border-red focus:border-red focus:ring-red'
+                      ? 'border-green focus:border-green'
+                      : 'border-red focus:border-red'
                     : ''
                 )}
                 rows={6}
               />
-              {!sampleValidation.isValid && eventSample && eventSample.trim() !== '{}' && eventSample.trim() !== '' && (
-                <p className="text-xs text-red mt-1 flex items-center gap-1">
-                  <XCircle className="h-3 w-3" />
-                  {sampleValidation.error}
-                </p>
-              )}
-              {sampleValidation.isValid && sampleValidation.selectorOptions.length === 0 && eventSample.trim() !== '{}' && eventSample.trim() !== '' && (
-                <p className="text-xs text-orange-600 mt-1">
-                  Warning: No valid selector fields found. Add non-object, non-array fields.
-                </p>
-              )}
-              {(!eventSample || eventSample.trim() === '' || eventSample.trim() === '{}') && (
-                <p className="text-xs text-grey-600 mt-1">
-                  Example payload structure in JSON format
-                </p>
-              )}
             </div>
 
-            {/* Selector */}
             <div>
-              <Label htmlFor="event-selector" className="required">
-                Event Selector
-              </Label>
+              <Label htmlFor="event-selector" className="required">Event Selector</Label>
               <Select value={eventSelector} onValueChange={setEventSelector}>
                 <SelectTrigger className="mt-2">
                   <SelectValue placeholder="Select a field from sample payload" />
                 </SelectTrigger>
                 <SelectContent>
                   {!sampleValidation.isValid ? (
-                    <div className="px-2 py-1.5 text-sm text-grey-600">
-                      Invalid JSON in sample payload
-                    </div>
+                    <div className="px-2 py-1.5 text-sm text-grey-600">Invalid JSON</div>
                   ) : sampleValidation.selectorOptions.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-grey-600">
-                      No valid fields available. Add a valid sample payload first.
-                    </div>
+                    <div className="px-2 py-1.5 text-sm text-grey-600">No fields available</div>
                   ) : (
                     sampleValidation.selectorOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
               {eventSelector && (
                 <p className="text-xs text-grey-600 mt-1">
-                  Preview:{" "}
-                  <code className="text-primary">
-                    $Event&#123;{eventSelector.split(".").join("}{")}&#125;
-                  </code>
-                </p>
-              )}
-              {!eventSelector && (
-                <p className="text-xs text-grey-600 mt-1">
-                  Select a field from the sample payload to identify this event type
+                  Selector: <code className="text-primary">{`$Event{${eventSelector.split(".").join("}{")}\}`}</code>
                 </p>
               )}
             </div>
           </div>
 
           <div className="flex justify-end gap-3 border-t pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowNewEventDialog(false);
-                resetForm();
-              }}
-              disabled={isCreatingEvent}
-            >
+            <Button variant="outline" onClick={() => { setShowNewEventDialog(false); resetForm(); }} disabled={isCreatingEvent}>
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateEvent}
-              disabled={isCreatingEvent}
-              className="gap-2"
-            >
+            <Button onClick={handleCreateEvent} disabled={isCreatingEvent} className="gap-2">
               {isCreatingEvent ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

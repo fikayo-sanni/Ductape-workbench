@@ -61,8 +61,10 @@ import UpdateAppEnvironmentModal from '@/components/modals/UpdateAppEnvironmentM
 import CreateVariableModal from '@/components/modals/CreateVariableModal';
 import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
+import CreateFolderModal from '@/components/modals/CreateFolderModal';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useDuctape } from '@/hooks/useDuctape';
+import { useAppDashboard } from '@/hooks/useAnalytics';
 import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
 import ActionViewTabContent from './ActionViewTabContent';
@@ -125,6 +127,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const [showCreateVariableModal, setShowCreateVariableModal] = useState(false);
   const [showCreateConstantModal, setShowCreateConstantModal] = useState(false);
   const [showCreateSharedVariableModal, setShowCreateSharedVariableModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+  const [newFolderParentName, setNewFolderParentName] = useState<string | undefined>(undefined);
 
   // Sidebar state - initialize from persisted values
   const [sidebarView, setSidebarView] = useState<SidebarView>(persistedState?.sidebarView || 'overview');
@@ -203,6 +208,17 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const variablesCount = selectedVersion?.variables?.length || 0;
   const constantsCount = selectedVersion?.constants?.length || 0;
   const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any)?.webhooks_count || 0;
+
+  // Fetch app dashboard analytics
+  const { data: dashboardMetrics, isLoading: isLoadingMetrics } = useAppDashboard({
+    app_id: currentApp?._id || '',
+    version: selectedVersionTag || undefined,
+    app_env: selectedVersion?.envs?.find((e: any) => e.active)?.slug,
+    groupBy: 'day',
+    enabled: !!currentApp?._id,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    refetchInterval: 1000 * 60 * 2, // Refresh every 2 minutes
+  });
 
   // Check if the selected version is unpublished (draft or private)
   const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private' || !selectedVersion?.status;
@@ -588,22 +604,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
-                      openTab({
-                        id: `new-folder-${Date.now()}`,
-                        type: 'feature',
-                        title: 'New Subfolder',
-                        data: {
-                          componentType: 'folder',
-                          isNew: true,
-                          app: currentApp,
-                          appId: currentApp?._id,
-                          appTag: currentApp?.tag,
-                          version: selectedVersionTag,
-                          parentFolderId: folder._id,
-                          parentFolderName: folder.name,
-                        },
-                        isDirty: true,
-                      });
+                      setNewFolderParentId(folder._id);
+                      setNewFolderParentName(folder.name);
+                      setShowCreateFolderModal(true);
                     }}
                   >
                     <FolderPlus className="h-4 w-4 mr-2" />
@@ -1102,39 +1105,67 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     }
 
     // Default view - API Dashboard (Overview)
-    // Dummy API analytics data (replace with real data from API)
-    const apiAnalytics = {
-      totalRequests: { current: 45678, previous: 42134, change: 8.4 },
-      successRate: { current: 98.7, previous: 97.2, change: 1.5 },
-      avgLatency: { current: '142ms', previous: '168ms', change: -15.5 },
-      errorRate: { current: 1.3, previous: 2.8, change: -53.6 },
-      activeEndpoints: { current: actionsCount, previous: actionsCount - 2, change: actionsCount > 0 ? ((2 / (actionsCount - 2)) * 100) : 0 },
-      webhookEvents: { current: 1234, previous: 1089, change: 13.3 },
+    // Use real data from the dashboard metrics hook, with fallbacks for loading/empty states
+    const hasMetrics = !!dashboardMetrics && !isLoadingMetrics;
+
+    const apiAnalytics = hasMetrics ? {
+      totalRequests: dashboardMetrics.totalRequests,
+      successRate: dashboardMetrics.successRate,
+      avgLatency: {
+        current: `${dashboardMetrics.avgLatency.current}ms`,
+        previous: `${dashboardMetrics.avgLatency.previous}ms`,
+        change: dashboardMetrics.avgLatency.change,
+      },
+      errorRate: dashboardMetrics.errorRate,
+      activeEndpoints: { current: actionsCount, previous: actionsCount, change: 0 },
+      webhookEvents: dashboardMetrics.webhookEvents,
+    } : {
+      // Fallback values while loading or when no data
+      totalRequests: { current: 0, previous: 0, change: 0 },
+      successRate: { current: 100, previous: 100, change: 0 },
+      avgLatency: { current: '0ms', previous: '0ms', change: 0 },
+      errorRate: { current: 0, previous: 0, change: 0 },
+      activeEndpoints: { current: actionsCount, previous: actionsCount, change: 0 },
+      webhookEvents: { current: 0, previous: 0, change: 0 },
     };
 
-    const requestsByMethod = [
-      { method: 'GET', count: 23456, percentage: 51 },
-      { method: 'POST', count: 15678, percentage: 34 },
-      { method: 'PUT', count: 4567, percentage: 10 },
-      { method: 'DELETE', count: 1977, percentage: 5 },
-    ];
+    // Use real method distribution or fallback to empty array
+    const requestsByMethod = hasMetrics && dashboardMetrics.requestsByMethod.length > 0
+      ? dashboardMetrics.requestsByMethod
+      : [
+          { method: 'GET', count: 0, percentage: 0 },
+          { method: 'POST', count: 0, percentage: 0 },
+          { method: 'PUT', count: 0, percentage: 0 },
+          { method: 'DELETE', count: 0, percentage: 0 },
+        ].filter(m => m.count > 0 || !hasMetrics);
 
-    const recentActivity = [
-      { date: 'Mon', requests: 6234 },
-      { date: 'Tue', requests: 7123 },
-      { date: 'Wed', requests: 6892 },
-      { date: 'Thu', requests: 7456 },
-      { date: 'Fri', requests: 8234 },
-      { date: 'Sat', requests: 4567 },
-      { date: 'Sun', requests: 5172 },
-    ];
+    // Use real daily activity or generate placeholder days
+    const recentActivity = hasMetrics && dashboardMetrics.dailyActivity.length > 0
+      ? dashboardMetrics.dailyActivity.map(d => ({
+          date: d.day || d.date,
+          requests: d.requests,
+        }))
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+          date: day,
+          requests: 0,
+        }));
 
-    const topEndpoints = (selectedVersion?.actions || []).slice(0, 5).map((action: any, index: number) => ({
-      name: action.name || action.tag,
-      method: action.method || 'GET',
-      calls: Math.floor(Math.random() * 5000) + 1000,
-      avgLatency: `${Math.floor(Math.random() * 200) + 50}ms`,
-    }));
+    // Use real top endpoints or fallback to action-based placeholders
+    const topEndpoints = hasMetrics && dashboardMetrics.topEndpoints.length > 0
+      ? dashboardMetrics.topEndpoints.slice(0, 5).map(ep => ({
+          name: ep.name,
+          tag: ep.tag,
+          method: ep.method,
+          calls: ep.calls,
+          avgLatency: `${ep.avgLatency}ms`,
+        }))
+      : (selectedVersion?.actions || []).slice(0, 5).map((action: any) => ({
+          name: action.name || action.tag,
+          tag: action.tag,
+          method: action.method || 'GET',
+          calls: 0,
+          avgLatency: '0ms',
+        }));
 
     const renderMetricCard = (
       title: string,
@@ -1142,19 +1173,32 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       change: number,
       icon: React.ReactNode,
       iconBg: string,
-      suffix?: string
+      suffix?: string,
+      isLoading?: boolean
     ) => (
       <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-5">
         <div className="flex items-start justify-between mb-3">
           <div className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center`}>
             {icon}
           </div>
-          <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-green' : 'text-red-500'}`}>
-            {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {Math.abs(change).toFixed(1)}%
-          </div>
+          {isLoading ? (
+            <div className="flex items-center gap-1 text-xs text-grey-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+            </div>
+          ) : (
+            <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-green' : 'text-red-500'}`}>
+              {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {Math.abs(change).toFixed(1)}%
+            </div>
+          )}
         </div>
-        <div className="text-2xl font-bold text-grey mb-1">{value}{suffix}</div>
+        <div className="text-2xl font-bold text-grey mb-1">
+          {isLoading ? (
+            <span className="inline-block w-16 h-6 bg-grey-200 dark:bg-grey-600 rounded animate-pulse" />
+          ) : (
+            <>{value}{suffix}</>
+          )}
+        </div>
         <div className="text-xs text-grey-600 font-medium">{title}</div>
       </div>
     );
@@ -1279,7 +1323,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               apiAnalytics.totalRequests.current.toLocaleString(),
               apiAnalytics.totalRequests.change,
               <Activity className="h-5 w-5 text-blue-600" />,
-              'bg-blue-500/10'
+              'bg-blue-500/10',
+              undefined,
+              isLoadingMetrics
             )}
             {renderMetricCard(
               'Success Rate',
@@ -1287,14 +1333,17 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               apiAnalytics.successRate.change,
               <CheckCircle className="h-5 w-5 text-green" />,
               'bg-green/10',
-              '%'
+              '%',
+              isLoadingMetrics
             )}
             {renderMetricCard(
               'Avg Latency',
               apiAnalytics.avgLatency.current,
               apiAnalytics.avgLatency.change,
               <Clock className="h-5 w-5 text-orange-600" />,
-              'bg-orange-500/10'
+              'bg-orange-500/10',
+              undefined,
+              isLoadingMetrics
             )}
             {renderMetricCard(
               'Error Rate',
@@ -1302,45 +1351,59 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               apiAnalytics.errorRate.change,
               <XCircle className="h-5 w-5 text-red-500" />,
               'bg-red-500/10',
-              '%'
+              '%',
+              isLoadingMetrics
             )}
             {renderMetricCard(
               'Active Endpoints',
               actionsCount,
               0,
               <Zap className="h-5 w-5 text-primary" />,
-              'bg-primary/10'
+              'bg-primary/10',
+              undefined,
+              false // Actions count is not from metrics
             )}
             {renderMetricCard(
               'Webhook Events',
               apiAnalytics.webhookEvents.current.toLocaleString(),
               apiAnalytics.webhookEvents.change,
               <Webhook className="h-5 w-5 text-purple-600" />,
-              'bg-purple-500/10'
+              'bg-purple-500/10',
+              undefined,
+              isLoadingMetrics
             )}
           </div>
 
           {/* Request Activity Timeline */}
           <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-            <h2 className="text-lg font-semibold text-grey mb-4">Request Activity (Last 7 Days)</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-grey">Request Activity (Last 7 Days)</h2>
+              {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+            </div>
             <div className="space-y-3">
               {recentActivity.map((day) => {
-                const maxRequests = Math.max(...recentActivity.map(d => d.requests));
-                const percentage = (day.requests / maxRequests) * 100;
+                const maxRequests = Math.max(...recentActivity.map(d => d.requests), 1);
+                const percentage = maxRequests > 0 ? (day.requests / maxRequests) * 100 : 0;
 
                 return (
                   <div key={day.date} className="flex items-center gap-3">
                     <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
                     <div className="flex-1 h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                      <div className="absolute inset-0 flex items-center px-3">
-                        <span className="text-xs font-semibold text-white dark:text-grey">
-                          {day.requests.toLocaleString()} requests
-                        </span>
-                      </div>
+                      {isLoadingMetrics ? (
+                        <div className="h-full w-full bg-grey-300 dark:bg-grey-600 animate-pulse rounded-lg" />
+                      ) : (
+                        <>
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center px-3">
+                            <span className="text-xs font-semibold text-white dark:text-grey">
+                              {day.requests.toLocaleString()} requests
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -1351,7 +1414,23 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Requests by Method */}
             <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-              <h2 className="text-lg font-semibold text-grey mb-4">Requests by Method</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Requests by Method</h2>
+                {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+              </div>
+              {isLoadingMetrics ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="w-12 h-5 bg-grey-300 dark:bg-grey-600 rounded animate-pulse" />
+                        <div className="w-24 h-5 bg-grey-200 dark:bg-grey-700 rounded animate-pulse" />
+                      </div>
+                      <div className="h-2 bg-grey-200 dark:bg-grey-700 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : requestsByMethod.length > 0 ? (
               <div className="space-y-4">
                 {requestsByMethod.map((item) => (
                   <div key={item.method} className="space-y-2">
@@ -1378,19 +1457,40 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   </div>
                 ))}
               </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <p className="text-sm text-grey-600">No request data available</p>
+                </div>
+              )}
             </div>
 
             {/* Top Endpoints */}
             <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-              <h2 className="text-lg font-semibold text-grey mb-4">Top Endpoints</h2>
-              {topEndpoints.length > 0 ? (
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Top Endpoints</h2>
+                {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+              </div>
+              {isLoadingMetrics ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-grey-100 dark:bg-grey-500 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-5 bg-grey-300 dark:bg-grey-600 rounded animate-pulse" />
+                        <div className="w-32 h-4 bg-grey-200 dark:bg-grey-700 rounded animate-pulse" />
+                      </div>
+                      <div className="w-24 h-4 bg-grey-200 dark:bg-grey-700 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : topEndpoints.length > 0 ? (
                 <div className="space-y-3">
                   {topEndpoints.map((endpoint: any, index: number) => (
                     <div
-                      key={index}
+                      key={endpoint.tag || index}
                       className="flex items-center justify-between p-3 bg-grey-100 dark:bg-grey-500 rounded-lg hover:bg-grey-200 transition-colors cursor-pointer"
                       onClick={() => {
-                        const action = selectedVersion?.actions?.find((a: any) => (a.name || a.tag) === endpoint.name);
+                        const action = selectedVersion?.actions?.find((a: any) => (a.name || a.tag) === endpoint.name || a.tag === endpoint.tag);
                         if (action) handleSelectAction(action);
                       }}
                     >
@@ -1509,6 +1609,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   setSelectedAction(null);
                   setSelectedWebhook(null);
                   setIsCreatingAction(false);
+                  setIsCreatingWebhook(false);
                 }
               }}
               className={cn(
@@ -1535,6 +1636,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                     setSelectedAction(null);
                     setSelectedWebhook(null);
                     setIsCreatingAction(false);
+                    setIsCreatingWebhook(false);
                   }}
                   className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
                   title="Return to overview"
@@ -1564,10 +1666,11 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 setSelectedAction(null);
                 setSelectedWebhook(null);
                 setIsCreatingAction(false);
+                setIsCreatingWebhook(false);
               }}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-                sidebarView === 'overview' && !selectedAction && !selectedWebhook
+                sidebarView === 'overview' && !selectedAction && !selectedWebhook && !isCreatingAction && !isCreatingWebhook
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-grey hover:bg-grey-100",
                 isSidebarCollapsed && "justify-center px-2"
@@ -1586,6 +1689,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 setSidebarView('environments');
                 setSelectedAction(null);
                 setSelectedWebhook(null);
+                setIsCreatingAction(false);
+                setIsCreatingWebhook(false);
               }}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
@@ -1618,6 +1723,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 setSidebarView('webhooks');
                 setSelectedAction(null);
                 setSelectedWebhook(null);
+                setIsCreatingAction(false);
+                setIsCreatingWebhook(false);
               }}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
@@ -1693,21 +1800,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                           New Action
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
-                          openTab({
-                            id: `new-folder-${Date.now()}`,
-                            type: 'feature',
-                            title: 'New Folder',
-                            data: {
-                              componentType: 'folder',
-                              isNew: true,
-                              app: currentApp,
-                              appId: currentApp?._id,
-                              appTag: currentApp?.tag,
-                              version: selectedVersionTag,
-                              parentFolderId: null,
-                            },
-                            isDirty: true,
-                          });
+                          setNewFolderParentId(null);
+                          setNewFolderParentName(undefined);
+                          setShowCreateFolderModal(true);
                         }}>
                           <FolderPlus className="h-4 w-4 mr-2" />
                           New Folder
@@ -1819,6 +1914,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
           if (!open) setEditingEnv(null);
         }}
         appTag={currentApp?.tag}
+        appId={currentApp?._id}
         environment={editingEnv}
         onSuccess={() => {
           setEditingEnv(null);
@@ -1852,6 +1948,18 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
         onOpenChange={setShowCreateSharedVariableModal}
         appId={currentApp?._id}
         actions={selectedVersion?.actions || []}
+      />
+
+      <CreateFolderModal
+        open={showCreateFolderModal}
+        onOpenChange={setShowCreateFolderModal}
+        appId={String(currentApp?._id)}
+        version={selectedVersionTag}
+        parentFolderId={newFolderParentId}
+        parentFolderName={newFolderParentName}
+        onSuccess={() => {
+          // Refresh will be handled by the modal's onSuccess
+        }}
       />
 
       {showIntegrationModal && currentApp && (

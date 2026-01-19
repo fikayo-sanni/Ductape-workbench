@@ -8,11 +8,8 @@ import {
   Database,
   Clock,
   AlertTriangle,
-  CheckCircle,
-  XCircle,
   BarChart3,
   Loader2,
-  Inbox,
   HardDrive,
   MessageSquare,
   Filter,
@@ -124,46 +121,46 @@ export default function Dashboard() {
       bgColor: 'bg-blue-500/10',
     },
     {
-      title: 'Active Apps',
+      title: 'Internal Calls',
       value: dashboardData?.data?.stats[1]?.value || '0',
       change: dashboardData?.data?.stats[1]?.change || '0%',
       trend: dashboardData?.data?.stats[1]?.trend || 'up',
-      icon: Grid3x3,
-      color: 'text-green',
-      bgColor: 'bg-green/10',
-    },
-    {
-      title: 'API Calls In',
-      value: dashboardData?.data?.stats[2]?.value || '0',
-      change: dashboardData?.data?.stats[2]?.change || '0%',
-      trend: dashboardData?.data?.stats[2]?.trend || 'up',
       icon: Activity,
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
     },
     {
-      title: 'API Calls Out',
+      title: 'External Outbound',
+      value: dashboardData?.data?.stats[2]?.value || '0',
+      change: dashboardData?.data?.stats[2]?.change || '0%',
+      trend: dashboardData?.data?.stats[2]?.trend || 'up',
+      icon: Zap,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/10',
+    },
+    {
+      title: 'External Inbound',
       value: dashboardData?.data?.stats[3]?.value || '0',
       change: dashboardData?.data?.stats[3]?.change || '0%',
       trend: dashboardData?.data?.stats[3]?.trend || 'up',
-      icon: Activity,
-      color: 'text-indigo-500',
-      bgColor: 'bg-indigo-500/10',
+      icon: Zap,
+      color: 'text-green',
+      bgColor: 'bg-green/10',
     },
     {
-      title: 'Features Deployed',
+      title: 'Total Resources',
       value: dashboardData?.data?.stats[4]?.value || '0',
       change: dashboardData?.data?.stats[4]?.change || '0%',
       trend: dashboardData?.data?.stats[4]?.trend || 'up',
-      icon: Zap,
+      icon: Database,
       color: 'text-yellow',
       bgColor: 'bg-yellow/10',
     },
   ];
 
-  const productHealth: Array<{ name: string; status: string; apps: number; apiCalls: string }> = dashboardData?.data?.productHealth || [];
-  const recentActivity: Array<{ time: string; event: string; type: string }> = dashboardData?.data?.recentActivity || [];
-  const topProducts: Array<{ name: string; apps: number; requests: string; growth: string }> = dashboardData?.data?.topProducts || [];
+  const activityTimeline: Array<{ date: string; count: number }> = dashboardData?.data?.activityTimeline || [];
+  const activityByType: Array<{ type: string; count: number; percentage: number }> = dashboardData?.data?.activityByType || [];
+  const topProducts: Array<{ name: string; resources: number; internalCalls: string; externalOutbound: string; externalInbound: string; growth: string }> = dashboardData?.data?.topProducts || [];
   const resourceUsage: Array<{ name: string; count: number; type: string; status: string }> = dashboardData?.data?.resourceUsage || [];
 
   // Show loading state
@@ -380,102 +377,103 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Product Health */}
+          {/* Activity Timeline (Last 7 days) */}
           <div className="lg:col-span-2 bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">Product Health</h2>
-              <Package className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 days)</h2>
+              <Activity className="h-5 w-5 text-grey-600" />
             </div>
             <div className="space-y-3">
-              {productHealth.length > 0 ? (
-                productHealth.map((product) => (
-                  <div
-                    key={product.name}
-                    className="flex items-center justify-between p-3 rounded-lg border border-grey-400 hover:border-primary transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          'w-2 h-2 rounded-full',
-                          product.status === 'healthy' && 'bg-green',
-                          product.status === 'warning' && 'bg-yellow',
-                          product.status === 'error' && 'bg-red'
-                        )}
-                      />
-                      <div>
-                        <h4 className="text-sm font-medium text-grey">{product.name}</h4>
-                        <p className="text-xs text-grey-600">
-                          {product.apps} apps • {product.apiCalls}
-                        </p>
+              {activityTimeline.length > 0 ? (
+                <>
+                  {activityTimeline.map((day, index) => {
+                    const maxCount = Math.max(...activityTimeline.map(d => d.count), 1);
+                    const percentage = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
+                    return (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                        <div className="flex-1 h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                          <div className="absolute inset-0 flex items-center px-3">
+                            <span className={cn(
+                              "text-xs font-semibold",
+                              percentage > 30 ? "text-white" : "text-grey"
+                            )}>
+                              {day.count} activities
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                    );
+                  })}
+                  {/* Summary */}
+                  <div className="pt-4 border-t border-grey-400">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-grey-600">Total activities</span>
+                      <span className="font-semibold text-grey">
+                        {activityTimeline.reduce((sum, day) => sum + day.count, 0)}
+                      </span>
                     </div>
-                    {product.status === 'healthy' ? (
-                      <CheckCircle className="h-5 w-5 text-green" />
-                    ) : product.status === 'warning' ? (
-                      <AlertTriangle className="h-5 w-5 text-yellow" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red" />
-                    )}
                   </div>
-                ))
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Inbox className="h-12 w-12 text-grey-400 mb-3" />
-                  <p className="text-grey-600 font-medium">No healthchecks yet</p>
-                  <p className="text-sm text-grey-500 mt-1">Create your first healthcheck to see health metrics</p>
+                  <Activity className="h-12 w-12 text-grey-400 mb-3" />
+                  <p className="text-grey-600 font-medium">No activity yet</p>
+                  <p className="text-sm text-grey-500 mt-1">Activity timeline will appear here as you use your workspace</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Activity by Type */}
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">Recent Activity</h2>
-              <Activity className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Activity by Type</h2>
+              <BarChart3 className="h-5 w-5 text-grey-600" />
             </div>
-            <div className="space-y-2">
-              {recentActivity.length > 0 ? (
-                recentActivity.map((activity, index) => {
-                  // Parse text with quotes and apply styling
-                  const renderEventText = (text: string) => {
-                    const parts = text.split(/"([^"]*)"/g);
-                    return parts.map((part, i) => 
-                      i % 2 === 1 ? (
-                        <span key={i} className="text-primary font-medium">"{part}"</span>
-                      ) : (
-                        part
-                      )
-                    );
+            <div className="space-y-3">
+              {activityByType.length > 0 ? (
+                activityByType.map((activity, index) => {
+                  // Color mapping for different activity types
+                  const getTypeColor = (type: string) => {
+                    const typeColors: Record<string, string> = {
+                      'Actions': 'bg-blue-500',
+                      'Session': 'bg-green',
+                      'Storage': 'bg-purple-500',
+                      'Cache': 'bg-yellow',
+                      'Notifications': 'bg-indigo-500',
+                      'Database': 'bg-pink-500',
+                      'Queue': 'bg-orange-500',
+                      'Feature': 'bg-cyan-500',
+                      'Other': 'bg-grey-500',
+                    };
+                    return typeColors[type] || 'bg-primary';
                   };
 
                   return (
-                    <div 
-                      key={index} 
-                      className="flex items-start gap-3"
-                    >
-                      <div
-                        className={cn(
-                          'w-2 h-2 rounded-full mt-2 flex-shrink-0',
-                          activity.type === 'success' && 'bg-green',
-                          activity.type === 'warning' && 'bg-yellow',
-                          activity.type === 'error' && 'bg-red'
-                        )}
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm text-grey leading-relaxed break-words">
-                          {renderEventText(activity.event)}
-                        </p>
-                        <p className="text-xs text-grey-500 mt-0.5">{activity.time}</p>
+                    <div key={index} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-grey font-medium">{activity.type}</span>
+                        <span className="text-grey-600">{activity.count} ({activity.percentage}%)</span>
+                      </div>
+                      <div className="w-full bg-grey-200 rounded-full h-2">
+                        <div
+                          className={cn('h-2 rounded-full transition-all', getTypeColor(activity.type))}
+                          style={{ width: `${activity.percentage}%` }}
+                        />
                       </div>
                     </div>
                   );
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Activity className="h-12 w-12 text-grey-400 mb-3" />
-                  <p className="text-grey-600 font-medium">No recent activity</p>
-                  <p className="text-sm text-grey-500 mt-1">Activity will appear here as you use your workspace</p>
+                  <BarChart3 className="h-12 w-12 text-grey-400 mb-3" />
+                  <p className="text-grey-600 font-medium">No activity data</p>
+                  <p className="text-sm text-grey-500 mt-1">Activity breakdown will appear here</p>
                 </div>
               )}
             </div>
@@ -494,8 +492,10 @@ export default function Dashboard() {
                 <thead>
                   <tr className="border-b border-grey-400">
                     <th className="text-left text-sm font-medium text-grey-600 pb-3">Product</th>
-                    <th className="text-right text-sm font-medium text-grey-600 pb-3">Apps</th>
-                    <th className="text-right text-sm font-medium text-grey-600 pb-3">API Calls</th>
+                    <th className="text-right text-sm font-medium text-grey-600 pb-3">Resources</th>
+                    <th className="text-right text-sm font-medium text-grey-600 pb-3">Internal</th>
+                    <th className="text-right text-sm font-medium text-grey-600 pb-3">Outbound</th>
+                    <th className="text-right text-sm font-medium text-grey-600 pb-3">Inbound</th>
                     <th className="text-right text-sm font-medium text-grey-600 pb-3">Growth</th>
                   </tr>
                 </thead>
@@ -508,8 +508,10 @@ export default function Dashboard() {
                           <span className="text-sm text-grey font-medium">{product.name}</span>
                         </div>
                       </td>
-                      <td className="text-right text-sm text-grey">{product.apps}</td>
-                      <td className="text-right text-sm text-grey">{product.requests}</td>
+                      <td className="text-right text-sm text-grey">{product.resources}</td>
+                      <td className="text-right text-sm text-grey">{product.internalCalls}</td>
+                      <td className="text-right text-sm text-grey">{product.externalOutbound}</td>
+                      <td className="text-right text-sm text-grey">{product.externalInbound}</td>
                       <td className="text-right">
                         <span className="text-sm font-medium text-green">
                           {product.growth}

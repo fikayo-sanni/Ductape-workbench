@@ -6,13 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Webhook,
   Save,
   Loader2,
@@ -37,7 +30,7 @@ interface WebhookEvent {
   name: string;
   tag: string;
   description: string;
-  selector: string;
+  selectors: string[];
   sample: string;
   isExpanded: boolean;
 }
@@ -91,7 +84,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
       name: '',
       tag: '',
       description: '',
-      selector: '',
+      selectors: [],
       sample: '{}',
       isExpanded: true,
     };
@@ -193,16 +186,16 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
           // Use empty object if invalid
         }
 
-        // Format selector: convert "field.subfield" to "$Event{field}{subfield}"
-        const formattedSelector = event.selector
-          ? `$Event{${event.selector.split('.').join('}{')}}`
-          : '';
+        // Format selectors: convert ["field.subfield", "other.field"] to ["$Event{field}{subfield}", "$Event{other}{field}"]
+        const formattedSelectors = event.selectors.map(
+          (sel) => `$Event{${sel.split('.').join('}{')}}`
+        );
 
         return {
           name: event.name,
           tag: `${tag}:${event.tag}`,
           description: event.description,
-          selector: formattedSelector,
+          selector: formattedSelectors.join(','),
           sample: parsedSample,
         };
       });
@@ -234,7 +227,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
   // Validate all events have required fields
   const areEventsValid = events.every((event) => {
     if (!event.name.trim() || !event.tag.trim()) return false;
-    if (event.sample && event.sample.trim() !== '{}' && event.sample.trim() !== '' && !event.selector) {
+    if (event.sample && event.sample.trim() !== '{}' && event.sample.trim() !== '' && event.selectors.length === 0) {
       return false;
     }
     const validation = validateEventSample(event.sample);
@@ -555,32 +548,58 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                           />
                         </div>
 
-                        {/* Event Selector */}
+                        {/* Event Selector - Multi-select */}
                         {validation.isValid && validation.selectorOptions.length > 0 && (
                           <div>
-                            <Label className="text-xs">Event Selector</Label>
-                            <Select
-                              value={event.selector}
-                              onValueChange={(val) => updateEvent(event.id, { selector: val })}
-                            >
-                              <SelectTrigger className="mt-1">
-                                <SelectValue placeholder="Select a field from sample" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {validation.selectorOptions.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {event.selector && (
-                              <p className="text-xs text-grey-500 mt-1">
-                                Selector:{' '}
-                                <code className="text-primary">
-                                  {`$Event{${event.selector.split('.').join('}{')}}`}
-                                </code>
-                              </p>
+                            <Label className="text-xs">Event Selectors</Label>
+                            <p className="text-xs text-grey-500 mb-2">
+                              Select one or more fields that uniquely identify this event. These will be used to track what events are sent.
+                            </p>
+                            <div className="mt-1 border border-grey-300 rounded-lg max-h-48 overflow-y-auto">
+                              {validation.selectorOptions.map((option) => {
+                                const isSelected = event.selectors.includes(option);
+                                return (
+                                  <div
+                                    key={option}
+                                    onClick={() => {
+                                      const newSelectors = isSelected
+                                        ? event.selectors.filter((s) => s !== option)
+                                        : [...event.selectors, option];
+                                      updateEvent(event.id, { selectors: newSelectors });
+                                    }}
+                                    className={cn(
+                                      'flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-b border-grey-200 last:border-b-0',
+                                      isSelected
+                                        ? 'bg-primary/5 hover:bg-primary/10'
+                                        : 'hover:bg-grey-50'
+                                    )}
+                                  >
+                                    <div
+                                      className={cn(
+                                        'w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
+                                        isSelected ? 'border-primary bg-primary' : 'border-grey-400'
+                                      )}
+                                    >
+                                      {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+                                    </div>
+                                    <code className="text-sm font-mono text-grey">{option}</code>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {event.selectors.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs text-grey-500 mb-1">
+                                  Selected ({event.selectors.length}):
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {event.selectors.map((sel) => (
+                                    <code key={sel} className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono">
+                                      {`$Event{${sel.split('.').join('}{')}}`}
+                                    </code>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}

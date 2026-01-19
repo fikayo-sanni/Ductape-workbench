@@ -41,6 +41,8 @@ export const fetchLogs = async (
       product_tag: payload.product_tag,
       parent_tag: payload.parent_tag,
       child_tag: payload.child_tag,
+      session_tag: payload.session_tag,
+      session_user_id: payload.session_user_id,
       type: payload.type,
       app_id: payload.app_id,
       env: payload.env,
@@ -166,6 +168,8 @@ export interface StorageDashboardMetrics {
     downloads: number;
     totalSize: number;
   }[];
+  // Activity timeline (last 7 days by day name) - same format as graph dashboard
+  activityTimeline: Array<{ date: string; sessions: number }>;
   dailyActivity: {
     day: string;
     date: string;
@@ -562,6 +566,623 @@ export const fetchNotificationDashboard = async (
   return response.data.data;
 };
 
+// ==================== APP DASHBOARD ====================
+
+export interface AppDashboardQuery {
+  app_id: string;
+  version?: string;
+  app_env?: string;
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface AppDashboardMetrics {
+  // Core metrics with trends
+  totalRequests: { current: number; previous: number; change: number };
+  successRate: { current: number; previous: number; change: number };
+  errorRate: { current: number; previous: number; change: number };
+  avgLatency: { current: number; previous: number; change: number };
+  activeEndpoints: { current: number; previous: number; change: number };
+  webhookEvents: { current: number; previous: number; change: number };
+
+  // Distribution
+  requestsByMethod: Array<{
+    method: string;
+    count: number;
+    percentage: number;
+  }>;
+
+  // Time series
+  dailyActivity: Array<{
+    date: string;
+    day: string;
+    requests: number;
+    success: number;
+    failures: number;
+  }>;
+
+  // Top endpoints
+  topEndpoints: Array<{
+    name: string;
+    tag: string;
+    method: string;
+    calls: number;
+    avgLatency: number;
+    successRate: number;
+  }>;
+
+  // Raw totals
+  totals: {
+    successCount: number;
+    failureCount: number;
+    totalCount: number;
+  };
+}
+
+export interface AppDashboardResponse {
+  success: boolean;
+  data: AppDashboardMetrics;
+}
+
+/**
+ * Fetches app-specific dashboard metrics from the logs service.
+ * This transforms the existing analytics endpoint response into dashboard-friendly format.
+ */
+export const fetchAppDashboard = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: AppDashboardQuery
+): Promise<AppDashboardMetrics> => {
+  const { app_id, version, app_env, groupBy = 'day', start_date, end_date } = query;
+
+  // Calculate date range (default 7 days)
+  const today = new Date();
+  const weekAgo = new Date();
+  weekAgo.setDate(today.getDate() - 7);
+
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(today.getDate() - 14);
+
+  // Fetch current period data
+  const currentResponse = await fetchLogs(
+    { workspace_id, user_id, public_key },
+    {
+      component: 'app',
+      app_id,
+      app_env,
+      version,
+      groupBy,
+      start_date: start_date || formatDate(weekAgo),
+      end_date: end_date || formatDate(today),
+      limit: 1000, // Get more logs for aggregation
+    }
+  );
+
+  // Fetch previous period data for comparison
+  const previousResponse = await fetchLogs(
+    { workspace_id, user_id, public_key },
+    {
+      component: 'app',
+      app_id,
+      app_env,
+      version,
+      groupBy,
+      start_date: formatDate(twoWeeksAgo),
+      end_date: formatDate(weekAgo),
+      limit: 1000,
+    }
+  );
+
+  const currentData = currentResponse.data;
+  const previousData = previousResponse.data;
+
+  // Process current period metrics
+  const currentLogs = currentData?.logs?.data || [];
+  const previousLogs = previousData?.logs?.data || [];
+
+  // Calculate totals
+  const currentTotals = calculateTotals(currentLogs);
+  const previousTotals = calculateTotals(previousLogs);
+
+  // Calculate success/error rates
+  const currentSuccessRate = currentTotals.totalCount > 0
+    ? (currentTotals.successCount / currentTotals.totalCount) * 100
+    : 100;
+  const previousSuccessRate = previousTotals.totalCount > 0
+    ? (previousTotals.successCount / previousTotals.totalCount) * 100
+    : 100;
+
+  const currentErrorRate = currentTotals.totalCount > 0
+    ? (currentTotals.failureCount / currentTotals.totalCount) * 100
+    : 0;
+  const previousErrorRate = previousTotals.totalCount > 0
+    ? (previousTotals.failureCount / previousTotals.totalCount) * 100
+    : 0;
+
+  // Calculate average latency
+  const currentAvgLatency = calculateAvgLatency(currentLogs);
+  const previousAvgLatency = calculateAvgLatency(previousLogs);
+
+  // Process method distribution
+  const requestsByMethod = calculateMethodDistribution(currentLogs);
+
+  // Process daily activity
+  const dailyActivity = processDailyActivity(currentData?.usageData?.requestsOverTime || []);
+
+  // Process top endpoints
+  const topEndpoints = calculateTopEndpoints(currentLogs);
+
+  // Count active endpoints and webhook events
+  const activeEndpointsCount = currentData?.metrics?.totalActions || 0;
+  const webhookEventsCount = currentLogs.filter((log: any) => log.type === 'webhook').length;
+  const previousWebhookCount = previousLogs.filter((log: any) => log.type === 'webhook').length;
+
+  return {
+    totalRequests: {
+      current: currentTotals.totalCount,
+      previous: previousTotals.totalCount,
+      change: calculateChange(currentTotals.totalCount, previousTotals.totalCount),
+    },
+    successRate: {
+      current: Math.round(currentSuccessRate * 10) / 10,
+      previous: Math.round(previousSuccessRate * 10) / 10,
+      change: calculateChange(currentSuccessRate, previousSuccessRate),
+    },
+    errorRate: {
+      current: Math.round(currentErrorRate * 10) / 10,
+      previous: Math.round(previousErrorRate * 10) / 10,
+      change: calculateChange(currentErrorRate, previousErrorRate),
+    },
+    avgLatency: {
+      current: Math.round(currentAvgLatency),
+      previous: Math.round(previousAvgLatency),
+      change: calculateChange(currentAvgLatency, previousAvgLatency),
+    },
+    activeEndpoints: {
+      current: activeEndpointsCount,
+      previous: activeEndpointsCount, // Static comparison
+      change: 0,
+    },
+    webhookEvents: {
+      current: webhookEventsCount,
+      previous: previousWebhookCount,
+      change: calculateChange(webhookEventsCount, previousWebhookCount),
+    },
+    requestsByMethod,
+    dailyActivity,
+    topEndpoints,
+    totals: currentTotals,
+  };
+};
+
+// Helper functions for dashboard calculations
+
+function calculateTotals(logs: any[]): { successCount: number; failureCount: number; totalCount: number } {
+  const successCount = logs.filter(log =>
+    log.status === 'success' || log.successful_execution === true
+  ).length;
+  const failureCount = logs.filter(log =>
+    log.status === 'fail' || log.failed_execution === true
+  ).length;
+  return {
+    successCount,
+    failureCount,
+    totalCount: logs.length,
+  };
+}
+
+function calculateAvgLatency(logs: any[]): number {
+  const logsWithLatency = logs.filter(log => log.latency && log.latency > 0);
+  if (logsWithLatency.length === 0) return 0;
+  const total = logsWithLatency.reduce((sum, log) => sum + log.latency, 0);
+  return total / logsWithLatency.length;
+}
+
+function calculateChange(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100 * 10) / 10;
+}
+
+function calculateMethodDistribution(logs: any[]): Array<{ method: string; count: number; percentage: number }> {
+  const methodCounts: Record<string, number> = {};
+
+  logs.forEach(log => {
+    // Try to extract method from various possible fields
+    const method = log.method || extractMethodFromAction(log.child_tag || log.action) || 'GET';
+    methodCounts[method] = (methodCounts[method] || 0) + 1;
+  });
+
+  const total = logs.length || 1;
+  const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+
+  return methods
+    .map(method => ({
+      method,
+      count: methodCounts[method] || 0,
+      percentage: Math.round(((methodCounts[method] || 0) / total) * 100),
+    }))
+    .filter(m => m.count > 0)
+    .sort((a, b) => b.count - a.count);
+}
+
+function extractMethodFromAction(actionTag: string): string | null {
+  if (!actionTag) return null;
+  const tag = actionTag.toUpperCase();
+  if (tag.includes('GET') || tag.includes('FETCH') || tag.includes('LIST')) return 'GET';
+  if (tag.includes('POST') || tag.includes('CREATE') || tag.includes('ADD')) return 'POST';
+  if (tag.includes('PUT') || tag.includes('UPDATE') || tag.includes('EDIT')) return 'PUT';
+  if (tag.includes('DELETE') || tag.includes('REMOVE')) return 'DELETE';
+  if (tag.includes('PATCH')) return 'PATCH';
+  return null;
+}
+
+function processDailyActivity(requestsOverTime: any[]): Array<{ date: string; day: string; requests: number; success: number; failures: number }> {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  return requestsOverTime.slice(-7).map(item => {
+    const date = new Date(item.period || item.date);
+    return {
+      date: item.period || item.date,
+      day: dayNames[date.getDay()],
+      requests: (item.requestsIn || 0) + (item.requestsOut || 0),
+      success: item.successCount || 0,
+      failures: item.failureCount || 0,
+    };
+  });
+}
+
+function calculateTopEndpoints(logs: any[]): Array<{ name: string; tag: string; method: string; calls: number; avgLatency: number; successRate: number }> {
+  const endpointMap: Record<string, {
+    name: string;
+    tag: string;
+    method: string;
+    calls: number;
+    totalLatency: number;
+    successCount: number
+  }> = {};
+
+  logs.forEach(log => {
+    const tag = log.child_tag || log.action || 'unknown';
+    const name = log.name || tag;
+
+    if (!endpointMap[tag]) {
+      endpointMap[tag] = {
+        name,
+        tag,
+        method: log.method || extractMethodFromAction(tag) || 'GET',
+        calls: 0,
+        totalLatency: 0,
+        successCount: 0,
+      };
+    }
+
+    endpointMap[tag].calls++;
+    endpointMap[tag].totalLatency += log.latency || 0;
+    if (log.status === 'success' || log.successful_execution) {
+      endpointMap[tag].successCount++;
+    }
+  });
+
+  return Object.values(endpointMap)
+    .map(endpoint => ({
+      name: endpoint.name,
+      tag: endpoint.tag,
+      method: endpoint.method,
+      calls: endpoint.calls,
+      avgLatency: endpoint.calls > 0 ? Math.round(endpoint.totalLatency / endpoint.calls) : 0,
+      successRate: endpoint.calls > 0 ? Math.round((endpoint.successCount / endpoint.calls) * 100) : 0,
+    }))
+    .sort((a, b) => b.calls - a.calls)
+    .slice(0, 10);
+}
+
+// ==================== DATABASE DASHBOARD ====================
+
+export interface DatabaseDashboardQuery {
+  product_tag: string;
+  database_tag: string;
+  env?: string;
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface DatabaseDashboardMetrics {
+  dau: { current: number; previous: number; change: number };
+  wau: { current: number; previous: number; change: number };
+  mau: { current: number; previous: number; change: number };
+  totalOperations: number;
+  successfulOperations: number;
+  failedOperations: number;
+  newOperationsThisWeek: number;
+  avgExecutionTime: { current: string; previous: string; change: number };
+  activityTimeline: Array<{ date: string; sessions: number }>;
+  peakHours: Array<{ hour: string; count: number }>;
+  environmentBreakdown: Array<{ env: string; count: number; percentage: number }>;
+  methodBreakdown: Array<{ method: string; count: number; percentage: number }>;
+}
+
+export interface DatabaseDashboardResponse {
+  success: boolean;
+  data: DatabaseDashboardMetrics;
+}
+
+export const fetchDatabaseDashboard = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: DatabaseDashboardQuery
+): Promise<DatabaseDashboardMetrics> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<DatabaseDashboardResponse>(
+    `/log/v1/database/dashboard/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
+// Vector Dashboard Types
+export interface VectorDashboardQuery {
+  product_tag: string;
+  vector_tag: string;
+  env?: string;
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface VectorDashboardMetrics {
+  // Overall stats
+  totalOperations: number;
+  successfulOperations: number;
+  failedOperations: number;
+  successRate: number;
+
+  // Operation breakdown
+  totalQueries: number;
+  totalUpserts: number;
+  totalFetches: number;
+  totalDeletes: number;
+
+  // Performance
+  avgExecutionTime: { current: string; previous: string; change: number };
+
+  // Activity timeline (last 7 days by day name)
+  activityTimeline: Array<{ date: string; operations: number }>;
+
+  // Peak activity hours
+  peakHours: Array<{ hour: string; count: number }>;
+
+  // Environment breakdown
+  environmentBreakdown: Array<{ env: string; count: number; percentage: number }>;
+
+  // Operation type breakdown
+  operationBreakdown: Array<{ operation: string; count: number; percentage: number }>;
+
+  // Daily activity (for weekly chart)
+  dailyActivity: Array<{
+    day: string;
+    date: string;
+    queries: number;
+    upserts: number;
+    fetches: number;
+    deletes: number;
+    totalOperations: number;
+  }>;
+
+  // Recent activity summary
+  recentActivity: {
+    last24Hours: {
+      queries: number;
+      upserts: number;
+      fetches: number;
+      deletes: number;
+    };
+    last7Days: {
+      queries: number;
+      upserts: number;
+      fetches: number;
+      deletes: number;
+    };
+  };
+}
+
+export interface VectorDashboardResponse {
+  status: boolean;
+  data: VectorDashboardMetrics;
+}
+
+export const fetchVectorDashboard = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: VectorDashboardQuery
+): Promise<VectorDashboardMetrics> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<VectorDashboardResponse>(
+    `/log/v1/vector/dashboard/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
+// Session User Logs Types
+export interface SessionUserLogsQuery {
+  product_tag: string;
+  session_tag: string;
+  identifier: string;
+  env?: string;
+  status?: 'success' | 'fail' | 'processing';
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+  process_id?: string;  // For searching by process_id
+}
+
+export interface SessionUserLogsResponse {
+  success: boolean;
+  data: {
+    logs: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export const fetchSessionUserLogs = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: SessionUserLogsQuery
+): Promise<{ logs: any[]; total: number; page: number; limit: number; totalPages: number }> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<SessionUserLogsResponse>(
+    `/log/v1/session/user-logs/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
+// Session User Dashboard Types
+export interface SessionUserDashboardQuery {
+  product_tag: string;
+  session_tag: string;
+  identifier: string;
+  env?: string;
+}
+
+export interface SessionUserDashboardResult {
+  totalLogs: number;
+  successRate: number;
+  activityTimeline: Array<{ day: string; count: number }>;
+  peakHours: Array<{ hour: string; count: number }>;
+}
+
+interface SessionUserDashboardResponse {
+  success: boolean;
+  data: SessionUserDashboardResult;
+}
+
+export const fetchSessionUserDashboard = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: SessionUserDashboardQuery
+): Promise<SessionUserDashboardResult> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<SessionUserDashboardResponse>(
+    `/log/v1/session/user-dashboard/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
+// Graph Dashboard Types
+export interface GraphDashboardQuery {
+  product_tag: string;
+  graph_tag: string;
+  env?: string;
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface GraphDashboardMetrics {
+  // User activity metrics
+  dau: { current: number; previous: number; change: number };
+  wau: { current: number; previous: number; change: number };
+  mau: { current: number; previous: number; change: number };
+
+  // Overall stats
+  totalOperations: number;
+  successfulOperations: number;
+  failedOperations: number;
+  newOperationsThisWeek: number;
+
+  // Performance
+  avgExecutionTime: { current: string; previous: string; change: number };
+
+  // Activity timeline (last 7 days by day name)
+  activityTimeline: Array<{ date: string; sessions: number }>;
+
+  // Peak activity hours
+  peakHours: Array<{ hour: string; count: number }>;
+
+  // Environment breakdown
+  environmentBreakdown: Array<{ env: string; count: number; percentage: number }>;
+
+  // Operation breakdown
+  operationBreakdown: Array<{ operation: string; count: number; percentage: number }>;
+}
+
+export interface GraphDashboardResponse {
+  success: boolean;
+  data: GraphDashboardMetrics;
+}
+
+export const fetchGraphDashboard = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: GraphDashboardQuery
+): Promise<GraphDashboardMetrics> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<GraphDashboardResponse>(
+    `/log/v1/graph/dashboard/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
 const logsServices = {
   fetchLogs,
   fetchSessionDashboard,
@@ -569,6 +1190,11 @@ const logsServices = {
   fetchCacheDashboard,
   fetchMessageBrokerDashboard,
   fetchNotificationDashboard,
+  fetchAppDashboard,
+  fetchDatabaseDashboard,
+  fetchVectorDashboard,
+  fetchGraphDashboard,
+  fetchSessionUserLogs,
 };
 
 export default logsServices;

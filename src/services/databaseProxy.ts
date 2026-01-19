@@ -22,6 +22,16 @@ export interface DatabaseProxyConfig {
 }
 
 /**
+ * Database context for auto-reconnection
+ * Passed with every request so the backend can ensure the correct database is connected
+ */
+export interface DatabaseContext {
+  database: string;
+  env: string;
+  product: string;
+}
+
+/**
  * Response from the database proxy endpoint
  */
 interface DBProxyResponse<T = any> {
@@ -42,9 +52,25 @@ interface DBProxyResponse<T = any> {
  */
 export class DatabaseProxyService {
   private config: DatabaseProxyConfig;
+  private databaseContext: DatabaseContext | null = null;
 
   constructor(config: DatabaseProxyConfig) {
     this.config = config;
+  }
+
+  /**
+   * Set the database context for auto-reconnection
+   * Called after a successful connect() or can be set directly
+   */
+  setDatabaseContext(context: DatabaseContext): void {
+    this.databaseContext = context;
+  }
+
+  /**
+   * Get the current database context
+   */
+  getDatabaseContext(): DatabaseContext | null {
+    return this.databaseContext;
   }
 
   /**
@@ -53,11 +79,12 @@ export class DatabaseProxyService {
    */
   private async execute<T = any>(method: string, ...params: any[]): Promise<T> {
 
-    // Encrypt sensitive data (method, params, user_id) using public_key
+    // Encrypt sensitive data (method, params, user_id, database_context) using public_key
     const sensitiveData = {
       method,
       params,
       user_id: this.config.user_id,
+      database_context: this.databaseContext, // Include context for auto-reconnection
     };
 
     console.log('[DB-Proxy] Executing method:', method);
@@ -81,6 +108,7 @@ export class DatabaseProxyService {
         workspace_id: this.config.workspace_id,
         user_id: this.config.user_id,
         public_key: this.config.public_key,
+        database_context: this.databaseContext, // Also send unencrypted for quick access
       },
       {
         headers: {
@@ -105,7 +133,15 @@ export class DatabaseProxyService {
    */
   databases = {
     // ==================== CONNECTION MANAGEMENT ====================
-    connect: <T = any>(config: any) => this.execute<T>('connect', config),
+    connect: async <T = any>(config: { database: string; env: string; product: string; [key: string]: any }) => {
+      // Store the context for auto-reconnection in subsequent requests
+      this.setDatabaseContext({
+        database: config.database,
+        env: config.env,
+        product: config.product,
+      });
+      return this.execute<T>('connect', config);
+    },
     testConnection: <T = any>(config: any) => this.execute<T>('testConnection', config),
     disconnect: () => this.execute('disconnect'),
     closeAll: () => this.execute('closeAll'),

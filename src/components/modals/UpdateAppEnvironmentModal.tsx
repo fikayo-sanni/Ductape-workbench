@@ -29,6 +29,7 @@ interface UpdateAppEnvironmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appTag?: string;
+  appId?: string;
   environment: any;
   onSuccess?: () => void;
 }
@@ -37,6 +38,7 @@ export default function UpdateAppEnvironmentModal({
   open,
   onOpenChange,
   appTag,
+  appId,
   environment,
   onSuccess,
 }: UpdateAppEnvironmentModalProps) {
@@ -115,11 +117,20 @@ export default function UpdateAppEnvironmentModal({
       };
 
       delete (payload as any).slug;
-      await ductape.environments.update(environment.slug, payload);
+      await ductape.environments.update(appTag, environment.slug, payload);
       return payload;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['app', appTag] });
+      // Invalidate app query using appId (used by AppTabContent)
+      if (appId) {
+        queryClient.invalidateQueries({ queryKey: ['app', appId] });
+      }
+      // Also invalidate by appTag for backwards compatibility
+      if (appTag) {
+        queryClient.invalidateQueries({ queryKey: ['app', appTag] });
+      }
+      // Invalidate apps list
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
       toast.success('Environment updated successfully!');
       onSuccess?.();
       onOpenChange(false);

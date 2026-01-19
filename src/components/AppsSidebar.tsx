@@ -91,6 +91,8 @@ export default function AppsSidebar() {
   });
 
   const filteredThirdPartyApps = thirdPartyApps.filter((app: IApp) => {
+    // Exclude apps that belong to the current workspace (those are shown in Internal section)
+    if (app.workspace_id === currentWorkspaceId) return false;
     if (!searchQuery) return true;
     return (
       app.app_name.toLowerCase().includes(searchQuery.toLowerCase()) ||

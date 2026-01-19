@@ -37,6 +37,7 @@ const componentTypes = [
   { id: 'cache', name: 'Cache' },
   { id: 'broker', name: 'Messaging' },
   { id: 'job', name: 'Job' },
+  { id: 'session', name: 'Session' },
 ];
 
 const timeRangeOptions = [

@@ -28,6 +28,12 @@ import {
   Share2,
   KeyRound,
   Timer,
+  UserCheck,
+  Megaphone,
+  Headphones,
+  Bell,
+  Code,
+  Webhook,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import logsServicesReal from '@/services/logsServicesReal';
@@ -53,17 +59,24 @@ const responseStatuses = [
   { id: 'success', name: 'Success', icon: CheckCircle, color: 'text-green' },
 ];
 
+// Component types mapped to LogEventTypes enum from backend
 const componentTypes = [
-  { id: 'app', name: 'App', icon: Box },
-  { id: 'product', name: 'Product', icon: Server },
+  { id: 'actions', name: 'Actions', icon: Box },
+  { id: 'database_actions', name: 'Database Actions', icon: Database },
   { id: 'database', name: 'Database', icon: Database },
   { id: 'graph', name: 'Graph', icon: Share2 },
   { id: 'vector', name: 'Vector', icon: Boxes },
-  { id: 'secret', name: 'Secret', icon: KeyRound },
   { id: 'storage', name: 'Storage', icon: HardDrive },
   { id: 'cache', name: 'Cache', icon: Zap },
-  { id: 'broker', name: 'Messaging', icon: MessageSquare },
-  { id: 'job', name: 'Job', icon: Terminal },
+  { id: 'message_broker', name: 'Message Broker', icon: MessageSquare },
+  { id: 'producer', name: 'Producer', icon: Megaphone },
+  { id: 'consumer', name: 'Consumer', icon: Headphones },
+  { id: 'jobs', name: 'Jobs', icon: Terminal },
+  { id: 'session', name: 'Session', icon: UserCheck },
+  { id: 'notifications', name: 'Notifications', icon: Bell },
+  { id: 'feature', name: 'Feature', icon: Server },
+  { id: 'functions', name: 'Functions', icon: Code },
+  { id: 'webhook', name: 'Webhook', icon: Webhook },
 ];
 
 const timeRangeOptions = [
@@ -461,10 +474,19 @@ export default function Logs() {
     const now = new Date();
     const startDate = new Date(now.getTime() - (minutes * 60 * 1000));
 
-    return {
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: now.toISOString().split('T')[0],
-    };
+    // For time ranges less than a day, send full ISO timestamp for precision
+    // For longer ranges, send just the date (YYYY-MM-DD)
+    if (minutes < 1440) { // Less than 24 hours
+      return {
+        start_date: startDate.toISOString(),
+        end_date: now.toISOString(),
+      };
+    } else {
+      return {
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: now.toISOString().split('T')[0],
+      };
+    }
   };
 
   // Fetch products for filtering
@@ -515,11 +537,11 @@ export default function Logs() {
           workspace_id: currentWorkspaceId ?? '',
         },
         {
-          component: logsFilters.component === 'all' ? undefined : logsFilters.component,
+          type: logsFilters.component === 'all' ? undefined : logsFilters.component,
           app_id: logsFilters.app === 'all' ? undefined : logsFilters.app,
-          product_id: logsFilters.product === 'all' ? undefined : logsFilters.product,
+          product_tag: logsFilters.product === 'all' ? undefined : logsFilters.product,
           status: logsFilters.status === 'all' ? undefined : logsFilters.status,
-          process_id: debouncedSearch || undefined,
+          search: debouncedSearch || undefined,
           start_date: logsFilters.startDate || dateRange.start_date,
           end_date: logsFilters.endDate || dateRange.end_date,
           page: pageParam,
@@ -781,7 +803,7 @@ export default function Logs() {
                   <SelectContent>
                     <SelectItem value="all">All Products</SelectItem>
                     {products.map((product) => (
-                      <SelectItem key={product._id} value={product._id}>
+                      <SelectItem key={product._id} value={product.tag}>
                         {product.name}
                       </SelectItem>
                     ))}
@@ -855,7 +877,7 @@ export default function Logs() {
                   )}
                   {logsFilters.product !== 'all' && (
                     <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
-                      <span>Product: {products.find(p => p._id === logsFilters.product)?.name}</span>
+                      <span>Product: {products.find(p => p.tag === logsFilters.product)?.name}</span>
                       <button onClick={() => setLogsFilters({ product: 'all' })} className="hover:bg-primary/20 rounded p-0.5">
                         <X className="h-3 w-3" />
                       </button>

@@ -39,6 +39,7 @@ export default function CreateWorkspaceEnvironmentModal({
     description: '',
   });
   const [isDescriptionManuallyEdited, setIsDescriptionManuallyEdited] = useState(false);
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   useEffect(() => {
     if (editingEnv) {
@@ -48,6 +49,7 @@ export default function CreateWorkspaceEnvironmentModal({
         description: editingEnv.description || '',
       });
       setIsDescriptionManuallyEdited(true); // Don't auto-generate when editing
+      setIsSlugManuallyEdited(true); // Don't auto-generate slug when editing
     } else {
       setFormData({
         env_name: '',
@@ -55,8 +57,29 @@ export default function CreateWorkspaceEnvironmentModal({
         description: '',
       });
       setIsDescriptionManuallyEdited(false); // Allow auto-generation for new environments
+      setIsSlugManuallyEdited(false); // Allow auto-generation for new environments
     }
   }, [editingEnv, open]);
+
+  const generateSlug = (name: string): string => {
+    const lowerName = name.toLowerCase().trim();
+
+    // Common environment name patterns and their standard slugs
+    if (lowerName.includes('prod') || lowerName === 'live') return 'prd';
+    if (lowerName.includes('stag') || lowerName === 'stg') return 'stg';
+    if (lowerName.includes('dev') || lowerName === 'development') return 'dev';
+    if (lowerName.includes('test') || lowerName === 'qa') return 'tst';
+    if (lowerName.includes('sandbox') || lowerName === 'sbx') return 'sbx';
+    if (lowerName.includes('demo')) return 'dmo';
+    if (lowerName.includes('local')) return 'lcl';
+    if (lowerName.includes('uat')) return 'uat';
+    if (lowerName.includes('preview')) return 'prv';
+    if (lowerName.includes('integration') || lowerName === 'int') return 'int';
+
+    // Default: take first 3 letters
+    const sanitized = lowerName.replace(/[^a-z]/g, '').slice(0, 3).padEnd(3, 'x');
+    return sanitized;
+  };
 
   const generateDescription = (name: string): string => {
     const lowerName = name.toLowerCase().trim();
@@ -106,9 +129,15 @@ export default function CreateWorkspaceEnvironmentModal({
       ? generateDescription(value)
       : formData.description;
 
+    // Only auto-generate slug if user hasn't manually edited it
+    const newSlug = !isSlugManuallyEdited
+      ? generateSlug(value)
+      : formData.slug;
+
     setFormData({
       ...formData,
       env_name: value,
+      slug: newSlug,
       description: newDescription,
     });
   };
@@ -119,6 +148,8 @@ export default function CreateWorkspaceEnvironmentModal({
   };
 
   const handleSlugChange = (value: string) => {
+    // Mark as manually edited when user types
+    setIsSlugManuallyEdited(true);
     // Restrict to 3 characters exactly
     const sanitized = value.toLowerCase().slice(0, 3).replace(/[^a-z]/g, '');
     setFormData({ ...formData, slug: sanitized });

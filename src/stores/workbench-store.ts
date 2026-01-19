@@ -541,7 +541,9 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             // For vector tabs, persist enough to refetch on restore
             vector: (tab.data as any).vector ? {
               name: (tab.data as any).vector.name,
-              tag: (tab.data as any).vector.tag,
+              // Persist vector tag - check both 'vector' and 'tag' properties
+              vector: (tab.data as any).vector.vector || (tab.data as any).vector.tag,
+              tag: (tab.data as any).vector.tag || (tab.data as any).vector.vector,
               type: (tab.data as any).vector.type,
               productTag: (tab.data as any).vector.productTag,
               productName: (tab.data as any).vector.productName,
@@ -573,15 +575,36 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             cacheTag: (tab.data as any).cacheTag,
             brokerTag: (tab.data as any).brokerTag,
             sessionTag: (tab.data as any).sessionTag,
+            productTag: (tab.data as any).productTag,
+            productName: (tab.data as any).productName,
+            sessionName: (tab.data as any).sessionName,
             type: (tab.data as any).type,
             provider: (tab.data as any).provider,
             // Also preserve nested component objects if they exist
             cache: (tab.data as any).cache,
             broker: (tab.data as any).broker,
             session: (tab.data as any).session,
+            // For session-user tabs, persist user essential fields
+            user: (tab.data as any).user ? {
+              identifier: (tab.data as any).user.identifier,
+              ductape_user_id: (tab.data as any).user.ductape_user_id,
+              env: (tab.data as any).user.env,
+              session_count: (tab.data as any).user.session_count,
+              status: (tab.data as any).user.status,
+              first_seen: (tab.data as any).user.first_seen,
+              last_seen: (tab.data as any).user.last_seen,
+            } : undefined,
             // Environment info if present at root level
             env: (tab.data as any).env,
             envs: (tab.data as any).envs,
+            // Webhook explorer - preserve app context
+            appTag: (tab.data as any).appTag,
+            appName: (tab.data as any).appName,
+            appLogo: (tab.data as any).appLogo,
+            // Webhook events (needed for display)
+            events: (tab.data as any).events,
+            description: (tab.data as any).description,
+            active: (tab.data as any).active,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),

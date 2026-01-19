@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   Database,
@@ -73,6 +73,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeDatabase } from '@/hooks/useDuctapeDatabase';
 import { useAuth } from '@/store/useAuth';
+import logsServices, { DatabaseDashboardMetrics } from '@/services/logsServices';
 
 // Column type definitions
 type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
@@ -385,6 +386,44 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     staleTime: 60000, // Cache schema for 1 minute
   });
 
+  // Fetch table schema for Query Builder when a table is selected there
+  const [queryBuilderTableName, setQueryBuilderTableName] = useState<string | null>(null);
+
+  const { data: queryBuilderTableSchema } = useQuery({
+    queryKey: ['query-builder-table-schema', database.productTag, database.tag, database.env.slug, queryBuilderTableName],
+    queryFn: async () => {
+      if (!databaseService || !database.productTag || !queryBuilderTableName) {
+        return null;
+      }
+      try {
+        const result = await databaseService.schema.describe(queryBuilderTableName);
+        console.log('[DB-Explorer] Query Builder table schema:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching query builder table schema:', error);
+        return null;
+      }
+    },
+    enabled: !!databaseService && !!database.productTag && !!queryBuilderTableName && isConnected,
+    staleTime: 60000, // Cache schema for 1 minute
+  });
+
+  // Compute columns for the query builder table from its schema
+  const queryBuilderTableColumns = useMemo(() => {
+    if (!queryBuilderTableSchema) return [];
+
+    // Handle ITableSchema format with columns array
+    if (queryBuilderTableSchema.columns && Array.isArray(queryBuilderTableSchema.columns)) {
+      return queryBuilderTableSchema.columns.map((col: any) => ({
+        name: col.name || col.column_name || '',
+        type: col.type || col.data_type || 'string',
+        nullable: col.nullable ?? col.is_nullable ?? true,
+      })).filter((col: any) => col.name);
+    }
+
+    return [];
+  }, [queryBuilderTableSchema]);
+
   // Persistent state key
   const stateKey = `db-explorer-state-${database.tag}-${database.env.slug}`;
 
@@ -526,7 +565,22 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   // Query Builder state - initialized from persisted state
   const [showQueryBuilder, setShowQueryBuilder] = useState(persistedState?.showQueryBuilder || false);
   const [queryBuilderOperation, setQueryBuilderOperation] = useState<DatabaseOperation>(persistedState?.queryBuilderOperation || 'query');
-  const [queryBuilderTable, setQueryBuilderTable] = useState(persistedState?.queryBuilderTable || '');
+  const [queryBuilderTableInternal, setQueryBuilderTableInternal] = useState(persistedState?.queryBuilderTable || '');
+
+  // Wrapper to update both queryBuilderTable and queryBuilderTableName for schema fetching
+  const queryBuilderTable = queryBuilderTableInternal;
+  const setQueryBuilderTable = (tableName: string) => {
+    setQueryBuilderTableInternal(tableName);
+    setQueryBuilderTableName(tableName || null);
+  };
+
+  // Sync queryBuilderTableName with initial persisted queryBuilderTable
+  useEffect(() => {
+    if (queryBuilderTable && !queryBuilderTableName) {
+      setQueryBuilderTableName(queryBuilderTable);
+    }
+  }, [queryBuilderTable, queryBuilderTableName]);
+
   const [queryBuilderColumns, setQueryBuilderColumns] = useState<string[]>(persistedState?.queryBuilderColumns || []);
   const [queryBuilderWhere, setQueryBuilderWhere] = useState<Array<{ column: string; operator: string; value: string }>>(persistedState?.queryBuilderWhere || []);
   const [queryBuilderOrderBy, setQueryBuilderOrderBy] = useState<{ column: string; direction: 'ASC' | 'DESC' } | null>(persistedState?.queryBuilderOrderBy || null);
@@ -1471,6 +1525,34 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     staleTime: 30000,
   });
 
+  // Query for fetching database activity metrics from logs service
+  const { data: databaseActivityData, isLoading: isLoadingActivity } = useQuery<DatabaseDashboardMetrics | null>({
+    queryKey: ['database-activity', database.productTag, database.tag, database.env.slug],
+    queryFn: async () => {
+      if (!database.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
+        return null;
+      }
+      try {
+        const result = await logsServices.fetchDatabaseDashboard(
+          currentWorkspaceId,
+          user._id,
+          user.public_key,
+          {
+            product_tag: database.productTag,
+            database_tag: database.tag,
+            env: database.env.slug,
+          }
+        );
+        return result;
+      } catch (error) {
+        console.error('Error fetching database activity data:', error);
+        return null;
+      }
+    },
+    enabled: !!database.productTag && !!currentWorkspaceId && !!user?._id,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
   // SDK Mutation for creating an action
   const createActionMutation = useMutation({
     mutationFn: async (actionData: {
@@ -2324,12 +2406,8 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
           code: `import Ductape from '@ductape/sdk';
 
 const ductape = new Ductape({
-  workspaceId: 'your-workspace-id',
-  publicKey: 'your-public-key',
-  secretKey: 'your-secret-key',
-});
-
-await ductape.init();`,
+  accessKey: 'your-access-key',
+});`,
         },
       ];
     }
@@ -2943,9 +3021,7 @@ const complexQuery = await ductape.database.raw({
           code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  private_key: 'your-private-key'
+  accessKey: 'your-access-key',
 });`,
         }
       : {
@@ -2953,9 +3029,7 @@ const ductape = new Ductape({
           code: `const Ductape = require("@ductape/sdk")
 
 const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  private_key: 'your-private-key'
+  accessKey: 'your-access-key',
 });`,
         };
 
@@ -3480,18 +3554,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     Migrations
                   </button>
                 )}
-                <button
-                  onClick={() => handleViewChange('actions')}
-                  className={cn(
-                    'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
-                    sidebarView === 'actions'
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-grey-600 hover:text-grey'
-                  )}
-                >
-                  <Zap className="h-3 w-3 inline mr-1" />
-                  Actions
-                </button>
+{/* Actions tab hidden for now */}
               </div>
 
               {/* Search */}
@@ -3546,21 +3609,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                   <GitBranch className="h-5 w-5" />
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setIsSidebarCollapsed(false);
-                  handleViewChange('actions');
-                }}
-                className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
-                  sidebarView === 'actions'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
-                )}
-                title="Actions"
-              >
-                <Zap className="h-5 w-5" />
-              </button>
+{/* Actions icon hidden for now */}
             </div>
           ) : (
           <>
@@ -3843,12 +3892,50 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
 
             {/* Activity Timeline (7 Days) */}
             <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-                <p className="text-sm text-grey-600 font-medium mb-1">No database activity data available</p>
-                <p className="text-xs text-grey-500">Activity charts will appear once database operations are logged</p>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
+              {isLoadingActivity ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : databaseActivityData?.activityTimeline && databaseActivityData.activityTimeline.length > 0 ? (
+                <div className="space-y-3">
+                  {databaseActivityData.activityTimeline.map((day) => {
+                    const maxOperations = Math.max(...databaseActivityData.activityTimeline.map(d => d.sessions), 1);
+                    const percentage = maxOperations > 0 ? (day.sessions / maxOperations) * 100 : 0;
+
+                    return (
+                      <div key={day.date} className="flex items-center gap-3">
+                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center px-3">
+                            <span className="text-xs font-semibold text-white drop-shadow-sm">
+                              {day.sessions.toLocaleString()} operations
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+                  <p className="text-sm text-grey-600 font-medium mb-1">No database activity data available</p>
+                  <p className="text-xs text-grey-500">Activity charts will appear once database operations are logged</p>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions */}
@@ -4150,11 +4237,11 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 </SelectTrigger>
                                 <SelectContent>
                                   {allColumns && allColumns.length > 0 ? (
-                                    allColumns.map(col => (
+                                    allColumns.filter(col => col).map(col => (
                                       <SelectItem key={col} value={col}>{col}</SelectItem>
                                     ))
                                   ) : (
-                                    <SelectItem value="" disabled>No columns available</SelectItem>
+                                    <SelectItem value="__no_columns__" disabled>No columns available</SelectItem>
                                   )}
                                 </SelectContent>
                               </Select>
@@ -4725,16 +4812,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     )}
                     Test Query
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleOpenSaveActionModal}
-                    disabled={!generatedQuery || !queryTestResult?.success}
-                    className="gap-2"
-                    title={!queryTestResult?.success ? 'Test the query successfully before saving' : undefined}
-                  >
-                    <Save className="h-4 w-4" />
-                    Save as Action
-                  </Button>
+{/* Save as Action button hidden for now */}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -4786,13 +4864,13 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                         </SelectTrigger>
                         <SelectContent>
                           {tables && tables.length > 0 ? (
-                            tables.map((table) => (
+                            tables.filter(table => table?.name).map((table) => (
                               <SelectItem key={table.name} value={table.name}>
                                 {table.name}
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="" disabled>No tables available</SelectItem>
+                            <SelectItem value="__no_tables__" disabled>No tables available</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
@@ -4826,8 +4904,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                       <div>
                         <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
                         {queryBuilderWhere.map((condition, idx) => {
-                          const selectedTable = tables.find(t => t.name === queryBuilderTable);
-                          const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                          const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
                           const columnType: ColumnType = selectedColumn?.type || 'string';
                           const operators = OPERATORS_BY_TYPE[columnType];
                           const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
@@ -4841,7 +4918,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                   const newWhere = [...queryBuilderWhere];
                                   newWhere[idx].column = v;
                                   // Reset operator and value when column changes
-                                  const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                  const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
                                   const newType = newColumn?.type || 'string';
                                   const newOperators = OPERATORS_BY_TYPE[newType];
                                   if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
@@ -4855,15 +4932,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                   <SelectValue placeholder="Select column..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {selectedTable?.columns.map((col) => (
+                                  {queryBuilderTableColumns.length > 0 ? (
+                                    queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
                                     <SelectItem key={col.name} value={col.name}>
                                       <span className="flex items-center gap-2">
                                         {col.name}
                                         <span className="text-xs text-grey-400">({col.type})</span>
                                       </span>
                                     </SelectItem>
-                                  )) || (
-                                    <SelectItem value="" disabled>Select a table first</SelectItem>
+                                  ))
+                                  ) : (
+                                    <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
                                   )}
                                 </SelectContent>
                               </Select>
@@ -4982,8 +5061,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <div>
                       <Label className="text-xs text-grey mb-2 block">Data</Label>
                       {queryBuilderData.map((data, idx) => {
-                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
-                        const selectedColumn = selectedTable?.columns.find(c => c.name === data.column);
+                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === data.column);
                         const columnType: ColumnType = selectedColumn?.type || 'string';
 
                         return (
@@ -5002,8 +5080,8 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {selectedTable?.columns.length ? (
-                                  selectedTable.columns.map((col) => (
+                                {queryBuilderTableColumns.length > 0 ? (
+                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
                                     <SelectItem key={col.name} value={col.name}>
                                       <span className="flex items-center gap-2">
                                         {col.name}
@@ -5100,8 +5178,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <div>
                       <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
                       {queryBuilderWhere.map((condition, idx) => {
-                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
-                        const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
                         const columnType: ColumnType = selectedColumn?.type || 'string';
                         const operators = OPERATORS_BY_TYPE[columnType];
                         const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
@@ -5113,7 +5190,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                               onValueChange={(v) => {
                                 const newWhere = [...queryBuilderWhere];
                                 newWhere[idx].column = v;
-                                const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
                                 const newType = newColumn?.type || 'string';
                                 const newOperators = OPERATORS_BY_TYPE[newType];
                                 if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
@@ -5127,8 +5204,8 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {selectedTable?.columns.length ? (
-                                  selectedTable.columns.map((col) => (
+                                {queryBuilderTableColumns.length > 0 ? (
+                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
                                     <SelectItem key={col.name} value={col.name}>
                                       <span className="flex items-center gap-2">
                                         {col.name}
@@ -5258,14 +5335,16 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                           <SelectValue placeholder="Select column to aggregate..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {tables.find(t => t.name === queryBuilderTable)?.columns
-                            .filter(col => col.type === 'number')
-                            .map((col) => (
-                              <SelectItem key={col.name} value={col.name}>
-                                {col.name}
-                              </SelectItem>
-                            )) || (
-                            <SelectItem value="" disabled>Select a table first</SelectItem>
+                          {queryBuilderTableColumns.length > 0 ? (
+                            queryBuilderTableColumns
+                              .filter((col: any) => col.type === 'number' && col?.name)
+                              .map((col: any) => (
+                                <SelectItem key={col.name} value={col.name}>
+                                  {col.name}
+                                </SelectItem>
+                              ))
+                          ) : (
+                            <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
@@ -5277,8 +5356,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                     <div>
                       <Label className="text-xs text-grey mb-2 block">Where Conditions (Optional)</Label>
                       {queryBuilderWhere.map((condition, idx) => {
-                        const selectedTable = tables.find(t => t.name === queryBuilderTable);
-                        const selectedColumn = selectedTable?.columns.find(c => c.name === condition.column);
+                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
                         const columnType: ColumnType = selectedColumn?.type || 'string';
                         const operators = OPERATORS_BY_TYPE[columnType];
                         const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
@@ -5290,7 +5368,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                               onValueChange={(v) => {
                                 const newWhere = [...queryBuilderWhere];
                                 newWhere[idx].column = v;
-                                const newColumn = selectedTable?.columns.find(c => c.name === v);
+                                const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
                                 const newType = newColumn?.type || 'string';
                                 const newOperators = OPERATORS_BY_TYPE[newType];
                                 if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
@@ -5304,8 +5382,8 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {selectedTable?.columns.length ? (
-                                  selectedTable.columns.map((col) => (
+                                {queryBuilderTableColumns.length > 0 ? (
+                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
                                     <SelectItem key={col.name} value={col.name}>
                                       <span className="flex items-center gap-2">
                                         {col.name}
@@ -5509,6 +5587,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
             )}
           </div>
         )}
+
       </div>
 
       {/* Create Table Dialog */}

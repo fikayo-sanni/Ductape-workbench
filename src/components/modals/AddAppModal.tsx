@@ -63,13 +63,6 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
       data: app,
     });
 
-    // Open a new request tab for this app
-    openTab({
-      id: `request-${Date.now()}`,
-      type: 'request',
-      title: 'New Request',
-    });
-
     setShowInternalAppModal(false);
   };
 

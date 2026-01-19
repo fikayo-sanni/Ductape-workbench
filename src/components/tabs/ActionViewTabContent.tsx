@@ -907,9 +907,7 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
             code: `const Ductape = require("@ductape/sdk")
 
 const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  private_key: 'your-private-key'
+  accessKey: 'your-access-key',
 });`
           },
           {
@@ -938,9 +936,7 @@ console.log('Action result:', result);`
             code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
-  workspace_id: 'your-workspace-id',
-  user_id: 'your-user-id',
-  private_key: 'your-private-key'
+  accessKey: 'your-access-key',
 });`
           },
           {
@@ -1469,52 +1465,11 @@ println!("Action result: {:?}", result);`
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* URL & Environment Bar */}
         <div className="bg-white border-b border-grey-400 p-4 flex-shrink-0">
-          <div className="flex flex-col lg:flex-row gap-3">
-            {/* Method + Send Button */}
-            <div className="flex items-center gap-2">
-              <Select
-                value={formData.method}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, method: value }))}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(method => (
-                    <SelectItem key={method} value={method}>
-                      <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(method))}>
-                        {method}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                onClick={handleTest}
-                disabled={isLoadingRequest || !fullUrl || !baseUrl}
-                className="bg-primary text-white hover:bg-primary/90"
-                size="sm"
-              >
-                <Send className="h-4 w-4 mr-1" />
-                {isLoadingRequest ? 'Sending...' : 'Send'}
-              </Button>
-            </div>
-
-            {/* URL Display */}
-            <div className="flex-1">
-              <Input
-                placeholder={baseUrl ? "Full URL" : "Select an environment to see full URL"}
-                value={fullUrl}
-                readOnly
-                className="font-mono text-sm bg-grey-50 dark:bg-transparent h-9"
-              />
-            </div>
-
-            {/* Environment Selector */}
-            {environments.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-grey-600 whitespace-nowrap">Env:</Label>
+          {/* Environment Selector - Top Row */}
+          {environments.length > 0 && (
+            <div className="flex items-center justify-between mb-3 pb-3 border-b border-grey-200">
+              <div className="flex items-center gap-3">
+                <Label className="text-xs font-medium text-grey-700">Environment</Label>
                 <div className="flex gap-1">
                   {customEnvs.map((env) => {
                     const originalEnv = environments.find((e: any) => e.slug === env.slug);
@@ -1538,10 +1493,55 @@ println!("Action result: {:?}", result);`
                   })}
                 </div>
               </div>
-            )}
+              {baseUrl && (
+                <span className="text-xs text-grey-500 font-mono">{baseUrl}</span>
+              )}
+            </div>
+          )}
+
+          {/* URL Input Row */}
+          <div className="flex items-center gap-2">
+            {/* Method Selector */}
+            <Select
+              value={formData.method}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, method: value }))}
+            >
+              <SelectTrigger className="w-24 h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(method => (
+                  <SelectItem key={method} value={method}>
+                    <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(method))}>
+                      {method}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* URL Display */}
+            <div className="flex-1">
+              <Input
+                placeholder={baseUrl ? "Full URL" : "Select an environment to see full URL"}
+                value={fullUrl}
+                readOnly
+                className="font-mono text-sm bg-grey-50 dark:bg-transparent h-10"
+              />
+            </div>
+
+            {/* Send Button */}
+            <Button
+              onClick={handleTest}
+              disabled={isLoadingRequest || !fullUrl || !baseUrl}
+              className="bg-primary text-white hover:bg-primary/90 h-10 px-6"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {isLoadingRequest ? 'Sending...' : 'Send'}
+            </Button>
           </div>
 
-          {/* Resource Path - Compact */}
+          {/* Resource Path */}
           <div className="mt-3 flex items-center gap-2">
             <Label className="text-xs text-grey-600 flex items-center gap-1 whitespace-nowrap">
               <Hash className="h-3 w-3" />

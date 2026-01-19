@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -11,6 +12,8 @@ import { useQuery } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
 import { useAuth } from '@/store/useAuth';
 import { useEffect } from 'react';
+import { useDuctape } from '@/hooks/useDuctape';
+import { toast } from 'react-hot-toast';
 
 const mapEnvironmentsSchema = z.object({
   isSelected: z.boolean().default(false),
@@ -23,14 +26,24 @@ const formSchema = z.object({
 });
 
 interface StepTwoProps {
-  goToNextStep: () => void;
   goToPreviousStep: () => void;
+  handleFinish: () => void;
   app: any;
 }
 
-export default function StepTwo({ goToNextStep, goToPreviousStep, app }: StepTwoProps) {
+export default function StepTwo({ goToPreviousStep, handleFinish, app }: StepTwoProps) {
   const { data: integrationData, setEnvironmentMappings } = useIntegration();
   const { user, currentWorkspaceId } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const productBuilder = useDuctape({
+    workspace_id: currentWorkspaceId || '',
+    user_id: user?._id || '',
+    token: user?.auth_token || '',
+    public_key: user?.public_key || '',
+    type: 'product'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any;
 
   // Get app environments from latest version
   const latestVersion = app?.versions?.find((v: any) => v.latest);
@@ -95,9 +108,42 @@ export default function StepTwo({ goToNextStep, goToPreviousStep, app }: StepTwo
     }
   }, [productEnvs.length, integrationData.environmentMappings.length]);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setEnvironmentMappings(values.environments);
-    goToNextStep();
+
+    // Perform integration directly
+    if (!productBuilder || !integrationData.productTag) {
+      toast.error('Missing product configuration');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Build environment mappings for integration
+      const envs = values.environments
+        .filter((mapping: any) => mapping.isSelected)
+        .map((mapping: any) => ({
+          app_env_slug: mapping.app_env_slug,
+          product_env_slug: mapping.product_env_slug,
+          variables: [],
+        }));
+
+      const integrationDetails = {
+        access_tag: app.access_tag || integrationData.accessTag,
+        envs
+      };
+
+      // await productBuilder.init(integrationData.productTag);
+      await productBuilder.apps.add(integrationData.productTag, integrationDetails);
+      toast.success('App integrated successfully!');
+      handleFinish();
+    } catch (error) {
+      console.error('Integration error:', error);
+      toast.error('Failed to integrate app');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoadingProduct) {
@@ -203,15 +249,24 @@ export default function StepTwo({ goToNextStep, goToPreviousStep, app }: StepTwo
                 form.reset();
                 goToPreviousStep();
               }}
+              disabled={isSubmitting}
               className="flex-1"
             >
               Previous
             </Button>
             <Button
               type="submit"
-              className="flex-1"
+              disabled={isSubmitting}
+              className="flex-1 gap-2"
             >
-              Next
+              {isSubmitting ? (
+                <>
+                  <Loader className="h-4 w-4 animate-spin" />
+                  Integrating...
+                </>
+              ) : (
+                'Finish'
+              )}
             </Button>
           </div>
         </form>

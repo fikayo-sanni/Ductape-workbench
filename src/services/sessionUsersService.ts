@@ -1,5 +1,4 @@
-import qs from 'qs';
-import apiClient from '@/config/axiosinstance';
+import { createSDKProxy, SDKProxyConfig } from './sdkProxy';
 
 // ==================== SESSION USERS TYPES ====================
 
@@ -48,11 +47,28 @@ export interface IFetchSessionUserDetailsOptions {
   env?: string;
 }
 
+export interface IUserSessionInfo {
+  session_id: string;
+  start_at: Date;
+  end_at?: Date;
+  active: boolean;
+  data?: Record<string, any>;
+}
+
 export interface IFetchSessionUserDetailsResult {
-  user: ISessionUser;
-  sessions: IUserSession[];
+  ductape_user_id: string;
+  identifier: string;
+  product_tag: string;
+  session_tag?: string;
+  env: string;
+  first_seen?: Date | null;
+  last_seen?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  sessions: IUserSessionInfo[];
   totalSessions: number;
-  activeSessions: number;
+  activeSessionsCount: number;
+  latestSessionData?: Record<string, any>;
 }
 
 export interface IFetchSessionDashboardOptions {
@@ -71,17 +87,41 @@ export interface ISessionDashboardResult {
   totalSessions: number;
   activeSessions: number;
   averageSessionsPerUser: number;
-}
-
-export interface SessionUsersResponse<T> {
-  success: boolean;
-  data: T;
+  // DAU/WAU/MAU metrics
+  dau: { current: number; previous: number; change: number };
+  wau: { current: number; previous: number; change: number };
+  mau: { current: number; previous: number; change: number };
+  // Activity timeline (sessions per day of week)
+  activityTimeline: Array<{ date: string; sessions: number }>;
+  // Peak activity hours
+  peakHours: Array<{ hour: string; count: number }>;
+  // Environment breakdown
+  environmentBreakdown: Array<{ env: string; count: number; percentage: number }>;
+  // Average session duration
+  avgSessionDuration: { current: string; previous: string; change: number };
 }
 
 // ==================== SESSION USERS API METHODS ====================
 
 /**
- * Fetch paginated session users
+ * Get SDK proxy config from auth data
+ */
+const getProxyConfig = (
+  workspace_id: string,
+  user_id: string,
+  public_key: string
+): SDKProxyConfig => {
+  const token = localStorage.getItem('token')?.replace(/"/g, '') || '';
+  return {
+    workspace_id,
+    user_id,
+    public_key,
+    token,
+  };
+};
+
+/**
+ * Fetch paginated session users via SDK proxy
  */
 export const fetchSessionUsers = async (
   workspace_id: string,
@@ -89,25 +129,19 @@ export const fetchSessionUsers = async (
   public_key: string,
   options: IFetchSessionUsersOptions
 ): Promise<IFetchSessionUsersResult> => {
-  const cleanedPayload = Object.fromEntries(
-    Object.entries({
-      user_id,
-      public_key,
-      ...options,
-    }).filter(([_, value]) => value !== undefined && value !== null)
-  );
+  const proxy = createSDKProxy(getProxyConfig(workspace_id, user_id, public_key));
 
-  const queryString = qs.stringify(cleanedPayload);
-
-  const response = await apiClient.get<SessionUsersResponse<IFetchSessionUsersResult>>(
-    `/integrations/v1/session/users/${workspace_id}?${queryString}`
-  );
-
-  return response.data.data;
+  return proxy.sessions.fetchUsers<IFetchSessionUsersResult>({
+    product: options.product_tag,
+    session: options.session_tag,
+    env: options.env,
+    page: options.page,
+    limit: options.limit,
+  });
 };
 
 /**
- * Fetch session user details with sessions
+ * Fetch session user details with sessions via SDK proxy
  */
 export const fetchSessionUserDetails = async (
   workspace_id: string,
@@ -115,27 +149,18 @@ export const fetchSessionUserDetails = async (
   public_key: string,
   options: IFetchSessionUserDetailsOptions
 ): Promise<IFetchSessionUserDetailsResult> => {
-  const { identifier, ...queryParams } = options;
+  const proxy = createSDKProxy(getProxyConfig(workspace_id, user_id, public_key));
 
-  const cleanedPayload = Object.fromEntries(
-    Object.entries({
-      user_id,
-      public_key,
-      ...queryParams,
-    }).filter(([_, value]) => value !== undefined && value !== null)
-  );
-
-  const queryString = qs.stringify(cleanedPayload);
-
-  const response = await apiClient.get<SessionUsersResponse<IFetchSessionUserDetailsResult>>(
-    `/integrations/v1/session/users/${workspace_id}/${encodeURIComponent(identifier)}?${queryString}`
-  );
-
-  return response.data.data;
+  return proxy.sessions.fetchUserDetails<IFetchSessionUserDetailsResult>({
+    product: options.product_tag,
+    session: options.session_tag,
+    identifier: options.identifier,
+    env: options.env,
+  });
 };
 
 /**
- * Fetch session dashboard metrics
+ * Fetch session dashboard metrics via SDK proxy
  */
 export const fetchSessionDashboard = async (
   workspace_id: string,
@@ -143,21 +168,13 @@ export const fetchSessionDashboard = async (
   public_key: string,
   options: IFetchSessionDashboardOptions
 ): Promise<ISessionDashboardResult> => {
-  const cleanedPayload = Object.fromEntries(
-    Object.entries({
-      user_id,
-      public_key,
-      ...options,
-    }).filter(([_, value]) => value !== undefined && value !== null)
-  );
+  const proxy = createSDKProxy(getProxyConfig(workspace_id, user_id, public_key));
 
-  const queryString = qs.stringify(cleanedPayload);
-
-  const response = await apiClient.get<SessionUsersResponse<ISessionDashboardResult>>(
-    `/integrations/v1/session/dashboard/${workspace_id}?${queryString}`
-  );
-
-  return response.data.data;
+  return proxy.sessions.fetchDashboard<ISessionDashboardResult>({
+    product: options.product_tag,
+    session: options.session_tag,
+    env: options.env,
+  });
 };
 
 const sessionUsersService = {
