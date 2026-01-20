@@ -1314,9 +1314,11 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                       border: '1px solid #E5E7EB',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number | undefined) => {
-                      if (value === undefined) return ['', ''];
-                      return [`${value} subscription${value !== 1 ? 's' : ''}`, ''];
+                    formatter={(value) => {
+                      if (value === undefined || value === null) return ['', ''];
+                      const numValue = typeof value === 'number' ? value : parseInt(String(value), 10);
+                      if (isNaN(numValue)) return ['', ''];
+                      return [`${numValue} subscription${numValue !== 1 ? 's' : ''}`, ''];
                     }}
                   />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]} />
