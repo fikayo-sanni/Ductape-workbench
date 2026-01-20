@@ -179,7 +179,7 @@ export default function CreateAppEnvironmentModal({
         request_type: data.request_type,
       };
 
-      const environment = await ductape.environments.create(payload);
+      const environment = await ductape.environments.create(appTag, payload);
       return environment;
     },
     onSuccess: (environment) => {

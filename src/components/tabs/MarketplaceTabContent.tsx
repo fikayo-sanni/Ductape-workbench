@@ -75,11 +75,11 @@ export default function MarketplaceTabContent() {
   const sortedApps = [...filteredApps].sort((a, b) => {
     switch (sortBy) {
       case 'name':
-        return a.app_name.localeCompare(b.app_name);
+        return (a.app_name || '').localeCompare(b.app_name || '');
       case 'domain':
-        return a.domain_name.localeCompare(b.domain_name);
+        return (a.domain_name || '').localeCompare(b.domain_name || '');
       case 'created':
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       default:
         return 0;
     }

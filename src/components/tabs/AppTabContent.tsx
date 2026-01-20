@@ -222,7 +222,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   });
 
   // Check if the selected version is unpublished (draft or private)
-  const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private' || !selectedVersion?.status;
+  const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private';
 
   // Build folder tree structure with actions
   const folderTree = useMemo((): FolderTreeNode[] => {
@@ -1774,6 +1774,10 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                           <FolderPlus className="h-4 w-4 mr-2" />
                           New Folder
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setShowCreateSharedVariableModal(true)}>
+                          <Settings2 className="h-4 w-4 mr-2" />
+                          Shared Variable
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -1966,6 +1970,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
             status: selectedVersion.status,
           }}
           onSuccess={() => {
+            setShowPublishModal(false);
             queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
             queryClient.invalidateQueries({ queryKey: ['apps'] });
           }}
