@@ -20,6 +20,7 @@ import { useSDKProxy } from '@/services/sdkProxy';
 import { useAuth } from '@/store/useAuth';
 import { cn } from '@/lib/utils';
 import { Notifiers } from '@ductape/sdk/dist/types/enums';
+import { z } from 'zod';
 
 interface InlineNotifierFormProps {
   product: {
@@ -55,6 +56,138 @@ interface EnvConfig {
   };
 }
 
+// Zod validation schema
+const smtpConfigSchema = z.object({
+  host: z.string().min(1, 'SMTP host is required'),
+  port: z.string().min(1, 'SMTP port is required'),
+  sender_email: z.string().email('Invalid sender email'),
+  auth: z.object({
+    user: z.string().min(1, 'Auth username is required'),
+    pass: z.string().min(1, 'Auth password is required'),
+  }),
+  secure: z.boolean().default(false),
+  tls: z.object({
+    rejectUnauthorized: z.boolean(),
+  }).optional(),
+});
+
+const mailgunConfigSchema = z.object({
+  apiKey: z.string().min(1, 'Mailgun API key is required'),
+  domain: z.string().min(1, 'Mailgun domain is required'),
+  sender_email: z.string().email('Invalid sender email'),
+  region: z.enum(['us', 'eu']).default('us'),
+  baseUrl: z.string().url('Invalid base URL').optional(),
+});
+
+const sendgridConfigSchema = z.object({
+  apiKey: z.string().min(1, 'SendGrid API key is required'),
+  sender_email: z.string().email('Invalid sender email'),
+});
+
+const postmarkConfigSchema = z.object({
+  serverToken: z.string().min(1, 'Postmark server token is required'),
+  sender_email: z.string().email('Invalid sender email'),
+  messageStream: z.string().optional(),
+});
+
+const brevoConfigSchema = z.object({
+  apiKey: z.string().min(1, 'Brevo API key is required'),
+  sender_email: z.string().email('Invalid sender email'),
+  sender_name: z.string().optional(),
+});
+
+const emailConfigSchema = z.object({
+  provider: z.enum(['smtp', 'mailgun', 'sendgrid', 'postmark', 'brevo']),
+  smtp: smtpConfigSchema.optional(),
+  mailgun: mailgunConfigSchema.optional(),
+  sendgrid: sendgridConfigSchema.optional(),
+  postmark: postmarkConfigSchema.optional(),
+  brevo: brevoConfigSchema.optional(),
+}).refine((data) => {
+  // Ensure provider-specific config exists
+  const providerConfig = data[data.provider];
+  return providerConfig !== undefined && providerConfig !== null;
+}, {
+  message: 'Provider-specific configuration is required',
+  path: ['provider'],
+});
+
+const smsConfigSchema = z.object({
+  provider: z.enum(['twilio', 'nexmo', 'plivo']),
+  accountSid: z.string().optional(),
+  authToken: z.string().optional(),
+  apiKey: z.string().optional(),
+  apiSecret: z.string().optional(),
+  sender: z.string().min(1, 'Sender phone number is required'),
+}).refine((data) => {
+  if (data.provider === 'twilio') {
+    return data.accountSid && data.authToken;
+  } else if (data.provider === 'nexmo') {
+    return data.apiKey && data.apiSecret;
+  } else if (data.provider === 'plivo') {
+    return data.apiKey;
+  }
+  return false;
+}, {
+  message: 'Provider-specific fields are required',
+});
+
+const pushNotificationConfigSchema = z.object({
+  type: z.enum(['firebase', 'expo']),
+  credentials: z.object({
+    type: z.string(),
+    project_id: z.string(),
+    private_key_id: z.string(),
+    private_key: z.string(),
+    client_email: z.string().email(),
+    client_id: z.string(),
+    auth_uri: z.string().url(),
+    token_uri: z.string().url(),
+    auth_provider_x509_cert_url: z.string().url(),
+    client_x509_cert_url: z.string().url(),
+  }).optional(),
+  databaseUrl: z.string().url().optional(),
+}).refine((data) => {
+  if (data.type === 'firebase') {
+    return data.credentials && data.databaseUrl;
+  }
+  return true;
+}, {
+  message: 'Firebase requires credentials and database URL',
+});
+
+const callbackConfigSchema = z.object({
+  url: z.string().url('Invalid callback URL'),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('POST'),
+  headers: z.record(z.string()).optional(),
+  query: z.record(z.string()).optional(),
+  params: z.record(z.string()).optional(),
+  body: z.string().optional(),
+});
+
+const envConfigSchema = z.object({
+  slug: z.string().length(3, 'Environment slug must be 3 characters'),
+  push_notifications: pushNotificationConfigSchema.optional().nullable(),
+  emails: emailConfigSchema.optional().nullable(),
+  sms: smsConfigSchema.optional().nullable(),
+  callbacks: callbackConfigSchema.optional().nullable(),
+});
+
+const notifierFormSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  tag: z.string().min(1, 'Tag is required').regex(/^[a-z0-9-]+$/, 'Tag must contain only lowercase letters, numbers, and hyphens'),
+  description: z.string().optional(),
+  envs: z.array(envConfigSchema).min(1, 'At least one environment must be configured'),
+}).refine((data) => {
+  // Validate that at least one environment has at least one configured channel
+  return data.envs.some(env => 
+    env.push_notifications || env.emails || env.sms || env.callbacks
+  );
+}, {
+  message: 'At least one environment must have a channel configured',
+  path: ['envs'],
+});
+
 export default function InlineNotifierForm({ product, onCancel, onSuccess }: InlineNotifierFormProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
@@ -73,6 +206,17 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
   ]);
 
   const [envConfigs, setEnvConfigs] = useState<EnvConfig[]>([]);
+  /** Inline validation errors: path -> message (e.g. "name", "tag", "envs.0.emails") */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Clear a field error when user changes that field
+  const clearFieldError = (path: string) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  };
 
   // Initialize environment configurations
   useEffect(() => {
@@ -123,21 +267,23 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
       if (!sdkProxy) throw new Error('SDK proxy not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
 
-      const envs = envConfigs.map((config) => ({
-        slug: config.slug,
-        ...(selectedNotifiers.find((n) => n.id === 'push')?.selected && config.push_notifications && {
-          push_notifications: config.push_notifications,
-        }),
-        ...(selectedNotifiers.find((n) => n.id === 'email')?.selected && config.emails && {
-          emails: config.emails,
-        }),
-        ...(selectedNotifiers.find((n) => n.id === 'sms')?.selected && config.sms && {
-          sms: config.sms,
-        }),
-        ...(selectedNotifiers.find((n) => n.id === 'callback')?.selected && config.callbacks && {
-          callbacks: config.callbacks,
-        }),
-      }));
+      const envs = envConfigs.map((config) => {
+        const out: Record<string, unknown> = { slug: config.slug };
+        // Include each channel when selected and config has it; include when config has it so no env is dropped
+        if (selectedNotifiers.find((n) => n.id === 'push')?.selected && config.push_notifications) {
+          out.push_notifications = config.push_notifications;
+        }
+        if (selectedNotifiers.find((n) => n.id === 'email')?.selected && config.emails) {
+          out.emails = config.emails;
+        }
+        if (selectedNotifiers.find((n) => n.id === 'sms')?.selected && config.sms) {
+          out.sms = config.sms;
+        }
+        if (selectedNotifiers.find((n) => n.id === 'callback')?.selected && config.callbacks) {
+          out.callbacks = config.callbacks;
+        }
+        return out;
+      });
 
       const payload = {
         name: formData.name,
@@ -146,10 +292,8 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
         envs,
       };
 
-      alert(JSON.stringify(payload, null, 2));
-
       const notification = await sdkProxy.notifications.create(product.tag, payload);
-      return notification;
+        return notification;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications', product?._id] });
@@ -160,26 +304,67 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
       onSuccess();
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to create notifier');
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        'Failed to create notifier';
+      toast.error(message);
     },
   });
 
   const handleCreate = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Please enter a name');
-      return;
-    }
-    if (!formData.tag.trim()) {
-      toast.error('Please enter a tag');
-      return;
-    }
-    const hasSelection = selectedNotifiers.some((n) => n.selected);
-    if (!hasSelection) {
-      toast.error('Please select at least one notifier type');
-      return;
-    }
+    setFieldErrors({}); // reset inline errors before validating
 
-    await createNotification();
+    try {
+      const envsForValidation = envConfigs.map((config) => {
+        const cleanConfig: any = { slug: config.slug };
+        if (config.push_notifications) cleanConfig.push_notifications = config.push_notifications;
+        if (config.emails) cleanConfig.emails = config.emails;
+        if (config.sms) cleanConfig.sms = config.sms;
+        if (config.callbacks) cleanConfig.callbacks = config.callbacks;
+        return cleanConfig;
+      });
+
+      const payload = {
+        name: formData.name.trim(),
+        tag: formData.tag.trim(),
+        description: formData.description?.trim() || '',
+        envs: envsForValidation,
+      };
+
+      notifierFormSchema.parse(payload);
+
+      const selectedChannels = selectedNotifiers.filter(n => n.selected).map(n => n.id);
+      const configuredChannels = new Set<string>();
+      envConfigs.forEach(env => {
+        if (env.push_notifications) configuredChannels.add('push');
+        if (env.emails) configuredChannels.add('email');
+        if (env.sms) configuredChannels.add('sms');
+        if (env.callbacks) configuredChannels.add('callback');
+      });
+
+      const missingConfigs = selectedChannels.filter(ch => !configuredChannels.has(ch));
+      if (missingConfigs.length > 0) {
+        setFieldErrors({
+          channels: `Please configure ${missingConfigs.map(ch => selectedNotifiers.find(n => n.id === ch)?.label).join(', ')} for at least one environment`,
+        });
+        return;
+      }
+
+      await createNotification();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          const path = err.path.length > 0 ? err.path.join('.') : 'form';
+          errors[path] = err.message;
+        });
+        setFieldErrors(errors);
+      } else {
+        setFieldErrors({ form: 'Failed to validate form data' });
+      }
+      return;
+    }
   };
 
   const isStep1Complete = formData.name.trim() !== '' && formData.tag.trim() !== '';
@@ -212,6 +397,24 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
 
         {/* Form */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+          {Object.keys(fieldErrors).length > 0 && (
+            <div className="p-3 rounded-lg bg-red/10 border border-red/30 text-sm text-red" role="alert">
+              <span className="font-medium">Please fix the following:</span>
+              <ul className="mt-1 list-disc list-inside">
+                {fieldErrors.name && <li>{fieldErrors.name}</li>}
+                {fieldErrors.tag && <li>{fieldErrors.tag}</li>}
+                {fieldErrors.channels && <li>{fieldErrors.channels}</li>}
+                {fieldErrors.envs && <li>{fieldErrors.envs}</li>}
+                {Object.entries(fieldErrors)
+                  .filter(([k]) => k.startsWith('envs.'))
+                  .map(([path, msg]) => (
+                    <li key={path}>{msg}</li>
+                  ))}
+                {fieldErrors.form && <li>{fieldErrors.form}</li>}
+              </ul>
+            </div>
+          )}
+
           {/* Step 1: Basic Information */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -227,6 +430,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                   placeholder="e.g., User Notifications"
                   value={formData.name}
                   onChange={(e) => {
+                    clearFieldError('name');
                     const name = e.target.value;
                     setFormData({
                       ...formData,
@@ -236,9 +440,18 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                         : formData.description,
                     });
                   }}
-                  className="mt-2"
+                  onBlur={() => {
+                    const result = z.string().min(1, 'Name is required').safeParse(formData.name.trim());
+                    if (!result.success) {
+                      setFieldErrors((prev) => ({ ...prev, name: result.error.errors[0].message }));
+                    }
+                  }}
+                  className={cn('mt-2', fieldErrors.name && 'border-red focus-visible:ring-red')}
                   autoFocus
                 />
+                {fieldErrors.name && (
+                  <p className="text-sm text-red mt-1" role="alert">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -248,13 +461,24 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                     id="tag"
                     placeholder="e.g., user-notifications"
                     value={formData.tag}
-                    onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                    className="font-mono"
+                    onChange={(e) => {
+                      clearFieldError('tag');
+                      setFormData({ ...formData, tag: e.target.value });
+                    }}
+                    onBlur={() => {
+                      const tagSchema = z.string().min(1, 'Tag is required').regex(/^[a-z0-9-]+$/, 'Tag must contain only lowercase letters, numbers, and hyphens');
+                      const result = tagSchema.safeParse(formData.tag.trim());
+                      if (!result.success) {
+                        setFieldErrors((prev) => ({ ...prev, tag: result.error.errors[0].message }));
+                      }
+                    }}
+                    className={cn('font-mono', fieldErrors.tag && 'border-red focus-visible:ring-red')}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
+                      clearFieldError('tag');
                       const sanitized = formData.name
                         .toLowerCase()
                         .replace(/[^a-z0-9]/g, '-')
@@ -267,6 +491,9 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                     Auto-generate
                   </Button>
                 </div>
+                {fieldErrors.tag && (
+                  <p className="text-sm text-red mt-1" role="alert">{fieldErrors.tag}</p>
+                )}
               </div>
 
               <div>
@@ -319,6 +546,15 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                 <h2 className="text-lg font-semibold text-grey">3. Configure Environments</h2>
               </div>
 
+              {(fieldErrors.envs || fieldErrors.channels || Object.keys(fieldErrors).some((k) => k.startsWith('envs.'))) && (
+                <div className="mb-4 p-3 rounded-lg bg-red/10 border border-red/30 text-sm text-red" role="alert">
+                  {fieldErrors.channels ?? fieldErrors.envs ?? Object.entries(fieldErrors)
+                    .filter(([k]) => k.startsWith('envs.'))
+                    .map(([, msg]) => msg)
+                    .join(' ')}
+                </div>
+              )}
+
               <div className="space-y-6">
                 {envConfigs.map((config, envIndex) => (
                   <EnvironmentConfigCard
@@ -327,8 +563,21 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
                     envConfig={config}
                     selectedNotifiers={selectedNotifiers}
                     onConfigChange={(updatedConfig) => {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.channels;
+                        delete next.envs;
+                        Object.keys(next).filter((k) => k.startsWith('envs.')).forEach((k) => delete next[k]);
+                        return next;
+                      });
                       const newConfigs = [...envConfigs];
-                      newConfigs[envIndex] = updatedConfig;
+                      const existingConfig = newConfigs[envIndex] || { slug: config.slug };
+                      const mergedConfig = { ...existingConfig, ...updatedConfig };
+                      if (mergedConfig.emails === undefined) delete mergedConfig.emails;
+                      if (mergedConfig.sms === undefined) delete mergedConfig.sms;
+                      if (mergedConfig.push_notifications === undefined) delete mergedConfig.push_notifications;
+                      if (mergedConfig.callbacks === undefined) delete mergedConfig.callbacks;
+                      newConfigs[envIndex] = mergedConfig;
                       setEnvConfigs(newConfigs);
                     }}
                     envIndex={envIndex}
@@ -406,6 +655,7 @@ function EnvironmentConfigCard({
             </AccordionTrigger>
             <AccordionContent className="py-4">
               <NotificationTypeConfig
+                initialValue={envConfig.push_notifications}
                 onFieldChange={(value) => onConfigChange({ ...envConfig, push_notifications: value })}
                 envIndex={envIndex}
               />
@@ -422,12 +672,12 @@ function EnvironmentConfigCard({
                 </div>
                 <div className="text-left">
                   <div className="font-medium text-grey">Email</div>
-                  <div className="text-xs text-grey-600">Configure SMTP email settings</div>
+                  <div className="text-xs text-grey-600">Configure email provider settings (SMTP, Mailgun, SendGrid, Postmark, Brevo)</div>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <EmailConfig onFieldChange={(value) => onConfigChange({ ...envConfig, emails: value })} />
+              <EmailConfig initialValue={envConfig.emails} onFieldChange={(value) => onConfigChange({ ...envConfig, emails: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -446,7 +696,7 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <SmsConfig onFieldChange={(value) => onConfigChange({ ...envConfig, sms: value })} />
+              <SmsConfig initialValue={envConfig.sms} onFieldChange={(value) => onConfigChange({ ...envConfig, sms: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -465,7 +715,7 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <CallbackConfig onFieldChange={(value) => onConfigChange({ ...envConfig, callbacks: value })} />
+              <CallbackConfig initialValue={envConfig.callbacks} onFieldChange={(value) => onConfigChange({ ...envConfig, callbacks: value })} />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -474,35 +724,61 @@ function EnvironmentConfigCard({
   );
 }
 
-function NotificationTypeConfig({ onFieldChange, envIndex }: { onFieldChange: (value: any) => void; envIndex?: number }) {
-  const [notificationType, setNotificationType] = useState<'firebase' | 'expo'>('firebase');
-  const [credentials, setCredentials] = useState({
-    type: 'service_account',
-    project_id: '',
-    private_key_id: '',
-    private_key: '',
-    client_email: '',
-    client_id: '',
-    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-    token_uri: 'https://oauth2.googleapis.com/token',
-    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-    client_x509_cert_url: '',
+const defaultCredentials = {
+  type: 'service_account',
+  project_id: '',
+  private_key_id: '',
+  private_key: '',
+  client_email: '',
+  client_id: '',
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: '',
+};
+
+function NotificationTypeConfig({ initialValue, onFieldChange, envIndex }: { initialValue?: any; onFieldChange: (value: any) => void; envIndex?: number }) {
+  const [notificationType, setNotificationType] = useState<'firebase' | 'expo'>(() => {
+    if (!initialValue?.type) return 'firebase';
+    return initialValue.type === 'expo' || initialValue.type === Notifiers.EXPO ? 'expo' : 'firebase';
   });
-  const [databaseUrl, setDatabaseUrl] = useState('');
+  const [credentials, setCredentials] = useState(() => {
+    if (!initialValue?.credentials) return defaultCredentials;
+    const c = initialValue.credentials;
+    return {
+      type: c.type || 'service_account',
+      project_id: c.project_id || '',
+      private_key_id: c.private_key_id || '',
+      private_key: c.private_key || '',
+      client_email: c.client_email || '',
+      client_id: c.client_id || '',
+      auth_uri: c.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: c.token_uri || 'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url: c.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url: c.client_x509_cert_url || '',
+    };
+  });
+  const [databaseUrl, setDatabaseUrl] = useState(() => initialValue?.databaseUrl ?? '');
 
   useEffect(() => {
     if (notificationType === 'firebase') {
-      onFieldChange({
-        type: Notifiers.FIREBASE,
-        credentials,
-        databaseUrl,
-      });
-    } else {
+      // Only call onFieldChange if we have required Firebase credentials, otherwise clear
+      if (credentials.project_id && credentials.private_key && credentials.client_email && databaseUrl) {
+        onFieldChange({
+          type: Notifiers.FIREBASE,
+          credentials,
+          databaseUrl,
+        });
+      } else {
+        onFieldChange(undefined);
+      }
+    } else if (notificationType === 'expo') {
+      // Expo doesn't require additional config, so we can call it immediately
       onFieldChange({
         type: Notifiers.EXPO,
       });
     }
-  }, [notificationType, credentials, databaseUrl]);
+  }, [notificationType, credentials, databaseUrl, onFieldChange]);
 
   return (
     <div className="space-y-4">
@@ -674,121 +950,474 @@ function NotificationTypeConfig({ onFieldChange, envIndex }: { onFieldChange: (v
   );
 }
 
-function EmailConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
-  const [emailConfig, setEmailConfig] = useState({
-    host: '',
-    port: '',
-    sender_email: '',
-    auth_user: '',
-    auth_pass: '',
-    secure: false,
+function EmailConfig({ initialValue, onFieldChange }: { initialValue?: any; onFieldChange: (value: any) => void }) {
+  const [provider, setProvider] = useState<'smtp' | 'mailgun' | 'sendgrid' | 'postmark' | 'brevo'>(() => (initialValue?.provider as any) || 'smtp');
+  const [showSecret, setShowSecret] = useState(false);
+
+  // SMTP config
+  const [smtpConfig, setSmtpConfig] = useState(() => {
+    const s = initialValue?.smtp;
+    if (!s) return { host: '', port: '', sender_email: '', auth_user: '', auth_pass: '', secure: false };
+    return {
+      host: s.host ?? '',
+      port: s.port ?? '',
+      sender_email: s.sender_email ?? '',
+      auth_user: s.auth?.user ?? '',
+      auth_pass: s.auth?.pass ?? '',
+      secure: s.secure ?? false,
+    };
+  });
+
+  // Mailgun config
+  const [mailgunConfig, setMailgunConfig] = useState(() => {
+    const m = initialValue?.mailgun;
+    if (!m) return { apiKey: '', domain: '', sender_email: '', region: 'us', baseUrl: '' };
+    return {
+      apiKey: m.apiKey ?? '',
+      domain: m.domain ?? '',
+      sender_email: m.sender_email ?? '',
+      region: m.region ?? 'us',
+      baseUrl: m.baseUrl ?? '',
+    };
+  });
+
+  // SendGrid config
+  const [sendgridConfig, setSendgridConfig] = useState(() => {
+    const s = initialValue?.sendgrid;
+    if (!s) return { apiKey: '', sender_email: '' };
+    return { apiKey: s.apiKey ?? '', sender_email: s.sender_email ?? '' };
+  });
+
+  // Postmark config
+  const [postmarkConfig, setPostmarkConfig] = useState(() => {
+    const p = initialValue?.postmark;
+    if (!p) return { serverToken: '', sender_email: '', messageStream: '' };
+    return {
+      serverToken: p.serverToken ?? '',
+      sender_email: p.sender_email ?? '',
+      messageStream: p.messageStream ?? '',
+    };
+  });
+
+  // Brevo config
+  const [brevoConfig, setBrevoConfig] = useState(() => {
+    const b = initialValue?.brevo;
+    if (!b) return { apiKey: '', sender_email: '', sender_name: '' };
+    return {
+      apiKey: b.apiKey ?? '',
+      sender_email: b.sender_email ?? '',
+      sender_name: b.sender_name ?? '',
+    };
   });
 
   useEffect(() => {
-    const emailsData = {
-      host: emailConfig.host,
-      port: emailConfig.port,
-      sender_email: emailConfig.sender_email,
-      auth: {
-        user: emailConfig.auth_user,
-        pass: emailConfig.auth_pass,
-      },
-      secure: emailConfig.secure,
+    let emailsData: any = {
+      provider,
     };
 
-    onFieldChange(emailsData);
-  }, [emailConfig]);
+    let hasValidData = false;
+
+    switch (provider) {
+      case 'smtp':
+        if (smtpConfig.host && smtpConfig.port && smtpConfig.sender_email && smtpConfig.auth_user && smtpConfig.auth_pass) {
+          hasValidData = true;
+          emailsData.smtp = {
+            host: smtpConfig.host,
+            port: smtpConfig.port,
+            sender_email: smtpConfig.sender_email,
+            auth: {
+              user: smtpConfig.auth_user,
+              pass: smtpConfig.auth_pass,
+            },
+            secure: smtpConfig.secure,
+          };
+        }
+        break;
+      case 'mailgun':
+        if (mailgunConfig.apiKey && mailgunConfig.domain && mailgunConfig.sender_email) {
+          hasValidData = true;
+          emailsData.mailgun = {
+            apiKey: mailgunConfig.apiKey,
+            domain: mailgunConfig.domain,
+            sender_email: mailgunConfig.sender_email,
+            region: mailgunConfig.region,
+            ...(mailgunConfig.baseUrl && { baseUrl: mailgunConfig.baseUrl }),
+          };
+        }
+        break;
+      case 'sendgrid':
+        if (sendgridConfig.apiKey && sendgridConfig.sender_email) {
+          hasValidData = true;
+          emailsData.sendgrid = {
+            apiKey: sendgridConfig.apiKey,
+            sender_email: sendgridConfig.sender_email,
+          };
+        }
+        break;
+      case 'postmark':
+        if (postmarkConfig.serverToken && postmarkConfig.sender_email) {
+          hasValidData = true;
+          emailsData.postmark = {
+            serverToken: postmarkConfig.serverToken,
+            sender_email: postmarkConfig.sender_email,
+            ...(postmarkConfig.messageStream && { messageStream: postmarkConfig.messageStream }),
+          };
+        }
+        break;
+      case 'brevo':
+        if (brevoConfig.apiKey && brevoConfig.sender_email) {
+          hasValidData = true;
+          emailsData.brevo = {
+            apiKey: brevoConfig.apiKey,
+            sender_email: brevoConfig.sender_email,
+            ...(brevoConfig.sender_name && { sender_name: brevoConfig.sender_name }),
+          };
+        }
+        break;
+    }
+
+    // Call onFieldChange with valid data, or undefined to clear the config
+    onFieldChange(hasValidData ? emailsData : undefined);
+  }, [provider, smtpConfig, mailgunConfig, sendgridConfig, postmarkConfig, brevoConfig, onFieldChange]);
+
+  // Reset provider-specific fields when provider changes
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider as any);
+    // Reset all configs
+    setSmtpConfig({ host: '', port: '', sender_email: '', auth_user: '', auth_pass: '', secure: false });
+    setMailgunConfig({ apiKey: '', domain: '', sender_email: '', region: 'us', baseUrl: '' });
+    setSendgridConfig({ apiKey: '', sender_email: '' });
+    setPostmarkConfig({ serverToken: '', sender_email: '', messageStream: '' });
+    setBrevoConfig({ apiKey: '', sender_email: '', sender_name: '' });
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
       <div>
-        <Label>SMTP Host</Label>
-        <Input
-          value={emailConfig.host}
-          onChange={(e) => setEmailConfig({ ...emailConfig, host: e.target.value })}
-          className="mt-1"
-          placeholder="smtp.gmail.com"
-        />
+        <Label>Email Provider</Label>
+        <Select value={provider} onValueChange={handleProviderChange}>
+          <SelectTrigger className="mt-2">
+            <SelectValue placeholder="Select email provider" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="smtp">SMTP</SelectItem>
+            <SelectItem value="mailgun">Mailgun</SelectItem>
+            <SelectItem value="sendgrid">SendGrid</SelectItem>
+            <SelectItem value="postmark">Postmark</SelectItem>
+            <SelectItem value="brevo">Brevo</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-      <div>
-        <Label>Port</Label>
-        <Input
-          value={emailConfig.port}
-          onChange={(e) => setEmailConfig({ ...emailConfig, port: e.target.value })}
-          className="mt-1"
-          placeholder="587"
-        />
-      </div>
-      <div>
-        <Label>Sender Email</Label>
-        <Input
-          value={emailConfig.sender_email}
-          onChange={(e) => setEmailConfig({ ...emailConfig, sender_email: e.target.value })}
-          className="mt-1"
-          placeholder="noreply@example.com"
-        />
-      </div>
-      <div>
-        <Label>Auth Username</Label>
-        <Input
-          value={emailConfig.auth_user}
-          onChange={(e) => setEmailConfig({ ...emailConfig, auth_user: e.target.value })}
-          className="mt-1"
-        />
-      </div>
-      <div>
-        <Label>Auth Password</Label>
-        <Input
-          type="password"
-          value={emailConfig.auth_pass}
-          onChange={(e) => setEmailConfig({ ...emailConfig, auth_pass: e.target.value })}
-          className="mt-1"
-        />
-      </div>
-      <div className="flex items-center gap-2 mt-6">
-        <Checkbox
-          checked={emailConfig.secure}
-          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, secure: !!checked })}
-        />
-        <Label>Use Secure Connection</Label>
-      </div>
+
+      {/* SMTP Configuration */}
+      {provider === 'smtp' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>SMTP Host</Label>
+            <Input
+              value={smtpConfig.host}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, host: e.target.value })}
+              className="mt-1"
+              placeholder="smtp.gmail.com"
+            />
+          </div>
+          <div>
+            <Label>Port</Label>
+            <Input
+              value={smtpConfig.port}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, port: e.target.value })}
+              className="mt-1"
+              placeholder="587"
+            />
+          </div>
+          <div>
+            <Label>Sender Email</Label>
+            <Input
+              value={smtpConfig.sender_email}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, sender_email: e.target.value })}
+              className="mt-1"
+              placeholder="noreply@example.com"
+            />
+          </div>
+          <div>
+            <Label>Auth Username</Label>
+            <Input
+              value={smtpConfig.auth_user}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, auth_user: e.target.value })}
+              className="mt-1"
+              placeholder="your-username"
+            />
+          </div>
+          <div>
+            <Label>Auth Password</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={smtpConfig.auth_pass}
+                onChange={(e) => setSmtpConfig({ ...smtpConfig, auth_pass: e.target.value })}
+                className="pr-10"
+                placeholder="Your password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-6">
+            <Checkbox
+              checked={smtpConfig.secure}
+              onCheckedChange={(checked) => setSmtpConfig({ ...smtpConfig, secure: !!checked })}
+            />
+            <Label>Use Secure Connection (SSL/TLS)</Label>
+          </div>
+        </div>
+      )}
+
+      {/* Mailgun Configuration */}
+      {provider === 'mailgun' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>API Key</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={mailgunConfig.apiKey}
+                onChange={(e) => setMailgunConfig({ ...mailgunConfig, apiKey: e.target.value })}
+                className="pr-10"
+                placeholder="key-xxxxxxxxxxxxxxxxxxxxx"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Domain</Label>
+            <Input
+              value={mailgunConfig.domain}
+              onChange={(e) => setMailgunConfig({ ...mailgunConfig, domain: e.target.value })}
+              className="mt-1"
+              placeholder="mg.example.com"
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Base URL (Optional)</Label>
+            <Input
+              value={mailgunConfig.baseUrl}
+              onChange={(e) => setMailgunConfig({ ...mailgunConfig, baseUrl: e.target.value })}
+              className="mt-1"
+              placeholder="https://api.mailgun.net (leave empty to use default based on region)"
+            />
+            <p className="text-xs text-grey-600 mt-1">
+              Custom base URL for self-hosted Mailgun or testing. Defaults to https://api.mailgun.net (US) or https://api.eu.mailgun.net (EU) if not provided.
+            </p>
+          </div>
+          <div>
+            <Label>Region</Label>
+            <Select value={mailgunConfig.region} onValueChange={(value) => setMailgunConfig({ ...mailgunConfig, region: value })}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="us">US (Default)</SelectItem>
+                <SelectItem value="eu">EU</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Sender Email</Label>
+            <Input
+              value={mailgunConfig.sender_email}
+              onChange={(e) => setMailgunConfig({ ...mailgunConfig, sender_email: e.target.value })}
+              className="mt-1"
+              placeholder="noreply@example.com"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SendGrid Configuration */}
+      {provider === 'sendgrid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>API Key</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={sendgridConfig.apiKey}
+                onChange={(e) => setSendgridConfig({ ...sendgridConfig, apiKey: e.target.value })}
+                className="pr-10"
+                placeholder="SG.xxxxxxxxxxxxxxxxxxxxx"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Sender Email</Label>
+            <Input
+              value={sendgridConfig.sender_email}
+              onChange={(e) => setSendgridConfig({ ...sendgridConfig, sender_email: e.target.value })}
+              className="mt-1"
+              placeholder="noreply@example.com"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Postmark Configuration */}
+      {provider === 'postmark' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Server Token</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={postmarkConfig.serverToken}
+                onChange={(e) => setPostmarkConfig({ ...postmarkConfig, serverToken: e.target.value })}
+                className="pr-10"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Sender Email</Label>
+            <Input
+              value={postmarkConfig.sender_email}
+              onChange={(e) => setPostmarkConfig({ ...postmarkConfig, sender_email: e.target.value })}
+              className="mt-1"
+              placeholder="noreply@example.com"
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Message Stream (Optional)</Label>
+            <Input
+              value={postmarkConfig.messageStream}
+              onChange={(e) => setPostmarkConfig({ ...postmarkConfig, messageStream: e.target.value })}
+              className="mt-1"
+              placeholder="outbound (default if not provided)"
+            />
+            <p className="text-xs text-grey-600 mt-1">
+              Message stream ID for organizing emails (e.g., "outbound", "broadcasts"). Defaults to "outbound" if not provided.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Brevo Configuration */}
+      {provider === 'brevo' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>API Key</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showSecret ? 'text' : 'password'}
+                value={brevoConfig.apiKey}
+                onChange={(e) => setBrevoConfig({ ...brevoConfig, apiKey: e.target.value })}
+                className="pr-10"
+                placeholder="xkeysib-xxxxxxxxxxxxxxxxxxxxx"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey focus:outline-none"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Sender Email</Label>
+            <Input
+              value={brevoConfig.sender_email}
+              onChange={(e) => setBrevoConfig({ ...brevoConfig, sender_email: e.target.value })}
+              className="mt-1"
+              placeholder="noreply@example.com"
+            />
+          </div>
+          <div>
+            <Label>Sender Name (Optional)</Label>
+            <Input
+              value={brevoConfig.sender_name}
+              onChange={(e) => setBrevoConfig({ ...brevoConfig, sender_name: e.target.value })}
+              className="mt-1"
+              placeholder="Your Company Name"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SmsConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
-  const [smsConfig, setSmsConfig] = useState({
-    provider: '',
-    // Twilio fields
-    accountSid: '',
-    authToken: '',
-    // Nexmo/Plivo fields
-    apiKey: '',
-    apiSecret: '',
-    // Common field
-    sender: '',
+function SmsConfig({ initialValue, onFieldChange }: { initialValue?: any; onFieldChange: (value: any) => void }) {
+  const [smsConfig, setSmsConfig] = useState(() => {
+    if (!initialValue) return { provider: '', accountSid: '', authToken: '', apiKey: '', apiSecret: '', sender: '' };
+    return {
+      provider: initialValue.provider ?? '',
+      accountSid: initialValue.accountSid ?? '',
+      authToken: initialValue.authToken ?? '',
+      apiKey: initialValue.apiKey ?? '',
+      apiSecret: initialValue.apiSecret ?? '',
+      sender: initialValue.sender ?? '',
+    };
   });
   const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    // Build provider-specific config
+    // Only call onFieldChange if we have a provider and required fields
+    if (!smsConfig.provider || !smsConfig.sender) {
+      return;
+    }
+
+    let hasValidData = false;
     let smsData: any = {
       provider: smsConfig.provider,
       sender: smsConfig.sender,
     };
 
     if (smsConfig.provider === 'twilio') {
-      smsData.accountSid = smsConfig.accountSid;
-      smsData.authToken = smsConfig.authToken;
+      if (smsConfig.accountSid && smsConfig.authToken) {
+        hasValidData = true;
+        smsData.accountSid = smsConfig.accountSid;
+        smsData.authToken = smsConfig.authToken;
+      }
     } else if (smsConfig.provider === 'nexmo') {
-      smsData.apiKey = smsConfig.apiKey;
-      smsData.apiSecret = smsConfig.apiSecret;
+      if (smsConfig.apiKey && smsConfig.apiSecret) {
+        hasValidData = true;
+        smsData.apiKey = smsConfig.apiKey;
+        smsData.apiSecret = smsConfig.apiSecret;
+      }
     } else if (smsConfig.provider === 'plivo') {
-      smsData.apiKey = smsConfig.apiKey;
+      if (smsConfig.apiKey) {
+        hasValidData = true;
+        smsData.apiKey = smsConfig.apiKey;
+      }
     }
 
-    onFieldChange(smsData);
-  }, [smsConfig]);
+    // Call onFieldChange with valid data, or undefined to clear the config
+    onFieldChange(hasValidData ? smsData : undefined);
+  }, [smsConfig, onFieldChange]);
 
   // Reset provider-specific fields when provider changes
   const handleProviderChange = (provider: string) => {
@@ -923,12 +1552,43 @@ function SmsConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
   );
 }
 
-function CallbackConfig({ onFieldChange }: { onFieldChange: (value: any) => void }) {
-  const [url, setUrl] = useState('');
-  const [method, setMethod] = useState('POST');
-  const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>([]);
+function buildRequestFieldsFromInitial(initialValue?: any): Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }> {
+  if (!initialValue) return [];
+  const fields: Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }> = [];
+  let id = 0;
+  if (initialValue.headers && typeof initialValue.headers === 'object') {
+    for (const [k, v] of Object.entries(initialValue.headers)) {
+      fields.push({ id: `field_${id++}`, key: k, value: String(v), addTo: 'headers' });
+    }
+  }
+  if (initialValue.query && typeof initialValue.query === 'object') {
+    for (const [k, v] of Object.entries(initialValue.query)) {
+      fields.push({ id: `field_${id++}`, key: k, value: String(v), addTo: 'query' });
+    }
+  }
+  if (initialValue.params && typeof initialValue.params === 'object') {
+    for (const [k, v] of Object.entries(initialValue.params)) {
+      fields.push({ id: `field_${id++}`, key: k, value: String(v), addTo: 'params' });
+    }
+  }
+  if (initialValue.body != null && initialValue.body !== '') {
+    fields.push({ id: `field_${id++}`, key: '', value: String(initialValue.body), addTo: 'body' });
+  }
+  return fields;
+}
+
+function CallbackConfig({ initialValue, onFieldChange }: { initialValue?: any; onFieldChange: (value: any) => void }) {
+  const [url, setUrl] = useState(() => initialValue?.url ?? '');
+  const [method, setMethod] = useState(() => (initialValue?.method as string) || 'POST');
+  const [requestFields, setRequestFields] = useState<Array<{ id: string; key: string; value: string; addTo: 'headers' | 'body' | 'params' | 'query' }>>(() => buildRequestFieldsFromInitial(initialValue));
 
   useEffect(() => {
+    // Only call onFieldChange if we have a URL, otherwise pass undefined to clear
+    if (!url) {
+      onFieldChange(undefined);
+      return;
+    }
+
     const headers: Record<string, string> = {};
     const query: Record<string, string> = {};
     const params: Record<string, string> = {};
@@ -958,7 +1618,7 @@ function CallbackConfig({ onFieldChange }: { onFieldChange: (value: any) => void
     };
 
     onFieldChange(newCallbacks);
-  }, [url, method, requestFields]);
+  }, [url, method, requestFields, onFieldChange]);
 
   const handleAddField = () => {
     setRequestFields([...requestFields, { id: `field_${Date.now()}`, key: '', value: '', addTo: 'headers' }]);

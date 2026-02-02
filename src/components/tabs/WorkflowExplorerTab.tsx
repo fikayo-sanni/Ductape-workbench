@@ -45,7 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -724,32 +724,35 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                 </div>
               </div>
 
-              {/* Activity Timeline - Session Dashboard Style */}
+              {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
               <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-                <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                </div>
                 <div className="space-y-3">
-                  {metrics.weeklyStats.dailyTrend.map((day) => {
-                    const maxActivity = Math.max(...metrics.weeklyStats.dailyTrend.map(d => d.executions));
-                    const percentage = maxActivity > 0 ? (day.executions / maxActivity) * 100 : 0;
-                    const successRate = day.executions > 0 ? Math.round((day.successful / day.executions) * 100) : 0;
-
-                    return (
-                      <div key={day.day} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.day}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white">
-                              {day.executions} runs ({successRate}% success)
-                            </span>
+                  {(() => {
+                    const normalized = getLast7DaysNormalized(metrics.weeklyStats.dailyTrend, (d) => d.executions ?? 0);
+                    const maxActivity = Math.max(...normalized.map((d) => d.value), 1);
+                    return normalized.map((day) => {
+                      const percentage = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
+                      return (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                {day.value.toLocaleString()} executions
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

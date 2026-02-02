@@ -608,6 +608,28 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             events: (tab.data as any).events,
             description: (tab.data as any).description,
             active: (tab.data as any).active,
+            // Notification explorer - product + notification + env for restore after refresh
+            product: (tab.data as any).product ? {
+              tag: (tab.data as any).product.tag,
+              name: (tab.data as any).product.name,
+              logo: (tab.data as any).product.logo,
+              envs: (tab.data as any).product.envs?.map((e: any) => ({ slug: e.slug, name: e.name })),
+            } : undefined,
+            notification: (tab.data as any).notification ? {
+              tag: (tab.data as any).notification.tag,
+              name: (tab.data as any).notification.name,
+              envs: (tab.data as any).notification.envs?.map((e: any) => ({ slug: e.slug, name: e.name })),
+            } : undefined,
+            // Job explorer - job + env so tab restores after refresh
+            job: (tab.data as any).job ? {
+              tag: (tab.data as any).job.tag,
+              name: (tab.data as any).job.name,
+              productTag: (tab.data as any).job.productTag,
+              productName: (tab.data as any).job.productName,
+              type: (tab.data as any).job.type,
+              event: (tab.data as any).job.event,
+              schedule: (tab.data as any).job.schedule,
+            } : undefined,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),

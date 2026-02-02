@@ -1,4 +1,4 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Key, Users, Store, MessageCircle, Handshake, Receipt } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Lock, Users, Store, MessageCircle, Handshake, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
@@ -164,7 +164,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         )}
         aria-label="Tokens"
       >
-        <Key className="h-5 w-5" />
+        <Lock className="h-5 w-5" />
 
         {/* Tooltip on hover */}
         <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">

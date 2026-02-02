@@ -96,26 +96,34 @@ export class SDKProxyService {
     };
     const encryptedPayload = encryptProxyPayload(sensitiveData, this.config.public_key);
 
-    const response = await apiClient.post<SDKProxyResponse<T>>(
-      '/proxy/v1/sdk-proxy/execute',
-      {
-        encrypted_payload: encryptedPayload,
-        workspace_id: this.config.workspace_id,
-        user_id: this.config.user_id,
-        public_key: this.config.public_key,
-      },
-      {
-        headers: {
-          'x-access-token': this.config.token,
+    try {
+      const response = await apiClient.post<SDKProxyResponse<T>>(
+        '/proxy/v1/sdk-proxy/execute',
+        {
+          encrypted_payload: encryptedPayload,
+          workspace_id: this.config.workspace_id,
+          user_id: this.config.user_id,
+          public_key: this.config.public_key,
         },
+        {
+          headers: {
+            'x-access-token': this.config.token,
+          },
+        }
+      );
+
+      if (!response.data.status) {
+        throw new Error(response.data.message || 'SDK operation failed');
       }
-    );
 
-    if (!response.data.status) {
-      throw new Error(response.data.message || 'SDK operation failed');
+      return response.data.data?.data as T;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ??
+        err?.message ??
+        'SDK operation failed';
+      throw new Error(message);
     }
-
-    return response.data.data?.data as T;
   }
 
   // ==================== PRODUCT MODULE ====================
@@ -335,9 +343,32 @@ export class SDKProxyService {
       delete: <T = any>(data: any) =>
         this.execute<T>('notifications', 'templates.delete', data),
     },
+    // SDK notifications.messages API (product, tag, data)
+    messages: {
+      create: <T = any>(product: string, data: any) =>
+        this.execute<T>('notifications', 'messages.create', product, data),
+      list: <T = any>(product: string, notificationTag: string) =>
+        this.execute<T>('notifications', 'messages.list', product, notificationTag),
+      fetch: <T = any>(product: string, tag: string) =>
+        this.execute<T>('notifications', 'messages.fetch', product, tag),
+      update: <T = any>(product: string, tag: string, data: any) =>
+        this.execute<T>('notifications', 'messages.update', product, tag, data),
+    },
 
     dispatch: <T = any>(data: any) => this.execute<T>('notifications', 'dispatch', data),
     send: <T = any>(data: any) => this.execute<T>('notifications', 'send', data),
+    /** Message log (send history) with decrypted input — for Notification Explorer and resend */
+    getMessages: <T = any>(options: {
+      product_tag?: string;
+      env?: string;
+      notification_tag?: string;
+      status?: string;
+      type?: string;
+      start_date?: string;
+      end_date?: string;
+      page?: number;
+      limit?: number;
+    }) => this.execute<T>('notifications', 'getMessages', options),
   };
 
   // ==================== MESSAGE BROKERS MODULE ====================
@@ -403,6 +434,9 @@ export class SDKProxyService {
     expire: <T = any>(data: any) => this.execute<T>('caches', 'expire', data),
     keys: <T = any>(data: any) => this.execute<T>('caches', 'keys', data),
 
+    // Cache values operations
+    fetchValues: <T = any>(data: { product: string; cache: string; env?: string; page?: number; limit?: number; expiryFilter?: 'all' | 'expiring' | 'permanent' | 'expired' }) =>
+      this.execute<T>('caches', 'fetchValues', data),
     fetchRemote: <T = any>(data: any) => this.execute<T>('caches', 'fetchRemote', data),
     dispatch: <T = any>(data: any) => this.execute<T>('caches', 'dispatch', data),
   };

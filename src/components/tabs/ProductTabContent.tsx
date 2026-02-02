@@ -32,6 +32,7 @@ import {
   BarChart3,
   Activity,
   Home,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -106,9 +107,9 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
   { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
   { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
-  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow' },
-  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence' },
-  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience' },
+  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
+  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
+  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
 ];
 
 export default function ProductTabContent({ tabId, product: initialProduct, productId }: ProductTabContentProps) {
@@ -153,6 +154,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   const [searchQuery, setSearchQuery] = useState(persistedState?.searchQuery || '');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(persistedState?.isSidebarCollapsed || false);
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
+  // Which notification card is expanded to show templates inline (tag or null)
+  const [expandedNotificationTag, setExpandedNotificationTag] = useState<string | null>(null);
 
   // Mark state as restored after initial load
   useEffect(() => {
@@ -406,6 +409,31 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   };
 
   const handleOpenComponent = (component: any, type: string) => {
+    // Jobs: open single-job + env explorer (past/future invocations, timeline, metrics)
+    if (type === 'job') {
+      const env = product?.envs?.[0]
+        ? { slug: product.envs[0].slug, name: product.envs[0].name }
+        : { slug: 'prd', name: 'Production' };
+      openTab({
+        id: `job-explorer-${component.tag}-${env.slug}-${Date.now()}`,
+        type: 'job-explorer',
+        title: `${component.name || component.tag} (${env.slug})`,
+        itemId: `${component.tag}-${env.slug}`,
+        data: {
+          product: {
+            tag: product?.tag,
+            name: product?.name,
+            logo: product?.logo,
+            envs: product?.envs || [],
+          },
+          job: { ...component, productTag: product?.tag, productName: product?.name },
+          env,
+          isExplorer: true,
+        },
+      });
+      return;
+    }
+
     openTab({
       id: `${type}-${component._id}-${Date.now()}`,
       type: type as any,
@@ -467,7 +495,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       setInlineCreateMode('notifier');
       return;
     }
-    // Jobs are dispatched via code, show code examples dialog
+    // Jobs: "Add job" opens code sample sidebar (Dispatching Jobs)
     if (type === 'job') {
       setShowJobsCodeDialog(true);
       return;
@@ -516,6 +544,50 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     });
   };
 
+  // Open template: MessageTabContent (view) when clicking a template, NotificationTemplateTabContent when creating new
+  const handleOpenNotificationTemplate = (notification: any, template?: { tag: string; name?: string; _id?: string }) => {
+    if (template) {
+      // View existing template in MessageTabContent (message tag for SDK fetch must be full "notifier:template")
+      const fullTag = template.tag?.includes(':')
+        ? template.tag
+        : notification?.tag
+          ? `${notification.tag}:${template.tag}`
+          : template.tag;
+      const messageForTab = { ...template, tag: fullTag };
+      openTab({
+        id: `message-${notification?.tag}-${fullTag}`.replace(/:/g, '-'),
+        type: 'message',
+        title: template.name || template.tag || 'Template',
+        itemId: template._id ?? fullTag,
+        data: {
+          ...messageForTab,
+          productTag: product?.tag,
+          notifierTag: notification?.tag,
+          notification: notification ?? undefined,
+        },
+      });
+    } else {
+      // Create new template: open NotificationTemplateTabContent
+      openTab({
+        id: `notification-template-new-${Date.now()}`,
+        type: 'notification-template',
+        title: 'New Template',
+        itemId: 'new',
+        data: {
+          productTag: product?.tag,
+          productName: product?.name,
+          productLogo: product?.logo,
+          productEnvs: product?.envs || [],
+          workspaceId: currentWorkspaceId || '',
+          notificationTag: notification?.tag,
+          notification: notification ? { name: notification.name, tag: notification.tag } : undefined,
+          isNew: true,
+        },
+        isDirty: true,
+      });
+    }
+  };
+
   // Open database explorer for a specific environment
   const handleOpenDatabaseExplorer = (database: any, env: any, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click
@@ -552,7 +624,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       'cache': 'cache-values',  // Opens directly to cache values
       'message-broker': 'message-broker-events',  // Opens directly to broker events
       'session': 'session-activity',  // Opens SessionActivityTab
-      'job': 'jobs-explorer',  // Opens JobsExplorerTab
+      'job': 'job-explorer',  // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
       'workflow': 'workflow',  // Opens WorkflowExplorerTab
       'agent': 'agent',  // Opens AgentExplorerTab
       'fallback': 'fallback-explorer',  // Opens FallbackExplorerTab
@@ -682,7 +754,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         productName: product?.name,
       };
     } else if (resourceType === 'notification') {
-      // NotificationExplorerTab expects product object with tag, name, and envs
+      // NotificationExplorerTab: product + notification + env = Notifier+Env mode (sidebar + overview/templates)
       data = {
         product: {
           tag: product?.tag,
@@ -691,6 +763,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           envs: product?.envs || [],
         },
         notification: resource,
+        env: env ? { slug: env.slug, name: env.name } : undefined,
         isExplorer: true,
       };
     } else if (resourceType === 'fallback') {
@@ -730,7 +803,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         isExplorer: true,
       };
     } else if (resourceType === 'job') {
-      // JobsExplorerTab expects product object with tag, name, and envs
+      // JobExplorerTab (single job) expects product, job, and env
       data = {
         product: {
           tag: product?.tag,
@@ -738,7 +811,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           logo: product?.logo,
           envs: product?.envs || [],
         },
-        job: resource,
+        job: { ...resource, productTag: product?.tag, productName: product?.name },
+        env: env ? { slug: env.slug, name: env.name } : undefined,
         isExplorer: true,
       };
     } else {
@@ -770,12 +844,12 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     const resourceType = item._resourceType || category.componentType;
 
     // Check if this resource has environments configured
-    // For caches and sessions (product-level resources without their own envs), use product environments
-    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions') && product?.envs?.length;
+    // Caches, sessions, and jobs (product-level) use product environments for env chips
+    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions' || category.id === 'jobs') && product?.envs?.length;
     const itemEnvs = Array.isArray(item.envs) && item.envs.length > 0
       ? item.envs
       : useProductEnvs
-        ? product.envs.map((env: any) => ({ slug: env.slug }))
+        ? product.envs.map((env: any) => ({ slug: env.slug, name: env.name }))
         : [];
     const hasEnvs = itemEnvs.length > 0;
 
@@ -955,10 +1029,15 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Get category-specific detail text
     const getDetailText = () => {
       if (category.id === 'caches' && item.expiry) {
-        return `TTL: ${item.expiry} ${item.period}`;
+        // Cache expiry is in milliseconds, format to human readable
+        const seconds = item.expiry / 1000;
+        if (seconds >= 86400) return `TTL: ${Math.floor(seconds / 86400)}d`;
+        if (seconds >= 3600) return `TTL: ${Math.floor(seconds / 3600)}h`;
+        if (seconds >= 60) return `TTL: ${Math.floor(seconds / 60)}m`;
+        return `TTL: ${seconds}s`;
       }
       if (category.id === 'sessions' && item.expiry) {
-        return `TTL: ${item.expiry} ${item.period}`;
+        return `TTL: ${item.expiry} ${item.period || ''}`.trim();
       }
       // Skip database types - handled by badge now
       if (item._resourceType === 'database' || item._resourceType === 'graph' || item._resourceType === 'vector') {
@@ -986,17 +1065,18 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     };
 
     const detailText = getDetailText();
+    const isNotifications = category.id === 'notifications';
+    const isExpanded = isNotifications && expandedNotificationTag === item.tag;
+    const templates = (isNotifications && item.messages) ? item.messages : [];
 
-    return (
+    const cardContent = (
       <div
-        key={item._id}
         onClick={() => {
           if (category.id === 'apps') {
             handleOpenApp(item);
           } else if (category.id === 'environments') {
             handleEditEnvironment(item);
           } else {
-            // For combined categories, use the actual resource type
             handleOpenComponent(item, resourceType);
           }
         }}
@@ -1097,10 +1177,81 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                 ))}
               </div>
             )}
+
+            {/* Notifications: Templates toggle - expand to show templates inline */}
+            {isNotifications && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedNotificationTag(isExpanded ? null : item.tag);
+                }}
+                className="mt-2.5 flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1.5 transition-colors"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Templates ({templates.length})
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
     );
+
+    // For notifications, wrap card + expandable templates section in a container
+    if (isNotifications) {
+      return (
+        <div key={item._id} className="space-y-0">
+          {cardContent}
+          {isExpanded && (
+            <div
+              className="ml-4 pl-4 border-l-2 border-blue-200 bg-blue-50/50 rounded-r-lg py-3 pr-4 mt-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-grey-600 uppercase tracking-wide">Templates</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenNotificationTemplate(item);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Create template
+                </Button>
+              </div>
+              {templates.length === 0 ? (
+                <p className="text-xs text-grey-500 py-2">No templates yet. Create one to get started.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {templates.map((msg: any) => (
+                    <li key={msg.tag}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenNotificationTemplate(item, msg);
+                        }}
+                        className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-md text-sm text-grey-700 hover:bg-white hover:shadow-sm transition-colors border border-transparent hover:border-grey-200"
+                      >
+                        <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                        <span className="font-medium truncate">{msg.name || msg.tag}</span>
+                        <span className="text-xs text-grey-500 truncate flex-shrink-0">{msg.tag}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return <div key={item._id}>{cardContent}</div>;
   };
 
   // Get category description for empty states

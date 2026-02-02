@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { IWebhook, IWebhookEvent } from '@/types/webhook';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDuctape } from '@/hooks/useDuctape';
@@ -1051,39 +1051,49 @@ print('Webhook registered:', registration)`,
               </div>
             </div>
 
-            {/* Activity Timeline */}
-            {globalMetrics && globalMetrics.dailyActivity && (
-              <div className="bg-grey-50 rounded-lg border border-grey-300 p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
-                </div>
+            {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+              </div>
+              {isLoadingMetrics ? (
                 <div className="space-y-3">
-                  {globalMetrics.dailyActivity.map((day: any) => {
-                    const maxActivity = Math.max(
-                      ...globalMetrics.dailyActivity.map((d: any) => d.requests)
-                    );
-                    const percentage = maxActivity > 0 ? (day.requests / maxActivity) * 100 : 0;
-
-                    return (
-                      <div key={day.day} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.day}</div>
-                        <div className="flex-1 h-8 bg-grey-200 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white">
-                              {day.requests} requests ({day.successful} success, {day.failed} failed)
-                            </span>
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(() => {
+                    const normalized = getLast7DaysNormalized(globalMetrics?.dailyActivity ?? [], (d: any) => d.requests ?? 0);
+                    const maxActivity = Math.max(...normalized.map((d) => d.value), 1);
+                    return normalized.map((day) => {
+                      const percentage = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
+                      return (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                {day.value.toLocaleString()} requests
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Environment Endpoints with Metrics */}
             {appEnvironments && appEnvironments.length > 0 && (

@@ -487,6 +487,11 @@ export class AutomationService {
         canTriggerActions: true,
         formIds: ['new-notification-form'],
       },
+      'notification-template': {
+        canInspectForms: true,
+        canFillForms: true,
+        canTriggerActions: false,
+      },
       'fallback-explorer': {
         canInspectForms: false,
         canFillForms: false,
@@ -509,7 +514,12 @@ export class AutomationService {
         canTriggerActions: true,
         formIds: ['new-quota-form'],
       },
-      'jobs-explorer': {
+      'job-explorer': {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
+      'job-run': {
         canInspectForms: false,
         canFillForms: false,
         canTriggerActions: false,
@@ -872,11 +882,13 @@ export class AutomationService {
       'agent-run': 'Agent Run',
       'notification-explorer': 'Notification Explorer',
       'new-notification': 'New Notification',
+      'notification-template': 'Notification Template',
       'fallback-explorer': 'Fallback Explorer',
       'new-fallback': 'New Fallback',
       'quota-explorer': 'Quota Explorer',
       'new-quota': 'New Quota',
-      'jobs-explorer': 'Jobs Explorer',
+      'job-explorer': 'Job Explorer',
+      'job-run': 'Job run',
       'new-healthcheck': 'New Health Check',
     };
     return titles[tabType] || tabType;

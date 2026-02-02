@@ -16,7 +16,7 @@ import {
   X as CloseIcon,
   Layers,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import workspaceServices from '@/services/workspaceServices';
@@ -158,7 +158,8 @@ export default function Dashboard() {
     },
   ];
 
-  const activityTimeline: Array<{ date: string; count: number }> = dashboardData?.data?.activityTimeline || [];
+  const rawActivityTimeline: Array<{ date?: string; day?: string; count: number }> = dashboardData?.data?.activityTimeline || [];
+  const activityTimeline = getLast7DaysNormalized(rawActivityTimeline, (d) => d.count ?? 0);
   const activityByType: Array<{ type: string; count: number; percentage: number }> = dashboardData?.data?.activityByType || [];
   const topProducts: Array<{ name: string; resources: number; internalCalls: string; externalOutbound: string; externalInbound: string; growth: string }> = dashboardData?.data?.topProducts || [];
   const resourceUsage: Array<{ name: string; count: number; type: string; status: string }> = dashboardData?.data?.resourceUsage || [];
@@ -384,13 +385,13 @@ export default function Dashboard() {
               <Activity className="h-5 w-5 text-grey-600" />
             </div>
             <div className="space-y-3">
-              {activityTimeline.length > 0 ? (
+              {activityTimeline.some((d) => d.value > 0) ? (
                 <>
                   {activityTimeline.map((day, index) => {
-                    const maxCount = Math.max(...activityTimeline.map(d => d.count), 1);
-                    const percentage = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
+                    const maxCount = Math.max(...activityTimeline.map(d => d.value), 1);
+                    const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
                     return (
-                      <div key={index} className="flex items-center gap-3">
+                      <div key={day.date} className="flex items-center gap-3">
                         <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
                         <div className="flex-1 h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
                           <div
@@ -402,7 +403,7 @@ export default function Dashboard() {
                               "text-xs font-semibold",
                               percentage > 30 ? "text-white" : "text-grey"
                             )}>
-                              {day.count} activities
+                              {day.value} activities
                             </span>
                           </div>
                         </div>
@@ -414,7 +415,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-grey-600">Total activities</span>
                       <span className="font-semibold text-grey">
-                        {activityTimeline.reduce((sum, day) => sum + day.count, 0)}
+                        {activityTimeline.reduce((sum, day) => sum + day.value, 0)}
                       </span>
                     </div>
                   </div>

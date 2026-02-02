@@ -34,7 +34,7 @@ import {
   Loader2,
   Box,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import {
@@ -1111,16 +1111,11 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
           { method: 'DELETE', count: 0, percentage: 0 },
         ].filter(m => m.count > 0 || !hasMetrics);
 
-    // Use real daily activity or generate placeholder days
-    const recentActivity = hasMetrics && dashboardMetrics.dailyActivity.length > 0
-      ? dashboardMetrics.dailyActivity.map(d => ({
-          date: d.day || d.date,
-          requests: d.requests,
-        }))
-      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
-          date: day,
-          requests: 0,
-        }));
+    // Normalize to last 7 days (Mon–Sun) with 0 for days that have no activity
+    const recentActivity = getLast7DaysNormalized(
+      hasMetrics && dashboardMetrics.dailyActivity?.length ? dashboardMetrics.dailyActivity : [],
+      (d: { day?: string; date?: string; requests?: number; count?: number }) => d.requests ?? d.count ?? 0
+    );
 
     // Use real top endpoints or fallback to action-based placeholders
     const topEndpoints = hasMetrics && dashboardMetrics.topEndpoints.length > 0
@@ -1349,8 +1344,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
             </div>
             <div className="space-y-3">
               {recentActivity.map((day) => {
-                const maxRequests = Math.max(...recentActivity.map(d => d.requests), 1);
-                const percentage = maxRequests > 0 ? (day.requests / maxRequests) * 100 : 0;
+                const maxRequests = Math.max(...recentActivity.map(d => d.value), 1);
+                const percentage = maxRequests > 0 ? (day.value / maxRequests) * 100 : 0;
 
                 return (
                   <div key={day.date} className="flex items-center gap-3">
@@ -1366,7 +1361,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                           ></div>
                           <div className="absolute inset-0 flex items-center px-3">
                             <span className="text-xs font-semibold text-white dark:text-grey">
-                              {day.requests.toLocaleString()} requests
+                              {day.value.toLocaleString()} requests
                             </span>
                           </div>
                         </>

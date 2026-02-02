@@ -71,7 +71,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { JsonViewer } from '@/components/JsonViewer';
@@ -1954,42 +1954,46 @@ await ductape.init();`,
         </div>
       </div>
 
-      {/* Activity Timeline (7 Days) */}
+      {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
       <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+          {isLoadingDashboard && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+        </div>
         {isLoadingDashboard ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
-          </div>
-        ) : dashboardMetrics?.activityTimeline && dashboardMetrics.activityTimeline.length > 0 ? (
           <div className="space-y-3">
-            {dashboardMetrics.activityTimeline.map((day) => {
-              const maxOperations = Math.max(...dashboardMetrics.activityTimeline.map(d => d.operations), 1);
-              const percentage = (day.operations / maxOperations) * 100;
-
-              return (
-                <div key={day.date} className="flex items-center gap-3">
-                  <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                  <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-center px-3">
-                      <span className="text-xs font-semibold text-grey-700">
-                        {day.operations.toLocaleString()} operations
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-            <p className="text-sm text-grey-600 font-medium mb-1">No vector activity data available</p>
-            <p className="text-xs text-grey-500">Activity charts will appear once vector operations are logged</p>
+          <div className="space-y-3">
+            {(() => {
+              const normalized = getLast7DaysNormalized(dashboardMetrics?.activityTimeline ?? [], (d) => d.operations ?? 0);
+              const maxOperations = Math.max(...normalized.map((d) => d.value), 1);
+              return normalized.map((day) => {
+                const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
+                return (
+                  <div key={day.date} className="flex items-center gap-3">
+                    <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                    <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      />
+                      <div className="absolute inset-0 flex items-center px-3">
+                        <span className="text-xs font-semibold text-white drop-shadow-sm">
+                          {day.value.toLocaleString()} operations
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

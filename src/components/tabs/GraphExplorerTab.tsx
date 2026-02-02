@@ -79,7 +79,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -4958,35 +4958,31 @@ await ductape.init();`,
                     </div>
                   ))}
                 </div>
-              ) : graphActivityData?.activityTimeline && graphActivityData.activityTimeline.length > 0 ? (
+              ) : (
                 <div className="space-y-3">
-                  {graphActivityData.activityTimeline.map((day) => {
-                    const maxOperations = Math.max(...graphActivityData.activityTimeline.map(d => d.sessions), 1);
-                    const percentage = maxOperations > 0 ? (day.sessions / maxOperations) * 100 : 0;
-
-                    return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white drop-shadow-sm">
-                              {day.sessions.toLocaleString()} operations
-                            </span>
+                  {(() => {
+                    const normalized = getLast7DaysNormalized(graphActivityData?.activityTimeline ?? [], (d) => d.sessions ?? 0);
+                    const maxOperations = Math.max(...normalized.map((d) => d.value), 1);
+                    return normalized.map((day) => {
+                      const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
+                      return (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                {day.value.toLocaleString()} operations
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-                  <p className="text-sm text-grey-600 font-medium mb-1">No graph activity data available</p>
-                  <p className="text-xs text-grey-500">Activity charts will appear once graph operations are logged</p>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>
