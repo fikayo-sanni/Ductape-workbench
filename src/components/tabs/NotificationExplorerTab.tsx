@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Bell,
   Mail,
@@ -9,37 +9,20 @@ import {
   RefreshCw,
   ChevronRight,
   Settings,
-  Code,
   Send,
   Loader2,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  MoreVertical,
-  Eye,
-  Trash2,
   LayoutDashboard,
-  X,
   FileText,
   Smartphone,
-  TrendingUp,
-  TrendingDown,
   Activity,
   CheckCircle,
   XCircle,
   BarChart3,
   PanelLeftClose,
   PanelLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  ColumnDef,
-  createColumnHelper,
-  getPaginationRowModel,
-} from '@tanstack/react-table';
 import {
   Table,
   TableBody,
@@ -51,7 +34,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -59,44 +41,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useSDKProxy } from '@/services/sdkProxy';
 import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
-import CodeSidebar from '@/components/CodeSidebar';
-import { fetchNotificationDashboard, NotificationDashboardMetrics } from '@/services/logsServices';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import {
+  fetchNotificationLogs,
+  fetchNotificationMessageLogs,
+  fetchNotificationActivityLogs,
+  type NotificationActivityLog as INotificationActivityLog,
+  type NotificationLogEntry,
+} from '@/services/logsServices';
 
-interface NotificationExplorerTabProps {
-  product: {
-    tag: string;
-    name: string;
-    logo?: string;
-    envs?: Array<{ slug: string; name?: string }>;
-  };
+/** SDK notification message log item (decrypted input from notifications.getMessages) */
+export interface NotificationMessageLogItemSDK {
+  _id?: string;
+  workspace_id?: string;
+  product_id?: string;
+  product_tag: string;
+  env: string;
+  notification_tag: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  status: string;
+  type: string;
+  process_id?: string;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface NotificationMessage {
   _id?: string;
   name: string;
   tag: string;
-  email?: boolean;
-  push_notification?: boolean;
+  email?: boolean | { subject?: string; template?: string };
+  push_notification?: boolean | { title?: string; body?: string };
   sms?: boolean;
   callback?: boolean;
   email_data?: any[];
@@ -114,6 +96,7 @@ interface Notification {
   messages?: NotificationMessage[];
   envs?: Array<{
     slug: string;
+    name?: string;
     emails?: any;
     push_notifications?: any;
     sms?: any;
@@ -122,8 +105,25 @@ interface Notification {
   created_at?: string | Date;
 }
 
+/** Tab data: product only = Product Mode (notifier cards); product + notification + env + isExplorer = Notifier+Env Mode (sidebar + overview/templates) */
+interface NotificationExplorerTabData {
+  product?: {
+    tag: string;
+    name: string;
+    logo?: string;
+    envs?: Array<{ slug: string; name?: string }>;
+  };
+  notification?: Notification | null;
+  env?: { slug: string; name?: string };
+  isExplorer?: boolean;
+}
+
+interface NotificationExplorerTabProps {
+  data?: NotificationExplorerTabData | null;
+}
+
 type ChannelFilter = 'all' | 'email' | 'push' | 'sms' | 'webhook';
-type ViewMode = 'overview' | 'messages';
+type ViewMode = 'overview' | 'activity';
 
 // Channel type categorization
 const CHANNEL_TYPES: { value: ChannelFilter; label: string; icon: React.ReactNode }[] = [
@@ -134,62 +134,64 @@ const CHANNEL_TYPES: { value: ChannelFilter; label: string; icon: React.ReactNod
   { value: 'webhook', label: 'Webhook', icon: <Webhook className="h-4 w-4" /> },
 ];
 
-export default function NotificationExplorerTab({ product }: NotificationExplorerTabProps) {
+export default function NotificationExplorerTab({ data }: NotificationExplorerTabProps) {
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
+
+  const product = data?.product ?? { tag: '', name: '', envs: [] };
+  const isProductMode = !data?.notification || !data?.isExplorer;
+  const initialNotification = data?.notification ?? null;
+  const initialEnvSlug = data?.env?.slug ?? initialNotification?.envs?.[0]?.slug ?? product.envs?.[0]?.slug ?? 'prd';
 
   // Collapse workbench sidebar when explorer opens
   useEffect(() => {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
-  // Initialize SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product',
-  });
+  const sdkProxy = useSDKProxy(
+    product.tag && currentWorkspaceId && user?._id
+      ? {
+          workspace_id: currentWorkspaceId || '',
+          user_id: user._id || '',
+          token: user.auth_token || '',
+          public_key: user.public_key || '',
+        }
+      : null
+  );
 
   const queryClient = useQueryClient();
 
-  // State
+  // State (Notifier+Env mode; Product Mode uses notifications list only)
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
-  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
-  const [selectedMessage, setSelectedMessage] = useState<NotificationMessage | null>(null);
-  const [selectedEnv, setSelectedEnv] = useState<string>(product.envs?.[0]?.slug || 'prd');
+  // Templates are shown inline on Product tab; explorer has Overview + Sent Messages only
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(initialNotification);
+  const [selectedEnv, setSelectedEnv] = useState<string>(initialEnvSlug);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<ChannelFilter>('all');
-  const [envFilter, setEnvFilter] = useState<string>('all');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
-  const [showTestDialog, setShowTestDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [messageToDelete, setMessageToDelete] = useState<(NotificationMessage & { notificationTag: string }) | null>(null);
-  const [testData, setTestData] = useState<Record<string, any>>({});
-  const [isSending, setIsSending] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Sync Notifier+Env mode from tab data when opening with notification+env
+  useEffect(() => {
+    if (!isProductMode && initialNotification) {
+      setSelectedNotification(initialNotification);
+      setSelectedEnv(initialEnvSlug);
+    }
+  }, [isProductMode, initialNotification?.tag, initialEnvSlug]);
 
   // Fetch all notifications for the product
   const { data: notifications, isLoading: isLoadingNotifications, refetch: refetchNotifications } = useQuery({
     queryKey: ['notifications', product.tag],
     queryFn: async () => {
-      if (!ductape || !product.tag) return [];
+      if (!sdkProxy || !product.tag) return [];
       try {
-        await ductape.init(product.tag);
-        // @ts-ignore - SDK type might not include this
-        const result = await ductape.notifications.list();
-        console.log('[Notification-Explorer] Fetched notifications:', result);
-        return result || [];
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
+        const result = await sdkProxy.notifications.list(product.tag);
+        return result ?? [];
+      } catch {
         return [];
       }
     },
-    enabled: !!ductape && !!product.tag,
+    enabled: !!sdkProxy && !!product.tag,
     staleTime: 30000,
   });
 
@@ -197,32 +199,42 @@ export default function NotificationExplorerTab({ product }: NotificationExplore
   const { data: notificationDetails } = useQuery({
     queryKey: ['notification-details', product.tag, selectedNotification?.tag],
     queryFn: async () => {
-      if (!ductape || !product.tag || !selectedNotification?.tag) return null;
+      if (!sdkProxy || !product.tag || !selectedNotification?.tag) return null;
       try {
-        await ductape.init(product.tag);
-        // @ts-ignore
-        const result = await ductape.notifications.fetch(selectedNotification.tag);
-        console.log('[Notification-Explorer] Fetched notification details:', result);
-        return result;
-      } catch (error) {
-        console.error('Error fetching notification details:', error);
+        return await sdkProxy.notifications.fetch(product.tag, selectedNotification.tag);
+      } catch {
         return null;
       }
     },
-    enabled: !!ductape && !!product.tag && !!selectedNotification?.tag,
+    enabled: !!sdkProxy && !!product.tag && !!selectedNotification?.tag,
     staleTime: 30000,
   });
 
   // Use details if available, otherwise use selected notification
   const displayNotification = notificationDetails || selectedNotification;
 
-  // Get notification config for selected environment
+  // Scope env to the selected notifier: when notifier changes, sync selectedEnv to that notifier's envs
+  useEffect(() => {
+    if (!displayNotification?.envs?.length) return;
+    const notifierEnvSlugs = displayNotification.envs.map((e: any) => e.slug);
+    const currentInNotifier = notifierEnvSlugs.includes(selectedEnv);
+    if (!currentInNotifier) {
+      setSelectedEnv(displayNotification.envs[0]?.slug ?? 'prd');
+    }
+  }, [displayNotification?.tag, displayNotification?.envs]);
+
+  // Env list is per notifier when one is selected, else product-level for overview
+  const effectiveEnvs = displayNotification?.envs?.length
+    ? displayNotification.envs
+    : (product.envs ?? []);
+
+  // Get notification config for selected environment (within the selected notifier's envs)
   const notificationConfig = useMemo(() => {
     if (!displayNotification?.envs) return null;
     return displayNotification.envs.find((env: any) => env.slug === selectedEnv);
   }, [displayNotification, selectedEnv]);
 
-  // Calculate metrics
+  // Calculate metrics (for sidebar counts we still use notifications list; overview uses log data)
   const metrics = useMemo(() => {
     if (!notifications) return { total: 0, email: 0, push: 0, sms: 0, webhook: 0 };
 
@@ -236,8 +248,8 @@ export default function NotificationExplorerTab({ product }: NotificationExplore
       const messages = n.messages || [];
       totalMessages += messages.length;
       messages.forEach((m: NotificationMessage) => {
-        if (m.email) emailCount++;
-        if (m.push_notification) pushCount++;
+        if ((m.email_data?.length ?? 0) > 0 || (m.email && typeof m.email === 'object' && (m.email.subject || m.email.template))) emailCount++;
+        if ((m.push_notification_data?.length ?? 0) > 0 || (m.push_notification && typeof m.push_notification === 'object' && (m.push_notification.title || m.push_notification.body))) pushCount++;
         if (m.sms) smsCount++;
         if (m.callback) webhookCount++;
       });
@@ -253,79 +265,230 @@ export default function NotificationExplorerTab({ product }: NotificationExplore
     };
   }, [notifications]);
 
-  // Fetch notification dashboard metrics from logs service
-  const { data: dashboardMetrics } = useQuery({
-    queryKey: ['notification-dashboard-metrics', currentWorkspaceId, product.tag],
+  // Fetch notification logs from log service (type = email|push|sms|callback, parent_tag = notification tag, env, product_tag)
+  const today = useMemo(() => new Date(), []);
+  const weekAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d;
+  }, []);
+
+  const { data: notificationLogsData, isLoading: isLoadingNotificationLogs, refetch: refetchNotificationLogs } = useQuery({
+    queryKey: [
+      'notification-logs',
+      currentWorkspaceId,
+      product.tag,
+      displayNotification?.tag,
+      selectedEnv,
+    ],
     queryFn: async () => {
       if (!currentWorkspaceId || !user?._id || !user?.public_key || !product.tag) {
-        return null;
+        return { logs: [] };
       }
-      const today = new Date();
-      const weekAgo = new Date();
-      weekAgo.setDate(today.getDate() - 7);
+      return fetchNotificationLogs(currentWorkspaceId, user._id, user.public_key, {
+        product_tag: product.tag,
+        parent_tag: displayNotification?.tag ?? undefined,
+        env: selectedEnv,
+        start_date: weekAgo.toISOString().split('T')[0],
+        end_date: today.toISOString().split('T')[0],
+      });
+    },
+    enabled:
+      !!currentWorkspaceId &&
+      !!user?._id &&
+      !!user?.public_key &&
+      !!product.tag &&
+      !!displayNotification?.tag,
+  });
 
-      return fetchNotificationDashboard(
+  const notificationLogs: NotificationLogEntry[] = notificationLogsData?.logs ?? [];
+
+  // Notification message logs via SDK (decrypted input for display + resend); fallback to integrations API when no sdkProxy
+  const { data: messageLogsData, isLoading: isLoadingMessageLogs, refetch: refetchMessageLogs } = useQuery({
+    queryKey: [
+      'notification-message-logs',
+      currentWorkspaceId,
+      product.tag,
+      displayNotification?.tag,
+      selectedEnv,
+      !!sdkProxy,
+    ],
+    queryFn: async () => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key || !product.tag || !displayNotification?.tag) {
+        return { logs: [], items: [] };
+      }
+      if (sdkProxy) {
+        try {
+          const result = await sdkProxy.notifications.getMessages<{
+            items: NotificationMessageLogItemSDK[];
+            total: number;
+            page: number;
+            limit: number;
+            hasMore: boolean;
+          }>({
+            product_tag: product.tag,
+            notification_tag: displayNotification.tag,
+            env: selectedEnv,
+            start_date: weekAgo.toISOString(),
+            end_date: today.toISOString(),
+            limit: 500,
+          });
+          const items = result?.items ?? [];
+          const logs: NotificationLogEntry[] = items.map((item) => {
+            const [parent_tag, child_tag] = (item.notification_tag || '').split(':');
+            return {
+              _id: item._id ?? '',
+              product_tag: item.product_tag,
+              parent_tag: parent_tag ?? item.notification_tag,
+              child_tag: child_tag ?? item.notification_tag,
+              env: item.env,
+              type: item.type === 'notification' ? 'callback' : item.type,
+              successful_execution: item.status === 'sent',
+              failed_execution: item.status === 'failed',
+              timestamp: item.created_at ?? new Date().toISOString(),
+              process_id: item.process_id,
+            };
+          });
+          return { logs, items };
+        } catch (e) {
+          console.error('[notification-message-logs] SDK getMessages failed:', e);
+          const fallback = await fetchNotificationMessageLogs(currentWorkspaceId, user._id, user.public_key, {
+            product_tag: product.tag,
+            parent_tag: displayNotification.tag,
+            env: selectedEnv,
+            start_date: weekAgo.toISOString().split('T')[0],
+            end_date: today.toISOString().split('T')[0],
+          });
+          return { logs: fallback.logs, items: [] };
+        }
+      }
+      const fallback = await fetchNotificationMessageLogs(currentWorkspaceId, user._id, user.public_key, {
+        product_tag: product.tag,
+        parent_tag: displayNotification.tag,
+        env: selectedEnv,
+        start_date: weekAgo.toISOString().split('T')[0],
+        end_date: today.toISOString().split('T')[0],
+      });
+      return { logs: fallback.logs, items: [] };
+    },
+    enabled:
+      !!currentWorkspaceId &&
+      !!user?._id &&
+      !!user?.public_key &&
+      !!product.tag &&
+      !!displayNotification?.tag,
+  });
+
+  const messageLogs: NotificationLogEntry[] = messageLogsData?.logs ?? [];
+  const messageLogItems: NotificationMessageLogItemSDK[] = messageLogsData?.items ?? [];
+
+  // Sidebar channel filter counts from notification message log (integrations API)
+  const messageLogChannelCounts = useMemo(() => {
+    const total = messageLogs.length;
+    const email = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'email').length;
+    const push = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'push').length;
+    const sms = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'sms').length;
+    const webhook = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'callback').length;
+    return { total, email, push, sms, webhook };
+  }, [messageLogs]);
+
+  // Activity (sent messages) status filter for the Activity view
+  const [activityStatusFilter, setActivityStatusFilter] = useState<'all' | 'success' | 'fail' | 'processing'>('all');
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  // Map UI channel (webhook) to API channel (callback) for activity logs
+  const activityChannelApi = selectedChannel === 'all' ? undefined : selectedChannel === 'webhook' ? 'callback' : selectedChannel;
+
+  // Fetch notification activity logs (individual sent messages) — like broker messages in MessageBrokerEventsTabContent
+  const {
+    data: activityData,
+    isLoading: activityLoading,
+    fetchNextPage: fetchNextActivityPage,
+    hasNextPage: hasNextActivityPage,
+    isFetchingNextPage: isFetchingNextActivity,
+    refetch: refetchActivity,
+  } = useInfiniteQuery({
+    queryKey: [
+      'notification-activity-logs',
+      currentWorkspaceId,
+      product.tag,
+      displayNotification?.tag,
+      selectedEnv,
+      activityStatusFilter,
+      activityChannelApi,
+    ],
+    queryFn: async ({ pageParam = 1 }) => {
+      if (!currentWorkspaceId || !user?._id || !user?.public_key || !product.tag) {
+        return { logs: [], total: 0, page: 1, limit: 20, totalPages: 0 };
+      }
+      return fetchNotificationActivityLogs(
         currentWorkspaceId,
         user._id,
         user.public_key,
         {
           product_tag: product.tag,
-          groupBy: 'day',
-          start_date: weekAgo.toISOString().split('T')[0],
-          end_date: today.toISOString().split('T')[0],
+          notifier_tag: displayNotification?.tag,
+          env: selectedEnv,
+          status: activityStatusFilter !== 'all' ? activityStatusFilter : undefined,
+          channel: activityChannelApi,
+          page: pageParam,
+          limit: 20,
         }
       );
     },
-    enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key && !!product.tag,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.totalPages) return lastPage.page + 1;
+      return undefined;
+    },
+    initialPageParam: 1,
+    enabled:
+      !!currentWorkspaceId &&
+      !!user?._id &&
+      !!user?.public_key &&
+      !!product.tag &&
+      !!displayNotification?.tag,
   });
 
-  // Get all messages from all notifications for the table view
-  const allMessages = useMemo(() => {
-    if (!notifications) return [];
-    const messages: (NotificationMessage & { notificationName: string; notificationTag: string })[] = [];
-    (notifications as Notification[]).forEach((n) => {
-      (n.messages || []).forEach((m: NotificationMessage) => {
-        messages.push({
-          ...m,
-          notificationName: n.name,
-          notificationTag: n.tag,
-        });
-      });
+  const activityLogs: INotificationActivityLog[] = useMemo(() => {
+    if (!activityData?.pages) return [];
+    return activityData.pages.flatMap((p) => p.logs);
+  }, [activityData?.pages]);
+  const activityTotal = activityData?.pages?.[0]?.total ?? 0;
+
+  // Activity "sent messages" list from SDK message log (decrypted input for display + resend); filter by channel and status
+  const activityRowsFromMessages = useMemo(() => {
+    let rows = messageLogItems.map((item) => {
+      const [parent_tag, child_tag] = (item.notification_tag || '').split(':');
+      const status = item.status === 'sent' ? 'success' : item.status === 'failed' ? 'fail' : 'processing';
+      return {
+        _id: item._id ?? '',
+        process_id: item.process_id,
+        product_tag: item.product_tag,
+        parent_tag: parent_tag ?? item.notification_tag,
+        child_tag: child_tag ?? item.notification_tag,
+        env: item.env,
+        type: item.type === 'notification' ? 'callback' : item.type,
+        name: item.type,
+        message: '—',
+        status: status as 'success' | 'fail' | 'processing',
+        successful_execution: item.status === 'sent',
+        failed_execution: item.status === 'failed',
+        timestamp: item.created_at ?? new Date().toISOString(),
+        input: item.input,
+        output: item.output,
+        raw: item,
+      };
     });
-    return messages;
-  }, [notifications]);
-
-  // Filter messages based on search and channel
-  const filteredMessages = useMemo(() => {
-    let filtered = [...allMessages];
-
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter((message) => {
-        const name = message.name?.toLowerCase() || '';
-        const tag = message.tag?.toLowerCase() || '';
-        const notificationName = message.notificationName?.toLowerCase() || '';
-        return name.includes(searchQuery.toLowerCase()) ||
-          tag.includes(searchQuery.toLowerCase()) ||
-          notificationName.includes(searchQuery.toLowerCase());
-      });
-    }
-
-    // Apply channel filter
     if (selectedChannel !== 'all') {
-      filtered = filtered.filter((message) => {
-        switch (selectedChannel) {
-          case 'email': return message.email;
-          case 'push': return message.push_notification;
-          case 'sms': return message.sms;
-          case 'webhook': return message.callback;
-          default: return true;
-        }
-      });
+      const channelType = selectedChannel === 'webhook' ? 'callback' : selectedChannel;
+      rows = rows.filter((r) => (r.type?.toLowerCase() ?? '') === channelType);
     }
-
-    return filtered;
-  }, [allMessages, searchQuery, selectedChannel]);
+    if (activityStatusFilter !== 'all') {
+      rows = rows.filter((r) => r.status === activityStatusFilter);
+    }
+    return rows;
+  }, [messageLogItems, selectedChannel, activityStatusFilter]);
 
   // Filter notifications for sidebar
   const filteredNotifications = useMemo(() => {
@@ -337,52 +500,78 @@ export default function NotificationExplorerTab({ product }: NotificationExplore
     );
   }, [notifications, searchQuery]);
 
-  // Generate 7-day activity stats for display - use real data from logs when available
+  // Derive 7-day stats from notification logs (type=email|push|sms|callback, parent_tag, env, product_tag)
   const weeklyStats = useMemo(() => {
-    // Use real dashboard metrics if available
-    if (dashboardMetrics) {
+    const daysOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    if (!notificationLogs.length) {
       return {
-        totalSent: dashboardMetrics.totalOperations || 0,
-        totalDelivered: dashboardMetrics.successfulOperations || 0,
-        totalFailed: dashboardMetrics.failedOperations || 0,
-        deliveryRate: dashboardMetrics.deliveryRate || 0,
+        totalSent: 0,
+        totalDelivered: 0,
+        totalFailed: 0,
+        deliveryRate: 0,
         byChannel: {
-          email: dashboardMetrics.byChannel?.email || { sent: 0, delivered: 0, failed: 0 },
-          push: dashboardMetrics.byChannel?.push || { sent: 0, delivered: 0, failed: 0 },
-          sms: dashboardMetrics.byChannel?.sms || { sent: 0, delivered: 0, failed: 0 },
-          webhook: dashboardMetrics.byChannel?.callback || { sent: 0, delivered: 0, failed: 0 },
+          email: { sent: 0, delivered: 0, failed: 0 },
+          push: { sent: 0, delivered: 0, failed: 0 },
+          sms: { sent: 0, delivered: 0, failed: 0 },
+          webhook: { sent: 0, delivered: 0, failed: 0 },
         },
-        dailyTrend: dashboardMetrics.dailyActivity?.map(day => ({
-          day: day.day,
-          sent: day.totalOperations || 0,
-          delivered: day.successful || 0,
-          failed: day.failed || 0,
-        })) || [],
-        topTemplates: dashboardMetrics.topTemplates?.map(t => ({
-          name: t.name || t.tag || '',
-          tag: t.tag || '',
-          sent: t.sent || 0,
-          deliveryRate: t.deliveryRate || 0,
-        })) || [],
+        dailyTrend: daysOrder.map((day) => ({ day, sent: 0, delivered: 0, failed: 0 })),
+        topTemplates: [] as Array<{ name: string; tag: string; sent: number; deliveryRate: number }>,
       };
     }
 
-    // Fallback: Generate stats based on current templates count
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const today = new Date();
-    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1; // Adjust for Mon-Sun
-
-    // Use seeded random based on product tag for consistent display
-    const seed = (product.tag || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const seededRandom = (offset: number) => {
-      const x = Math.sin(seed + offset) * 10000;
-      return x - Math.floor(x);
-    };
-
-    const totalSent = Math.floor(seededRandom(1) * 400) + 100 + (allMessages.length * 10);
-    const totalDelivered = Math.floor(totalSent * (0.92 + seededRandom(2) * 0.07));
-    const totalFailed = totalSent - totalDelivered;
+    const totalSent = notificationLogs.length;
+    const totalDelivered = notificationLogs.filter((l) => l.successful_execution).length;
+    const totalFailed = notificationLogs.filter((l) => l.failed_execution).length;
     const deliveryRate = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0;
+
+    const byType = { email: 0, push: 0, sms: 0, callback: 0 };
+    const byTypeDelivered = { email: 0, push: 0, sms: 0, callback: 0 };
+    const byTypeFailed = { email: 0, push: 0, sms: 0, callback: 0 };
+    notificationLogs.forEach((l) => {
+      const t = (l.type?.toLowerCase() || '') as keyof typeof byType;
+      if (t in byType) {
+        byType[t]++;
+        if (l.successful_execution) byTypeDelivered[t]++;
+        if (l.failed_execution) byTypeFailed[t]++;
+      }
+    });
+
+    const byDay: Record<string, { sent: number; delivered: number; failed: number }> = {};
+    daysOrder.forEach((d) => {
+      byDay[d] = { sent: 0, delivered: 0, failed: 0 };
+    });
+    notificationLogs.forEach((l) => {
+      if (!l.timestamp) return;
+      const date = new Date(l.timestamp);
+      const day = daysOrder[date.getDay() === 0 ? 6 : date.getDay() - 1] ?? daysOrder[0];
+      byDay[day].sent++;
+      if (l.successful_execution) byDay[day].delivered++;
+      if (l.failed_execution) byDay[day].failed++;
+    });
+    const dailyTrend = daysOrder.map((day) => ({
+      day,
+      sent: byDay[day]?.sent ?? 0,
+      delivered: byDay[day]?.delivered ?? 0,
+      failed: byDay[day]?.failed ?? 0,
+    }));
+
+    const childCount: Record<string, number> = {};
+    const childSuccess: Record<string, number> = {};
+    notificationLogs.forEach((l) => {
+      const tag = l.child_tag || l.parent_tag || '—';
+      childCount[tag] = (childCount[tag] ?? 0) + 1;
+      if (l.successful_execution) childSuccess[tag] = (childSuccess[tag] ?? 0) + 1;
+    });
+    const topTemplates = Object.entries(childCount)
+      .map(([tag, sent]) => ({
+        name: tag,
+        tag,
+        sent,
+        deliveryRate: sent > 0 ? Math.round(((childSuccess[tag] ?? 0) / sent) * 100) : 0,
+      }))
+      .sort((a, b) => b.sent - a.sent)
+      .slice(0, 10);
 
     return {
       totalSent,
@@ -390,384 +579,122 @@ export default function NotificationExplorerTab({ product }: NotificationExplore
       totalFailed,
       deliveryRate,
       byChannel: {
-        email: { sent: Math.floor(seededRandom(3) * 150) + 30 + (metrics.email * 5), delivered: 0, failed: 0 },
-        push: { sent: Math.floor(seededRandom(4) * 100) + 20 + (metrics.push * 5), delivered: 0, failed: 0 },
-        sms: { sent: Math.floor(seededRandom(5) * 60) + 10 + (metrics.sms * 5), delivered: 0, failed: 0 },
-        webhook: { sent: Math.floor(seededRandom(6) * 30) + 5 + (metrics.webhook * 5), delivered: 0, failed: 0 },
+        email: { sent: byType.email, delivered: byTypeDelivered.email, failed: byTypeFailed.email },
+        push: { sent: byType.push, delivered: byTypeDelivered.push, failed: byTypeFailed.push },
+        sms: { sent: byType.sms, delivered: byTypeDelivered.sms, failed: byTypeFailed.sms },
+        webhook: { sent: byType.callback, delivered: byTypeDelivered.callback, failed: byTypeFailed.callback },
       },
-      dailyTrend: days.map((day, idx) => ({
-        day,
-        sent: idx <= dayOfWeek ? Math.floor(seededRandom(7 + idx) * 60) + 15 : 0,
-        delivered: 0,
-        failed: 0,
-      })),
-      topTemplates: allMessages.slice(0, 5).map((m, idx) => ({
-        name: m.name,
-        tag: m.tag,
-        sent: Math.floor(seededRandom(14 + idx) * 80) + 20 - (idx * 10),
-        deliveryRate: 92 + Math.floor(seededRandom(19 + idx) * 8),
-      })),
+      dailyTrend,
+      topTemplates,
     };
-  }, [product.tag, allMessages, metrics, dashboardMetrics]);
+  }, [notificationLogs]);
+
+  // Activity timeline content (7 days normalized) — computed outside JSX to avoid IIFE parse issues
+  const activityTimelineContent = useMemo(() => {
+    const normalized = getLast7DaysNormalized(weeklyStats.dailyTrend, (d) => d.sent ?? 0);
+    const hasAny = normalized.some((d) => d.value > 0);
+    if (!hasAny) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
+          <p className="text-sm text-grey-600 font-medium mb-1">No notification activity data available</p>
+          <p className="text-xs text-grey-500">Activity charts will appear once notifications are sent</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3">
+        {normalized.map((day) => {
+          const maxSent = Math.max(...normalized.map((d) => d.value), 1);
+          const percentage = maxSent > 0 ? (day.value / maxSent) * 100 : 0;
+          return (
+            <div key={day.date} className="flex items-center gap-3">
+              <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+              <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                  style={{ width: `${percentage}%` }}
+                />
+                <div className="absolute inset-0 flex items-center px-3">
+                  <span className="text-xs font-semibold text-white drop-shadow-sm">
+                    {day.value.toLocaleString()} messages sent
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div className="pt-4 border-t border-grey-200 flex justify-between text-sm">
+          <span className="text-grey-600">Total messages</span>
+          <span className="font-semibold text-grey">{normalized.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
+        </div>
+      </div>
+    );
+  }, [weeklyStats.dailyTrend]);
 
   // Handle refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetchNotifications();
+    await Promise.all([
+      refetchNotifications(),
+      refetchActivity(),
+      refetchNotificationLogs(),
+      refetchMessageLogs(),
+    ]);
     setIsRefreshing(false);
     toast.success('Notifications refreshed');
   };
 
-  // Clear filters
-  const clearFilters = () => {
-    setSelectedChannel('all');
-    setEnvFilter('all');
-    setSearchQuery('');
-    setCurrentPage(1);
-  };
-
-  const hasActiveFilters = selectedChannel !== 'all' || envFilter !== 'all' || searchQuery !== '';
-
-  // Delete message mutation
-  const deleteMessageMutation = useMutation({
-    mutationFn: async (message: NotificationMessage & { notificationTag: string }) => {
-      if (!ductape || !product.tag) throw new Error('SDK not initialized');
-      await ductape.init(product.tag);
-      // @ts-ignore - SDK type might not include this
-      return await ductape.notifications.messages.delete(message.tag);
-    },
-    onSuccess: () => {
-      toast.success('Message deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['notifications', product.tag] });
-      setShowDeleteDialog(false);
-      setMessageToDelete(null);
-    },
-    onError: (error: any) => {
-      console.error('Error deleting message:', error);
-      toast.error(error.message || 'Failed to delete message');
-    },
-  });
-
-  // Handle delete message
-  const handleDeleteMessage = (message: NotificationMessage & { notificationTag: string }) => {
-    setMessageToDelete(message);
-    setShowDeleteDialog(true);
-  };
-
-  // Confirm delete
-  const confirmDelete = () => {
-    if (messageToDelete) {
-      deleteMessageMutation.mutate(messageToDelete);
-    }
-  };
-
-  // Open message in view tab
-  const handleViewMessage = (message: NotificationMessage & { notificationName: string; notificationTag: string }) => {
-    const notification = (notifications as Notification[])?.find(n => n.tag === message.notificationTag);
-    openTab({
-      id: `message-${message._id}-${Date.now()}`,
-      type: 'message',
-      title: message.name,
-      itemId: message._id,
-      data: {
-        ...message,
-        productTag: product.tag,
-        notifierTag: message.notificationTag,
-        notification,
-      },
-    });
-  };
-
-  // Open new message creation tab
-  const handleCreateMessage = (notification?: Notification) => {
-    const targetNotification = notification || (notifications as Notification[])?.[0];
-    if (!targetNotification) {
-      toast.error('Please create a notification first');
+  const handleResend = async (row: (typeof activityRowsFromMessages)[0]) => {
+    const input = row.raw?.input;
+    if (!sdkProxy || !input || typeof input !== 'object') {
+      toast.error('Cannot resend: no input or SDK not available');
       return;
     }
+    const id = row._id ?? '';
+    setResendingId(id);
+    try {
+      await sdkProxy.notifications.send(input);
+      toast.success('Notification resent');
+      await refetchMessageLogs();
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Resend failed');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  // Open Notifier+Env explorer tab (overview + sent messages for one notifier in one env) — used from Product Mode
+  const handleViewTemplates = (notifier: Notification, env: { slug: string; name?: string }) => {
     openTab({
-      id: `new-message-${Date.now()}`,
-      type: 'new-message',
-      title: 'New Message',
-      itemId: 'new',
+      id: `notification-explorer-${notifier.tag}-${env.slug}`,
+      type: 'notification-explorer',
+      title: `${notifier.name} (${env.slug})`,
+      itemId: `${notifier.tag}-${env.slug}`,
       data: {
-        notification: targetNotification,
-        productTag: product.tag,
-        isNew: true,
+        product: { tag: product.tag, name: product.name, logo: product.logo, envs: product.envs || [] },
+        notification: notifier,
+        env: { slug: env.slug, name: env.name },
+        isExplorer: true,
       },
-      isDirty: true,
     });
   };
 
-  // Handle test notification
-  const handleTestNotification = async () => {
-    if (!selectedMessage || !displayNotification) return;
-    setIsSending(true);
-    try {
-      toast.success('Test notification sent!');
-      setShowTestDialog(false);
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      toast.error('Failed to send test notification');
-    } finally {
-      setIsSending(false);
-    }
+  const handleCreateMessage = () => {
+    toast('Create template: coming soon');
   };
 
-  // Generate code sections for CodeSidebar
-  const generateCodeSections = (language: string, env?: string) => {
-    if (!selectedMessage || !displayNotification) return [];
-
-    const messageTag = selectedMessage.tag;
-    const fullTag = displayNotification.tag ? `${displayNotification.tag}:${messageTag}` : messageTag;
-    const envSlug = env || selectedEnv || 'prd';
-
-    if (language === 'javascript' || language === 'typescript') {
-      const importStatement = language === 'typescript'
-        ? `import Ductape from "@ductape/sdk"`
-        : `const Ductape = require("@ductape/sdk")`;
-
-      const sections = [
-        {
-          title: 'Init Ductape',
-          code: `${importStatement}
-
-const ductape = new Ductape({
-  accessKey: 'your-access-key',
-});`
-        }
-      ];
-
-      const inputParts: string[] = [];
-
-      if (selectedMessage.push_notification) {
-        sections.push({
-          title: 'Input - Push Notification',
-          code: `const push_notification = {
-  device_token: '{{deviceToken}}',
-  title: { en: 'Your title here' },
-  body: { en: 'Your message here' },
-  data: { action: 'open_screen' }
-};`
-        });
-        inputParts.push('  push_notification');
-      }
-
-      if (selectedMessage.email) {
-        sections.push({
-          title: 'Input - Email',
-          code: `const email = {
-  to: ['user@example.com'],
-  subject: { en: 'Email subject' },
-  template: { en: '<p>Email content</p>' }
-};`
-        });
-        inputParts.push('  email');
-      }
-
-      if (selectedMessage.sms) {
-        sections.push({
-          title: 'Input - SMS',
-          code: `const sms = {
-  recipients: ['+1234567890'],
-  body: {
-    firstname: '{{firstName}}',
-    lastname: '{{lastName}}'
-  }
-};`
-        });
-        inputParts.push('  sms');
-      }
-
-      if (selectedMessage.callback) {
-        sections.push({
-          title: 'Input - Callback',
-          code: `const callback = {
-  url: '{{callbackUrl}}',
-  method: 'POST',
-  body: { data: '{{callbackData}}' }
-};`
-        });
-        inputParts.push('  callback');
-      }
-
-      sections.push({
-        title: 'Execute',
-        code: `const input = {
-${inputParts.join(',\n')}
-};
-
-await ductape.processor.notification.send({
-  env: '${envSlug}',
-  product: '${product.tag}',
-  event: '${fullTag}',
-  input,
-  retries: 3
-});`
-      });
-
-      return sections;
-    }
-
-    return [];
-  };
-
-  // Get channel count
+  // Channel count = number of messages in that channel (from notification message log / integrations API)
   const getChannelCount = (channel: ChannelFilter) => {
     switch (channel) {
-      case 'all': return allMessages.length;
-      case 'email': return metrics.email;
-      case 'push': return metrics.push;
-      case 'sms': return metrics.sms;
-      case 'webhook': return metrics.webhook;
+      case 'all': return messageLogChannelCounts.total;
+      case 'email': return messageLogChannelCounts.email;
+      case 'push': return messageLogChannelCounts.push;
+      case 'sms': return messageLogChannelCounts.sms;
+      case 'webhook': return messageLogChannelCounts.webhook;
       default: return 0;
     }
   };
-
-  // Table columns
-  const columnHelper = createColumnHelper<NotificationMessage & { notificationName: string; notificationTag: string }>();
-  const columns = useMemo<ColumnDef<NotificationMessage & { notificationName: string; notificationTag: string }, any>[]>(
-    () => [
-      columnHelper.accessor('name', {
-        header: 'Message',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-grey">{row.original.name}</span>
-              <p className="text-xs text-grey-600 truncate">{row.original.tag}</p>
-            </div>
-          </div>
-        ),
-      }),
-      columnHelper.accessor('notificationName', {
-        header: 'Notification',
-        cell: ({ row }) => (
-          <div>
-            <span className="text-sm text-grey">{row.original.notificationName}</span>
-            <p className="text-xs text-grey-600 truncate">{row.original.notificationTag}</p>
-          </div>
-        ),
-      }),
-      columnHelper.display({
-        id: 'channels',
-        header: 'Channels',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1.5">
-            {row.original.email && (
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded border bg-blue-100 text-blue-700 border-blue-200">
-                <Mail className="h-3 w-3 mr-1" />
-                Email
-              </span>
-            )}
-            {row.original.push_notification && (
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded border bg-purple-100 text-purple-700 border-purple-200">
-                <Smartphone className="h-3 w-3 mr-1" />
-                Push
-              </span>
-            )}
-            {row.original.sms && (
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded border bg-green-100 text-green-700 border-green-200">
-                <MessageSquare className="h-3 w-3 mr-1" />
-                SMS
-              </span>
-            )}
-            {row.original.callback && (
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded border bg-orange-100 text-orange-700 border-orange-200">
-                <Webhook className="h-3 w-3 mr-1" />
-                Webhook
-              </span>
-            )}
-          </div>
-        ),
-      }),
-      columnHelper.accessor('created_at', {
-        header: 'Created',
-        cell: ({ row }) => (
-          <span className="text-sm text-grey-600">
-            {row.original.created_at
-              ? format(new Date(String(row.original.created_at)), 'MMM dd, yyyy')
-              : '-'}
-          </span>
-        ),
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                <MoreVertical className="h-4 w-4 text-grey-600" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                handleViewMessage(row.original);
-              }}>
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMessage(row.original);
-                const notification = (notifications as Notification[])?.find(n => n.tag === row.original.notificationTag);
-                if (notification) setSelectedNotification(notification);
-                setShowCodeSidebar(true);
-              }}>
-                <Code className="h-4 w-4 mr-2" />
-                View Code
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMessage(row.original);
-                setShowTestDialog(true);
-              }}>
-                <Send className="h-4 w-4 mr-2" />
-                Send Test
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteMessage(row.original);
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      }),
-    ],
-    [notifications, openTab, product.tag, handleViewMessage, handleDeleteMessage]
-  );
-
-  const table = useReactTable({
-    data: filteredMessages,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    state: {
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize,
-      },
-    },
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const newState = updater({ pageIndex: currentPage - 1, pageSize });
-        setCurrentPage(newState.pageIndex + 1);
-        setPageSize(newState.pageSize);
-      }
-    },
-    manualPagination: false,
-  });
 
   // Loading state
   if (isLoadingNotifications) {
@@ -781,6 +708,122 @@ await ductape.processor.notification.send({
     );
   }
 
+  // ——— Product Mode (like StorageTabContent): notifier cards, "View templates" per env ———
+  if (isProductMode) {
+    const notifiers = (notifications as Notification[]) ?? [];
+    return (
+      <div className="h-full overflow-auto bg-grey-100 p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Product Context Header — same pattern as StorageTabContent */}
+          {product?.name && product?.tag && (
+            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+                  {product.logo ? (
+                    <img src={product.logo} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                  ) : (
+                    product.name?.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-xl font-bold text-grey">Notifications for {product.name}</h2>
+                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-medium rounded">{product.tag}</span>
+                  </div>
+                  <p className="text-sm text-grey-600">
+                    Manage notifiers and templates per environment
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-grey-600">
+                  <CheckCircle className="h-4 w-4 text-green" />
+                  <span>Connected</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Header with New Template */}
+          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <Bell className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-grey mb-2">Notification Configurations</h1>
+                  <p className="text-sm text-grey-600">{notifiers.length} notifier{notifiers.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
+                onClick={() => handleCreateMessage()}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Template
+              </Button>
+            </div>
+          </div>
+
+          {/* Notifier cards (like Storage env cards) — each with per-env "View templates" */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
+            {notifiers.length === 0 ? (
+              <div className="bg-white rounded-lg border border-grey-400 p-12 text-center shadow-sm">
+                <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <p className="text-grey-600 mb-2">No notifiers yet</p>
+                <p className="text-sm text-grey-500 mb-4">Create a notification from your product to get started.</p>
+              </div>
+            ) : (
+              notifiers.map((notifier) => {
+                const envs = notifier.envs ?? product.envs ?? [];
+                return (
+                  <div key={notifier.tag} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <Bell className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <h3 className="text-base font-semibold text-grey">{notifier.name}</h3>
+                        <span className="text-xs text-grey-500 font-mono">{notifier.tag}</span>
+                      </div>
+                      <span className="text-sm text-grey-600">{notifier.messages?.length ?? 0} template{notifier.messages?.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {envs.length === 0 ? (
+                      <p className="text-sm text-grey-500">No environments configured</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {envs.map((env: { slug: string; name?: string }) => (
+                          <div
+                            key={env.slug}
+                            className="flex items-center justify-between py-2 px-3 rounded-lg bg-grey-50 border border-grey-400"
+                          >
+                            <span className="text-sm font-medium text-grey">{env.name ?? env.slug}</span>
+                            <Button
+                              onClick={() => handleViewTemplates(notifier, env)}
+                              className="gap-2"
+                              size="sm"
+                            >
+                              <FileText className="h-4 w-4" />
+                              View templates
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ——— Notifier+Env Mode (like MessageBrokerEventsTabContent): sidebar + overview/templates ———
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">
       {/* Sidebar */}
@@ -788,19 +831,43 @@ await ductape.processor.notification.send({
         "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300",
         isSidebarCollapsed ? "w-14" : "w-64"
       )}>
-        {/* Header */}
-        <div className="flex-shrink-0 p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Bell className="h-5 w-5 text-blue-500" />
+        {/* Header - collapse at top like DatabaseExplorerTab */}
+        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) setIsSidebarCollapsed(false);
+              }}
+              className={cn(
+                'flex items-center justify-center rounded-lg bg-blue-500/10 flex-shrink-0',
+                isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
+              )}
+              title={isSidebarCollapsed ? 'Expand sidebar' : product.name}
+            >
+              <Bell className="h-5 w-5 text-blue-500" />
+            </button>
             {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-grey text-sm truncate">{product.name}</h2>
-                <p className="text-xs text-grey-600 truncate">Notifications</p>
-              </div>
+              <>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-grey text-sm truncate">
+                    {displayNotification ? (displayNotification.name ?? displayNotification.tag) : product.name}
+                  </h2>
+                  <p className="text-xs text-grey-600 truncate">
+                    {displayNotification ? selectedEnv : 'Notifications'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
 
-          {/* Search */}
+          {/* Search - only when expanded */}
           {!isSidebarCollapsed && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
@@ -838,42 +905,6 @@ await ductape.processor.notification.send({
             </button>
           </div>
 
-          {/* Templates Link */}
-          <div className="mb-4">
-            <button
-              onClick={() => {
-                setSelectedChannel('all');
-                setViewMode('messages');
-              }}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                viewMode === 'messages' && selectedChannel === 'all'
-                  ? 'bg-blue-500/10 text-blue-500'
-                  : 'text-grey hover:bg-background-secondary',
-                isSidebarCollapsed && 'justify-center'
-              )}
-              title={isSidebarCollapsed ? 'Templates' : undefined}
-            >
-              <FileText className={cn(
-                'h-4 w-4',
-                viewMode === 'messages' && selectedChannel === 'all' ? 'text-blue-500' : 'text-grey-600'
-              )} />
-              {!isSidebarCollapsed && (
-                <>
-                  <span className="flex-1 text-left font-medium">Templates</span>
-                  <span className={cn(
-                    'text-xs px-1.5 py-0.5 rounded',
-                    viewMode === 'messages' && selectedChannel === 'all'
-                      ? 'bg-blue-500/20 text-blue-500'
-                      : 'bg-background-secondary text-grey-600'
-                  )}>
-                    {allMessages.length}
-                  </span>
-                </>
-              )}
-            </button>
-          </div>
-
           {!isSidebarCollapsed && (
             <>
               <div className="flex items-center justify-between px-2 py-2">
@@ -893,14 +924,14 @@ await ductape.processor.notification.send({
               <div className="space-y-0.5">
                 {CHANNEL_TYPES.map((channel) => {
                   const count = getChannelCount(channel.value);
-                  const isSelected = viewMode === 'messages' && selectedChannel === channel.value;
+                  const isSelected = viewMode === 'activity' && selectedChannel === channel.value;
 
                   return (
                     <button
                       key={channel.value}
                       onClick={() => {
                         setSelectedChannel(channel.value);
-                        setViewMode('messages');
+                        setViewMode('activity');
                       }}
                       className={cn(
                         'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
@@ -908,6 +939,7 @@ await ductape.processor.notification.send({
                           ? 'bg-blue-500/10 text-blue-500'
                           : 'text-grey hover:bg-background-secondary'
                       )}
+                      title={`View sent messages for ${channel.label}`}
                     >
                       <span className={cn(
                         isSelected ? 'text-blue-500' : 'text-grey-600'
@@ -927,60 +959,21 @@ await ductape.processor.notification.send({
                   );
                 })}
               </div>
-
-              {/* Environment Filter */}
-              <div className="mt-4 px-2">
-                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
-                  Environment
-                </div>
-                <Select value={envFilter} onValueChange={setEnvFilter}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="All Environments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Environments</SelectItem>
-                    {(product.envs || []).map((env) => (
-                      <SelectItem key={env.slug} value={env.slug}>
-                        {env.name || env.slug}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {hasActiveFilters && (
-                <div className="mt-3 px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="w-full text-grey-600 hover:text-grey"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Clear Filters
-                  </Button>
-                </div>
-              )}
             </>
           )}
         </div>
 
-        {/* Collapse Toggle */}
-        <div className="flex-shrink-0 p-2 border-t border-grey-400">
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-blue-500 transition-colors"
-            title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isSidebarCollapsed ? (
+        {/* Bottom - expand when collapsed (like DatabaseExplorerTab) */}
+        <div className={cn('flex-shrink-0 border-t border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-3')}>
+          {isSidebarCollapsed ? (
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              title="Expand sidebar"
+            >
               <PanelLeft className="h-4 w-4" />
-            ) : (
-              <>
-                <PanelLeftClose className="h-4 w-4" />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -995,13 +988,21 @@ await ductape.processor.notification.send({
                   <Bell className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-grey">Notifications</h1>
+                  <h1 className="text-xl font-semibold text-grey">
+                    {displayNotification ? displayNotification.name ?? displayNotification.tag : 'Notifications'}
+                    {displayNotification && (
+                      <span className="text-grey-600 font-normal ml-2">({selectedEnv})</span>
+                    )}
+                  </h1>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="text-sm text-grey-600 font-mono">{product.tag}</code>
+                    {displayNotification && (
+                      <code className="text-sm text-grey-500 font-mono">{displayNotification.tag}</code>
+                    )}
                     <span className={cn(
                       'px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-500'
                     )}>
-                      {metrics.total} notifications
+                      {displayNotification ? `${weeklyStats.totalSent} messages (7d)` : `${metrics.total} notifications`}
                     </span>
                   </div>
                 </div>
@@ -1017,86 +1018,14 @@ await ductape.processor.notification.send({
                   <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
                   Refresh
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
-                  onClick={() => handleCreateMessage()}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Template
-                </Button>
               </div>
             </div>
           </div>
         </div>
 
-        {viewMode === 'overview' ? (
+        {viewMode === 'overview' && (
           /* Overview Content */
           <div className="flex-1 overflow-auto p-6">
-            {/* Metrics Dashboard */}
-            <div className="grid grid-cols-6 gap-4 mb-6">
-              {/* Total Notifications */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Notifications</span>
-                  <Bell className="h-4 w-4 text-grey-400" />
-                </div>
-                <p className="text-2xl font-bold text-grey">{metrics.total}</p>
-                <p className="text-xs text-grey-500 mt-2">{metrics.messages} messages</p>
-              </div>
-
-              {/* Email */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Email</span>
-                  <Mail className="h-4 w-4 text-blue" />
-                </div>
-                <p className="text-2xl font-bold text-blue">{metrics.email}</p>
-                <p className="text-xs text-grey-500 mt-2">messages</p>
-              </div>
-
-              {/* Push */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Push</span>
-                  <Smartphone className="h-4 w-4 text-purple-500" />
-                </div>
-                <p className="text-2xl font-bold text-purple-500">{metrics.push}</p>
-                <p className="text-xs text-grey-500 mt-2">messages</p>
-              </div>
-
-              {/* SMS */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">SMS</span>
-                  <MessageSquare className="h-4 w-4 text-green" />
-                </div>
-                <p className="text-2xl font-bold text-green">{metrics.sms}</p>
-                <p className="text-xs text-grey-500 mt-2">messages</p>
-              </div>
-
-              {/* Webhooks */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Webhooks</span>
-                  <Webhook className="h-4 w-4 text-orange-500" />
-                </div>
-                <p className="text-2xl font-bold text-orange-500">{metrics.webhook}</p>
-                <p className="text-xs text-grey-500 mt-2">callbacks</p>
-              </div>
-
-              {/* Environments */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Environments</span>
-                  <Settings className="h-4 w-4 text-grey-400" />
-                </div>
-                <p className="text-2xl font-bold text-grey">{product.envs?.length || 0}</p>
-                <p className="text-xs text-grey-500 mt-2">configured</p>
-              </div>
-            </div>
-
             {/* Key Metrics - Session Dashboard Style */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {/* Total Sent */}
@@ -1105,10 +1034,7 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                     <Send className="h-5 w-5 text-blue-600" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                    <TrendingUp className="h-3 w-3" />
-                    12.5%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalSent.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Sent (7 days)</div>
@@ -1120,10 +1046,7 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
                     <CheckCircle className="h-5 w-5 text-green" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                    <TrendingUp className="h-3 w-3" />
-                    8.3%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalDelivered.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Delivered (7 days)</div>
@@ -1135,10 +1058,7 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
                     <XCircle className="h-5 w-5 text-red-600" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-red-500">
-                    <TrendingDown className="h-3 w-3" />
-                    -15.2%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalFailed.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
@@ -1150,10 +1070,7 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <BarChart3 className="h-5 w-5 text-purple-600" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                    <TrendingUp className="h-3 w-3" />
-                    2.1%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className={cn(
                   "text-2xl font-bold mb-1",
@@ -1170,10 +1087,7 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
                     <Mail className="h-5 w-5 text-blue" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                    <TrendingUp className="h-3 w-3" />
-                    9.7%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.email.sent}</div>
                 <div className="text-xs text-grey-600 font-medium">Emails Sent</div>
@@ -1185,42 +1099,29 @@ await ductape.processor.notification.send({
                   <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <Smartphone className="h-5 w-5 text-purple-600" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                    <TrendingUp className="h-3 w-3" />
-                    14.3%
-                  </div>
+                  <div className="text-xs font-medium text-grey-500">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.push.sent}</div>
                 <div className="text-xs text-grey-600 font-medium">Push Notifications</div>
               </div>
             </div>
 
-            {/* Activity Timeline - Session Dashboard Style */}
+            {/* Activity Timeline (7 Days) - matches DatabaseExplorerTab style */}
             <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-              <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
-              <div className="space-y-3">
-                {weeklyStats.dailyTrend.map((day) => {
-                  const maxSent = Math.max(...weeklyStats.dailyTrend.map(d => d.sent));
-                  const percentage = maxSent > 0 ? (day.sent / maxSent) * 100 : 0;
-
-                  return (
-                    <div key={day.day} className="flex items-center gap-3">
-                      <div className="w-12 text-xs font-medium text-grey-600">{day.day}</div>
-                      <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
-                        <div className="absolute inset-0 flex items-center px-3">
-                          <span className="text-xs font-semibold text-white">
-                            {day.sent} notifications sent
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                {isLoadingNotificationLogs && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
+              {isLoadingNotificationLogs ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : activityTimelineContent}
             </div>
 
             {/* Channel Distribution - Session Dashboard Style */}
@@ -1309,9 +1210,8 @@ await ductape.processor.notification.send({
               </div>
             </div>
 
-            {/* Channel Breakdown */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {/* By Channel */}
+            {/* Messages by Channel (from log service: type=email|push|sms|callback, parent_tag, env, product_tag) */}
+            <div className="mb-6">
               <div className="bg-white rounded-lg p-5 border border-border shadow-sm">
                 <h3 className="text-sm font-semibold text-grey mb-4">Messages by Channel</h3>
                 <div className="space-y-3">
@@ -1321,11 +1221,11 @@ await ductape.processor.notification.send({
                       <span className="text-sm text-grey">Email</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-grey">{metrics.email}</span>
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.email.sent}</span>
                       <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-blue rounded-full"
-                          style={{ width: `${metrics.messages ? (metrics.email / metrics.messages) * 100 : 0}%` }}
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.email.sent / weeklyStats.totalSent) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -1336,11 +1236,11 @@ await ductape.processor.notification.send({
                       <span className="text-sm text-grey">Push Notifications</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-grey">{metrics.push}</span>
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.push.sent}</span>
                       <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-purple-500 rounded-full"
-                          style={{ width: `${metrics.messages ? (metrics.push / metrics.messages) * 100 : 0}%` }}
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.push.sent / weeklyStats.totalSent) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -1351,11 +1251,11 @@ await ductape.processor.notification.send({
                       <span className="text-sm text-grey">SMS</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-grey">{metrics.sms}</span>
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.sms.sent}</span>
                       <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-green rounded-full"
-                          style={{ width: `${metrics.messages ? (metrics.sms / metrics.messages) * 100 : 0}%` }}
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.sms.sent / weeklyStats.totalSent) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -1366,479 +1266,219 @@ await ductape.processor.notification.send({
                       <span className="text-sm text-grey">Webhooks</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-grey">{metrics.webhook}</span>
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.webhook.sent}</span>
                       <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-orange-500 rounded-full"
-                          style={{ width: `${metrics.messages ? (metrics.webhook / metrics.messages) * 100 : 0}%` }}
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.webhook.sent / weeklyStats.totalSent) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* By Notification */}
-              <div className="bg-white rounded-lg p-5 border border-border shadow-sm">
-                <h3 className="text-sm font-semibold text-grey mb-4">Messages by Notification</h3>
-                <div className="space-y-3">
-                  {(notifications as Notification[] || []).slice(0, 4).map((notification) => (
-                    <div key={notification.tag} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        <span className="text-sm text-grey truncate max-w-[150px]">{notification.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-grey">{notification.messages?.length || 0}</span>
-                        <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-blue-500 rounded-full"
-                            style={{ width: `${metrics.messages ? ((notification.messages?.length || 0) / metrics.messages) * 100 : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Recent Notifications */}
+            {/* All Messages (templates/child_tags from log service) */}
             <div className="bg-white rounded-lg border border-border shadow-sm">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-grey">All Notifications</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedChannel('all');
-                    setViewMode('messages');
-                  }}
-                  className="text-blue-500 hover:text-blue-500/80 text-xs"
-                >
-                  View All Messages
-                  <ChevronRight className="h-3 w-3 ml-1" />
-                </Button>
+              <div className="px-5 py-4 border-b border-border">
+                <h3 className="text-sm font-semibold text-grey">All Messages</h3>
               </div>
               <div className="divide-y divide-border">
-                {(notifications as Notification[] || []).slice(0, 5).map((notification) => (
-                  <div
-                    key={notification.tag}
-                    className="px-5 py-3 flex items-center justify-between hover:bg-background-secondary transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedNotification(notification);
-                      setViewMode('messages');
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <Bell className="h-4 w-4 text-blue-500" />
+                {(() => {
+                  const byChild: Record<string, number> = {};
+                  notificationLogs.forEach((l) => {
+                    const tag = l.child_tag || l.parent_tag || '—';
+                    byChild[tag] = (byChild[tag] ?? 0) + 1;
+                  });
+                  const allMessages = Object.entries(byChild)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 10);
+                  if (allMessages.length === 0) {
+                    return (
+                      <div className="px-5 py-8 text-center text-sm text-grey-500">
+                        No sent messages in the last 7 days
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-grey">{notification.name}</p>
-                        <p className="text-xs text-grey-500">{notification.tag} • {notification.messages?.length || 0} messages</p>
+                    );
+                  }
+                  return allMessages.map(([tag, count]) => (
+                    <div
+                      key={tag}
+                      className="px-5 py-3 flex items-center justify-between hover:bg-background-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-grey font-mono">{tag}</p>
+                          <p className="text-xs text-grey-500">{count} sent (7d)</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {notification.messages?.some(m => m.email) && (
-                        <Mail className="h-4 w-4 text-blue" />
-                      )}
-                      {notification.messages?.some(m => m.push_notification) && (
-                        <Smartphone className="h-4 w-4 text-purple-500" />
-                      )}
-                      {notification.messages?.some(m => m.sms) && (
-                        <MessageSquare className="h-4 w-4 text-green" />
-                      )}
-                      {notification.messages?.some(m => m.callback) && (
-                        <Webhook className="h-4 w-4 text-orange-500" />
-                      )}
                       <ChevronRight className="h-4 w-4 text-grey-400" />
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* All Templates */}
-            <div className="bg-white rounded-lg border border-border shadow-sm">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-grey">All Templates</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-grey-500">{allMessages.length} templates</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedChannel('all');
-                      setViewMode('messages');
-                    }}
-                    className="text-blue-500 hover:text-blue-500/80 text-xs"
-                  >
-                    View All
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-              </div>
-              <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
-                {allMessages.length === 0 ? (
-                  <div className="px-5 py-8 text-center">
-                    <FileText className="h-8 w-8 text-grey-400 mx-auto mb-2" />
-                    <p className="text-sm text-grey-600">No templates yet</p>
-                    <p className="text-xs text-grey-500 mt-1">Create a notifier first, then add templates</p>
-                  </div>
-                ) : (
-                  allMessages.map((message) => (
-                    <div
-                      key={`${message.notificationTag}-${message.tag}`}
-                      className="px-5 py-3 flex items-center justify-between hover:bg-background-secondary transition-colors cursor-pointer group"
-                      onClick={() => handleViewMessage(message)}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-grey truncate">{message.name}</p>
-                          <p className="text-xs text-grey-500 truncate">
-                            {message.notificationName} • {message.tag}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {message.email && (
-                          <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                            <Mail className="h-3 w-3" />
-                          </span>
-                        )}
-                        {message.push_notification && (
-                          <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
-                            <Smartphone className="h-3 w-3" />
-                          </span>
-                        )}
-                        {message.sms && (
-                          <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                            <MessageSquare className="h-3 w-3" />
-                          </span>
-                        )}
-                        {message.callback && (
-                          <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
-                            <Webhook className="h-3 w-3" />
-                          </span>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4 text-grey-600" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewMessage(message);
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedMessage(message);
-                              const notification = (notifications as Notification[])?.find(n => n.tag === message.notificationTag);
-                              if (notification) setSelectedNotification(notification);
-                              setShowCodeSidebar(true);
-                            }}>
-                              <Code className="h-4 w-4 mr-2" />
-                              View Code
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedMessage(message);
-                              setShowTestDialog(true);
-                            }}>
-                              <Send className="h-4 w-4 mr-2" />
-                              Send Test
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMessage(message);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <ChevronRight className="h-4 w-4 text-grey-400" />
-                      </div>
-                    </div>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             </div>
           </div>
-        ) : (
-          /* Messages View */
-          <>
-            {/* Toolbar */}
-            <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-grey-600">
-                    Showing <span className="font-medium text-grey">{filteredMessages.length}</span> messages
-                  </span>
-                  {hasActiveFilters && (
-                    <span className="text-xs text-grey-500">(filtered)</span>
-                  )}
-                </div>
+        )}
+
+        {viewMode === 'activity' && (
+          /* Activity (Sent Messages) View — individual sent notifications, like broker messages */
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-border flex flex-wrap items-center justify-between gap-4">
+              <span className="text-sm text-grey-600">
+                <span className="font-medium text-grey">{activityRowsFromMessages.length}</span>
+                {selectedChannel !== 'all' ? ` ${CHANNEL_TYPES.find(c => c.value === selectedChannel)?.label.toLowerCase() ?? selectedChannel}` : ''} sent message{activityRowsFromMessages.length !== 1 ? 's' : ''}
+              </span>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedChannel}
+                  onValueChange={(v: ChannelFilter) => setSelectedChannel(v)}
+                >
+                  <SelectTrigger className="w-[130px] h-9 text-sm">
+                    <SelectValue placeholder="Channel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All channels</SelectItem>
+                    {CHANNEL_TYPES.filter(c => c.value !== 'all').map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={activityStatusFilter}
+                  onValueChange={(v: 'all' | 'success' | 'fail' | 'processing') => setActivityStatusFilter(v)}
+                >
+                  <SelectTrigger className="w-[140px] h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="success">Success</SelectItem>
+                    <SelectItem value="fail">Failed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-
-            {/* Table */}
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
-                {isRefreshing ? (
-                  <div className="flex flex-col items-center justify-center h-full">
+              <div className="bg-white rounded-lg border border-border overflow-auto">
+                {isLoadingMessageLogs ? (
+                  <div className="flex flex-col items-center justify-center py-16">
                     <Loader2 className="animate-spin w-8 h-8 text-blue-500 mb-4" />
-                    <p className="text-sm font-medium text-grey">Loading messages...</p>
+                    <p className="text-sm font-medium text-grey">Loading sent messages...</p>
                   </div>
-                ) : filteredMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <div className="w-16 h-16 rounded-full bg-border flex items-center justify-center mb-4">
-                      <Bell className="h-8 w-8 text-grey-500" />
-                    </div>
-                    <p className="text-grey font-medium">No messages found</p>
-                    {hasActiveFilters && (
-                      <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
-                    )}
+                ) : activityRowsFromMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <Send className="h-12 w-12 text-grey-400 mb-3" />
+                    <p className="text-grey font-medium">No sent messages yet</p>
+                    <p className="text-grey-600 text-sm mt-1">Send notifications from your app to see them here</p>
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
-                      {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id} className="border-b border-border bg-background-secondary">
-                          {headerGroup.headers.map((header) => (
-                            <TableHead
-                              key={header.id}
-                              className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3"
-                            >
-                              {header.isPlaceholder ? null : (
-                                <div
-                                  {...{
-                                    className: header.column.getCanSort()
-                                      ? 'cursor-pointer select-none flex items-center hover:text-grey'
-                                      : 'flex items-center',
-                                    onClick: header.column.getToggleSortingHandler(),
-                                  }}
-                                >
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  {
-                                    {
-                                      asc: <ChevronUpIcon className="ml-1 h-4 w-4" />,
-                                      desc: <ChevronDownIcon className="ml-1 h-4 w-4" />,
-                                    }[header.column.getIsSorted() as string] ?? null
-                                  }
-                                </div>
-                              )}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      ))}
+                      <TableRow className="border-b border-border bg-background-secondary">
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3 w-8" />
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3">Template</TableHead>
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3">Channel</TableHead>
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3">Status</TableHead>
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3">Message</TableHead>
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3">Time</TableHead>
+                        <TableHead className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3 text-right">Actions</TableHead>
+                      </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {table.getRowModel().rows.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          className="border-b border-border hover:bg-background-secondary transition-colors cursor-pointer"
-                          onClick={() => handleViewMessage(row.original)}
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-6 py-3">
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {activityRowsFromMessages.map((log) => (
+                        <React.Fragment key={log._id}>
+                          <TableRow className="border-b border-border hover:bg-background-secondary">
+                            <TableCell className="px-2 py-2 w-8">
+                              {(log.input != null || log.output != null) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedRowId((prev) => (prev === log._id ? null : log._id ?? null))}
+                                  className="p-1 rounded text-grey-500 hover:text-grey hover:bg-grey-100"
+                                  title={expandedRowId === log._id ? 'Collapse input/output' : 'View input/output'}
+                                >
+                                  <ChevronRight className={cn('h-4 w-4 transition-transform', expandedRowId === log._id && 'rotate-90')} />
+                                </button>
+                              )}
                             </TableCell>
-                          ))}
-                        </TableRow>
+                            <TableCell className="px-6 py-3 font-mono text-sm text-grey">
+                              {log.child_tag ? `${log.parent_tag}:${log.child_tag}` : log.parent_tag}
+                            </TableCell>
+                            <TableCell className="px-6 py-3">
+                              <span className="text-sm text-grey-600 capitalize">{log.name?.toLowerCase().replace(' notification', '') || '—'}</span>
+                            </TableCell>
+                            <TableCell className="px-6 py-3">
+                              <span
+                                className={cn(
+                                  'text-xs font-medium px-2 py-1 rounded',
+                                  log.status === 'success' && 'bg-green/10 text-green',
+                                  log.status === 'fail' && 'bg-red/10 text-red',
+                                  log.status === 'processing' && 'bg-orange-500/10 text-orange-500'
+                                )}
+                              >
+                                {log.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="px-6 py-3 text-sm text-grey-600 max-w-[280px] truncate" title={log.message}>
+                              {log.message || '—'}
+                            </TableCell>
+                            <TableCell className="px-6 py-3 text-sm text-grey-500">
+                              {log.timestamp ? format(new Date(log.timestamp), 'MMM d, HH:mm') : '—'}
+                            </TableCell>
+                            <TableCell className="px-6 py-3 text-right">
+                              {log.raw?.input && sdkProxy && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="gap-1.5"
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                  Resend
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {expandedRowId === log._id && (log.input != null || log.output != null) && (
+                            <TableRow className="border-b border-border bg-background-secondary/50">
+                              <TableCell colSpan={7} className="px-6 py-4 align-top">
+                                <div className="space-y-4">
+                                  {log.input != null && (
+                                    <div className="rounded-lg border border-border bg-white shadow-sm p-4">
+                                      <p className="text-xs font-medium text-grey-500 mb-2">Input</p>
+                                      <pre className="p-4 rounded-md bg-grey-50 border border-border text-xs font-mono text-grey-700 leading-relaxed overflow-auto max-h-56 select-text">
+                                        {JSON.stringify(log.input, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  {log.output != null && (
+                                    <div className="rounded-lg border border-border bg-white shadow-sm p-4">
+                                      <p className="text-xs font-medium text-grey-500 mb-2">Output</p>
+                                      <pre className="p-4 rounded-md bg-grey-50 border border-border text-xs font-mono text-grey-700 leading-relaxed overflow-auto max-h-56 select-text">
+                                        {typeof log.output === 'object' ? JSON.stringify(log.output, null, 2) : String(log.output)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       ))}
                     </TableBody>
                   </Table>
                 )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Pagination */}
-        {viewMode === 'messages' && filteredMessages.length > 0 && (
-          <div className="flex-shrink-0 px-6 py-3 bg-white border-t border-border">
-            <div className="flex items-center justify-between text-sm text-grey-600">
-              <div className="flex items-center gap-4">
-                <span>
-                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredMessages.length)} of {filteredMessages.length}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">Rows:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="h-7 px-2 text-xs border border-grey-400 rounded bg-white"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs px-2">
-                  Page {currentPage} of {Math.ceil(filteredMessages.length / pageSize)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= Math.ceil(filteredMessages.length / pageSize)}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </Button>
+                {/* Message log (integrations API) returns up to 500 items; no pagination in this view */}
               </div>
             </div>
           </div>
         )}
+
       </div>
-
-      {/* Code Sidebar */}
-      {showCodeSidebar && selectedMessage && (
-        <CodeSidebar
-          title={selectedMessage.name}
-          subtitle={`Send notifications using the ${displayNotification?.tag}:${selectedMessage.tag} message template`}
-          tag={`${displayNotification?.tag}:${selectedMessage.tag}`}
-          onClose={() => {
-            setShowCodeSidebar(false);
-          }}
-          generateCodeSections={generateCodeSections}
-          environments={displayNotification?.envs || product.envs || []}
-        />
-      )}
-
-      {/* Test Dialog */}
-      <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Test Notification</DialogTitle>
-            <DialogDescription>
-              Send a test notification using the {selectedMessage?.name} template
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {selectedMessage?.email && (
-              <div>
-                <Label>Email Recipients</Label>
-                <Input
-                  placeholder="test@example.com"
-                  value={testData.email_to || ''}
-                  onChange={(e) => setTestData({ ...testData, email_to: e.target.value })}
-                />
-              </div>
-            )}
-            {selectedMessage?.push_notification && (
-              <div>
-                <Label>Device Token</Label>
-                <Input
-                  placeholder="Enter device token"
-                  value={testData.device_token || ''}
-                  onChange={(e) => setTestData({ ...testData, device_token: e.target.value })}
-                />
-              </div>
-            )}
-            {selectedMessage?.sms && (
-              <div>
-                <Label>Phone Number</Label>
-                <Input
-                  placeholder="+1234567890"
-                  value={testData.phone || ''}
-                  onChange={(e) => setTestData({ ...testData, phone: e.target.value })}
-                />
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTestDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleTestNotification} disabled={isSending}>
-              {isSending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Test
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Message</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{messageToDelete?.name}"? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setMessageToDelete(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteMessageMutation.isPending}
-            >
-              {deleteMessageMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   Clock,
   Share2,
-  KeyRound,
   Timer,
   UserCheck,
   Megaphone,
@@ -34,6 +33,10 @@ import {
   Bell,
   Code,
   Webhook,
+  Mail,
+  Smartphone,
+  MessageCircle,
+  Link2,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import logsServicesReal from '@/services/logsServicesReal';
@@ -74,6 +77,10 @@ const componentTypes = [
   { id: 'jobs', name: 'Jobs', icon: Terminal },
   { id: 'session', name: 'Session', icon: UserCheck },
   { id: 'notifications', name: 'Notifications', icon: Bell },
+  { id: 'push', name: 'Push', icon: Smartphone },
+  { id: 'email', name: 'Email', icon: Mail },
+  { id: 'sms', name: 'SMS', icon: MessageCircle },
+  { id: 'callbacks', name: 'Callbacks', icon: Link2 },
   { id: 'feature', name: 'Feature', icon: Server },
   { id: 'functions', name: 'Functions', icon: Code },
   { id: 'webhook', name: 'Webhook', icon: Webhook },

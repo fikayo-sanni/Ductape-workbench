@@ -53,6 +53,7 @@ export const fetchLogs = async (
       tag: payload.tag,
       page: payload.page || 1,
       limit: payload.limit || 20,
+      only_completed_execution: payload.only_completed_execution,
       ...payload,
     }).filter(([_, value]) => value !== undefined && value !== null)
   );
@@ -564,6 +565,213 @@ export const fetchNotificationDashboard = async (
   );
 
   return response.data.data;
+};
+
+// ==================== NOTIFICATION ACTIVITY LOGS (individual sent messages) ====================
+
+export interface NotificationActivityQuery {
+  product_tag: string;
+  notifier_tag?: string;
+  env?: string;
+  channel?: 'email' | 'push' | 'sms' | 'callback';
+  status?: 'success' | 'fail' | 'processing';
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface NotificationActivityLog {
+  _id: string;
+  process_id: string;
+  product_tag: string;
+  parent_tag: string;
+  child_tag?: string;
+  env: string;
+  type: string;
+  name: string;
+  message: string;
+  status: 'success' | 'fail' | 'processing';
+  successful_execution: boolean;
+  failed_execution: boolean;
+  data?: string;
+  start?: number;
+  end?: number;
+  latency?: number;
+  timestamp: string;
+}
+
+export interface NotificationActivityResult {
+  logs: NotificationActivityLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface NotificationActivityResponse {
+  success: boolean;
+  data: NotificationActivityResult;
+}
+
+export const fetchNotificationActivityLogs = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: NotificationActivityQuery
+): Promise<NotificationActivityResult> => {
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({
+      user_id,
+      public_key,
+      ...query,
+    }).filter(([_, value]) => value !== undefined && value !== null)
+  );
+
+  const queryString = qs.stringify(cleanedPayload);
+
+  const response = await apiClient.get<NotificationActivityResponse>(
+    `/log/v1/notification/activity/${workspace_id}?${queryString}`
+  );
+
+  return response.data.data;
+};
+
+/** Log entry from analytics (fetchLogs) - notification logs use type in email|push|sms|callback */
+export interface NotificationLogEntry {
+  _id: string;
+  product_tag: string;
+  parent_tag: string;
+  child_tag?: string;
+  env: string;
+  type: string;
+  name?: string;
+  message?: string;
+  successful_execution: boolean;
+  failed_execution: boolean;
+  status?: string;
+  timestamp: string;
+  process_id?: string;
+}
+
+export interface FetchNotificationLogsQuery {
+  product_tag: string;
+  parent_tag?: string;
+  env?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+/** Notification message log item from integrations API (notification-messages table) */
+export interface NotificationMessageLogItem {
+  _id?: string;
+  workspace_id: string;
+  product_id: string;
+  product_tag: string;
+  env: string;
+  notification_tag: string;
+  input?: Record<string, unknown>;
+  status: string;
+  type: string;
+  process_id?: string;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Fetches notification message logs from the integrations API (notification-messages table).
+ * Used for channels/messages overview: messages by channel, top templates, activity timeline.
+ * Returns logs in NotificationLogEntry shape so weeklyStats and UI stay unchanged.
+ */
+export const fetchNotificationMessageLogs = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: FetchNotificationLogsQuery
+): Promise<{ logs: NotificationLogEntry[] }> => {
+  const params = new URLSearchParams({
+    workspace_id,
+    user_id,
+    public_key,
+    product_tag: query.product_tag,
+    ...(query.parent_tag && { notification_tag: query.parent_tag }),
+    ...(query.env && { env: query.env }),
+    ...(query.start_date && { start_date: query.start_date }),
+    ...(query.end_date && { end_date: query.end_date }),
+    limit: '500',
+  });
+
+  try {
+    const response = await apiClient.get<{ status: boolean; data: { items: NotificationMessageLogItem[] } }>(
+      `/integrations/v1/notification-messages?${params.toString()}`
+    );
+    const apiItems: NotificationMessageLogItem[] = response.data?.data?.items ?? [];
+
+    // Map to NotificationLogEntry shape so weeklyStats and UI work unchanged
+    const logs: NotificationLogEntry[] = apiItems.map((item) => {
+      const [parent_tag, child_tag] = (item.notification_tag || '').split(':');
+      return {
+        _id: item._id ?? '',
+        product_tag: item.product_tag,
+        parent_tag: parent_tag ?? item.notification_tag,
+        child_tag: child_tag ?? item.notification_tag,
+        env: item.env,
+        type: item.type === 'notification' ? 'callback' : item.type,
+        successful_execution: item.status === 'sent',
+        failed_execution: item.status === 'failed',
+        timestamp: item.created_at ?? new Date().toISOString(),
+        process_id: item.process_id,
+      };
+    });
+    return { logs };
+  } catch (e) {
+    console.error('[fetchNotificationMessageLogs] Error:', e);
+    return { logs: [] };
+  }
+};
+
+/**
+ * Fetches notification logs from the log service (analytics) using notification LogEventTypes.
+ * type in [email, push, sms, callback], parent_tag = notification tag, env, product_tag.
+ * @deprecated Prefer fetchNotificationMessageLogs for channels/messages (notification-messages table).
+ */
+export const fetchNotificationLogs = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: FetchNotificationLogsQuery
+): Promise<{ logs: NotificationLogEntry[] }> => {
+  const basePayload = {
+    workspace_id,
+    user_id,
+    public_key,
+  };
+  const opts = {
+    product_tag: query.product_tag,
+    parent_tag: query.parent_tag,
+    env: query.env,
+    start_date: query.start_date,
+    end_date: query.end_date,
+    limit: 500,
+  };
+
+  const types: Array<'email' | 'push' | 'sms' | 'callback'> = ['email', 'push', 'sms', 'callback'];
+  const results = await Promise.all(
+    types.map((type) =>
+      fetchLogs(basePayload, {
+        ...opts,
+        type,
+        only_completed_execution: true, // $or: [{ successful_execution: true }, { failed_execution: true }]
+      })
+    )
+  );
+
+  const raw = results.flatMap((res) => res?.data?.logs?.data ?? []);
+  const logs: NotificationLogEntry[] = raw.filter(
+    (l: NotificationLogEntry) => l.successful_execution === true || l.failed_execution === true
+  );
+  return { logs };
 };
 
 // ==================== APP DASHBOARD ====================
@@ -1190,6 +1398,8 @@ const logsServices = {
   fetchCacheDashboard,
   fetchMessageBrokerDashboard,
   fetchNotificationDashboard,
+  fetchNotificationLogs,
+  fetchNotificationMessageLogs,
   fetchAppDashboard,
   fetchDatabaseDashboard,
   fetchVectorDashboard,

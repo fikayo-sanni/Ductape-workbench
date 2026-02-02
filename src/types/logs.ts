@@ -156,6 +156,8 @@ export interface FetchLogsOptions {
   limit?: number;
   version?: string | null;
   app_env?: string;
+  /** When true, only return logs where successful_execution or failed_execution is true */
+  only_completed_execution?: boolean;
 }
 
 export interface FetchLogsData {

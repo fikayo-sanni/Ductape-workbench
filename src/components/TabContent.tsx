@@ -43,6 +43,7 @@ import SessionUserTab from './tabs/SessionUserTab';
 import SettingsTabContent from './tabs/SettingsTabContent';
 import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
+import NotificationTemplateTabContent from './tabs/NotificationTemplateTabContent';
 import NotificationExplorerTab from './tabs/NotificationExplorerTab';
 import FallbackExplorerTab from './tabs/FallbackExplorerTab';
 import QuotaExplorerTab from './tabs/QuotaExplorerTab';
@@ -67,8 +68,9 @@ import CacheValuesTabContent from './tabs/CacheValuesTabContent';
 import MessageBrokerEventsTabContent from './tabs/MessageBrokerEventsTabContent';
 import DatabaseComponentContent from './tabs/DatabaseComponentContent';
 import JobTabContent from './tabs/JobTabContent';
+import JobRunDetailContent from './tabs/JobRunDetailContent';
 import NewJobTabContent from './tabs/NewJobTabContent';
-import JobsExplorerTab from './tabs/JobsExplorerTab';
+import JobExplorerTab from './tabs/JobExplorerTab';
 import GenericComponentContent from './tabs/GenericComponentContent';
 import PricingTabContent from './tabs/PricingTabContent';
 
@@ -391,9 +393,13 @@ export default function TabContent() {
         // Create new notification/notifier
         return <NewNotificationTabContent key={activeTab.id} tabId={activeTab.id} data={activeTab.data} />;
 
+      case 'notification-template':
+        // Create/edit notification template (IProductNotificationTemplate via SDK notifications.messages)
+        return <NotificationTemplateTabContent key={activeTab.id} tabId={activeTab.id} data={activeTab.data} />;
+
       case 'notification-explorer':
-        // Notification explorer tab with product envs
-        return <NotificationExplorerTab key={activeTab.id} product={activeTab.data?.product || { tag: '', name: '', envs: [] }} />;
+        // Notification explorer: product-only = Product Mode (notifier cards); product+notification+env+isExplorer = Notifier+Env Mode (sidebar + overview/templates)
+        return <NotificationExplorerTab key={activeTab.id} data={activeTab.data} />;
 
       case 'fallback-explorer':
         // Fallback explorer tab with product envs
@@ -407,9 +413,18 @@ export default function TabContent() {
         // Healthcheck explorer tab with product envs
         return <HealthcheckExplorerTab key={activeTab.id} product={activeTab.data?.product || { tag: '', name: '', envs: [] }} />;
 
-      case 'jobs-explorer':
-        // Jobs explorer tab with product envs
-        return <JobsExplorerTab key={activeTab.id} product={activeTab.data?.product || { tag: '', name: '', envs: [] }} />;
+      case 'job-explorer':
+        // Single-job explorer: past/future invocations, timeline, metrics
+        return (
+          <JobExplorerTab
+            key={activeTab.id}
+            tabId={activeTab.id}
+            job={activeTab.data?.job || {}}
+            product={activeTab.data?.product || { tag: '', name: '', envs: [] }}
+            env={activeTab.data?.env}
+            initialActiveSection={activeTab.data?.activeSection}
+          />
+        );
 
       case 'message':
         // View message details
@@ -450,6 +465,17 @@ export default function TabContent() {
           return <NewJobTabContent key={activeTab.id} tabId={activeTab.id} data={activeTab.data} />;
         }
         return <JobTabContent key={activeTab.id} job={activeTab.data} />;
+
+      case 'job-run':
+        return (
+          <JobRunDetailContent
+            key={activeTab.id}
+            executionId={activeTab.itemId ?? activeTab.data?.id ?? ''}
+            productTag={activeTab.data?.productTag}
+            productName={activeTab.data?.productName}
+            jobName={activeTab.data?.jobName}
+          />
+        );
 
       case 'session':
         // Check if this is a new session creation tab

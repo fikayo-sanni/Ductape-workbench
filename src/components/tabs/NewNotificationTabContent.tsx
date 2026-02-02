@@ -54,8 +54,8 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Extract product context from data
-  const product = data?.productId ? {
+  // Extract product context from data (productId from header, or productTag from explorer)
+  const product = (data?.productId || data?.productTag) ? {
     _id: data.productId,
     name: data.productName,
     tag: data.productTag,

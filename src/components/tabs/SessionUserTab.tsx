@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { useDebouncedValue } from '@wojtekmaj/react-hooks';
 import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -1056,38 +1056,55 @@ export default function SessionUserTab({
                   </div>
                 )}
 
-                {/* Activity Timeline Card */}
-                <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">
+                {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+                <div className="bg-white rounded-lg border border-grey-300 overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b border-grey-400 bg-grey-50">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-blue-600" />
-                      <h3 className="text-base font-semibold text-grey">Activity Timeline</h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                        <h3 className="text-base font-semibold text-grey">Activity Timeline (7 Days)</h3>
+                      </div>
+                      {dashboardLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
                     </div>
                     <p className="text-sm text-grey-600 mt-1">User activity over the last 7 days</p>
                   </div>
                   <div className="p-5">
-                    {activityTimeline.length > 0 && activityTimeline.some(d => d.count > 0) ? (
+                    {dashboardLoading ? (
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                          <div key={i} className="flex items-center gap-3">
+                            <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                            <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
                       <div className="space-y-4">
-                        {/* Horizontal Bar Chart */}
                         <div className="space-y-3">
-                          {activityTimeline.map((day) => (
-                            <div key={day.day} className="flex items-center gap-3">
-                              <span className="text-xs text-grey-600 font-medium w-8">{day.day}</span>
-                              <div className="flex-1 h-6 bg-grey-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                                  style={{
-                                    width: `${day.count > 0 ? Math.max((day.count / maxTimelineCount) * 100, 4) : 0}%`,
-                                    opacity: day.count > 0 ? 1 : 0.3,
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs text-grey-600 font-medium w-8 text-right">{day.count}</span>
-                            </div>
-                          ))}
+                          {(() => {
+                            const normalized = getLast7DaysNormalized(activityTimeline, (d) => d.count ?? 0);
+                            const maxCount = Math.max(...normalized.map((d) => d.value), 1);
+                            return normalized.map((day) => {
+                              const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
+                              return (
+                                <div key={day.date} className="flex items-center gap-3">
+                                  <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                                  <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                    <div className="absolute inset-0 flex items-center px-3">
+                                      <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                        {day.value.toLocaleString()} events
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
-
-                        {/* Summary */}
                         <div className="pt-4 border-t border-grey-400">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-grey-600">Total Events</span>
@@ -1096,12 +1113,6 @@ export default function SessionUserTab({
                             </span>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-                        <p className="text-grey-600">No activity data available</p>
-                        <p className="text-sm text-grey-500 mt-1">Activity will appear as the user interacts with sessions</p>
                       </div>
                     )}
                   </div>

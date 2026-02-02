@@ -65,9 +65,15 @@ export default function MessageTabContent({ data }: MessageTabContentProps) {
     const productTagValue = productTag || 'your-product-tag';
     const envSlug = env || notification?.envs?.[0]?.slug || 'prd';
 
-    // Build input structure based on configured channels
-    const hasPushNotification = !!displayData?.push_notification;
-    const hasEmail = !!displayData?.email;
+    // Build input structure based on configured channels (only when there is actual content / push_notification_data or email_data)
+    const hasPushNotification = !!(
+      (displayData?.push_notification_data?.length > 0) ||
+      (displayData?.push_notification && typeof displayData.push_notification === 'object' && (displayData.push_notification.title || displayData.push_notification.body))
+    );
+    const hasEmail = !!(
+      (displayData?.email_data?.length > 0) ||
+      (displayData?.email && typeof displayData.email === 'object' && (displayData.email.subject || displayData.email.template))
+    );
     const hasCallback = !!displayData?.callback;
     const hasSms = !!displayData?.sms;
 
@@ -1229,8 +1235,8 @@ ductape.processor.notification.send(&request)?;`
 
         {/* Message Channels */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Push Notification */}
-          {displayData.push_notification && (
+          {/* Push Notification: only show when there is actual push_notification_data or push_notification title/body */}
+          {(displayData?.push_notification_data?.length > 0 || (displayData?.push_notification && typeof displayData.push_notification === 'object' && (displayData.push_notification.title || displayData.push_notification.body))) && (
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -1243,7 +1249,7 @@ ductape.processor.notification.send(&request)?;`
                 <div>
                   <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Title</Label>
                   <Input
-                    value={displayData.push_notification.title || ''}
+                    value={displayData.push_notification?.title || ''}
                     disabled
                     className="bg-white text-grey font-mono"
                   />
@@ -1251,7 +1257,7 @@ ductape.processor.notification.send(&request)?;`
                 <div>
                   <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Body</Label>
                   <Input
-                    value={displayData.push_notification.body || ''}
+                    value={displayData.push_notification?.body || ''}
                     disabled
                     className="bg-white text-grey font-mono"
                   />
@@ -1260,8 +1266,8 @@ ductape.processor.notification.send(&request)?;`
             </div>
           )}
 
-          {/* Email */}
-          {displayData.email && (
+          {/* Email: only show when there is actual email_data or email subject/template */}
+          {(displayData?.email_data?.length > 0 || (displayData?.email && typeof displayData.email === 'object' && (displayData.email.subject || displayData.email.template))) && (
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -1274,7 +1280,7 @@ ductape.processor.notification.send(&request)?;`
                 <div>
                   <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Subject</Label>
                   <Input
-                    value={displayData.email.subject || ''}
+                    value={displayData.email?.subject || ''}
                     disabled
                     className="bg-white text-grey font-mono"
                   />
@@ -1282,7 +1288,7 @@ ductape.processor.notification.send(&request)?;`
                 <div>
                   <Label className="text-xs font-semibold text-grey uppercase tracking-wide mb-1 block">Template</Label>
                   <Input
-                    value={displayData.email.template || ''}
+                    value={displayData.email?.template || ''}
                     disabled
                     className="bg-white text-grey font-mono"
                   />

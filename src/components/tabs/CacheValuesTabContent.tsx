@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
+import { useSDKProxy } from '@/services/sdkProxy';
 import {
   Zap,
   Loader2,
@@ -35,7 +36,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { fetchCacheDashboard, CacheDashboardMetrics } from '@/services/logsServices';
 
@@ -123,6 +124,18 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
   const [listViewMode, setListViewMode] = useState<'list' | 'grid'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Initialize SDK Proxy
+  const sdkProxy = useSDKProxy(
+    user?._id && currentWorkspaceId && user?.public_key && user?.auth_token
+      ? {
+          workspace_id: currentWorkspaceId,
+          user_id: user._id,
+          token: user.auth_token,
+          public_key: user.public_key,
+        }
+      : null
+  );
+
   const toggleRow = (key: string) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(key)) {
@@ -133,43 +146,71 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
     setExpandedRows(newExpanded);
   };
 
-  // Fetch cache values
+  // Fetch cache values using SDK proxy with expiry filter
   const { data: cacheValuesData, isLoading, refetch } = useQuery({
-    queryKey: ['cache-values', cache.cacheTag, cache.productTag],
+    queryKey: ['cache-values', cache.cacheTag, cache.productTag, currentWorkspaceId, filterType],
     queryFn: async () => {
+      if (!sdkProxy || !cache.productTag || !(cache.cacheTag || cache.tag)) {
+        return [];
+      }
+
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/cache/values`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            cache_tag: cache.cacheTag || cache.tag,
-            product_tag: cache.productTag,
-            workspace_id: currentWorkspaceId,
-            user_id: user?._id,
-            public_key: user?.public_key,
-          }),
+        // Map filterType to expiryFilter - this is the backend filter
+        const expiryFilter: 'all' | 'expiring' | 'permanent' | 'expired' | undefined = 
+          filterType === 'all' ? undefined :
+          filterType === 'expiring' ? 'expiring' :
+          filterType === 'permanent' ? 'permanent' :
+          filterType === 'expired' ? 'expired' :
+          undefined;
+
+        const result = await sdkProxy.caches.fetchValues({
+          product: cache.productTag,
+          cache: cache.cacheTag || cache.tag,
+          page: 1,
+          limit: 1000, // Fetch all values for the selected filter
+          expiryFilter, // Backend filter - this filters in the database
         });
 
-        if (!response.ok) {
-          return [];
-        }
-
-        const data = await response.json();
-        return data.data || [];
+        return result.values || [];
       } catch (error) {
         console.error('Error fetching cache values:', error);
         return [];
       }
     },
-    enabled: true,
+    enabled: !!sdkProxy && !!cache.productTag && !!(cache.cacheTag || cache.tag),
+  });
+
+  // Fetch unfiltered totals for sidebar counts (always fetch 'all' for accurate counts)
+  const { data: allCacheValuesData, isLoading: isLoadingTotals } = useQuery({
+    queryKey: ['cache-values-totals', cache.cacheTag, cache.productTag, currentWorkspaceId],
+    queryFn: async () => {
+      if (!sdkProxy || !cache.productTag || !(cache.cacheTag || cache.tag)) {
+        return [];
+      }
+
+      try {
+        const result = await sdkProxy.caches.fetchValues({
+          product: cache.productTag,
+          cache: cache.cacheTag || cache.tag,
+          page: 1,
+          limit: 1000, // Fetch all values to calculate totals
+          expiryFilter: undefined, // Always fetch all for sidebar counts
+        });
+
+        return result.values || [];
+      } catch (error) {
+        console.error('Error fetching cache values totals:', error);
+        return [];
+      }
+    },
+    enabled: !!sdkProxy && !!cache.productTag && !!(cache.cacheTag || cache.tag),
   });
 
   const cacheValues: IRemoteCache[] = cacheValuesData || [];
+  const allCacheValues: IRemoteCache[] = allCacheValuesData || [];
 
   // Fetch cache dashboard metrics from logs service
-  const { data: dashboardMetrics } = useQuery({
+  const { data: dashboardMetrics, isLoading: isLoadingCacheDashboard } = useQuery({
     queryKey: ['cache-dashboard-metrics', currentWorkspaceId, cache.productTag, cache.cacheTag || cache.tag],
     queryFn: async () => {
       if (!currentWorkspaceId || !user?._id || !user?.public_key || !cache.productTag) {
@@ -195,38 +236,60 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
     enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key && !!cache.productTag && !!(cache.cacheTag || cache.tag),
   });
 
-  // Get unique component types
+  // Get unique component types from filtered cache values
   const uniqueComponentTypes = Array.from(new Set(cacheValues.map(item => item.component_type)));
 
-  // Calculate metrics - use dashboard metrics from logs service when available
+  // Calculate metrics - use ALL cache values for sidebar counts, filtered values for display
   const metrics = useMemo(() => {
-    const total = cacheValues.length;
-    const withExpiry = cacheValues.filter(v => v.expiry).length;
-    const permanent = cacheValues.filter(v => !v.expiry).length;
-    const expired = cacheValues.filter(v => v.expiry && new Date(v.expiry).getTime() < Date.now()).length;
-    const expiringSoon = cacheValues.filter(v => {
+    // Use allCacheValues for sidebar totals (unfiltered counts)
+    const total = allCacheValues.length;
+    const withExpiry = allCacheValues.filter(v => v.expiry).length;
+    const permanent = allCacheValues.filter(v => !v.expiry).length;
+    const expired = allCacheValues.filter(v => v.expiry && new Date(v.expiry).getTime() < Date.now()).length;
+    const expiringSoon = allCacheValues.filter(v => {
       if (!v.expiry) return false;
       const diff = new Date(v.expiry).getTime() - Date.now();
       return diff > 0 && diff < 3600000; // Less than 1 hour
     }).length;
 
+    // Use filtered cacheValues for display metrics
     const totalReads = cacheValues.reduce((sum, v) => sum + (v.reads ?? 0), 0);
     const latencies = cacheValues.filter(v => v.latency !== undefined).map(v => v.latency!);
     const avgLatency = latencies.length > 0 ? latencies.reduce((sum, l) => sum + l, 0) / latencies.length : 0;
     const uniqueComponents = new Set(cacheValues.map(v => v.component_tag)).size;
 
-    // Generate sparkline data
-    const sparklineData = Array.from({ length: 24 }, () => Math.floor(Math.random() * 100) + 20);
-    const latencySparkline = Array.from({ length: 24 }, () => Math.floor(Math.random() * 15) + 3);
+    // Empty sparkline data - will be populated from dashboard metrics if available
+    const sparklineData: number[] = [];
+    const latencySparkline: number[] = [];
 
-    // Component type counts
-    const componentTypeCounts = uniqueComponentTypes.reduce((acc, type) => {
-      acc[type] = cacheValues.filter(v => v.component_type === type).length;
+    // Component type counts - use allCacheValues for accurate totals
+    const allUniqueComponentTypes = Array.from(new Set(allCacheValues.map(item => item.component_type)));
+    const componentTypeCounts = allUniqueComponentTypes.reduce((acc, type) => {
+      acc[type] = allCacheValues.filter(v => v.component_type === type).length;
       return acc;
     }, {} as Record<string, number>);
 
+    // Helper to calculate trend percentage between two values
+    const calcTrend = (current: number, previous: number): { value: number; direction: 'up' | 'down' | 'neutral' } => {
+      if (previous === 0) return { value: current > 0 ? 100 : 0, direction: current > 0 ? 'up' : 'neutral' };
+      const change = ((current - previous) / previous) * 100;
+      return { value: Math.abs(change), direction: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral' };
+    };
+
     // Use real dashboard metrics if available, otherwise fall back to generated data
     if (dashboardMetrics) {
+      const recent = dashboardMetrics.recentActivity;
+      const last24h = recent?.last24Hours || { gets: 0, sets: 0, hits: 0, misses: 0 };
+      const last7d = recent?.last7Days || { gets: 0, sets: 0, hits: 0, misses: 0 };
+
+      // Calculate daily averages to compare trends
+      const avgDaily7d = {
+        gets: last7d.gets / 7,
+        sets: last7d.sets / 7,
+        hits: last7d.hits / 7,
+        misses: last7d.misses / 7,
+      };
+
       const weeklyStats = {
         reads: dashboardMetrics.totalGets || 0,
         writes: dashboardMetrics.totalSets || 0,
@@ -238,71 +301,74 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
           day: day.day,
           reads: day.gets || 0,
           writes: day.sets || 0,
+          hits: day.hits || 0,
+          misses: day.misses || 0,
         })) || [],
+        // Trend data comparing last 24h vs daily average over 7d
+        trends: {
+          reads: calcTrend(last24h.gets, avgDaily7d.gets),
+          writes: calcTrend(last24h.sets, avgDaily7d.sets),
+          hits: calcTrend(last24h.hits, avgDaily7d.hits),
+          misses: calcTrend(last24h.misses, avgDaily7d.misses),
+          hitRate: calcTrend(
+            last24h.hits + last24h.misses > 0 ? (last24h.hits / (last24h.hits + last24h.misses)) * 100 : 0,
+            dashboardMetrics.hitRate || 0
+          ),
+          latency: { value: 0, direction: 'neutral' as const }, // Latency trend would need historical data
+        },
       };
-      return { total, withExpiry, permanent, expired, expiringSoon, totalReads, avgLatency, uniqueComponents, sparklineData, latencySparkline, componentTypeCounts, weeklyStats };
+
+      // Build sparkline data from daily activity
+      const readsSparkline = weeklyStats.dailyTrend.map(d => d.reads);
+      const latencySparklineReal = dashboardMetrics.peakUsageTimes?.map(p => p.operationCount) || latencySparkline;
+
+      return {
+        total, withExpiry, permanent, expired, expiringSoon, totalReads, avgLatency, uniqueComponents,
+        sparklineData: readsSparkline.length >= 3 ? readsSparkline : sparklineData,
+        latencySparkline: latencySparklineReal.length >= 3 ? latencySparklineReal : latencySparkline,
+        componentTypeCounts, weeklyStats
+      };
     }
 
-    // Fallback to generated data when no dashboard metrics
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const today = new Date();
-    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
-
-    // Use seeded random based on cache tag for consistent display
-    const seed = (cache?.tag || cache?.cacheTag || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-    const seededRandom = (offset: number) => {
-      const x = Math.sin(seed + offset) * 10000;
-      return x - Math.floor(x);
-    };
-
+    // No dashboard metrics available - show zeros
     const weeklyStats = {
-      reads: Math.floor(seededRandom(1) * 50000) + 10000 + totalReads,
-      writes: Math.floor(seededRandom(2) * 15000) + 3000,
-      hits: Math.floor(seededRandom(3) * 45000) + 8000,
-      misses: Math.floor(seededRandom(4) * 3000) + 500,
+      reads: 0,
+      writes: 0,
+      hits: 0,
+      misses: 0,
       hitRate: 0,
-      avgLatency7d: avgLatency + (seededRandom(5) * 2 - 1),
-      dailyTrend: days.map((day, idx) => ({
-        day,
-        reads: idx <= dayOfWeek ? Math.floor(seededRandom(6 + idx) * 8000) + 1500 : 0,
-        writes: idx <= dayOfWeek ? Math.floor(seededRandom(13 + idx) * 2500) + 400 : 0,
-      })),
+      avgLatency7d: avgLatency,
+      dailyTrend: [] as { day: string; reads: number; writes: number; hits: number; misses: number }[],
+      trends: {
+        reads: { value: 0, direction: 'neutral' as const },
+        writes: { value: 0, direction: 'neutral' as const },
+        hits: { value: 0, direction: 'neutral' as const },
+        misses: { value: 0, direction: 'neutral' as const },
+        hitRate: { value: 0, direction: 'neutral' as const },
+        latency: { value: 0, direction: 'neutral' as const },
+      },
     };
-    weeklyStats.hitRate = weeklyStats.hits + weeklyStats.misses > 0
-      ? Math.round((weeklyStats.hits / (weeklyStats.hits + weeklyStats.misses)) * 100)
-      : 0;
 
     return { total, withExpiry, permanent, expired, expiringSoon, totalReads, avgLatency, uniqueComponents, sparklineData, latencySparkline, componentTypeCounts, weeklyStats };
-  }, [cacheValues, uniqueComponentTypes, cache?.tag, cache?.cacheTag, dashboardMetrics]);
+  }, [cacheValues, allCacheValues, uniqueComponentTypes, cache?.tag, cache?.cacheTag, dashboardMetrics]);
 
   const filteredValues = useMemo(() => {
     return cacheValues.filter(item => {
-      // Search filter
+      // Search filter (client-side)
       const matchesSearch = !searchQuery ||
         item.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.component_tag.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Filter type
-      let matchesFilter = true;
-      if (filterType === 'expiring') {
-        if (!item.expiry) matchesFilter = false;
-        else {
-          const diff = new Date(item.expiry).getTime() - Date.now();
-          matchesFilter = diff > 0 && diff < 3600000;
-        }
-      } else if (filterType === 'permanent') {
-        matchesFilter = !item.expiry;
-      } else if (filterType === 'expired') {
-        matchesFilter = item.expiry ? new Date(item.expiry).getTime() < Date.now() : false;
-      }
+      // Expiry filter is now handled server-side via expiryFilter parameter
+      // No need to filter by expiry here since it's already filtered in the query
 
-      // Component type filter
+      // Component type filter (client-side)
       const matchesComponentType = selectedComponentType === 'all' || item.component_type === selectedComponentType;
 
-      return matchesSearch && matchesFilter && matchesComponentType;
+      return matchesSearch && matchesComponentType;
     });
-  }, [cacheValues, searchQuery, filterType, selectedComponentType]);
+  }, [cacheValues, searchQuery, selectedComponentType]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -396,13 +462,35 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
       )}>
         {/* Header */}
         <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-4")}>
-          <div className={cn("flex items-center gap-2", !isSidebarCollapsed && "mb-3")}>
-            <Zap className="h-5 w-5 text-orange-500 flex-shrink-0" />
+          <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2 mb-3")}>
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false);
+                }
+              }}
+              className={cn(
+                'flex items-center justify-center rounded-lg bg-orange-500/10 flex-shrink-0',
+                isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
+              )}
+              title={isSidebarCollapsed ? 'Expand sidebar' : cache.name}
+            >
+              <Zap className="h-5 w-5 text-orange-500" />
+            </button>
             {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-grey text-sm truncate">{cache.name}</h2>
-                <p className="text-xs text-grey-600 truncate">{cache.cacheTag || cache.tag}</p>
-              </div>
+              <>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-grey text-sm truncate">{cache.name}</h2>
+                  <p className="text-xs text-grey-600 truncate">{cache.cacheTag || cache.tag}</p>
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
 
@@ -492,14 +580,18 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                   {!isSidebarCollapsed && (
                     <>
                       <span className="flex-1 text-left">{filter.label}</span>
-                      <span className={cn(
-                        'text-xs px-1.5 py-0.5 rounded',
-                        viewMode === 'entries' && filterType === filter.value
-                          ? 'bg-orange-500/20 text-orange-500'
-                          : 'bg-background-secondary text-grey-600'
-                      )}>
-                        {filter.count}
-                      </span>
+                      {isLoadingTotals ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-grey-600" />
+                      ) : (
+                        <span className={cn(
+                          'text-xs px-1.5 py-0.5 rounded',
+                          viewMode === 'entries' && filterType === filter.value
+                            ? 'bg-orange-500/20 text-orange-500'
+                            : 'bg-background-secondary text-grey-600'
+                        )}>
+                          {filter.count}
+                        </span>
+                      )}
                     </>
                   )}
                 </button>
@@ -513,7 +605,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                   Component Type
                 </div>
                 <div className="space-y-0.5">
-                  {uniqueComponentTypes.map(type => {
+                  {Array.from(new Set(allCacheValues.map(item => item.component_type))).map(type => {
                     const Icon = getComponentTypeIcon(type);
                     return (
                       <button
@@ -531,9 +623,13 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                       >
                         <Icon className={cn('h-4 w-4', selectedComponentType === type ? 'text-orange-500' : 'text-grey-600')} />
                         <span className="flex-1 text-left capitalize">{type.replace('-', ' ')}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
-                          {metrics.componentTypeCounts[type] || 0}
-                        </span>
+                        {isLoadingTotals ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-grey-600" />
+                        ) : (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
+                            {metrics.componentTypeCounts[type] || 0}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -542,23 +638,18 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
             )}
           </div>
 
-          {/* Collapse Toggle Button */}
-          <div className="flex-shrink-0 p-2 border-t border-grey-400">
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-grey-600 hover:bg-background-secondary hover:text-orange-500 transition-colors"
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isSidebarCollapsed ? (
+          {/* Footer - Only show expand button when collapsed */}
+          {isSidebarCollapsed && (
+            <div className="flex-shrink-0 p-2 border-t border-grey-400 bg-grey-50">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                title="Expand sidebar"
+              >
                 <PanelLeft className="h-4 w-4" />
-              ) : (
-                <>
-                  <PanelLeftClose className="h-4 w-4" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
       {/* Main Content */}
@@ -616,10 +707,15 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                       <Zap className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      12.5%
-                    </div>
+                    {metrics.weeklyStats.trends.reads.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        metrics.weeklyStats.trends.reads.direction === 'up' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.reads.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.reads.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.reads.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Reads (7 days)</div>
@@ -631,10 +727,15 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
                       <Database className="h-5 w-5 text-green" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      8.3%
-                    </div>
+                    {metrics.weeklyStats.trends.writes.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        metrics.weeklyStats.trends.writes.direction === 'up' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.writes.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.writes.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.writes.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Writes (7 days)</div>
@@ -646,10 +747,15 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                       <CheckCircle className="h-5 w-5 text-purple-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      5.7%
-                    </div>
+                    {metrics.weeklyStats.trends.hits.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        metrics.weeklyStats.trends.hits.direction === 'up' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.hits.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.hits.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.hits.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Cache Hits</div>
@@ -661,10 +767,16 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
                       <XCircle className="h-5 w-5 text-red-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-red-500">
-                      <TrendingDown className="h-3 w-3" />
-                      -12.3%
-                    </div>
+                    {metrics.weeklyStats.trends.misses.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        // For misses, down is good (green) and up is bad (red)
+                        metrics.weeklyStats.trends.misses.direction === 'down' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.misses.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.misses.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.misses.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Cache Misses</div>
@@ -676,16 +788,21 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
                       <BarChart3 className="h-5 w-5 text-orange-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      2.1%
-                    </div>
+                    {metrics.weeklyStats.trends.hitRate.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        metrics.weeklyStats.trends.hitRate.direction === 'up' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.hitRate.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.hitRate.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className={cn(
                     "text-2xl font-bold mb-1",
                     metrics.weeklyStats.hitRate >= 90 ? 'text-green' : metrics.weeklyStats.hitRate >= 75 ? 'text-orange-500' : 'text-red'
                   )}>
-                    {metrics.weeklyStats.hitRate}%
+                    {metrics.weeklyStats.hitRate.toFixed(1)}%
                   </div>
                   <div className="text-xs text-grey-600 font-medium">Hit Rate</div>
                 </div>
@@ -696,42 +813,64 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                       <Timer className="h-5 w-5 text-indigo-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingDown className="h-3 w-3" />
-                      -8.5%
-                    </div>
+                    {metrics.weeklyStats.trends.latency.direction !== 'neutral' && (
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-semibold",
+                        // For latency, down is good (green) and up is bad (red)
+                        metrics.weeklyStats.trends.latency.direction === 'down' ? 'text-green' : 'text-red-500'
+                      )}>
+                        {metrics.weeklyStats.trends.latency.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {metrics.weeklyStats.trends.latency.value.toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.avgLatency7d.toFixed(1)}ms</div>
                   <div className="text-xs text-grey-600 font-medium">Avg Latency</div>
                 </div>
               </div>
 
-              {/* Activity Timeline - Session Dashboard Style */}
+              {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
               <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-                <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (7 Days)</h2>
-                <div className="space-y-3">
-                  {metrics.weeklyStats.dailyTrend.map((day) => {
-                    const maxActivity = Math.max(...metrics.weeklyStats.dailyTrend.map(d => d.reads + d.writes));
-                    const percentage = maxActivity > 0 ? ((day.reads + day.writes) / maxActivity) * 100 : 0;
-
-                    return (
-                      <div key={day.day} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.day}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white">
-                              {day.reads.toLocaleString()} reads, {day.writes.toLocaleString()} writes
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                  {isLoadingCacheDashboard && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
                 </div>
+                {isLoadingCacheDashboard ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                        <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(() => {
+                      const normalized = getLast7DaysNormalized(metrics.weeklyStats.dailyTrend, (d) => (d.reads ?? 0) + (d.writes ?? 0));
+                      const maxActivity = Math.max(...normalized.map((d) => d.value), 1);
+                      return normalized.map((day) => {
+                        const percentage = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
+                        return (
+                          <div key={day.date} className="flex items-center gap-3">
+                            <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                            <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                              <div
+                                className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                              />
+                              <div className="absolute inset-0 flex items-center px-3">
+                                <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                  {day.value.toLocaleString()} operations
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Cache Status Overview */}
@@ -962,12 +1101,47 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                   {/* Table body */}
                   <div className="divide-y divide-border">
                     {filteredValues.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
-                          <Search className="h-6 w-6 text-grey-500" />
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        {/* Decorative background */}
+                        <div className="relative mb-6">
+                          <div className="w-20 h-20 rounded-2xl flex items-center justify-center bg-orange-500/10">
+                            <Layers className="h-10 w-10 text-orange-500" />
+                          </div>
+                          {/* Decorative dots */}
+                          <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
+                          <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
+                          <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
                         </div>
-                        <p className="text-grey font-medium">No entries found</p>
-                        <p className="text-grey-500 text-sm mt-1">Try adjusting your filters</p>
+                        <h3 className="text-lg font-semibold text-grey mb-2">No cache entries found</h3>
+                        {(searchQuery || filterType !== 'all' || selectedComponentType !== 'all') ? (
+                          <p className="text-grey-600 text-sm max-w-md mb-4">
+                            {searchQuery 
+                              ? `No entries match "${searchQuery}"`
+                              : filterType !== 'all'
+                              ? `No entries found for the selected filter`
+                              : `No entries found for the selected component type`
+                            }
+                          </p>
+                        ) : (
+                          <p className="text-grey-600 text-sm max-w-md mb-4">
+                            This cache doesn't have any entries yet. Entries will appear here as they are cached.
+                          </p>
+                        )}
+                        {(searchQuery || filterType !== 'all' || selectedComponentType !== 'all') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchQuery('');
+                              setFilterType('all');
+                              setSelectedComponentType('all');
+                            }}
+                            className="gap-2 border-grey-400 text-grey-600 hover:text-grey hover:bg-grey-100"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Clear filters
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       filteredValues.map((item, index) => {

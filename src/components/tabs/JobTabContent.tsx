@@ -13,7 +13,7 @@ interface JobTabContentProps {
 export default function JobTabContent({ job }: JobTabContentProps) {
   const { user, currentWorkspaceId } = useAuth();
   const productTag = job?.productTag;
-  
+
   // Initialize SDK
   const ductape = useDuctape({
     workspace_id: currentWorkspaceId || '',
@@ -44,8 +44,9 @@ export default function JobTabContent({ job }: JobTabContentProps) {
     enabled: !!ductape && !!productTag && !!job?.tag && !isDummyData,
   });
 
-  const displayData = jobData || job;
-  
+  // Always an object so downstream useQuery (displayData.type) never throws when job/jobData is undefined
+  const displayData = jobData ?? job ?? {};
+
   // Extract product info for header
   const product = job?.productName && job?.productTag ? {
     name: job.productName,
@@ -53,63 +54,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
     logo: job.productLogo,
   } : null;
 
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center bg-grey-100">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-grey-600">Loading job details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error if job data is incomplete and can't be fetched
-  if (!job?.name && !job?.tag) {
-    return (
-      <div className="h-full flex items-center justify-center bg-grey-100">
-        <div className="text-center">
-          <Clock className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-          <p className="text-grey-600 mb-2">Incomplete job data</p>
-          <p className="text-grey-500 text-sm mb-4">
-            This tab was restored from an older session with incomplete data.
-          </p>
-          <p className="text-grey-500 text-sm">
-            Please close this tab and reopen the job from your product to reload it.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const getJobStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-      case 'running':
-        return 'bg-green/10 text-green';
-      case 'scheduled':
-      case 'pending':
-        return 'bg-blue/10 text-blue';
-      case 'paused':
-      case 'stopped':
-        return 'bg-orange-500/10 text-orange-500';
-      case 'failed':
-      case 'error':
-        return 'bg-red/10 text-red';
-      default:
-        return 'bg-grey-400 text-grey';
-    }
-  };
-
-  const formatSchedule = (schedule: any) => {
-    if (!schedule) return 'Manual';
-    if (typeof schedule === 'string') return schedule;
-    if (schedule.cron) return `Cron: ${schedule.cron}`;
-    if (schedule.interval) return `Interval: Every ${schedule.interval}`;
-    return 'Manual';
-  };
-
-  // Fetch component details based on job type
+  // Fetch component details based on job type (must be before any early return so hook count is stable)
   const { data: componentData } = useQuery({
     queryKey: ['job-component', productTag, displayData.type, displayData.event],
     queryFn: async () => {
@@ -178,6 +123,61 @@ export default function JobTabContent({ job }: JobTabContentProps) {
     },
     enabled: !!ductape && !!productTag && !!displayData.type && !!displayData.event,
   });
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-grey-600">Loading job details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!job?.name && !job?.tag) {
+    return (
+      <div className="h-full flex items-center justify-center bg-grey-100">
+        <div className="text-center">
+          <Clock className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <p className="text-grey-600 mb-2">Incomplete job data</p>
+          <p className="text-grey-500 text-sm mb-4">
+            This tab was restored from an older session with incomplete data.
+          </p>
+          <p className="text-grey-500 text-sm">
+            Please close this tab and reopen the job from your product to reload it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const getJobStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+      case 'running':
+        return 'bg-green/10 text-green';
+      case 'scheduled':
+      case 'pending':
+        return 'bg-blue/10 text-blue';
+      case 'paused':
+      case 'stopped':
+        return 'bg-orange-500/10 text-orange-500';
+      case 'failed':
+      case 'error':
+        return 'bg-red/10 text-red';
+      default:
+        return 'bg-grey-400 text-grey';
+    }
+  };
+
+  const formatSchedule = (schedule: any) => {
+    if (!schedule) return 'Manual';
+    if (typeof schedule === 'string') return schedule;
+    if (schedule.cron) return `Cron: ${schedule.cron}`;
+    if (schedule.interval) return `Interval: Every ${schedule.interval}`;
+    return 'Manual';
+  };
 
   const getComponentIcon = (type: string) => {
     switch (type?.toLowerCase()) {

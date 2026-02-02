@@ -1,5 +1,5 @@
 import { TrendingUp, TrendingDown, Users, Activity, Clock, BarChart3, UserPlus, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { ISessionDashboardResult } from '@/services/sessionUsersService';
 
 interface SessionDashboardProps {
@@ -240,56 +240,56 @@ export default function SessionDashboard({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Activity Timeline (Last 7 days) */}
-          <div className="lg:col-span-2 bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+          <div className="lg:col-span-2 bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 days)</h2>
-              <Activity className="h-5 w-5 text-grey-600" />
+              <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
             </div>
-            <div className="space-y-3">
-              {data?.activityTimeline?.length > 0 ? (
-                <>
-                  {data.activityTimeline.map((day, index) => {
-                    const maxCount = Math.max(...data.activityTimeline.map(d => d.sessions), 1);
-                    const percentage = maxCount > 0 ? (day.sessions / maxCount) * 100 : 0;
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
+                    <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(() => {
+                  const normalized = getLast7DaysNormalized(data?.activityTimeline ?? [], (d) => d.sessions ?? 0);
+                  const maxCount = Math.max(...normalized.map((d) => d.value), 1);
+                  return normalized.map((day) => {
+                    const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
                     return (
-                      <div key={index} className="flex items-center gap-3">
+                      <div key={day.date} className="flex items-center gap-3">
                         <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                        <div className="flex-1 h-8 bg-grey-200 rounded-lg overflow-hidden relative">
+                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                           <div
                             className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
                             style={{ width: `${percentage}%` }}
                           />
                           <div className="absolute inset-0 flex items-center px-3">
-                            <span className={cn(
-                              "text-xs font-semibold",
-                              percentage > 30 ? "text-white" : "text-grey"
-                            )}>
-                              {day.sessions} sessions
+                            <span className="text-xs font-semibold text-white drop-shadow-sm">
+                              {day.value.toLocaleString()} sessions
                             </span>
                           </div>
                         </div>
                       </div>
                     );
-                  })}
-                  {/* Summary */}
-                  <div className="pt-4 border-t border-grey-400">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-grey-600">Total sessions</span>
-                      <span className="font-semibold text-grey">
-                        {data.activityTimeline.reduce((sum, day) => sum + day.sessions, 0)}
-                      </span>
-                    </div>
+                  });
+                })()}
+                <div className="pt-4 border-t border-grey-400">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-grey-600">Total sessions</span>
+                    <span className="font-semibold text-grey">
+                      {getLast7DaysNormalized(data?.activityTimeline ?? [], (d) => d.sessions ?? 0).reduce((sum, d) => sum + d.value, 0)}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Activity className="h-12 w-12 text-grey-400 mb-3" />
-                  <p className="text-grey-600 font-medium">No activity yet</p>
-                  <p className="text-sm text-grey-500 mt-1">Activity timeline will appear here as users interact</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Peak Hours */}
