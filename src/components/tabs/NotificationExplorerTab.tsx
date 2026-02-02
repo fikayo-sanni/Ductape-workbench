@@ -77,8 +77,8 @@ interface NotificationMessage {
   _id?: string;
   name: string;
   tag: string;
-  email?: boolean;
-  push_notification?: boolean;
+  email?: boolean | { subject?: string; template?: string };
+  push_notification?: boolean | { title?: string; body?: string };
   sms?: boolean;
   callback?: boolean;
   email_data?: any[];
@@ -248,8 +248,8 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
       const messages = n.messages || [];
       totalMessages += messages.length;
       messages.forEach((m: NotificationMessage) => {
-        if ((m.email_data?.length > 0) || (m.email && typeof m.email === 'object' && (m.email.subject || m.email.template))) emailCount++;
-        if ((m.push_notification_data?.length > 0) || (m.push_notification && typeof m.push_notification === 'object' && (m.push_notification.title || m.push_notification.body))) pushCount++;
+        if ((m.email_data?.length ?? 0) > 0 || (m.email && typeof m.email === 'object' && (m.email.subject || m.email.template))) emailCount++;
+        if ((m.push_notification_data?.length ?? 0) > 0 || (m.push_notification && typeof m.push_notification === 'object' && (m.push_notification.title || m.push_notification.body))) pushCount++;
         if (m.sms) smsCount++;
         if (m.callback) webhookCount++;
       });
@@ -678,6 +678,10 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
         isExplorer: true,
       },
     });
+  };
+
+  const handleCreateMessage = () => {
+    toast('Create template: coming soon');
   };
 
   // Channel count = number of messages in that channel (from notification message log / integrations API)

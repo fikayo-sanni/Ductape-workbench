@@ -412,7 +412,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Jobs: open single-job + env explorer (past/future invocations, timeline, metrics)
     if (type === 'job') {
       const env = product?.envs?.[0]
-        ? { slug: product.envs[0].slug, name: product.envs[0].name }
+        ? { slug: product.envs[0].slug, name: product.envs[0].env_name ?? product.envs[0].slug }
         : { slug: 'prd', name: 'Production' };
       openTab({
         id: `job-explorer-${component.tag}-${env.slug}-${Date.now()}`,

@@ -337,14 +337,13 @@ export default function LogsTabContent() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const allLogs = useMemo(() => {
-    // If no workspace ID, always show dummy data
+    // If no workspace ID, show empty
     if (!currentWorkspaceId) {
-      return DUMMY_LOGS;
+      return [];
     }
 
     const realLogs = data?.pages.flatMap((page) => page.data?.logs?.data ?? []) ?? [];
-    // Use dummy data if no real logs exist
-    return realLogs.length > 0 ? realLogs : DUMMY_LOGS;
+    return realLogs.length > 0 ? realLogs : [];
   }, [data, currentWorkspaceId]);
 
   const clearFilters = () => {
