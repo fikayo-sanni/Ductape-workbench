@@ -453,41 +453,23 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
                 <hr className="flex-grow border-t border-grey-200" />
               </div>
 
-              <div className="flex gap-3 mt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-10"
-                  onClick={() => {
-                    window.location.href = `${
-                      import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/'
-                    }users/v1/auth/google`;
-                  }}
-                >
-                  Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 h-10"
-                  onClick={() => {
-                    window.location.href = `${
-                      import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/'
-                    }users/v1/auth/github`;
-                  }}
-                >
-                  GitHub
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 h-10"
-                  onClick={() => {
-                    window.location.href = `${
-                      import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/'
-                    }users/v1/auth/linkedin`;
-                  }}
-                >
-                  LinkedIn
-                </Button>
-              </div>
+              <div className="flex gap-4 items-center mt-6">
+                        {[
+                          { name: "google", label: "Google" },
+                          { name: "github", label: "GitHub" },
+                        ].map((provider) => (
+                          <Button
+                            key={provider.name}
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                              window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
+                            }}
+                          >
+                            <span className="capitalize">{provider.label}</span>
+                          </Button>
+                        ))}
+                      </div>
             </div>
           </>
         ) : (
