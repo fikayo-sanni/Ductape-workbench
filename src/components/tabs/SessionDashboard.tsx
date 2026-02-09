@@ -1,5 +1,5 @@
 import { TrendingUp, TrendingDown, Users, Activity, Clock, BarChart3, UserPlus, Loader2 } from 'lucide-react';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import { ISessionDashboardResult } from '@/services/sessionUsersService';
 
 interface SessionDashboardProps {
@@ -243,7 +243,7 @@ export default function SessionDashboard({
           {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
           <div className="lg:col-span-2 bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+              <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
               {isLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
             </div>
             {isLoading ? (
@@ -258,13 +258,13 @@ export default function SessionDashboard({
             ) : (
               <div className="space-y-3">
                 {(() => {
-                  const normalized = getLast7DaysNormalized(data?.activityTimeline ?? [], (d) => d.sessions ?? 0);
+                  const normalized = getLast7CalendarDays(data?.activityTimeline ?? [], (d) => d.sessions ?? 0);
                   const maxCount = Math.max(...normalized.map((d) => d.value), 1);
                   return normalized.map((day) => {
                     const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
                     return (
                       <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                        <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
                         <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                           <div
                             className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
@@ -284,7 +284,7 @@ export default function SessionDashboard({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-grey-600">Total sessions</span>
                     <span className="font-semibold text-grey">
-                      {getLast7DaysNormalized(data?.activityTimeline ?? [], (d) => d.sessions ?? 0).reduce((sum, d) => sum + d.value, 0)}
+                      {getLast7CalendarDays(data?.activityTimeline ?? [], (d) => d.sessions ?? 0).reduce((sum, d) => sum + d.value, 0)}
                     </span>
                   </div>
                 </div>

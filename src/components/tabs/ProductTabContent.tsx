@@ -107,7 +107,7 @@ const resourceCategories: ResourceCategoryConfig[] = [
   { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
   { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
   { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
-  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow', disabled: true },
+  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow' },
   { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
   { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
 ];
@@ -844,8 +844,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     const resourceType = item._resourceType || category.componentType;
 
     // Check if this resource has environments configured
-    // Caches, sessions, and jobs (product-level) use product environments for env chips
-    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions' || category.id === 'jobs') && product?.envs?.length;
+    // Caches, sessions, jobs, and workflows (product-level) use product environments for env chips
+    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions' || category.id === 'jobs' || category.id === 'workflows') && product?.envs?.length;
     const itemEnvs = Array.isArray(item.envs) && item.envs.length > 0
       ? item.envs
       : useProductEnvs
@@ -1072,6 +1072,10 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     const cardContent = (
       <div
         onClick={() => {
+          if (category.id === 'workflows') {
+            // Workflows: only env chips open the explorer; card click does nothing
+            return;
+          }
           if (category.id === 'apps') {
             handleOpenApp(item);
           } else if (category.id === 'environments') {
@@ -1081,7 +1085,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           }
         }}
         className={cn(
-          'bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer',
+          'bg-white rounded-lg border border-grey-400 p-4 transition-all',
+          category.id === 'workflows' ? 'cursor-default' : 'hover:border-primary hover:shadow-md cursor-pointer',
           isLoadingApp && 'opacity-70 cursor-wait'
         )}
       >
