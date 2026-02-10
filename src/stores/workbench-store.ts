@@ -76,6 +76,7 @@ interface WorkbenchState {
   // Actions - Tabs
   openTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
+  clearAllTabs: () => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
@@ -277,6 +278,12 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         tabs: newTabs,
         activeTabId: newActiveTabId,
       };
+    }),
+
+  clearAllTabs: () =>
+    set((state) => {
+      state.tabs.forEach((tab) => deleteTabState(tab.id));
+      return { tabs: [], activeTabId: null };
     }),
 
   setActiveTab: (tabId) =>
@@ -630,6 +637,33 @@ export const useWorkbenchStore = create<WorkbenchState>()(
               event: (tab.data as any).job.event,
               schedule: (tab.data as any).job.schedule,
             } : undefined,
+            // Workflow explorer - workflow + product so tab restores after refresh
+            workflow: (tab.data as any).workflow ? {
+              name: (tab.data as any).workflow.name,
+              tag: (tab.data as any).workflow.tag,
+              productTag: (tab.data as any).workflow.productTag,
+              env: (tab.data as any).workflow.env ? { slug: (tab.data as any).workflow.env.slug } : undefined,
+            } : undefined,
+            // Workflow run tab - minimal run + workflow context for restore (include completed_steps/step_outputs for step fallback)
+            run: (tab.data as any).run ? {
+              id: (tab.data as any).run.id,
+              runNumber: (tab.data as any).run.runNumber,
+              status: (tab.data as any).run.status,
+              startedAt: (tab.data as any).run.startedAt,
+              completedAt: (tab.data as any).run.completedAt,
+              duration: (tab.data as any).run.duration,
+              triggeredBy: (tab.data as any).run.triggeredBy,
+              steps: (tab.data as any).run.steps,
+              input: (tab.data as any).run.input,
+              output: (tab.data as any).run.output,
+              error: (tab.data as any).run.error,
+              version: (tab.data as any).run.version,
+              completed_steps: (tab.data as any).run.completed_steps,
+              step_outputs: (tab.data as any).run.step_outputs,
+              failed_step: (tab.data as any).run.failed_step,
+            } : undefined,
+            workflowName: (tab.data as any).workflowName,
+            workflowTag: (tab.data as any).workflowTag,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),

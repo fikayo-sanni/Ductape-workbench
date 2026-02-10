@@ -224,6 +224,10 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   // Check if the selected version is unpublished (draft or private)
   const isVersionUnpublished = selectedVersion?.status === 'draft' || selectedVersion?.status === 'private';
 
+  // Publish requires every environment to be set as active
+  const appEnvs = selectedVersion?.envs || [];
+  const allEnvironmentsActive = appEnvs.length > 0 && appEnvs.every((e: any) => e.active);
+
   // Build folder tree structure with actions
   const folderTree = useMemo((): FolderTreeNode[] => {
     if (!selectedVersion?.folders && !selectedVersion?.actions) return [];
@@ -1263,6 +1267,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                     onClick={() => setShowPublishModal(true)}
                     size="sm"
                     className="w-36"
+                    disabled={!allEnvironmentsActive}
+                    title={!allEnvironmentsActive ? 'Set all environments as active to publish' : undefined}
                   >
                     <Rocket className="h-4 w-4 mr-1" />
                     Publish

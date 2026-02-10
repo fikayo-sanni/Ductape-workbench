@@ -37,6 +37,9 @@ import {
   Smartphone,
   MessageCircle,
   Link2,
+  Lock,
+  GitBranch,
+  Layers,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import logsServicesReal from '@/services/logsServicesReal';
@@ -62,7 +65,7 @@ const responseStatuses = [
   { id: 'success', name: 'Success', icon: CheckCircle, color: 'text-green' },
 ];
 
-// Component types mapped to LogEventTypes enum from backend
+// Component types mapped to LogEventTypes enum from backend (workflow_step displayed as "Step")
 const componentTypes = [
   { id: 'actions', name: 'Actions', icon: Box },
   { id: 'database_actions', name: 'Database Actions', icon: Database },
@@ -76,6 +79,10 @@ const componentTypes = [
   { id: 'consumer', name: 'Consumer', icon: Headphones },
   { id: 'jobs', name: 'Jobs', icon: Terminal },
   { id: 'session', name: 'Session', icon: UserCheck },
+  { id: 'workflow', name: 'Workflow', icon: GitBranch },
+  { id: 'workflow_step', name: 'Step', icon: Layers },
+  { id: 'secret', name: 'Secret', icon: Lock },
+  { id: 'tokens', name: 'Tokens', icon: Lock },
   { id: 'notifications', name: 'Notifications', icon: Bell },
   { id: 'push', name: 'Push', icon: Smartphone },
   { id: 'email', name: 'Email', icon: Mail },
@@ -85,6 +92,14 @@ const componentTypes = [
   { id: 'functions', name: 'Functions', icon: Code },
   { id: 'webhook', name: 'Webhook', icon: Webhook },
 ];
+
+const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();
+
+const getLogTypeLabel = (type: string): string => {
+  const id = normalizeLogType(type);
+  const entry = componentTypes.find((c) => c.id === id);
+  return entry?.name ?? (type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : '');
+};
 
 const timeRangeOptions = [
   { id: 'custom', name: 'Custom', label: 'Custom Range', minutes: 0 },
@@ -164,10 +179,18 @@ const getStatusConfig = (log: ProcessLog) => {
   };
 };
 
-// Get component icon
+// Get component icon (normalizes type; workflow_step -> Layers, workflow -> GitBranch, secret/tokens -> Lock)
 const getComponentIcon = (type: string) => {
-  const component = componentTypes.find(c => c.id === type);
-  return component?.icon || Activity;
+  const id = normalizeLogType(type);
+  const component = componentTypes.find(c => c.id === id);
+  if (component?.icon) return component.icon;
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    workflow: GitBranch,
+    workflow_step: Layers,
+    secret: Lock,
+    tokens: Lock,
+  };
+  return iconMap[id] || Activity;
 };
 
 // Get environment badge style
@@ -221,7 +244,8 @@ function LogEntry({ log, isExpanded, onToggle }: {
 }) {
   const statusConfig = getStatusConfig(log);
   const StatusIcon = statusConfig.icon;
-  const ComponentIcon = getComponentIcon(log.type);
+  const componentType = (log.component || log.type || '').trim();
+  const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
     : log.feature_tag || log.parent_tag || '-';
@@ -260,11 +284,11 @@ function LogEntry({ log, isExpanded, onToggle }: {
           </p>
         </div>
 
-        {/* Component Type */}
+        {/* Component Type (workflow_step -> "Step", secret -> "Secret", etc.) */}
         <div className="flex-shrink-0 w-[100px]">
           <div className="flex items-center gap-1.5">
             <ComponentIcon className="h-4 w-4 text-grey-600" />
-            <span className="text-sm text-grey capitalize">{log.type}</span>
+            <span className="text-sm text-grey">{getLogTypeLabel(componentType)}</span>
           </div>
         </div>
 
@@ -368,6 +392,8 @@ function LogCard({ log }: { log: ProcessLog }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const statusConfig = getStatusConfig(log);
   const StatusIcon = statusConfig.icon;
+  const componentType = (log.component || log.type || '').trim();
+  const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
     : log.feature_tag || log.parent_tag || '-';
@@ -409,8 +435,9 @@ function LogCard({ log }: { log: ProcessLog }) {
 
         {/* Tags */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-grey-600 capitalize bg-grey-400/20 px-2 py-0.5 rounded">
-            {log.type}
+          <span className="text-xs text-grey-600 bg-grey-400/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
+            <ComponentIcon className="h-3.5 w-3.5" />
+            {getLogTypeLabel(componentType)}
           </span>
           <code className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
             {operationTag}

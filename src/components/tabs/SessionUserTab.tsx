@@ -25,6 +25,27 @@ import {
   Filter,
   Search,
   X,
+  Box,
+  Database,
+  Server,
+  HardDrive,
+  MessageSquare,
+  Zap,
+  Boxes,
+  Share2,
+  Megaphone,
+  Headphones,
+  Terminal,
+  Bell,
+  Smartphone,
+  Mail,
+  MessageCircle,
+  Link2,
+  Lock,
+  GitBranch,
+  Layers,
+  Code,
+  Webhook,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +56,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import { useDebouncedValue } from '@wojtekmaj/react-hooks';
 import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -71,6 +92,55 @@ const statusOptions = [
   { id: 'fail', name: 'Failed', icon: XCircle, color: 'text-red' },
   { id: 'processing', name: 'Processing', icon: AlertTriangle, color: 'text-yellow' },
 ];
+
+// Component types and icons - match Logs.tsx so activity log icons are consistent
+const componentTypes = [
+  { id: 'actions', name: 'Actions', icon: Box },
+  { id: 'database_actions', name: 'Database Actions', icon: Database },
+  { id: 'database', name: 'Database', icon: Database },
+  { id: 'graph', name: 'Graph', icon: Share2 },
+  { id: 'vector', name: 'Vector', icon: Boxes },
+  { id: 'storage', name: 'Storage', icon: HardDrive },
+  { id: 'cache', name: 'Cache', icon: Zap },
+  { id: 'message_broker', name: 'Message Broker', icon: MessageSquare },
+  { id: 'producer', name: 'Producer', icon: Megaphone },
+  { id: 'consumer', name: 'Consumer', icon: Headphones },
+  { id: 'jobs', name: 'Jobs', icon: Terminal },
+  { id: 'session', name: 'Session', icon: UserCheck },
+  { id: 'workflow', name: 'Workflow', icon: GitBranch },
+  { id: 'workflow_step', name: 'Step', icon: Layers },
+  { id: 'secret', name: 'Secret', icon: Lock },
+  { id: 'tokens', name: 'Tokens', icon: Lock },
+  { id: 'notifications', name: 'Notifications', icon: Bell },
+  { id: 'push', name: 'Push', icon: Smartphone },
+  { id: 'email', name: 'Email', icon: Mail },
+  { id: 'sms', name: 'SMS', icon: MessageCircle },
+  { id: 'callbacks', name: 'Callbacks', icon: Link2 },
+  { id: 'feature', name: 'Feature', icon: Server },
+  { id: 'functions', name: 'Functions', icon: Code },
+  { id: 'webhook', name: 'Webhook', icon: Webhook },
+];
+
+const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();
+
+const getLogTypeLabel = (type: string): string => {
+  const id = normalizeLogType(type);
+  const entry = componentTypes.find((c) => c.id === id);
+  return entry?.name ?? (type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : 'Session');
+};
+
+const getComponentIcon = (type: string): typeof Activity => {
+  const id = normalizeLogType(type);
+  const component = componentTypes.find((c) => c.id === id);
+  if (component?.icon) return component.icon;
+  const iconMap: Record<string, typeof Activity> = {
+    workflow: GitBranch,
+    workflow_step: Layers,
+    secret: Lock,
+    tokens: Lock,
+  };
+  return iconMap[id] || Activity;
+};
 
 // Helper to get date range from time range selection
 const getDateRangeFromTimeRange = (timeRange: string) => {
@@ -162,6 +232,10 @@ const getLatencyColor = (latencyMs: number | undefined): string => {
   return 'text-red'; // Very slow
 };
 
+// Normalize latency from log (API may send latency or latency_ms)
+const getLogLatency = (log: { latency?: number; latency_ms?: number }): number | undefined =>
+  log.latency ?? log.latency_ms;
+
 // Get status config for log entry
 const getLogStatusConfig = (log: any) => {
   if (log.successful_execution || log.status === 'success') {
@@ -239,6 +313,8 @@ function LogEntry({ log, isExpanded, onToggle }: {
 }) {
   const statusConfig = getLogStatusConfig(log);
   const StatusIcon = statusConfig.icon;
+  const componentType = (log.component || log.type || '').trim();
+  const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
     : log.feature_tag || log.parent_tag || '-';
@@ -277,11 +353,11 @@ function LogEntry({ log, isExpanded, onToggle }: {
           </p>
         </div>
 
-        {/* Component Type */}
+        {/* Component Type (match Logs.tsx icons) */}
         <div className="flex-shrink-0 w-[100px]">
           <div className="flex items-center gap-1.5">
-            <Activity className="h-4 w-4 text-grey-600" />
-            <span className="text-sm text-grey capitalize">{log.type || 'session'}</span>
+            <ComponentIcon className="h-4 w-4 text-grey-600" />
+            <span className="text-sm text-grey">{getLogTypeLabel(componentType)}</span>
           </div>
         </div>
 
@@ -305,18 +381,18 @@ function LogEntry({ log, isExpanded, onToggle }: {
           </div>
         </div>
 
-        {/* Message */}
+        {/* Message + Latency (match Logs.tsx) */}
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <p className="text-sm text-grey truncate">{log.message || log.name}</p>
           {/* Latency Badge */}
-          {log.latency !== undefined && log.latency !== null && (
+          {getLogLatency(log) !== undefined && getLogLatency(log) !== null && (
             <span className={cn(
-              "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded",
-              getLatencyColor(log.latency),
+              "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded shrink-0",
+              getLatencyColor(getLogLatency(log)),
               "bg-grey-400/10"
             )}>
               <Timer className="h-3 w-3" />
-              {formatLatency(log.latency)}
+              {formatLatency(getLogLatency(log))}
             </span>
           )}
         </div>
@@ -347,17 +423,17 @@ function LogEntry({ log, isExpanded, onToggle }: {
             </pre>
           </div>
 
-          {/* Additional Metadata */}
+          {/* Additional Metadata (match Logs.tsx: Process ID, Latency, etc.) */}
           <div className="mt-3 flex flex-wrap gap-3">
             <div className="flex items-center gap-1.5 text-xs text-grey-600">
               <span className="font-medium">Process ID:</span>
               <code className="font-mono bg-grey-400/20 px-1.5 py-0.5 rounded">{log.process_id}</code>
             </div>
-            {log.latency !== undefined && log.latency !== null && (
+            {getLogLatency(log) !== undefined && getLogLatency(log) !== null && (
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="font-medium text-grey-600">Latency:</span>
-                <code className={cn("font-mono px-1.5 py-0.5 rounded", getLatencyColor(log.latency), "bg-grey-400/10")}>
-                  {formatLatency(log.latency)}
+                <code className={cn("font-mono px-1.5 py-0.5 rounded", getLatencyColor(getLogLatency(log)), "bg-grey-400/10")}>
+                  {formatLatency(getLogLatency(log))}
                 </code>
               </div>
             )}
@@ -385,6 +461,8 @@ function LogCard({ log }: { log: any }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const statusConfig = getLogStatusConfig(log);
   const StatusIcon = statusConfig.icon;
+  const componentType = (log.component || log.type || '').trim();
+  const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
     : log.feature_tag || log.parent_tag || '-';
@@ -424,18 +502,29 @@ function LogCard({ log }: { log: any }) {
         {/* Message */}
         <p className="text-sm text-grey mb-3">{log.message || log.name}</p>
 
-        {/* Tags */}
+        {/* Tags (match Logs.tsx: type icon + operation + latency when present) */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-grey-600 capitalize bg-grey-400/20 px-2 py-0.5 rounded">
-            {log.type || 'session'}
+          <span className="text-xs text-grey-600 bg-grey-400/20 px-2 py-0.5 rounded inline-flex items-center gap-1">
+            <ComponentIcon className="h-3.5 w-3.5" />
+            {getLogTypeLabel(componentType)}
           </span>
           <code className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
             {operationTag}
           </code>
+          {getLogLatency(log) !== undefined && getLogLatency(log) !== null && (
+            <span className={cn(
+              "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded",
+              getLatencyColor(getLogLatency(log)),
+              "bg-grey-400/10"
+            )}>
+              <Timer className="h-3 w-3" />
+              {formatLatency(getLogLatency(log))}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Expanded Details */}
+      {/* Expanded Details (match Logs.tsx: Data + Process ID + Latency) */}
       {isExpanded && (
         <div className="border-t border-grey-400 bg-grey-100 p-4">
           <div className="bg-grey rounded-lg overflow-hidden">
@@ -449,9 +538,16 @@ function LogCard({ log }: { log: any }) {
               </code>
             </pre>
           </div>
-          <div className="mt-3 text-xs text-grey-600">
-            <span className="font-medium">ID:</span>{' '}
-            <code className="font-mono">{log.process_id}</code>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-grey-600">
+            <span><span className="font-medium">ID:</span>{' '}<code className="font-mono">{log.process_id}</code></span>
+            {getLogLatency(log) !== undefined && getLogLatency(log) !== null && (
+              <span>
+                <span className="font-medium text-grey-600">Latency:</span>{' '}
+                <code className={cn("font-mono px-1.5 py-0.5 rounded", getLatencyColor(getLogLatency(log)), "bg-grey-400/10")}>
+                  {formatLatency(getLogLatency(log))}
+                </code>
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -1056,13 +1152,13 @@ export default function SessionUserTab({
                   </div>
                 )}
 
-                {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+                {/* Activity Timeline (Last 7 Days) - last 7 calendar days with 0 for no activity */}
                 <div className="bg-white rounded-lg border border-grey-300 overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b border-grey-400 bg-grey-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-blue-600" />
-                        <h3 className="text-base font-semibold text-grey">Activity Timeline (7 Days)</h3>
+                        <h3 className="text-base font-semibold text-grey">Activity Timeline (Last 7 Days)</h3>
                       </div>
                       {dashboardLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
                     </div>
@@ -1082,13 +1178,13 @@ export default function SessionUserTab({
                       <div className="space-y-4">
                         <div className="space-y-3">
                           {(() => {
-                            const normalized = getLast7DaysNormalized(activityTimeline, (d) => d.count ?? 0);
+                            const normalized = getLast7CalendarDays(activityTimeline, (d) => d.count ?? 0);
                             const maxCount = Math.max(...normalized.map((d) => d.value), 1);
                             return normalized.map((day) => {
                               const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
                               return (
                                 <div key={day.date} className="flex items-center gap-3">
-                                  <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                                  <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
                                   <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                                     <div
                                       className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"

@@ -35,7 +35,7 @@ interface ApiError {
 
 export default function WorkbenchHeader() {
   const { user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId } = useAuth();
-  const { openTab, activeView, setActiveView } = useWorkbenchStore();
+  const { openTab, activeView, setActiveView, clearAllTabs } = useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -81,6 +81,9 @@ export default function WorkbenchHeader() {
         setUser(updatedUser as any);
         // Set the current workspace ID in auth store
         setCurrentWorkspaceId(variables);
+
+        // Clear all tabs so the new workspace starts with a clean slate
+        clearAllTabs();
 
         // Clear all queries to ensure fresh data for the new workspace
         await queryClient.clear();
@@ -370,6 +373,7 @@ export default function WorkbenchHeader() {
           <circle cx="16" cy="32" r="2" fill="currentColor" className="text-primary" />
         </svg>
         <div className="text-lg md:text-xl font-bold text-primary">Ductape</div>
+        <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary ml-1">Beta</span>
         <span className="hidden sm:inline text-sm text-grey-600 font-medium">Workbench</span>
       </div>
 

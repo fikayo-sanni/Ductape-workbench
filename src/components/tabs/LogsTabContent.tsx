@@ -19,6 +19,8 @@ import {
   Link2,
   Bell,
   Activity,
+  GitBranch,
+  Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import logsServices from '@/services/logsServices';
@@ -52,6 +54,8 @@ const componentTypes = [
   { id: 'broker', name: 'Messaging' },
   { id: 'job', name: 'Job' },
   { id: 'session', name: 'Session' },
+  { id: 'workflow', name: 'Workflow', icon: GitBranch },
+  { id: 'workflow_step', name: 'Step', icon: Layers },
   { id: 'secret', name: 'Secret', icon: Lock },
   { id: 'tokens', name: 'Tokens', icon: Lock },
   { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -61,9 +65,20 @@ const componentTypes = [
   { id: 'callbacks', name: 'Callbacks', icon: Link2 },
 ];
 
-// Icon for each log type (Secret/Tokens use Lock, not Pulse)
+// Normalize backend type (e.g. "Workflow_step", "Secret") to lowercase id for lookup
+const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();
+
+// Display label for log type (e.g. workflow_step -> "Step", secret -> "Secret")
+const getLogTypeLabel = (type: string): string => {
+  const id = normalizeLogType(type);
+  const entry = componentTypes.find((c) => c.id === id);
+  return entry?.name ?? (type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : '');
+};
+
+// Icon for each log type (Secret/Tokens: Lock; Workflow: GitBranch; Workflow_step: Step/Layers)
 const getLogTypeIcon = (type: string) => {
-  const entry = componentTypes.find((c) => c.id === type && 'icon' in c && c.icon);
+  const id = normalizeLogType(type);
+  const entry = componentTypes.find((c) => c.id === id && 'icon' in c && c.icon);
   if (entry && 'icon' in entry) return entry.icon as React.ComponentType<{ className?: string }>;
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     app: Box,
@@ -75,6 +90,8 @@ const getLogTypeIcon = (type: string) => {
     message_broker: MessageSquare,
     job: Terminal,
     session: UserCheck,
+    workflow: GitBranch,
+    workflow_step: Layers,
     secret: Lock,
     tokens: Lock,
     notifications: Bell,
@@ -83,7 +100,7 @@ const getLogTypeIcon = (type: string) => {
     sms: MessageCircle,
     callbacks: Link2,
   };
-  return iconMap[type] || Activity;
+  return iconMap[id] || Activity;
 };
 
 const timeRangeOptions = [
@@ -129,10 +146,14 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Backend may send component (e.g. workflow, workflow_step) or type; prefer component for processor logs
+  const getLogComponentType = (log: ProcessLog) => (log.component || log.type || '').trim();
+
   return (
     <div className="space-y-2">
       {processes.map((log) => {
-        const TypeIcon = getLogTypeIcon(log.type || '');
+        const componentType = getLogComponentType(log);
+        const TypeIcon = getLogTypeIcon(componentType);
         return (
         <div key={log._id} className="bg-white rounded-lg border border-grey-400 overflow-hidden hover:border-primary/50 transition-colors">
           {/* Log Header */}
@@ -194,10 +215,10 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
                     {log.name}
                   </span>
 
-                  {/* Type with icon (Secret/Tokens use Lock, not Pulse) */}
-                  <span className="text-xs text-grey-600 flex items-center gap-1">
-                    <TypeIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    {log.type}
+                  {/* Type with icon and label (e.g. workflow_step -> "Step", secret -> "Secret") */}
+                  <span className="text-xs text-grey-600 flex items-center gap-1.5 shrink-0">
+                    <TypeIcon className="h-3.5 w-3.5 flex-shrink-0 text-grey-500" />
+                    <span>{getLogTypeLabel(componentType)}</span>
                   </span>
                 </div>
 
@@ -301,6 +322,7 @@ export default function LogsTabContent() {
         },
         {
           component: filters.component === 'all' ? undefined : filters.component,
+          type: filters.component === 'all' ? undefined : filters.component,
           app_id: filters.app === 'all' ? undefined : filters.app,
           product_id: filters.product === 'all' ? undefined : filters.product,
           status: filters.status === 'all' ? undefined : filters.status,

@@ -66,7 +66,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -3890,10 +3890,10 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
               </div>
             </div>
 
-            {/* Activity Timeline (7 Days) */}
+            {/* Activity Timeline (Last 7 Days) */}
             <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
                 {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
               {isLoadingActivity ? (
@@ -3908,17 +3908,17 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
               ) : (
                 <div className="space-y-3">
                   {(() => {
-                    const normalized = getLast7DaysNormalized(
+                    const timeline = getLast7CalendarDays(
                       databaseActivityData?.activityTimeline ?? [],
                       (d) => d.sessions ?? 0
                     );
-                    const maxOperations = Math.max(...normalized.map((d) => d.value), 1);
-                    return normalized.map((day) => {
+                    const maxOperations = Math.max(...timeline.map((d) => d.value), 1);
+                    return timeline.map((day) => {
                       const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
 
                     return (
                       <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                        <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
                         <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                           <div
                             className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"

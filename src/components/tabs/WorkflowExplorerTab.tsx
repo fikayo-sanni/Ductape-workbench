@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Play,
   Search,
@@ -26,6 +27,8 @@ import {
   Zap,
   LayoutDashboard,
   TrendingDown,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,11 +48,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import { getTabState, saveTabState } from '@/lib/tab-state-manager';
+import { useAuth } from '@/store/useAuth';
+import {
+  fetchWorkflowRuns,
+  mapProcessorResultToWorkflowRun,
+  shortProcessId,
+} from '@/services/workflowRunsService';
 
 interface WorkflowExplorerTabProps {
+  tabId?: string;
   workflow?: {
     name?: string;
     tag?: string;
@@ -58,10 +69,26 @@ interface WorkflowExplorerTabProps {
       slug?: string;
     };
   };
+  product?: {
+    tag?: string;
+    name?: string;
+    logo?: string;
+    envs?: unknown[];
+  };
 }
 
 type StepStatus = 'completed' | 'failed' | 'running' | 'pending' | 'skipped' | 'retrying';
 type RunStatus = 'completed' | 'failed' | 'running' | 'pending' | 'cancelled' | 'timeout';
+
+interface WorkflowExplorerFormState {
+  statusFilter: RunStatus | 'all';
+  searchQuery: string;
+  timeRange: '1h' | '24h' | '7d' | '30d' | 'all';
+  listViewMode: 'list' | 'timeline';
+  viewMode: 'overview' | 'runs';
+  executeInput?: string;
+  isSidebarCollapsed?: boolean;
+}
 
 interface WorkflowStep {
   id: string;
@@ -100,103 +127,6 @@ interface WorkflowRun {
   version: string;
   tags?: string[];
 }
-
-// Generate realistic dummy data with patterns
-const generateDummyRuns = (): WorkflowRun[] => {
-  const triggers: WorkflowRun['triggeredBy'][] = ['manual', 'schedule', 'webhook', 'event', 'api'];
-  const users = ['john.doe@company.com', 'jane.smith@company.com', 'system', 'api-service', 'scheduler'];
-  const stepTypes: WorkflowStep['type'][] = ['action', 'condition', 'parallel', 'wait', 'transform', 'webhook'];
-
-  const runs: WorkflowRun[] = [];
-  const now = new Date();
-
-  for (let i = 0; i < 50; i++) {
-    const startTime = new Date(now.getTime() - i * 1000 * 60 * 20 - Math.random() * 1000 * 60 * 10);
-    const baseDuration = Math.floor(Math.random() * 180000) + 3000;
-    const statuses: RunStatus[] = ['completed', 'completed', 'completed', 'completed', 'completed', 'failed', 'running', 'cancelled', 'timeout'];
-    const status = i === 0 ? 'running' : statuses[Math.floor(Math.random() * statuses.length)];
-    const duration = status === 'running' ? null : baseDuration;
-    const endTime = status === 'running' ? null : new Date(startTime.getTime() + baseDuration);
-
-    const stepNames = [
-      { name: 'Validate Input', type: 'condition' as const },
-      { name: 'Authenticate', type: 'action' as const },
-      { name: 'Fetch External Data', type: 'webhook' as const },
-      { name: 'Transform Payload', type: 'transform' as const },
-      { name: 'Process in Parallel', type: 'parallel' as const },
-      { name: 'Update Records', type: 'action' as const },
-      { name: 'Send Notifications', type: 'action' as const },
-    ];
-
-    const failedStepIndex = status === 'failed' ? Math.floor(Math.random() * 4) + 2 : -1;
-    const runningStepIndex = status === 'running' ? Math.floor(Math.random() * 4) + 1 : -1;
-
-    const steps: WorkflowStep[] = stepNames.map((stepInfo, idx) => {
-      let stepStatus: StepStatus = 'completed';
-      if (status === 'running') {
-        if (idx > runningStepIndex) stepStatus = 'pending';
-        else if (idx === runningStepIndex) stepStatus = 'running';
-      } else if (status === 'failed') {
-        if (idx > failedStepIndex) stepStatus = 'skipped';
-        else if (idx === failedStepIndex) stepStatus = 'failed';
-      } else if (status === 'cancelled') {
-        if (idx >= 4) stepStatus = 'skipped';
-      } else if (status === 'timeout') {
-        if (idx === stepNames.length - 1) stepStatus = 'failed';
-      }
-
-      const stepDuration = Math.floor((baseDuration / stepNames.length) * (0.3 + Math.random() * 1.4));
-      const stepStart = new Date(startTime.getTime() + idx * (baseDuration / stepNames.length));
-
-      return {
-        id: `step_${i}_${idx}`,
-        name: stepInfo.name,
-        type: stepInfo.type,
-        status: stepStatus,
-        startedAt: stepStatus !== 'pending' && stepStatus !== 'skipped' ? stepStart.toISOString() : null,
-        completedAt: stepStatus === 'completed' || stepStatus === 'failed' ? new Date(stepStart.getTime() + stepDuration).toISOString() : null,
-        duration: stepStatus === 'completed' || stepStatus === 'failed' ? stepDuration : stepStatus === 'running' ? Date.now() - stepStart.getTime() : null,
-        input: { requestId: `req_${Math.random().toString(36).substr(2, 8)}`, index: idx },
-        output: stepStatus === 'completed' ? { success: true, processedAt: new Date().toISOString() } : null,
-        error: stepStatus === 'failed' ? (Math.random() > 0.5 ? 'Connection timeout after 30000ms' : 'Rate limit exceeded (429)') : undefined,
-        retryCount: stepStatus === 'failed' ? 3 : (stepStatus as StepStatus) === 'retrying' ? 1 : undefined,
-        maxRetries: 3,
-        logs: stepStatus !== 'pending' && stepStatus !== 'skipped' ? [
-          { timestamp: stepStart.toISOString(), level: 'info' as const, message: `Initiating ${stepInfo.name.toLowerCase()}...` },
-          ...(stepStatus === 'completed' ? [
-            { timestamp: new Date(stepStart.getTime() + stepDuration * 0.5).toISOString(), level: 'debug' as const, message: 'Processing payload' },
-            { timestamp: new Date(stepStart.getTime() + stepDuration).toISOString(), level: 'info' as const, message: `${stepInfo.name} completed successfully` }
-          ] : stepStatus === 'failed' ? [
-            { timestamp: new Date(stepStart.getTime() + stepDuration * 0.8).toISOString(), level: 'warn' as const, message: 'Retry attempt 2 of 3' },
-            { timestamp: new Date(stepStart.getTime() + stepDuration).toISOString(), level: 'error' as const, message: 'Max retries exceeded, step failed' }
-          ] : [])
-        ] : [],
-        metadata: { integration: 'stripe', app: 'payment-service', action: 'process' }
-      };
-    });
-
-    runs.push({
-      id: `run_${(10000 - i).toString(36)}${Math.random().toString(36).substr(2, 4)}`,
-      runNumber: 10000 - i,
-      status,
-      startedAt: startTime.toISOString(),
-      completedAt: endTime?.toISOString() || null,
-      duration,
-      input: { orderId: `ORD-${Math.random().toString(36).substr(2, 8).toUpperCase()}`, amount: Math.floor(Math.random() * 50000) / 100, currency: 'USD' },
-      output: status === 'completed' ? { transactionId: `TXN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`, processed: true } : null,
-      error: status === 'failed' ? `Workflow terminated: ${steps.find(s => s.status === 'failed')?.error || 'Unknown error'}` : status === 'timeout' ? 'Workflow exceeded maximum execution time (5m)' : undefined,
-      steps,
-      triggeredBy: triggers[Math.floor(Math.random() * triggers.length)],
-      triggeredByUser: users[Math.floor(Math.random() * users.length)],
-      version: `v${Math.floor(Math.random() * 3) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 20)}`,
-      tags: Math.random() > 0.7 ? ['priority', 'production'] : Math.random() > 0.5 ? ['test'] : undefined,
-    });
-  }
-
-  return runs;
-};
-
-const DUMMY_RUNS = generateDummyRuns();
 
 // Sparkline component for mini charts
 const Sparkline = ({ data, color, height = 32 }: { data: number[]; color: string; height?: number }) => {
@@ -259,143 +189,289 @@ const formatTime = (dateStr: string, relative = true) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerTabProps) {
-  const { setSidebarCollapsed, openTab } = useWorkbenchStore();
+function getTimeRangeDates(range: '1h' | '24h' | '7d' | '30d' | 'all'): { start_date?: string; end_date?: string } {
+  const end = new Date();
+  if (range === 'all') return {};
+  let start: Date;
+  if (range === '1h') start = new Date(end.getTime() - 60 * 60 * 1000);
+  else if (range === '24h') start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  else if (range === '7d') start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+  else start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return { start_date: start.toISOString(), end_date: end.toISOString() };
+}
 
-  const workflowName = workflow.name || 'Order Processing Pipeline';
-  const workflowTag = workflow.tag || 'order-processing';
+const DEFAULT_FORM_STATE: WorkflowExplorerFormState = {
+  statusFilter: 'all',
+  searchQuery: '',
+  timeRange: '24h',
+  listViewMode: 'list',
+  viewMode: 'overview',
+  executeInput: '{\n  "orderId": "ORD-EXAMPLE",\n  "amount": 99.99,\n  "currency": "USD"\n}',
+};
+
+export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: WorkflowExplorerTabProps) {
+  const { setSidebarCollapsed, openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
+  const hasRestoredRef = useRef(false);
+  const skipNextSaveRef = useRef(true); // skip first save on mount so we don't overwrite restored state
+
+  const workflowName = workflow.name || 'Workflow';
+  const workflowTag = workflow.tag || '';
+  const productTag = workflow.productTag || product?.tag || '';
   const envSlug = workflow.env?.slug || 'production';
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [showExecuteModal, setShowExecuteModal] = useState(false);
+  const [executeInput, setExecuteInput] = useState(DEFAULT_FORM_STATE.executeInput!);
+  const [statusFilter, setStatusFilter] = useState<RunStatus | 'all'>(DEFAULT_FORM_STATE.statusFilter);
+  const [searchQuery, setSearchQuery] = useState(DEFAULT_FORM_STATE.searchQuery);
+  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d' | '30d' | 'all'>(DEFAULT_FORM_STATE.timeRange);
+  const [listViewMode, setListViewMode] = useState<'list' | 'timeline'>(DEFAULT_FORM_STATE.listViewMode);
+  const [viewMode, setViewMode] = useState<'overview' | 'runs'>(DEFAULT_FORM_STATE.viewMode);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Restore state from tab state on mount (page refresh / tab switch back)
+  useEffect(() => {
+    if (!tabId || hasRestoredRef.current) return;
+    const saved = getTabState(tabId);
+    const form = saved?.formState as WorkflowExplorerFormState | undefined;
+    if (form) {
+      if (form.statusFilter != null) setStatusFilter(form.statusFilter);
+      if (form.searchQuery != null) setSearchQuery(form.searchQuery);
+      if (form.timeRange != null) setTimeRange(form.timeRange);
+      if (form.listViewMode != null) setListViewMode(form.listViewMode);
+      if (form.viewMode != null) setViewMode(form.viewMode);
+      if (form.executeInput != null) setExecuteInput(form.executeInput);
+      if (form.isSidebarCollapsed != null) setIsSidebarCollapsed(form.isSidebarCollapsed);
+    }
+    hasRestoredRef.current = true;
+  }, [tabId]);
+
+  // Persist state when it changes (skip first run on mount so we don't overwrite restored state)
+  useEffect(() => {
+    if (!tabId) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    const formState: WorkflowExplorerFormState = {
+      statusFilter,
+      searchQuery,
+      timeRange,
+      listViewMode,
+      viewMode,
+      executeInput,
+      isSidebarCollapsed,
+    };
+    saveTabState(
+      tabId,
+      'workflow-explorer',
+      `${workflowName} (${productTag || 'Workflow'})`,
+      {},
+      formState,
+      workflowTag || undefined
+    );
+  }, [tabId, workflowName, productTag, workflowTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
+
+  // Save on unmount (e.g. user switches to another tab) so state is never lost
+  useEffect(() => {
+    if (!tabId) return;
+    return () => {
+      const formState: WorkflowExplorerFormState = {
+        statusFilter,
+        searchQuery,
+        timeRange,
+        listViewMode,
+        viewMode,
+        executeInput,
+        isSidebarCollapsed,
+      };
+      saveTabState(
+        tabId,
+        'workflow-explorer',
+        `${workflowName} (${productTag || 'Workflow'})`,
+        {},
+        formState,
+        workflowTag || undefined
+      );
+    };
+  }, [tabId, workflowName, productTag, workflowTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
+
+  const timeRangeParams = useMemo(() => getTimeRangeDates(timeRange), [timeRange]);
+
+  const {
+    data: apiRuns = [],
+    isLoading: isLoadingRuns,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      'workflow-runs',
+      currentWorkspaceId,
+      workflowTag,
+      productTag,
+      envSlug,
+      timeRangeParams.start_date,
+      timeRangeParams.end_date,
+    ],
+    queryFn: () =>
+      fetchWorkflowRuns({
+        workspace_id: currentWorkspaceId ?? '',
+        user_id: user?._id ?? '',
+        public_key: user?.public_key ?? '',
+        workflow_tag: workflowTag || undefined,
+        product_tag: productTag || undefined,
+        env: envSlug || undefined,
+        ...timeRangeParams,
+        limit: 200,
+      }),
+    enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key),
+  });
+
+  const runs: WorkflowRun[] = useMemo(
+    () => apiRuns.map((item, i) => mapProcessorResultToWorkflowRun(item, i) as WorkflowRun),
+    [apiRuns]
+  );
 
   useEffect(() => {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
-  // State
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [showExecuteModal, setShowExecuteModal] = useState(false);
-  const [executeInput, setExecuteInput] = useState('{\n  "orderId": "ORD-EXAMPLE",\n  "amount": 99.99,\n  "currency": "USD"\n}');
-  const [statusFilter, setStatusFilter] = useState<RunStatus | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d' | '30d' | 'all'>('24h');
-  const [listViewMode, setListViewMode] = useState<'list' | 'timeline'>('list');
-  const [viewMode, setViewMode] = useState<'overview' | 'runs'>('overview');
-
-  // Open run in a new tab
   const handleOpenRun = (run: WorkflowRun) => {
     openTab({
       id: `workflow-run-${run.id}`,
       type: 'workflow-run',
-      title: `Run #${run.runNumber}`,
+      title: `Run ${formatTime(run.startedAt, false)}`,
       itemId: run.id,
       data: {
         run,
         workflowName,
         workflowTag,
+        workspaceId: currentWorkspaceId ?? undefined,
       },
     });
   };
 
-  // Filtered runs
   const filteredRuns = useMemo(() => {
-    return DUMMY_RUNS.filter((run) => {
+    return runs.filter((run) => {
       const matchesStatus = statusFilter === 'all' || run.status === statusFilter;
-      const matchesSearch = searchQuery === '' ||
+      const matchesSearch =
+        searchQuery === '' ||
         run.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        run.runNumber.toString().includes(searchQuery) ||
         run.triggeredBy.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [statusFilter, searchQuery]);
+  }, [runs, statusFilter, searchQuery]);
 
-  // Comprehensive metrics
   const metrics = useMemo(() => {
-    const runs = DUMMY_RUNS;
     const total = runs.length;
-    const completed = runs.filter(r => r.status === 'completed').length;
-    const failed = runs.filter(r => r.status === 'failed').length;
-    const running = runs.filter(r => r.status === 'running').length;
-    const cancelled = runs.filter(r => r.status === 'cancelled').length;
-    const timeout = runs.filter(r => r.status === 'timeout').length;
+    const completed = runs.filter((r) => r.status === 'completed').length;
+    const failed = runs.filter((r) => r.status === 'failed').length;
+    const running = runs.filter((r) => r.status === 'running').length;
+    const cancelled = runs.filter((r) => r.status === 'cancelled').length;
+    const timeout = runs.filter((r) => r.status === 'timeout').length;
 
-    const completedRuns = runs.filter(r => r.duration !== null);
-    const durations = completedRuns.map(r => r.duration!).sort((a, b) => a - b);
+    const completedRuns = runs.filter((r) => r.duration !== null);
+    const durations = completedRuns.map((r) => r.duration!).sort((a, b) => a - b);
 
     const avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
     const p50 = durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
     const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
     const p99 = durations.length > 0 ? durations[Math.floor(durations.length * 0.99)] : 0;
 
-    const successRate = total > 0 ? (completed / (total - running)) * 100 : 0;
-    const errorRate = total > 0 ? ((failed + timeout) / (total - running)) * 100 : 0;
+    const finished = total - running;
+    const successRate = finished > 0 ? (completed / finished) * 100 : 0;
+    const errorRate = finished > 0 ? ((failed + timeout) / finished) * 100 : 0;
 
-    // Generate sparkline data (last 24 data points)
     const sparklineData = Array.from({ length: 24 }, (_, i) => {
-      const hourRuns = runs.filter(r => {
-        const runTime = new Date(r.startedAt).getTime();
-        const hourStart = Date.now() - (24 - i) * 3600000;
-        const hourEnd = hourStart + 3600000;
-        return runTime >= hourStart && runTime < hourEnd;
-      });
-      return hourRuns.length;
+      const hourStart = Date.now() - (24 - i) * 3600000;
+      const hourEnd = hourStart + 3600000;
+      return runs.filter((r) => {
+        const t = new Date(r.startedAt).getTime();
+        return t >= hourStart && t < hourEnd;
+      }).length;
     });
 
     const errorSparkline = Array.from({ length: 24 }, (_, i) => {
-      const hourRuns = runs.filter(r => {
-        const runTime = new Date(r.startedAt).getTime();
-        const hourStart = Date.now() - (24 - i) * 3600000;
-        const hourEnd = hourStart + 3600000;
-        return runTime >= hourStart && runTime < hourEnd && (r.status === 'failed' || r.status === 'timeout');
-      });
-      return hourRuns.length;
+      const hourStart = Date.now() - (24 - i) * 3600000;
+      const hourEnd = hourStart + 3600000;
+      return runs.filter((r) => {
+        const t = new Date(r.startedAt).getTime();
+        return t >= hourStart && t < hourEnd && (r.status === 'failed' || r.status === 'timeout');
+      }).length;
     });
 
-    // Generate 7-day activity stats
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const today = new Date();
     const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
+    const dailyTrend = days.map((day, idx) => ({
+      day,
+      executions: idx <= dayOfWeek ? runs.filter((r) => new Date(r.startedAt).getDay() === (idx === 6 ? 0 : idx + 1)).length : 0,
+      successful: idx <= dayOfWeek ? runs.filter((r) => new Date(r.startedAt).getDay() === (idx === 6 ? 0 : idx + 1) && r.status === 'completed').length : 0,
+    }));
 
-    // Use seeded random based on workflow tag for consistent display
-    const seed = (workflowTag || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-    const seededRandom = (offset: number) => {
-      const x = Math.sin(seed + offset) * 10000;
-      return x - Math.floor(x);
-    };
+    // Last 7 calendar days (not weekdays): e.g. Jan 28, Jan 29, … Feb 3
+    const last7CalendarDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      d.setHours(0, 0, 0, 0);
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      const dateKey = d.toISOString().slice(0, 10);
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const executions = runs.filter((r) => {
+        const t = new Date(r.startedAt).getTime();
+        return t >= d.getTime() && t < next.getTime();
+      }).length;
+      const successful = runs.filter((r) => {
+        const t = new Date(r.startedAt).getTime();
+        return t >= d.getTime() && t < next.getTime() && (r.status === 'completed');
+      }).length;
+      return { dateKey, label, executions, successful };
+    });
 
     const weeklyStats = {
-      executions: Math.floor(seededRandom(1) * 800) + 200 + total,
-      successful: Math.floor(seededRandom(2) * 700) + 180 + completed,
-      failed: Math.floor(seededRandom(3) * 50) + 10 + failed,
-      avgDuration7d: avgDuration + (seededRandom(4) * 10000 - 5000),
-      p95_7d: p95 + (seededRandom(5) * 5000 - 2500),
-      throughput: Math.floor(seededRandom(6) * 50) + 10,
-      dailyTrend: days.map((day, idx) => ({
-        day,
-        executions: idx <= dayOfWeek ? Math.floor(seededRandom(7 + idx) * 120) + 30 : 0,
-        successful: idx <= dayOfWeek ? Math.floor(seededRandom(14 + idx) * 110) + 28 : 0,
-      })),
+      executions: total,
+      successful: completed,
+      failed,
+      avgDuration7d: avgDuration,
+      p95_7d: p95,
+      throughput: total,
+      dailyTrend,
+      last7CalendarDays,
     };
 
     return {
-      total, completed, failed, running, cancelled, timeout,
-      avgDuration, p50, p95, p99,
-      successRate, errorRate,
-      sparklineData, errorSparkline, weeklyStats
+      total,
+      completed,
+      failed,
+      running,
+      cancelled,
+      timeout,
+      avgDuration,
+      p50,
+      p95,
+      p99,
+      successRate,
+      errorRate,
+      sparklineData,
+      errorSparkline,
+      weeklyStats,
     };
-  }, [workflowTag]);
+  }, [runs]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise(r => setTimeout(r, 800));
+    await refetch();
     setIsRefreshing(false);
-    toast.success('Data refreshed');
+    toast.success('Runs refreshed');
   };
 
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
     try {
       JSON.parse(executeInput);
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 1200));
       toast.success('Workflow triggered successfully');
       setShowExecuteModal(false);
     } catch {
@@ -433,148 +509,245 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
   // ===== MAIN RUNS LIST VIEW =====
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
+      {/* Sidebar - collapsible like DatabaseExplorerTab */}
+      <div
+        className={cn(
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-[width] duration-200',
+          isSidebarCollapsed ? 'w-14' : 'w-64'
+        )}
+      >
         {/* Header */}
-        <div className="flex-shrink-0 p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Activity className="h-5 w-5 text-primary" />
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-grey text-sm truncate">{workflowName}</h2>
-              <p className="text-xs text-grey-600 truncate">{envSlug}</p>
-            </div>
+        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
+            <button
+              onClick={() => {
+                if (isSidebarCollapsed) setIsSidebarCollapsed(false);
+              }}
+              className={cn(
+                'flex items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
+                isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
+              )}
+              title={isSidebarCollapsed ? 'Expand sidebar' : workflowName}
+            >
+              <Activity className="h-5 w-5 text-primary" />
+            </button>
+            {!isSidebarCollapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-grey text-sm truncate">{workflowName}</h2>
+                  <p className="text-xs text-grey-600 truncate">{envSlug}</p>
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-            <Input
-              type="text"
-              placeholder="Search runs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
+          {/* Search - only when expanded */}
+          {!isSidebarCollapsed && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
+              <Input
+                type="text"
+                placeholder="Search runs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-2 min-h-0">
-            {/* Overview Link */}
-            <div className="mb-4">
+          {isSidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-2">
               <button
-                onClick={() => setViewMode('overview')}
+                onClick={() => {
+                  setIsSidebarCollapsed(false);
+                  setViewMode('overview');
+                }}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
                   viewMode === 'overview'
                     ? 'bg-primary/10 text-primary'
-                    : 'text-grey hover:bg-background-secondary'
+                    : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
                 )}
+                title="Overview"
               >
-                <LayoutDashboard className={cn(
-                  'h-4 w-4',
-                  viewMode === 'overview' ? 'text-primary' : 'text-grey-600'
-                )} />
-                <span className="flex-1 text-left font-medium">Overview</span>
+                <LayoutDashboard className="h-5 w-5" />
               </button>
-            </div>
-
-            {/* Status Filters */}
-            <div className="flex items-center justify-between px-2 py-2">
-              <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-                Status
-              </div>
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="text-grey-600 hover:text-primary transition-colors"
-                title="Refresh runs"
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-              </button>
-            </div>
-
-            <div className="space-y-0.5">
               {([
-                { value: 'all', label: 'All Runs', icon: <LayoutGrid className="h-4 w-4" />, count: DUMMY_RUNS.length },
-                { value: 'running', label: 'Running', icon: <Loader2 className="h-4 w-4" />, count: metrics.running },
-                { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-4 w-4" />, count: metrics.completed },
-                { value: 'failed', label: 'Failed', icon: <AlertCircle className="h-4 w-4" />, count: metrics.failed },
-              ] as const).map((status) => (
+                { value: 'all', icon: LayoutGrid },
+                { value: 'running', icon: Loader2 },
+                { value: 'completed', icon: CheckCircle2 },
+                { value: 'failed', icon: AlertCircle },
+              ] as const).map(({ value, icon: Icon }) => (
                 <button
-                  key={status.value}
+                  key={value}
                   onClick={() => {
-                    setStatusFilter(status.value);
+                    setIsSidebarCollapsed(false);
+                    setStatusFilter(value);
                     setViewMode('runs');
                   }}
                   className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
+                    viewMode === 'runs' && statusFilter === value
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+                  )}
+                  title={value === 'all' ? 'All Runs' : value.charAt(0).toUpperCase() + value.slice(1)}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              ))}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="text-grey-600 hover:text-primary hover:bg-grey-100 rounded-lg p-2 transition-colors"
+                title="Refresh runs"
+              >
+                <RefreshCw className={cn('h-5 w-5', isRefreshing && 'animate-spin')} />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Overview Link */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setViewMode('overview')}
+                  className={cn(
                     'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                    viewMode === 'runs' && statusFilter === status.value
+                    viewMode === 'overview'
                       ? 'bg-primary/10 text-primary'
                       : 'text-grey hover:bg-background-secondary'
                   )}
                 >
-                  <span className={cn(
-                    viewMode === 'runs' && statusFilter === status.value ? 'text-primary' : 'text-grey-600'
-                  )}>
-                    {status.icon}
-                  </span>
-                  <span className="flex-1 text-left">{status.label}</span>
-                  <span className={cn(
-                    'text-xs px-1.5 py-0.5 rounded',
-                    viewMode === 'runs' && statusFilter === status.value
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-background-secondary text-grey-600'
-                  )}>
-                    {status.count}
-                  </span>
+                  <LayoutDashboard className={cn(
+                    'h-4 w-4',
+                    viewMode === 'overview' ? 'text-primary' : 'text-grey-600'
+                  )} />
+                  <span className="flex-1 text-left font-medium">Overview</span>
                 </button>
-              ))}
-            </div>
-
-            {/* Time Range Filter */}
-            <div className="mt-4 px-2">
-              <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
-                Time Range
               </div>
+
+              {/* Status Filters */}
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                  Status
+                </div>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="text-grey-600 hover:text-primary transition-colors"
+                  title="Refresh runs"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+                </button>
+              </div>
+
               <div className="space-y-0.5">
-                {[
-                  { value: '1h', label: 'Last Hour' },
-                  { value: '24h', label: 'Last 24 Hours' },
-                  { value: '7d', label: 'Last 7 Days' },
-                  { value: '30d', label: 'Last 30 Days' },
-                  { value: 'all', label: 'All Time' },
-                ].map(option => (
+                {([
+                  { value: 'all', label: 'All Runs', icon: <LayoutGrid className="h-4 w-4" />, count: runs.length },
+                  { value: 'running', label: 'Running', icon: <Loader2 className="h-4 w-4" />, count: metrics.running },
+                  { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-4 w-4" />, count: metrics.completed },
+                  { value: 'failed', label: 'Failed', icon: <AlertCircle className="h-4 w-4" />, count: metrics.failed },
+                ] as const).map((status) => (
                   <button
-                    key={option.value}
-                    onClick={() => setTimeRange(option.value as any)}
+                    key={status.value}
+                    onClick={() => {
+                      setStatusFilter(status.value);
+                      setViewMode('runs');
+                    }}
                     className={cn(
                       'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                      timeRange === option.value
+                      viewMode === 'runs' && statusFilter === status.value
                         ? 'bg-primary/10 text-primary'
                         : 'text-grey hover:bg-background-secondary'
                     )}
                   >
-                    <Calendar className={cn(
-                      'h-4 w-4',
-                      timeRange === option.value ? 'text-primary' : 'text-grey-600'
-                    )} />
-                    <span className="flex-1 text-left">{option.label}</span>
+                    <span className={cn(
+                      viewMode === 'runs' && statusFilter === status.value ? 'text-primary' : 'text-grey-600'
+                    )}>
+                      {status.icon}
+                    </span>
+                    <span className="flex-1 text-left">{status.label}</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded min-w-[20px] flex items-center justify-center',
+                      viewMode === 'runs' && statusFilter === status.value
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {(isLoadingRuns || isRefreshing) ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        status.count
+                      )}
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
 
-        {/* Run Workflow Button */}
-        <div className="flex-shrink-0 p-4 border-t border-grey-400">
-          <Button
-            onClick={() => setShowExecuteModal(true)}
-            className="w-full bg-primary hover:bg-primary/90 text-white"
-          >
-            <Play className="h-4 w-4 mr-2" />
-            Run Workflow
-          </Button>
+              {/* Time Range Filter */}
+              <div className="mt-4 px-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
+                  Time Range
+                </div>
+                <div className="space-y-0.5">
+                  {[
+                    { value: '1h', label: 'Last Hour' },
+                    { value: '24h', label: 'Last 24 Hours' },
+                    { value: '7d', label: 'Last 7 Days' },
+                    { value: '30d', label: 'Last 30 Days' },
+                    { value: 'all', label: 'All Time' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setTimeRange(option.value as any)}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                        timeRange === option.value
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-grey hover:bg-background-secondary'
+                      )}
+                    >
+                      <Calendar className={cn(
+                        'h-4 w-4',
+                        timeRange === option.value ? 'text-primary' : 'text-grey-600'
+                      )} />
+                      <span className="flex-1 text-left">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer - Expand button when collapsed, Run Workflow when expanded */}
+        <div className={cn('flex-shrink-0 border-t border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+          {isSidebarCollapsed ? (
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              title="Expand sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <Button
+              onClick={() => setShowExecuteModal(true)}
+              className="w-full bg-primary hover:bg-primary/90 text-white"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Run Workflow
+            </Button>
+          )}
         </div>
       </div>
 
@@ -628,7 +801,18 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
           </div>
         </div>
 
-        {viewMode === 'overview' ? (
+        {isLoadingRuns ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="flex flex-col items-center gap-3 text-grey-600">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm font-medium">Loading workflow runs…</p>
+            </div>
+          </div>
+        ) : !currentWorkspaceId || !user ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <p className="text-sm text-grey-600">Sign in and select a workspace to view runs.</p>
+          </div>
+        ) : viewMode === 'overview' ? (
             /* Overview Content */
             <div className="flex-1 overflow-auto p-6">
               {/* 7-Day Activity Stats - Session Dashboard Style */}
@@ -724,35 +908,32 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                 </div>
               </div>
 
-              {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+              {/* Activity Timeline – last 7 calendar days (e.g. Jan 28 … Feb 3) */}
               <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
                 </div>
                 <div className="space-y-3">
-                  {(() => {
-                    const normalized = getLast7DaysNormalized(metrics.weeklyStats.dailyTrend, (d) => d.executions ?? 0);
-                    const maxActivity = Math.max(...normalized.map((d) => d.value), 1);
-                    return normalized.map((day) => {
-                      const percentage = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
-                      return (
-                        <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                              style={{ width: `${percentage}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center px-3">
-                              <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                {day.value.toLocaleString()} executions
-                              </span>
-                            </div>
+                  {metrics.weeklyStats.last7CalendarDays.map((day) => {
+                    const maxActivity = Math.max(...metrics.weeklyStats.last7CalendarDays.map((d) => d.executions), 1);
+                    const percentage = maxActivity > 0 ? (day.executions / maxActivity) * 100 : 0;
+                    return (
+                      <div key={day.dateKey} className="flex items-center gap-3">
+                        <div className="w-14 text-xs font-medium text-grey-600">{day.label}</div>
+                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                          <div className="absolute inset-0 flex items-center px-3">
+                            <span className="text-xs font-semibold text-white drop-shadow-sm">
+                              {day.executions.toLocaleString()} executions
+                            </span>
                           </div>
                         </div>
-                      );
-                    });
-                  })()}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -837,11 +1018,11 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                   <h3 className="text-sm font-semibold text-grey mb-4">Runs by Trigger</h3>
                   <div className="space-y-3">
                     {[
-                      { label: 'Manual', count: DUMMY_RUNS.filter(r => r.triggeredBy === 'manual').length, color: 'bg-primary' },
-                      { label: 'API', count: DUMMY_RUNS.filter(r => r.triggeredBy === 'api').length, color: 'bg-grey-500' },
-                      { label: 'Webhook', count: DUMMY_RUNS.filter(r => r.triggeredBy === 'webhook').length, color: 'bg-green' },
-                      { label: 'Schedule', count: DUMMY_RUNS.filter(r => r.triggeredBy === 'schedule').length, color: 'bg-blue' },
-                      { label: 'Event', count: DUMMY_RUNS.filter(r => r.triggeredBy === 'event').length, color: 'bg-yellow' },
+                      { label: 'Manual', count: runs.filter(r => r.triggeredBy === 'manual').length, color: 'bg-primary' },
+                      { label: 'API', count: runs.filter(r => r.triggeredBy === 'api').length, color: 'bg-grey-500' },
+                      { label: 'Webhook', count: runs.filter(r => r.triggeredBy === 'webhook').length, color: 'bg-green' },
+                      { label: 'Schedule', count: runs.filter(r => r.triggeredBy === 'schedule').length, color: 'bg-blue' },
+                      { label: 'Event', count: runs.filter(r => r.triggeredBy === 'event').length, color: 'bg-yellow' },
                     ].map((item) => (
                       <div key={item.label} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -911,7 +1092,7 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                   </Button>
                 </div>
                 <div className="divide-y divide-border">
-                  {DUMMY_RUNS.slice(0, 5).map((run) => {
+                  {runs.slice(0, 5).map((run) => {
                     const statusConfig = getStatusConfig(run.status);
                     const completedSteps = run.steps.filter(s => s.status === 'completed').length;
                     return (
@@ -923,8 +1104,8 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                         <div className="flex items-center gap-3">
                           <div className={cn('w-2 h-2 rounded-full', statusConfig.dotColor)} />
                           <div>
-                            <p className="text-sm font-medium text-grey">#{run.runNumber}</p>
-                            <p className="text-xs text-grey-500 font-mono">{run.id}</p>
+                            <p className="text-sm font-medium text-grey">{formatTime(run.startedAt, false)}</p>
+                            <p className="text-xs text-grey-500 font-mono truncate max-w-[200px]" title={run.id}>{shortProcessId(run.id)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1013,14 +1194,14 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
                         <div className={cn('w-2 h-2 rounded-full flex-shrink-0', statusConfig.dotColor)} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-grey">#{run.runNumber}</span>
+                            <span className="font-semibold text-grey" title={run.id}>{formatTime(run.startedAt, false)}</span>
                             {run.tags && run.tags.includes('priority') && (
                               <span className="px-1.5 py-0.5 text-[10px] font-bold bg-yellow/10 text-yellow rounded">
                                 PRIORITY
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-grey-700 font-mono truncate">{run.id}</p>
+                          <p className="text-xs text-grey-700 font-mono truncate" title={run.id}>{shortProcessId(run.id)}</p>
                         </div>
                       </div>
 
@@ -1039,7 +1220,10 @@ export default function WorkflowExplorerTab({ workflow = {} }: WorkflowExplorerT
 
                       {/* Trigger */}
                       <div className="flex items-center gap-2">
-                        <triggerConfig.icon className={cn('h-4 w-4', triggerConfig.color)} />
+                        {(() => {
+                          const TriggerIcon = triggerConfig.icon;
+                          return <TriggerIcon className={cn('h-4 w-4', triggerConfig.color)} />;
+                        })()}
                         <div className="min-w-0">
                           <p className="text-sm text-grey">{triggerConfig.label}</p>
                           {run.triggeredByUser && run.triggeredByUser !== 'system' && (
