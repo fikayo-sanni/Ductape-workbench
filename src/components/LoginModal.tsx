@@ -17,6 +17,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -27,6 +28,7 @@ import toast from "react-hot-toast";
 import { Loader, Eye, EyeOff, Mail } from "lucide-react";
 import CreateAccountModal from "./CreateAccountModal";
 import { triggerOnboardingForNewUser } from "@/utils/onboarding";
+import ResetPassword from "./resetPassword";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -45,6 +47,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
 
   // OTP verification state
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState(false);
   const [userId, setUserId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
@@ -245,6 +248,15 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               )}
             />
 
+            <div className="text-end">
+  <div 
+    className="text-primary text-sm font-bold cursor-pointer"
+    onClick={() => setResetPasswordModal(true)} // Add this onClick handler
+  >
+    Forgot your password?
+  </div>
+</div>
+
             <Button
               type="submit"
               className="w-full font-bold h-12"
@@ -266,7 +278,6 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           {[
             { name: "google", label: "Google" },
             { name: "github", label: "GitHub" },
-            { name: "linkedin", label: "LinkedIn" },
           ].map((provider) => (
             <Button
               key={provider.name}
@@ -385,6 +396,27 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+  open={resetPasswordModal}
+  onOpenChange={setResetPasswordModal}
+>
+  <DialogContent className="sm:max-w-md">
+    
+    
+    <ResetPassword />
+    
+    {/* Add a close button */}
+    <DialogFooter>
+      <Button 
+        variant="outline" 
+        onClick={() => setResetPasswordModal(false)}
+      >
+        Cancel
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </div>
   );
 }
