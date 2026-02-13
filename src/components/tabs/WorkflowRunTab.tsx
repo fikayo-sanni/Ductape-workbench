@@ -210,7 +210,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
       console.warn('[WorkflowRunTab] Steps fetch DISABLED:', reason);
       if (!hasAlertedDisabledRef.current) {
         hasAlertedDisabledRef.current = true;
-        alert(`Steps fetch is disabled: ${reason}. Check console for details.`);
+        //alert(`Steps fetch is disabled: ${reason}. Check console for details.`);
       }
     } else if (queryEnabled) {
       hasAlertedDisabledRef.current = false;
@@ -537,6 +537,109 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
             </div>
           )}
 
+          {/* Workflow visualization: linear flow of steps */}
+          <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <GitBranch className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-grey">Workflow</h3>
+                  <p className="text-xs text-grey-500">
+                    {stepsLoading ? 'Loading…' : `${steps.length} step${steps.length === 1 ? '' : 's'} in execution order`}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 overflow-x-auto">
+              <div className="flex items-center gap-0 min-w-max">
+                {/* Start node */}
+                <div className="flex items-center gap-0">
+                  <div className="px-4 py-2.5 rounded-lg bg-grey-100 border border-grey-300 text-sm font-medium text-grey-600">
+                    Start
+                  </div>
+                  {steps.length > 0 && (
+                    <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                  )}
+                </div>
+                {/* Step nodes */}
+                {showStepsLoading ? (
+                  <div className="flex items-center gap-2 px-4 py-3 text-grey-500 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading steps…
+                  </div>
+                ) : (
+                  steps.map((step, index) => {
+                    const stepStatus = stepDisplayStatus(step);
+                    const stepConfig = getStatusConfig(stepStatus);
+                    const StepStatusIcon = stepConfig.icon;
+                    const label = step.step_tag ?? step.process_id ?? `Step ${index + 1}`;
+                    return (
+                      <div key={step.process_id} className="flex items-center gap-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleStepExpanded(step.process_id);
+                            document.getElementById(`step-row-${step.process_id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }}
+                          className={cn(
+                            'px-4 py-2.5 rounded-lg border text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2',
+                            'min-w-[120px] max-w-[180px]',
+                            stepStatus === 'completed' && 'bg-green/5 border-green/30 text-grey',
+                            stepStatus === 'failed' && 'bg-red/5 border-red/30 text-grey',
+                            stepStatus === 'running' && 'bg-primary/5 border-primary/30 text-grey',
+                            stepStatus === 'pending' && 'bg-grey-50 border-grey-300 text-grey-600',
+                            stepStatus === 'skipped' && 'bg-grey-50 border-grey-300 text-grey-500',
+                            stepStatus === 'retrying' && 'bg-yellow/5 border-yellow/30 text-grey',
+                          )}
+                          title={`${label} (${step.step_type ?? 'action'}) – ${stepConfig.label}. Click to scroll to details.`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              'w-6 h-6 rounded flex items-center justify-center flex-shrink-0',
+                              stepConfig.bg,
+                              stepConfig.color,
+                            )}>
+                              {stepStatus === 'completed' ? (
+                                <CheckCircle className="h-3.5 w-3.5" />
+                              ) : stepStatus === 'failed' ? (
+                                <XCircle className="h-3.5 w-3.5" />
+                              ) : stepStatus === 'running' ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : stepStatus === 'retrying' ? (
+                                <RotateCcw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <span className="text-xs font-bold">{index + 1}</span>
+                              )}
+                            </div>
+                            <span className="truncate font-medium text-sm">{label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 ml-8 text-xs text-grey-500">
+                            {getStepTypeIcon(step.step_type ?? 'action')}
+                            <span className="capitalize">{step.step_type ?? 'action'}</span>
+                          </div>
+                        </button>
+                        {index < steps.length - 1 && (
+                          <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+                {/* End node */}
+                {!showStepsLoading && steps.length > 0 && (
+                  <>
+                    <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                    <div className="px-4 py-2.5 rounded-lg bg-grey-100 border border-grey-300 text-sm font-medium text-grey-600">
+                      End
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Visual Timeline */}
           <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -625,11 +728,15 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
                 const showBar = Object.keys(barStyle).length > 0;
 
                 return (
-                  <div key={step.process_id} className={cn(
-                    'transition-colors',
-                    stepStatus === 'running' && 'bg-primary/5',
-                    stepStatus === 'failed' && 'bg-red/5',
-                  )}>
+                  <div
+                    key={step.process_id}
+                    id={`step-row-${step.process_id}`}
+                    className={cn(
+                      'transition-colors',
+                      stepStatus === 'running' && 'bg-primary/5',
+                      stepStatus === 'failed' && 'bg-red/5',
+                    )}
+                  >
                     <button
                       onClick={() => toggleStepExpanded(step.process_id)}
                       className="w-full px-5 py-3 flex items-center gap-4 text-left hover:bg-grey-100 transition-colors"
