@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Coins, Clock, Zap, TrendingUp, Edit, Trash2, FileText, Download, CheckCircle, XCircle, AlertCircle, Calendar, Users, Package, HardDrive, ShoppingBag, ChevronDown, ChevronRight, DollarSign } from 'lucide-react';
+import { Plus, Coins, Clock, Zap, TrendingUp, Edit, Trash2, FileText, Download, CheckCircle, XCircle, AlertCircle, Calendar, Users, Package, HardDrive, ShoppingBag, ChevronDown, ChevronRight, DollarSign, Receipt, Clock1, Signal } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -35,6 +35,7 @@ import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { Pricing, PricingMode, PaymentInterval, PricingPlan } from '@/types/pricing';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 
 export type PricingBundle = Pricing;
 
@@ -694,8 +695,7 @@ export default function PricingTabContent() {
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
-  const [activeSection, setActiveSection] = useState<'pricing' | 'income' | 'expenditure'>('pricing');
-
+  const { billingView, setBillingView } = useWorkbenchStore();
   // Monthly drill-down state
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<WorkspaceInvoice | null>(null);
@@ -1064,36 +1064,118 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                 <Coins className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold text-grey">Pricing & Billing</h1>
               </div>
-              <p className="text-grey-600">
+              <p className="text-grey-600 pl-9">
                 Manage your pricing bundles, track income and expenses
               </p>
             </div>
-            <Button className="gap-2" onClick={handleAddBundle}>
+            <Button className="gap-2 my-auto" onClick={handleAddBundle}>
               <Plus className="h-4 w-4" />
               New Bundle
             </Button>
           </div>
         </div>
 
-        {/* Current Plan Banner */}
-        <div className="bg-gradient-to-r from-primary/10 via-blue/5 to-green/5 rounded-lg border border-primary/20 p-6 shadow-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Package className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-bold text-grey">Current Plan: Enterprise</h2>
-              </div>
-              <p className="text-sm text-grey-600">
+        {billingView === 'expenses' && (
+          <>
+        <section className="flex flex-col justify-center border border-grey-400 rounded-[5px] p-4 md:p-6 w-full">
+        <div className="flex flex-col md:flex-row">
+          <div className="flex flex-col md:flex-row justify-between items-start w-full md:pr-10 gap-4 md:gap-0">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <Receipt
+                  width={24}
+                  height={24}
+                  className="text-primary"
+                />
+                <div className="pl-2">
+                  <p className="text-sm md:text-base text-grey font-bold">
+                    YOUR BILLING SUMMARY
+                  </p>
+                  <p className="text-sm text-grey-600">
                 $199.00/month • Renews on January 24, 2025
               </p>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <p className="text-grey text-[32px] font-bold pb-1">
+                  $
+                  {expenseData?.totalSpending.toFixed(2)}
+                </p>
+                <p className="text-xs text-primary font-semibold">
+                  TOTAL AMOUNT DUE
+                </p>
+              </div>
             </div>
-            <Badge variant="default" className="bg-green">
-              Active
-            </Badge>
+
+            <span className="text-sm font-bold text-primary bg-[#0846A6] bg-opacity-15 px-2 py-1 rounded-[5px] ml-auto uppercase">
+              Enterprise
+            </span>
           </div>
 
-          {/* Usage Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-col ml-auto justify-between border-l border-l-[#8F92A1] pl-5 pr-10 border-opacity-[40%] w-1/3">
+            <div className="flex items-center">
+              <FileText
+                width={24}
+                height={24}
+                className="text-primary"
+              />
+              <div className="pl-2">
+                <p className="text-grey-700 text-sm font-normal">
+                  Current Plan Billing
+                </p>
+                <p className="text-[20px] text-grey font-bold">
+                  ${' '}
+                  {199.00.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <Clock
+                width={24}
+                height={24}
+                className="text-primary"
+              />
+              <div className="pl-2">
+                <p className="text-grey-700 text-sm font-normal">
+                  Next Billing Date
+                </p>
+                <p className="text-[20px] text-grey font-bold">
+                 March 1, 2025
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center border-t  mt-10 pt-6 border-t-[#8F92A1] border-opacity-[40%]">
+          <div className="flex items-center space-x-2">
+            <Signal
+              width={24}
+              height={24}
+              className="text-primary"
+            />
+            <p className="text-grey text-[20px] font-bold">
+              Current Plan Resource Usage
+            </p>
+            
+          </div>
+
+          <div className="flex gap-2">
+            
+            <Button variant="outline" size="sm" className="gap-1.5 w-[141px] h-[33px] border border-primary text-primary" onClick={() => setUsageDetailsOpen(true)}>
+              <FileText className="h-3.5 w-3.5" />
+              View Usage Details
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 w-[111px] h-[33px] border border-primary bg-primary text-white hover:bg-primary" onClick={() => setUpgradePlanOpen(true)}>
+              <TrendingUp className="h-3.5 w-3.5" />
+              Upgrade Plan
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10">
             {/* API Requests */}
             <div className="bg-white rounded-lg border border-grey-400 p-4">
               <div className="flex items-center justify-between mb-2">
@@ -1105,17 +1187,17 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="bg-primary h-2 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
                 1,150,000 / 1,000,000 requests
               </p>
-              <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-orange-700">
+              <div className="bg-primary/10 border border-primary/20 rounded px-2 py-1">
+                <p className="text-xs font-semibold text-primary/80">
                   Overage: +150,000 requests
                 </p>
-                <p className="text-xs text-orange-600">
+                <p className="text-xs text-primary/60">
                   $7.50 @ $0.05/1K
                 </p>
               </div>
@@ -1132,17 +1214,17 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="bg-[#00875A] h-2 rounded-full" style={{ width: '100%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
                 108 GB / 100 GB
               </p>
-              <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-orange-700">
+              <div className="bg-[#00875A]/  border border-[#00875A]/20 rounded px-2 py-1">
+                <p className="text-xs font-semibold text-[#00875A]/70">
                   Overage: +8 GB
                 </p>
-                <p className="text-xs text-orange-600">
+                <p className="text-xs text-[#00875A]/60">
                   $2.40 @ $0.30/GB
                 </p>
               </div>
@@ -1152,105 +1234,114 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
             <div className="bg-white rounded-lg border border-grey-400 p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-500" />
+                  <Users className="h-4 w-4 text-orange-500" />
                   <span className="text-sm font-semibold text-grey">Users</span>
                 </div>
                 <span className="text-xs text-grey-600">8 / 20</span>
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: '40%' }}></div>
+                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: '40%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
                 12 user slots remaining
               </p>
-              <div className="bg-green-50 border border-green-200 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-green-700">
+              <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                <p className="text-xs font-semibold text-orange-700">
                   No overage
                 </p>
-                <p className="text-xs text-green-600">
+                <p className="text-xs text-orange-600">
                   Within plan limits
                 </p>
               </div>
             </div>
           </div>
+        
+      </section>
 
-          {/* Quick Actions */}
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setUpgradePlanOpen(true)}>
-              <TrendingUp className="h-3.5 w-3.5" />
-              Upgrade Plan
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setUsageDetailsOpen(true)}>
-              <FileText className="h-3.5 w-3.5" />
-              View Usage Details
-            </Button>
-          </div>
-        </div>
-
-        {/* Section Navigation */}
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {/* Pricing */}
-          <button
-            onClick={() => setActiveSection('pricing')}
-            className={`bg-white rounded-lg border p-4 shadow-sm transition-colors text-left flex-shrink-0 ${
-              activeSection === 'pricing' ? 'border-primary bg-primary/5' : 'border-grey-400 hover:border-primary hover:bg-primary/5'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
+      <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
+              <div className=" flex gap-2 p-4 border-b border-grey-400">
+                <Clock1 
+                className="text-primary"
+                width={24}
+                height={24}
+                />
+                <h3 className="text-lg font-semibold text-grey">Recent Expenses</h3>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">{totalBundles}</p>
-                <p className="text-sm text-grey-600">Pricing Bundles</p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-semibold">Reference</TableHead>
+                      <TableHead className="font-semibold">Vendor</TableHead>
+                      <TableHead className="font-semibold">Category</TableHead>
+                      <TableHead className="font-semibold">Details</TableHead>
+                      <TableHead className="font-semibold">Amount</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
+                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
+                        <TableCell>
+                          <span className="font-medium text-grey">{expenditure.reference}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-grey-700">{expenditure.vendor}</span>
+                            <span className="text-xs text-grey-600">{expenditure.details}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="gap-1.5 text-grey">
+                            {getCategoryIcon(expenditure?.category as ExpenditureCategory)}
+                            {getCategoryLabel(expenditure?.category as ExpenditureCategory)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {expenditure?.usage_count && (
+                            <span className="text-sm text-grey-600">
+                              {expenditure?.usage_count.toLocaleString()} requests
+                            </span>
+                          )}
+                          {expenditure?.bundle_name && (
+                            <span className="text-sm text-grey-600">
+                              {expenditure?.bundle_name}
+                            </span>
+                          )}
+                          {!expenditure?.usage_count && !expenditure?.bundle_name && (
+                            <span className="text-sm text-grey-600">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold text-red">
+                            {formatCurrency(expenditure.amount, expenseData?.currency as CurrencyCode)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getExpenditureStatusIcon(expenditure?.status as ExpenditureStatus)}
+                            <Badge variant={getExpenditureStatusBadgeVariant(expenditure?.status as ExpenditureStatus)}>
+                              {expenditure.status.charAt(0).toUpperCase() + expenditure.status.slice(1)}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
-          </button>
+</>
+                  )}
 
-          {/* Income */}
-          <button
-            onClick={() => setActiveSection('income')}
-            className={`bg-white rounded-lg border p-4 shadow-sm transition-colors text-left flex-shrink-0 ${
-              activeSection === 'income' ? 'border-primary bg-primary/5' : 'border-grey-400 hover:border-primary hover:bg-primary/5'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-green" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">${(totalRevenue / 1000).toFixed(1)}k</p>
-                <p className="text-sm text-grey-600">Total Income</p>
-              </div>
-            </div>
-          </button>
-
-          {/* Expenditure */}
-          <button
-            onClick={() => setActiveSection('expenditure')}
-            className={`bg-white rounded-lg border p-4 shadow-sm transition-colors text-left flex-shrink-0 ${
-              activeSection === 'expenditure' ? 'border-primary bg-primary/5' : 'border-grey-400 hover:border-primary hover:bg-primary/5'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                <ShoppingBag className="h-5 w-5 text-red" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-grey">${(totalExpenditureAmount / 1000).toFixed(1)}k</p>
-                <p className="text-sm text-grey-600">Total Expenses</p>
-              </div>
-            </div>
-          </button>
-        </div>
 
         {/* Pricing Section */}
-        {activeSection === 'pricing' && (
+        {billingView === 'bundles' && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -1298,38 +1389,11 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
-            {/* Distribution Chart */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-grey mb-4">Bundle Distribution</h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={modeDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value) => {
-                      if (value === undefined || value === null) return ['', ''];
-                      const numValue = typeof value === 'number' ? value : parseInt(String(value), 10);
-                      if (isNaN(numValue)) return ['', ''];
-                      return [`${numValue} subscription${numValue !== 1 ? 's' : ''}`, ''];
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Pricing Bundles Table */}
             <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
               <div className="p-4 border-b border-grey-400">
-                <h3 className="text-lg font-semibold text-grey">Active Pricing Bundles</h3>
+                <h3 className="text-lg font-semibold text-grey">Active Pricing Bundles: {activePricings.length ?? 0}</h3>
               </div>
               <div className="overflow-x-auto">
                 <Table>
@@ -1340,15 +1404,22 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                       <TableHead className="font-semibold">Price</TableHead>
                       <TableHead className="font-semibold">Interval</TableHead>
                       <TableHead className="font-semibold">Overage Pricing</TableHead>
-                      <TableHead className="font-semibold text-right">Actions</TableHead>
+                      <TableHead className="font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activePricings.map((bundle) => {
-                      const customers = BUNDLE_CUSTOMERS[bundle._id] || [];
-                      const isExpanded = expandedBundleId === bundle._id;
+                    {activePricings.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-5 font-semibold">
+                          No active pricing bundles
+                        </TableCell>
+                      </TableRow>
+                      ) : (
+                      activePricings.map((bundle) => {
+                        const customers = BUNDLE_CUSTOMERS[bundle._id] || [];
+                        const isExpanded = expandedBundleId === bundle._id;
 
-                      return (
+                        return (
                         <React.Fragment key={bundle._id}>
                           <TableRow
                             className="hover:bg-grey-100 transition-colors cursor-pointer"
@@ -1513,20 +1584,120 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                       )}
                     </React.Fragment>
                   );
-                })}
+                })
+                )}
                   </TableBody>
                 </Table>
               </div>
             </div>
+
+            {/* Distribution Chart */}
+            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-grey mb-4">Bundle Distribution</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={modeDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value) => {
+                      if (value === undefined || value === null) return ['', ''];
+                      const numValue = typeof value === 'number' ? value : parseInt(String(value), 10);
+                      if (isNaN(numValue)) return ['', ''];
+                      return [`${numValue} subscription${numValue !== 1 ? 's' : ''}`, ''];
+                    }}
+                  />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Pricing Bundles Table */}
+            
           </div>
         )}
 
         {/* Income Section */}
-        {activeSection === 'income' && (
+        {billingView === 'revenue' && (
           <div className="space-y-6">
+            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row">
+          <div className="flex flex-col md:flex-row justify-between items-start w-full md:pr-10 gap-4 md:gap-0">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <Receipt
+                  width={24}
+                  height={24}
+                  className="text-primary"
+                />
+                <div className="pl-2">
+                  <p className="text-sm md:text-base text-grey font-bold">
+                    YOUR INCOME SUMMARY
+                  </p>
+                  <p className="text-sm text-grey-600">
+                Income Period: February 1, 2025 - March 1, 2025
+              </p>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <p className="text-grey text-[32px] font-bold pb-1">
+                  $121,567.00
+                </p>
+                <p className="text-xs text-primary font-semibold">
+                  TOTAL INCOME
+                </p>
+              </div>
+            </div>
+
+            
+          </div>
+
+          <div className="flex flex-col ml-auto justify-between border-l border-l-[#8F92A1] pl-5 pr-10 border-opacity-[40%] w-1/3">
+            <div className="flex items-center">
+              <FileText
+                width={24}
+                height={24}
+                className="text-primary"
+              />
+              <div className="pl-2">
+                <p className="text-grey-700 text-sm font-normal">
+                  Income this Month
+                </p>
+                <p className="text-[20px] text-grey font-bold">
+                  ${' '}
+                  {199.00.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <FileText
+                width={24}
+                height={24}
+                className="text-primary"
+              />
+              <div className="pl-2">
+                <p className="text-grey-700 text-sm font-normal">
+                  Average per month
+                </p>
+                <p className="text-[20px] text-grey font-bold">
+                ${' '}
+                  {121567.00.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+              
+              {/* <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
                     <DollarSign className="h-5 w-5 text-green" />
@@ -1581,8 +1752,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     <p className="text-sm text-grey-600">Avg / Month</p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </div> */}
 
             {/* Revenue Trend Chart */}
             <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
@@ -1789,10 +1959,10 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
         )}
 
         {/* Expenditure Section */}
-        {activeSection === 'expenditure' && (
+        {billingView === 'expenses' && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
@@ -1840,10 +2010,10 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Category Distribution Chart */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            {/* <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-grey mb-4">Category Breakdown</h3>
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
@@ -1874,77 +2044,10 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </div> */}
 
             {/* Expenditures Table */}
-            <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
-              <div className="p-4 border-b border-grey-400">
-                <h3 className="text-lg font-semibold text-grey">Recent Expenses</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold">Reference</TableHead>
-                      <TableHead className="font-semibold">Vendor</TableHead>
-                      <TableHead className="font-semibold">Category</TableHead>
-                      <TableHead className="font-semibold">Details</TableHead>
-                      <TableHead className="font-semibold">Amount</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
-                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
-                        <TableCell>
-                          <span className="font-medium text-grey">{expenditure.reference}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-grey-700">{expenditure.vendor}</span>
-                            <span className="text-xs text-grey-600">{expenditure.details}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="gap-1.5 text-grey">
-                            {getCategoryIcon(expenditure?.category as ExpenditureCategory)}
-                            {getCategoryLabel(expenditure?.category as ExpenditureCategory)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {expenditure?.usage_count && (
-                            <span className="text-sm text-grey-600">
-                              {expenditure?.usage_count.toLocaleString()} requests
-                            </span>
-                          )}
-                          {expenditure?.bundle_name && (
-                            <span className="text-sm text-grey-600">
-                              {expenditure?.bundle_name}
-                            </span>
-                          )}
-                          {!expenditure?.usage_count && !expenditure?.bundle_name && (
-                            <span className="text-sm text-grey-600">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-semibold text-red">
-                            {formatCurrency(expenditure.amount, expenseData?.currency as CurrencyCode)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getExpenditureStatusIcon(expenditure?.status as ExpenditureStatus)}
-                            <Badge variant={getExpenditureStatusBadgeVariant(expenditure?.status as ExpenditureStatus)}>
-                              {expenditure.status.charAt(0).toUpperCase() + expenditure.status.slice(1)}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
+            
           </div>
         )}
 
@@ -2300,189 +2403,187 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
 
         {/* Upgrade Plan Dialog */}
         <Dialog open={upgradePlanOpen} onOpenChange={setUpgradePlanOpen}>
-          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[1086px] w-full max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-grey">Upgrade Your Ductape Plan</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-[24px] font-bold text-grey">Upgrade Workspace</DialogTitle>
+              <DialogDescription className="font-medium text-base text-grey">
                 Choose the plan that best fits your needs. You can upgrade or downgrade at any time.
               </DialogDescription>
             </DialogHeader>
 
             <div className="mt-6 space-y-4">
               {/* Current Plan Indicator */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-900">Currently on Enterprise Plan</span>
-                </div>
-              </div>
+              
 
               {/* Plans Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Starter Plan */}
-                <div className="bg-white rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
+                <div className="bg-white max-w-[322px] w-auto rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
                   <div className="mb-4">
-                    <h3 className="text-lg font-bold text-grey mb-1">Starter</h3>
+                    <h3 className="text-[20px] font-bold text-grey mb-1">Starter</h3>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-grey">$49</span>
-                      <span className="text-grey-600">/month</span>
+                      <span className="text-[40px] font-bold text-grey">$49</span>
+                      <span className="text-grey-600 text-sm">/month</span>
                     </div>
                   </div>
 
                   <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">250,000 API requests/month</span>
+                      <span className="font-medium text-base text-[#78797A]">250,000 API requests/month</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">25 GB storage</span>
+                      <span className="font-medium text-base text-[#78797A]">25 GB storage</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">5 users</span>
+                      <span className="font-medium text-base text-[#78797A]">5 users</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">Email support</span>
+                      <span className="font-medium text-base text-[#78797A]">Email support</span>
                     </li>
                   </ul>
 
-                  <div className="bg-grey-50 rounded border border-grey-300 p-2 mb-4">
-                    <p className="text-xs font-semibold text-grey-700 mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-grey-600 space-y-0.5">
+                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
+                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
+                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
                       <li>• API: $0.10 per 1,000 requests</li>
                       <li>• Storage: $0.50 per GB</li>
                       <li>• Users: $5 per additional user</li>
                     </ul>
                   </div>
 
-                  <Button variant="outline" className="w-full" disabled>
+                  <Button variant="outline" className="w-full text-[12px] font-semibold text-grey mt-32" disabled>
                     Downgrade to Starter
                   </Button>
                 </div>
 
                 {/* Professional Plan */}
-                <div className="bg-white rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
+                <div className="bg-white max-w-[322px] w-auto rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
                   <div className="mb-4">
-                    <h3 className="text-lg font-bold text-grey mb-1">Professional</h3>
+                    <h3 className="text-[20px] font-bold text-grey mb-1">Professional</h3>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-grey">$99</span>
-                      <span className="text-grey-600">/month</span>
+                      <span className="text-[40px] font-bold text-grey">$99</span>
+                      <span className="text-grey-600 text-sm">/month</span>
                     </div>
                   </div>
 
                   <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">500,000 API requests/month</span>
+                      <span className="font-medium text-base text-[#78797A]">500,000 API requests/month</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">50 GB storage</span>
+                      <span className="font-medium text-base text-[#78797A]">50 GB storage</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">10 users</span>
+                      <span className="font-medium text-base text-[#78797A]">10 users</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">Priority email support</span>
+                      <span className="font-medium text-base text-[#78797A]">Priority email support</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">Advanced analytics</span>
+                      <span className="font-medium text-base text-[#78797A]">Advanced analytics</span>
                     </li>
                   </ul>
 
-                  <div className="bg-grey-50 rounded border border-grey-300 p-2 mb-4">
-                    <p className="text-xs font-semibold text-grey-700 mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-grey-600 space-y-0.5">
+                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
+                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
+                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
                       <li>• API: $0.08 per 1,000 requests</li>
                       <li>• Storage: $0.40 per GB</li>
                       <li>• Users: $4 per additional user</li>
                     </ul>
                   </div>
 
-                  <Button variant="outline" className="w-full" disabled>
+                  <Button variant="outline" className="w-full text-[12px] font-semibold text-grey mt-22" disabled>
                     Downgrade to Professional
                   </Button>
                 </div>
 
                 {/* Enterprise Plan (Current) */}
-                <div className="bg-gradient-to-br from-primary/5 to-green/5 rounded-lg border-2 border-primary p-5 relative">
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
-                    Current Plan
-                  </Badge>
+                <div className="bg-white max-w-[322px] w-auto rounded-lg border-2 border-primary p-5 hover:border-primary hover:shadow-md transition-all">
+                  
 
                   <div className="mb-4 mt-2">
-                    <h3 className="text-lg font-bold text-grey mb-1">Enterprise</h3>
+                    <div className="flex gap-2 items-center">
+                    <h3 className="text-[20px] font-bold text-grey mb-1">Enterprise</h3>
+                    <Badge className="bg-primary/20 text-primary">
+                    Current Plan
+                  </Badge>
+                  </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-grey">$199</span>
-                      <span className="text-grey-600">/month</span>
+                      <span className="text-[40px] font-bold text-grey">$199</span>
+                      <span className="text-grey-600 text-sm">/month</span>
                     </div>
                   </div>
 
                   <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">1,000,000 API requests/month</span>
+                      <span className="font-medium text-base text-[#78797A]">1,000,000 API requests/month</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">100 GB storage</span>
+                      <span className="font-medium text-base text-[#78797A]">100 GB storage</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">20 users</span>
+                      <span className="font-medium text-base text-[#78797A]">20 users</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">24/7 priority support</span>
+                      <span className="font-medium text-base text-[#78797A]">24/7 priority support</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">Advanced analytics & reports</span>
+                      <span className="font-medium text-base text-[#78797A]">Advanced analytics & reports</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">Custom integrations</span>
+                      <span className="font-medium text-base text-[#78797A]">Custom integrations</span>
                     </li>
-                    <li className="flex items-start gap-2 text-sm">
+                    <li className="flex items-start gap-2 text-sm py-1">
                       <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="text-grey-700">SLA guarantee</span>
+                      <span className="font-medium text-base text-[#78797A]">SLA guarantee</span>
                     </li>
                   </ul>
 
-                  <div className="bg-white/80 rounded border border-primary/30 p-2 mb-4">
-                    <p className="text-xs font-semibold text-grey-700 mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-grey-600 space-y-0.5">
+                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
+                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
+                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
                       <li>• API: $0.05 per 1,000 requests</li>
                       <li>• Storage: $0.30 per GB</li>
                       <li>• Users: $3 per additional user</li>
                     </ul>
                   </div>
 
-                  <Button className="w-full bg-primary" disabled>
+                  <Button className="w-full text-[12px] font-semibold text-grey mt-50" disabled>
                     Current Plan
                   </Button>
                 </div>
               </div>
 
               {/* Ultimate Plan */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-300 p-6">
+              <div className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 hover:border-[#391484] hover:shadow-md transition-all">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-xl font-bold text-grey">Ultimate</h3>
-                      <Badge className="bg-purple-600">Best Value</Badge>
+                      <h3 className="text-[20px] font-bold text-grey">Ultimate</h3>
+                      <Badge className="bg-[#391484] text-white">Best Value</Badge>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-grey">$399</span>
-                      <span className="text-grey-600">/month</span>
+                      <span className="text-[40px] font-bold text-grey">$399</span>
+                      <span className="text-grey-600 text-[14px]">/month</span>
                     </div>
                   </div>
-                  <Button className="bg-purple-600 hover:bg-purple-700">
+                  <Button className="bg-[#391484] hover:bg-[#391484]/80">
                     <TrendingUp className="h-4 w-4 mr-2" />
                     Upgrade to Ultimate
                   </Button>
@@ -2490,67 +2591,69 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-grey-600 mb-1">API Requests</p>
-                    <p className="text-lg font-bold text-grey">5M/month</p>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
+                    <p className="text-[24px] font-bold text-grey">5M/month</p>
                   </div>
                   <div>
-                    <p className="text-sm text-grey-600 mb-1">Storage</p>
-                    <p className="text-lg font-bold text-grey">500 GB</p>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
+                    <p className="text-[24px] font-bold text-grey">500 GB</p>
                   </div>
                   <div>
-                    <p className="text-sm text-grey-600 mb-1">Users</p>
-                    <p className="text-lg font-bold text-grey">Unlimited</p>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
+                    <p className="text-[24px] font-bold text-grey">Unlimited</p>
                   </div>
                   <div>
-                    <p className="text-sm text-grey-600 mb-1">Support</p>
-                    <p className="text-lg font-bold text-grey">Dedicated</p>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Support</p>
+                    <p className="text-[24px] font-bold text-grey">Dedicated</p>
                   </div>
                 </div>
 
-                <div className="bg-purple-50/50 rounded border border-purple-200 p-2 mt-3">
-                  <p className="text-xs font-semibold text-grey-700 mb-1">Overage Pricing:</p>
-                  <ul className="text-xs text-grey-600 space-y-0.5">
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Everything in Enterprise</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">White-label options</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Dedicated account manager</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Custom contract terms</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">On-premise deployment option</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Priority feature requests</span>
+                  </li>
+                </ul>
+
+                <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4 mt-3">
+                  <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
+                  <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
                     <li>• API: $0.03 per 1,000 requests</li>
                     <li>• Storage: $0.20 per GB</li>
                     <li>• Users: Unlimited (no overage)</li>
                   </ul>
                 </div>
 
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">Everything in Enterprise</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">White-label options</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">Dedicated account manager</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">Custom contract terms</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">On-premise deployment option</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-grey-700">Priority feature requests</span>
-                  </li>
-                </ul>
+                
               </div>
 
               {/* Footer Info */}
-              <div className="bg-grey-100 rounded-lg border border-grey-400 p-4">
+              <div className="bg-primary/15 rounded-lg border border-primary/50 p-4 mt-2">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-grey-700">
+                  <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-primary">
                     <p className="font-semibold mb-1">Upgrade Information</p>
-                    <ul className="space-y-1 text-grey-600">
+                    <ul className="space-y-1 text-primary">
                       <li>• Upgrades take effect immediately</li>
                       <li>• Downgrades will be applied at the end of your current billing cycle</li>
                       <li>• Pro-rated charges/credits will be applied to your next invoice</li>
