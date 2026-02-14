@@ -2,7 +2,7 @@ import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Lock, Use
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
-type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
+type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
 
 interface IconSidebarProps {
   activeView: SidebarView;
@@ -10,7 +10,7 @@ interface IconSidebarProps {
 }
 
 export default function IconSidebar({ onViewChange }: IconSidebarProps) {
-  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openPricingTab, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
+  const { openLogsTab, openDashboardTab, openTokensTab, openTeamsTab, openPricingTab, setBillingView, openMarketplaceTab, toggleChatbotSidebar, chatbotSidebarOpen, sidebarCollapsed, toggleSidebar, activeIconSidebar, setActiveIconSidebar } = useWorkbenchStore();
 
   const menuItems: Array<{
     id: SidebarView;
@@ -201,13 +201,18 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
       {/* Pricing Button - Opens as tab */}
       <button
         onClick={() => {
-          setActiveIconSidebar('pricing');
-          openPricingTab();
-          // Close sidebar on mobile when opening pricing
-          if (!sidebarCollapsed) {
-            toggleSidebar();
-          }
-        }}
+    setActiveIconSidebar('pricing');
+
+    if (sidebarCollapsed) {
+      toggleSidebar();
+    }
+
+    setBillingView('expenses');
+    openPricingTab();
+
+    onViewChange('pricing');
+  }}
+
         className={cn(
           'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
           activeIconSidebar === 'pricing'

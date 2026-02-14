@@ -9,7 +9,15 @@ import {
 import { Tab } from '@/types/tab';
 import { deleteTabState, cleanupOldTabStates } from '@/lib/tab-state-manager';
 
+type BillingView =
+  | "expenses"
+  | "revenue"
+  | "bundles";
+
+
 interface WorkbenchState {
+  billingView: BillingView;
+  setBillingView: (view: BillingView) => void;
   // Hydration state
   _hasHydrated: boolean;
 
@@ -37,7 +45,7 @@ interface WorkbenchState {
   chatbotSidebarOpen: boolean;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
-  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership';
+  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
   activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | 'pricing' | null;
 
   // Logs Filter State
@@ -99,6 +107,7 @@ interface WorkbenchState {
 
   // Actions - Logs
   setLogsFilters: (filters: Partial<WorkbenchState['logsFilters']>) => void;
+
 }
 
 export const useWorkbenchStore = create<WorkbenchState>()(
@@ -121,6 +130,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   responseTab: 'response',
   activeView: 'products',
   activeIconSidebar: null,
+  billingView: "expenses",
   logsFilters: {
     component: 'all',
     app: 'all',
@@ -486,6 +496,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   setResponseTab: (tab) => set({ responseTab: tab }),
   setActiveView: (view) => set({ activeView: view }),
   setActiveIconSidebar: (icon) => set({ activeIconSidebar: icon }),
+  setBillingView: (view) => set({ billingView: view }),
 
   // Logs Actions
   setLogsFilters: (filters) =>
@@ -499,6 +510,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       partialize: (state) => ({
         logsFilters: state.logsFilters,
         activeView: state.activeView,
+        billingView: state.billingView,
         currentWorkspaceId: state.currentWorkspaceId,
         currentProjectId: state.currentProjectId,
         // Only persist tab metadata, not the full data to avoid quota issues

@@ -20,6 +20,7 @@ import ChatbotSidebar from './ChatbotSidebar';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
+import PricingSidebar from './tabs/PricingSidebar';
 
 function WorkbenchContent() {
   const { user, currentWorkspaceId } = useAuth();
@@ -141,6 +142,7 @@ function WorkbenchContent() {
                     { id: 'products', label: 'Products' },
                     { id: 'apps', label: 'Apps' },
                     { id: 'environments', label: 'Envs' },
+                    {id: 'pricing', label: 'pricing'},
                     { id: 'partnership', label: 'Partners' },
                     { id: 'dashboard', label: 'Dashboard' },
                   ].map((view) => (
@@ -168,6 +170,7 @@ function WorkbenchContent() {
               {activeView === 'products' && <ProductsSidebar />}
               {activeView === 'apps' && <AppsSidebar />}
               {activeView === 'environments' && <EnvironmentsSidebar />}
+              {activeView === 'pricing' && <PricingSidebar />}
               {activeView === 'partnership' && <PartnershipsSidebar />}
             </div>
           )}
