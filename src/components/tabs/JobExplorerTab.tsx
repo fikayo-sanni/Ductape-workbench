@@ -171,6 +171,7 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
 
   const jobTag = job?.tag || 'unknown';
   const productTag = product?.tag || '';
+  const envSlug = env?.slug || product?.envs?.[0]?.slug || 'prd';
 
   const {
     data: jobExecutionsData,
@@ -179,7 +180,7 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
     refetch,
     error: jobExecutionsError,
   } = useQuery({
-    queryKey: ['job-executions-job', currentWorkspaceId, productTag, jobTag, user?._id],
+    queryKey: ['job-executions-job', currentWorkspaceId, productTag, jobTag, envSlug, user?._id],
     queryFn: () =>
       fetchJobExecutions({
         workspace_id: currentWorkspaceId ?? '',
@@ -187,6 +188,7 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
         public_key: user?.public_key ?? '',
         product_tag: productTag,
         job_tag: jobTag,
+        env: envSlug,
         limit: 200,
       }),
     enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key && !!productTag && !!jobTag,
@@ -285,8 +287,6 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
   const handleViewRun = (run: JobRun) => {
     setExpandedRunId((id) => (id === run.id ? null : run.id));
   };
-
-  const envSlug = env?.slug || product?.envs?.[0]?.slug || 'prd';
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">

@@ -21,7 +21,17 @@ import {
   PanelLeftClose,
   PanelLeft,
   ArrowRight,
+  Slack,
 } from 'lucide-react';
+
+/** Discord logo icon (Lucide does not provide Discord). */
+function DiscordIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C2.632 6.018 2.083 7.795 2.083 9.581c0 .194.015.389.043.583.012.09.02.18.027.27a.066.066 0 0 0 .032.05 18.094 18.094 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 12.58 12.58 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.598 12.598 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 18.2 18.2 0 0 0 6.002-3.03.066.066 0 0 0 .032-.05c.007-.09.014-.18.026-.27.03-.194.043-.389.043-.583 0-1.785-.55-3.562-1.562-5.184a.07.07 0 0 0-.031-.027zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+    </svg>
+  );
+}
 import { format } from 'date-fns';
 import {
   Table,
@@ -81,10 +91,14 @@ interface NotificationMessage {
   push_notification?: boolean | { title?: string; body?: string };
   sms?: boolean;
   callback?: boolean;
+  slack?: boolean | { text?: string };
+  discord?: boolean | { content?: string };
   email_data?: any[];
   push_notification_data?: any[];
   sms_data?: any[];
   callback_data?: any[];
+  slack_data?: any[];
+  discord_data?: any[];
   created_at?: string | Date;
 }
 
@@ -101,6 +115,8 @@ interface Notification {
     push_notifications?: any;
     sms?: any;
     callbacks?: any;
+    slack?: any;
+    discord?: any;
   }>;
   created_at?: string | Date;
 }
@@ -122,7 +138,7 @@ interface NotificationExplorerTabProps {
   data?: NotificationExplorerTabData | null;
 }
 
-type ChannelFilter = 'all' | 'email' | 'push' | 'sms' | 'webhook';
+type ChannelFilter = 'all' | 'email' | 'push' | 'sms' | 'webhook' | 'slack' | 'discord';
 type ViewMode = 'overview' | 'activity';
 
 // Channel type categorization
@@ -132,6 +148,8 @@ const CHANNEL_TYPES: { value: ChannelFilter; label: string; icon: React.ReactNod
   { value: 'push', label: 'Push', icon: <Smartphone className="h-4 w-4" /> },
   { value: 'sms', label: 'SMS', icon: <MessageSquare className="h-4 w-4" /> },
   { value: 'webhook', label: 'Webhook', icon: <Webhook className="h-4 w-4" /> },
+  { value: 'slack', label: 'Slack', icon: <Slack className="h-4 w-4" /> },
+  { value: 'discord', label: 'Discord', icon: <DiscordIcon className="h-4 w-4" /> },
 ];
 
 export default function NotificationExplorerTab({ data }: NotificationExplorerTabProps) {
@@ -389,7 +407,9 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
     const push = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'push').length;
     const sms = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'sms').length;
     const webhook = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'callback').length;
-    return { total, email, push, sms, webhook };
+    const slack = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'slack').length;
+    const discord = messageLogs.filter((l) => (l.type?.toLowerCase() ?? '') === 'discord').length;
+    return { total, email, push, sms, webhook, slack, discord };
   }, [messageLogs]);
 
   // Activity (sent messages) status filter for the Activity view
@@ -514,6 +534,8 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
           push: { sent: 0, delivered: 0, failed: 0 },
           sms: { sent: 0, delivered: 0, failed: 0 },
           webhook: { sent: 0, delivered: 0, failed: 0 },
+          slack: { sent: 0, delivered: 0, failed: 0 },
+          discord: { sent: 0, delivered: 0, failed: 0 },
         },
         dailyTrend: daysOrder.map((day) => ({ day, sent: 0, delivered: 0, failed: 0 })),
         topTemplates: [] as Array<{ name: string; tag: string; sent: number; deliveryRate: number }>,
@@ -525,9 +547,9 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
     const totalFailed = notificationLogs.filter((l) => l.failed_execution).length;
     const deliveryRate = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0;
 
-    const byType = { email: 0, push: 0, sms: 0, callback: 0 };
-    const byTypeDelivered = { email: 0, push: 0, sms: 0, callback: 0 };
-    const byTypeFailed = { email: 0, push: 0, sms: 0, callback: 0 };
+    const byType = { email: 0, push: 0, sms: 0, callback: 0, slack: 0, discord: 0 };
+    const byTypeDelivered = { email: 0, push: 0, sms: 0, callback: 0, slack: 0, discord: 0 };
+    const byTypeFailed = { email: 0, push: 0, sms: 0, callback: 0, slack: 0, discord: 0 };
     notificationLogs.forEach((l) => {
       const t = (l.type?.toLowerCase() || '') as keyof typeof byType;
       if (t in byType) {
@@ -583,6 +605,8 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
         push: { sent: byType.push, delivered: byTypeDelivered.push, failed: byTypeFailed.push },
         sms: { sent: byType.sms, delivered: byTypeDelivered.sms, failed: byTypeFailed.sms },
         webhook: { sent: byType.callback, delivered: byTypeDelivered.callback, failed: byTypeFailed.callback },
+        slack: { sent: byType.slack, delivered: byTypeDelivered.slack, failed: byTypeFailed.slack },
+        discord: { sent: byType.discord, delivered: byTypeDelivered.discord, failed: byTypeFailed.discord },
       },
       dailyTrend,
       topTemplates,
@@ -692,6 +716,8 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
       case 'push': return messageLogChannelCounts.push;
       case 'sms': return messageLogChannelCounts.sms;
       case 'webhook': return messageLogChannelCounts.webhook;
+      case 'slack': return messageLogChannelCounts.slack;
+      case 'discord': return messageLogChannelCounts.discord;
       default: return 0;
     }
   };
@@ -1138,13 +1164,17 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
                     { channel: 'Push', sent: weeklyStats.byChannel.push.sent, icon: Smartphone, color: 'purple' },
                     { channel: 'SMS', sent: weeklyStats.byChannel.sms.sent, icon: MessageSquare, color: 'green' },
                     { channel: 'Webhook', sent: weeklyStats.byChannel.webhook.sent, icon: Webhook, color: 'orange' },
+                    { channel: 'Slack', sent: weeklyStats.byChannel.slack.sent, icon: Slack, color: 'slack' },
+                    { channel: 'Discord', sent: weeklyStats.byChannel.discord.sent, icon: DiscordIcon, color: 'discord' },
                   ].map((item) => {
                     const totalSent = weeklyStats.totalSent || 1;
                     const percentage = Math.round((item.sent / totalSent) * 100);
                     const Icon = item.icon;
                     const colorClass = item.color === 'blue' ? 'bg-blue' :
                                        item.color === 'purple' ? 'bg-purple-500' :
-                                       item.color === 'green' ? 'bg-green' : 'bg-orange-500';
+                                       item.color === 'green' ? 'bg-green' :
+                                       item.color === 'slack' ? 'bg-[#4A154B]' :
+                                       item.color === 'discord' ? 'bg-[#5865F2]' : 'bg-orange-500';
                     return (
                       <div key={item.channel} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
@@ -1271,6 +1301,36 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
                         <div
                           className="h-full bg-orange-500 rounded-full"
                           style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.webhook.sent / weeklyStats.totalSent) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#4A154B]" />
+                      <span className="text-sm text-grey">Slack</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.slack.sent}</span>
+                      <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#4A154B] rounded-full"
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.slack.sent / weeklyStats.totalSent) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#5865F2]" />
+                      <span className="text-sm text-grey">Discord</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-grey">{weeklyStats.byChannel.discord.sent}</span>
+                      <div className="w-24 h-2 bg-grey-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#5865F2] rounded-full"
+                          style={{ width: `${weeklyStats.totalSent ? (weeklyStats.byChannel.discord.sent / weeklyStats.totalSent) * 100 : 0}%` }}
                         />
                       </div>
                     </div>

@@ -44,7 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
-import tokensServices from "@/services/tokensServices";
+import tokensServices, { type PublishableKeyScopeItem } from "@/services/tokensServices";
 import productServices from "@/services/productServices";
 import { MarkdownEditor } from "../ui/markdown-editor";
 import { connectDuctapeWorkspace, SDKProxyService } from "@/helpers/ductape";
@@ -88,6 +88,7 @@ export default function TokensTabContent() {
   const [newToken, setNewToken] = useState({
     name: "",
     description: "",
+    value: "", // optional: leave empty to auto-generate
     token_type: "credential",
     scope: [] as string[],
     expiryDuration: "",
@@ -336,8 +337,8 @@ export default function TokensTabContent() {
     try {
       const expires_at = calculateExpiryTimestamp(newToken.expiryDuration, newToken.expiryPeriod);
 
-      // Generate token value
-      const tokenValue = generateTokenValue();
+      // Use provided value or generate one
+      const tokenValue = newToken.value.trim() || generateTokenValue();
 
       await (ductape as any).secrets.create({
         key: newToken.name,
@@ -360,6 +361,7 @@ export default function TokensTabContent() {
       setNewToken({
         name: "",
         description: "",
+        value: "",
         token_type: "credential",
         scope: [],
         expiryDuration: "",
@@ -600,8 +602,129 @@ export default function TokensTabContent() {
     return () => clearInterval(interval);
   }, [secondsLeft, showOtpDialog]);
 
-  // State for access key panel
-  const [showAccessKeyPanel, setShowAccessKeyPanel] = useState(false);
+  // State for access key panel (false = Tokens, true = SDK Access Key, 'publishable' = Publishable Key)
+  const [showAccessKeyPanel, setShowAccessKeyPanel] = useState<boolean | 'publishable'>(false);
+
+  // Publishable Key state
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
+  const [publishableKeyScope, setPublishableKeyScope] = useState<PublishableKeyScopeItem[]>([]);
+  const [publishableKeyLoading, setPublishableKeyLoading] = useState(false);
+  const [publishableKeyAction, setPublishableKeyAction] = useState<'idle' | 'regenerate' | 'revoke'>('idle');
+  const [copiedPublishableKey, setCopiedPublishableKey] = useState(false);
+  const [publishableKeySampleTab, setPublishableKeySampleTab] = useState<'react' | 'vanilla' | 'vue'>('react');
+  const [showScopeEditor, setShowScopeEditor] = useState(false);
+  const [scopeDraft, setScopeDraft] = useState<PublishableKeyScopeItem[]>([]);
+  const [scopeSaving, setScopeSaving] = useState(false);
+
+  const fetchPublishableKey = useCallback(async () => {
+    if (!currentWorkspaceId || !user?._id) return;
+    setPublishableKeyLoading(true);
+    try {
+      const res = await tokensServices.getPublishableKey({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+      });
+      if (res.status && res.data?.publishable_key) {
+        setPublishableKey(res.data.publishable_key);
+        setPublishableKeyScope(Array.isArray(res.data?.scope) ? res.data.scope : []);
+      } else {
+        setPublishableKey(null);
+        setPublishableKeyScope([]);
+      }
+    } catch (e) {
+      setPublishableKey(null);
+      setPublishableKeyScope([]);
+      console.error('Failed to fetch publishable key:', e);
+    } finally {
+      setPublishableKeyLoading(false);
+    }
+  }, [currentWorkspaceId, user?._id]);
+
+  useEffect(() => {
+    if (showAccessKeyPanel === 'publishable' && currentWorkspaceId && user?._id) {
+      fetchPublishableKey();
+    }
+  }, [showAccessKeyPanel, currentWorkspaceId, user?._id, fetchPublishableKey]);
+
+  const handleCopyPublishableKey = () => {
+    if (!publishableKey) return;
+    navigator.clipboard.writeText(publishableKey).then(
+      () => {
+        setCopiedPublishableKey(true);
+        toast.success('Publishable key copied to clipboard!');
+        setTimeout(() => setCopiedPublishableKey(false), 2000);
+      },
+      () => toast.error('Failed to copy'),
+    );
+  };
+
+  const handleRegeneratePublishableKey = async () => {
+    if (!currentWorkspaceId || !user?._id) return;
+    setPublishableKeyAction('regenerate');
+    try {
+      const res = await tokensServices.regeneratePublishableKey({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+      });
+      if (res.status && res.data?.publishable_key) {
+        setPublishableKey(res.data.publishable_key);
+        setPublishableKeyScope(Array.isArray(res.data?.scope) ? res.data.scope : []);
+        toast.success('Publishable key regenerated. Previous key is no longer valid.');
+      } else {
+        toast.error('Failed to regenerate publishable key');
+      }
+    } catch (e) {
+      toast.error('Failed to regenerate publishable key');
+    } finally {
+      setPublishableKeyAction('idle');
+    }
+  };
+
+  const handleOpenScopeEditor = () => {
+    setScopeDraft(JSON.parse(JSON.stringify(publishableKeyScope)));
+    setShowScopeEditor(true);
+  };
+
+  const handleSavePublishableKeyScope = async () => {
+    if (!currentWorkspaceId || !user?._id || !publishableKey) return;
+    const scope = scopeDraft.filter((e) => String(e.module).trim()).map((e) => ({ module: String(e.module).trim(), methods: Array.isArray(e.methods) ? e.methods : [] }));
+    setScopeSaving(true);
+    try {
+      const res = await tokensServices.updatePublishableKeyScope({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        scope,
+      });
+      if (res.status) {
+        setPublishableKeyScope(scope);
+        setShowScopeEditor(false);
+        toast.success('Scope updated.');
+      } else {
+        toast.error('Failed to update scope');
+      }
+    } catch (e) {
+      toast.error('Failed to update scope');
+    } finally {
+      setScopeSaving(false);
+    }
+  };
+
+  const handleRevokePublishableKey = async () => {
+    if (!currentWorkspaceId || !user?._id) return;
+    setPublishableKeyAction('revoke');
+    try {
+      await tokensServices.revokePublishableKey({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+      });
+      setPublishableKey(null);
+      toast.success('Publishable key revoked.');
+    } catch (e) {
+      toast.error('Failed to revoke publishable key');
+    } finally {
+      setPublishableKeyAction('idle');
+    }
+  };
 
   return (
     <div className="h-full overflow-auto bg-grey-100">
@@ -662,7 +785,7 @@ export default function TokensTabContent() {
               onClick={() => setShowAccessKeyPanel(false)}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                !showAccessKeyPanel
+                showAccessKeyPanel === false
                   ? "bg-primary text-white"
                   : "text-grey-600 hover:text-grey hover:bg-grey-50"
               )}
@@ -679,7 +802,7 @@ export default function TokensTabContent() {
               onClick={() => setShowAccessKeyPanel(true)}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                showAccessKeyPanel
+                showAccessKeyPanel === true
                   ? "bg-primary text-white"
                   : "text-grey-600 hover:text-grey hover:bg-grey-50"
               )}
@@ -689,9 +812,23 @@ export default function TokensTabContent() {
                 SDK Access Key
               </span>
             </button>
+            <button
+              onClick={() => setShowAccessKeyPanel('publishable')}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                showAccessKeyPanel === 'publishable'
+                  ? "bg-primary text-white"
+                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                Publishable Key
+              </span>
+            </button>
           </div>
 
-          {!showAccessKeyPanel && (
+          {showAccessKeyPanel === false && (
             <div className="flex items-center gap-2">
               <Button
                 onClick={fetchTokens}
@@ -711,7 +848,243 @@ export default function TokensTabContent() {
         </div>
 
         {/* Content based on selected tab */}
-        {showAccessKeyPanel ? (
+        {showAccessKeyPanel === 'publishable' ? (
+          /* Publishable Key Panel */
+          <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-grey-400">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Key className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-grey">Publishable Key</h2>
+                    <p className="text-sm text-grey-600">
+                      Frontend-safe key for the SDK proxy. Cannot create/update/fetch primitives; use for query and read operations.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 bg-grey-50/50">
+              <label className="text-xs font-medium text-grey-600 uppercase tracking-wide mb-2 block">
+                Publishable Key
+              </label>
+              {publishableKeyLoading ? (
+                <div className="flex items-center gap-2 text-grey-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              ) : publishableKey ? (
+                <div className="bg-white rounded-lg border border-grey-300 p-4 flex items-center justify-between gap-4">
+                  <code className="text-sm font-mono text-grey break-all flex-1 select-all">
+                    {publishableKey}
+                  </code>
+                  <div className="flex items-center gap-1 shrink-0 border-l border-grey-200 pl-3">
+                    <Button size="sm" variant="ghost" onClick={handleCopyPublishableKey} className="h-8 w-8 p-0">
+                      {copiedPublishableKey ? <Check className="h-4 w-4 text-green" /> : <Copy className="h-4 w-4 text-grey-600" />}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border border-grey-300 p-4 text-grey-600 text-sm">
+                  No publishable key. Generate one to use the SDK from the frontend via the proxy.
+                </div>
+              )}
+              <div className="mt-4 flex items-center gap-2">
+                {publishableKey && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={handleCopyPublishableKey} className="gap-2">
+                      {copiedPublishableKey ? <Check className="h-4 w-4 text-green" /> : <Copy className="h-4 w-4" />}
+                      Copy
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRegeneratePublishableKey}
+                      disabled={publishableKeyAction === 'regenerate'}
+                      className="gap-2"
+                    >
+                      {publishableKeyAction === 'regenerate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Regenerate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleRevokePublishableKey}
+                      disabled={publishableKeyAction === 'revoke'}
+                      className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {publishableKeyAction === 'revoke' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Revoke
+                    </Button>
+                  </>
+                )}
+                {!publishableKey && !publishableKeyLoading && (
+                  <Button size="sm" onClick={fetchPublishableKey} className="gap-2">
+                    Generate key
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Scope */}
+            {publishableKey && (
+              <div className="p-6 border-t border-grey-400">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-grey-600 uppercase tracking-wide">
+                    Scope (allowed functionality)
+                  </label>
+                  {!showScopeEditor ? (
+                    <Button size="sm" variant="outline" onClick={handleOpenScopeEditor} className="h-7 text-xs">
+                      Edit scope
+                    </Button>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setShowScopeEditor(false)} className="h-7 text-xs">
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={handleSavePublishableKeyScope} disabled={scopeSaving} className="h-7 text-xs gap-1">
+                        {scopeSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                        Save scope
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {!showScopeEditor ? (
+                  <div className="bg-white rounded-lg border border-grey-300 p-3 text-sm">
+                    {publishableKeyScope.length === 0 ? (
+                      <p className="text-grey-500">Default: restricted (no create/update/fetch of primitives; query and read operations allowed).</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {publishableKeyScope.map((entry, i) => (
+                          <li key={i} className="flex items-baseline gap-2">
+                            <span className="font-mono font-medium text-grey">{entry.module}</span>
+                            <span className="text-grey-500">:</span>
+                            <span className="text-grey-600">{Array.isArray(entry.methods) ? entry.methods.join(", ") : ""}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg border border-grey-300 p-3 space-y-3">
+                    <p className="text-xs text-grey-500">When non-empty, only these module.methods are allowed. Empty = default restricted scope.</p>
+                    {scopeDraft.map((entry, i) => (
+                      <div key={i} className="flex gap-2 items-center flex-wrap">
+                        <Input
+                          placeholder="module (e.g. databases)"
+                          value={entry.module}
+                          onChange={(e) => {
+                            const next = [...scopeDraft];
+                            next[i] = { ...next[i], module: e.target.value.trim() };
+                            setScopeDraft(next);
+                          }}
+                          className="w-36 h-8 text-sm font-mono"
+                        />
+                        <Input
+                          placeholder="methods (comma-separated, e.g. query, list)"
+                          value={Array.isArray(entry.methods) ? entry.methods.join(", ") : ""}
+                          onChange={(e) => {
+                            const next = [...scopeDraft];
+                            next[i] = { ...next[i], methods: e.target.value.split(",").map((m) => m.trim()).filter(Boolean) };
+                            setScopeDraft(next);
+                          }}
+                          className="flex-1 min-w-[180px] h-8 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                          onClick={() => setScopeDraft(scopeDraft.filter((_, j) => j !== i))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => setScopeDraft([...scopeDraft, { module: "", methods: [] }])}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add module
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Code samples — aligned with docs/docs/frontend/*/getting-started */}
+            <div className="p-6 border-t border-grey-400">
+              <h3 className="text-sm font-medium text-grey mb-3">Init with publishable key (frontend SDK)</h3>
+              <div className="flex gap-1 mb-2">
+                {(['react', 'vanilla', 'vue'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setPublishableKeySampleTab(tab)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium rounded-md capitalize',
+                      publishableKeySampleTab === tab ? 'bg-primary text-white' : 'bg-grey-100 text-grey-600 hover:bg-grey-200'
+                    )}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-grey-100 dark:bg-grey-800 rounded-lg p-4 border border-grey-300 overflow-x-auto">
+                <pre className="text-sm font-mono text-grey dark:text-grey-100 leading-relaxed whitespace-pre">
+                  {publishableKeySampleTab === 'react' && `// @ductape/react (docs: frontend/react/getting-started)
+import { DuctapeProvider } from '@ductape/react';
+
+function App() {
+  return (
+    <DuctapeProvider
+      config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}
+      autoConnect={false}
+    >
+      <YourApp />
+    </DuctapeProvider>
+  );
+}
+
+// In any child:
+import { useDatabaseQuery } from '@ductape/react';
+const { data, isLoading } = useDatabaseQuery('users', { table: 'users', limit: 10 });`}
+                  {publishableKeySampleTab === 'vanilla' && `// @ductape/client (docs: frontend/client/getting-started)
+import { Ductape } from '@ductape/client';
+
+const ductape = new Ductape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+});
+
+const result = await ductape.databases.query({ table: 'users', limit: 10 });
+console.log(result.rows);`}
+                  {publishableKeySampleTab === 'vue' && `// @ductape/vue (docs: frontend/vue/getting-started)
+import { createApp } from 'vue';
+import { createDuctape } from '@ductape/vue';
+import App from './App.vue';
+
+const app = createApp(App);
+const ductape = createDuctape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+  autoConnect: false,
+});
+app.use(ductape);
+app.mount('#app');
+
+// In components: const { data, isLoading } = useDatabaseQuery(['users'], { table: 'users', limit: 10 });`}
+                </pre>
+              </div>
+              <p className="mt-2 text-xs text-grey-500">
+                Only <code className="bg-grey-100 px-1 rounded">publishableKey</code> is required. The client sends <code className="bg-grey-100 px-1 rounded">X-Publishable-Key</code>. Allowed operations are limited by this key&apos;s scope (see Scope above).
+              </p>
+            </div>
+          </div>
+        ) : showAccessKeyPanel === true ? (
           /* SDK Access Key Panel */
           <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
             {/* Header Section */}
@@ -1120,6 +1493,23 @@ const ductape = new Ductape({
               />
               <p className="text-xs text-grey-600">
                 Use only letters, numbers, and underscores (no spaces)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="token-value">Token Value (optional)</Label>
+              <Input
+                id="token-value"
+                type="password"
+                autoComplete="off"
+                placeholder="Leave empty to auto-generate a secure value"
+                value={newToken.value}
+                onChange={(e) =>
+                  setNewToken({ ...newToken, value: e.target.value })
+                }
+              />
+              <p className="text-xs text-grey-600">
+                Leave empty to auto-generate. Or paste an existing value (e.g. API key) to store as this secret.
               </p>
             </div>
 

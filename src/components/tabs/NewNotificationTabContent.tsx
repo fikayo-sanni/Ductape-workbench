@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2, Eye, EyeOff, Slack } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
@@ -47,6 +47,8 @@ interface EnvConfig {
     params?: Record<string, string>;
     body?: string;
   };
+  slack?: { webhook_url?: string };
+  discord?: { webhook_url?: string };
 }
 
 export default function NewNotificationTabContent({ data, tabId }: NewNotificationTabContentProps) {
@@ -81,6 +83,8 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       { id: 'email', label: 'Email', selected: false },
       { id: 'sms', label: 'SMS', selected: false },
       { id: 'callback', label: 'Callbacks', selected: false },
+      { id: 'slack', label: 'Slack', selected: false },
+      { id: 'discord', label: 'Discord', selected: false },
     ]
   );
 
@@ -104,6 +108,8 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
         emails: undefined,
         sms: undefined,
         callbacks: undefined,
+        slack: undefined,
+        discord: undefined,
       })));
     }
   }, [product?.envs]);
@@ -221,6 +227,12 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
       }),
       ...(selectedNotifiers.find(n => n.id === 'callback')?.selected && config.callbacks && {
         callbacks: config.callbacks,
+      }),
+      ...(selectedNotifiers.find(n => n.id === 'slack')?.selected && config.slack && {
+        slack: config.slack,
+      }),
+      ...(selectedNotifiers.find(n => n.id === 'discord')?.selected && config.discord && {
+        discord: config.discord,
       }),
     }));
 
@@ -489,7 +501,7 @@ function EnvironmentConfigCard({
       )}
 
       {/* Channels - Progressive Disclosure */}
-      <Accordion type="multiple" defaultValue={['push', 'email', 'sms', 'callback']} className="w-full">
+      <Accordion type="multiple" defaultValue={['push', 'email', 'sms', 'callback', 'slack', 'discord']} className="w-full">
         {selectedNotifiers.find(n => n.id === 'push')?.selected && (
           <AccordionItem value="push" className="border-b border-grey-300 last:border-b-0">
             <AccordionTrigger className="py-3 hover:no-underline">
@@ -565,7 +577,87 @@ function EnvironmentConfigCard({
             </AccordionContent>
           </AccordionItem>
         )}
+
+        {selectedNotifiers.find(n => n.id === 'slack')?.selected && (
+          <AccordionItem value="slack" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#4A154B]/10 flex items-center justify-center">
+                  <Slack className="h-4 w-4 text-[#4A154B]" />
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-grey">Slack</div>
+                  <div className="text-xs text-grey-600">Incoming webhook URL for Slack</div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="py-4">
+              <WebhookUrlConfig envConfig={envConfig} onConfigChange={onConfigChange} channelKey="slack" placeholder="https://hooks.slack.com/services/..." />
+            </AccordionContent>
+          </AccordionItem>
+        )}
+
+        {selectedNotifiers.find(n => n.id === 'discord')?.selected && (
+          <AccordionItem value="discord" className="border-b border-grey-300 last:border-b-0">
+            <AccordionTrigger className="py-3 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#5865F2]/10 flex items-center justify-center">
+                  <svg className="h-4 w-4 text-[#5865F2]" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C2.632 6.018 2.083 7.795 2.083 9.581c0 .194.015.389.043.583.012.09.02.18.027.27a.066.066 0 0 0 .032.05 18.094 18.094 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 12.58 12.58 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.598 12.598 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 18.2 18.2 0 0 0 6.002-3.03.066.066 0 0 0 .032-.05c.007-.09.014-.18.026-.27.03-.194.043-.389.043-.583 0-1.785-.55-3.562-1.562-5.184a.07.07 0 0 0-.031-.027z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-grey">Discord</div>
+                  <div className="text-xs text-grey-600">Webhook URL for Discord</div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="py-4">
+              <WebhookUrlConfig envConfig={envConfig} onConfigChange={onConfigChange} channelKey="discord" placeholder="https://discord.com/api/webhooks/..." />
+            </AccordionContent>
+          </AccordionItem>
+        )}
       </Accordion>
+    </div>
+  );
+}
+
+function WebhookUrlConfig({
+  envConfig,
+  onConfigChange,
+  channelKey,
+  placeholder,
+}: {
+  envConfig: EnvConfig;
+  onConfigChange: (config: EnvConfig) => void;
+  channelKey: 'slack' | 'discord';
+  placeholder: string;
+}) {
+  const config = channelKey === 'slack' ? envConfig.slack : envConfig.discord;
+  const [url, setUrl] = useState(() => config?.webhook_url ?? '');
+  const lastSyncedRef = useRef<any>(null);
+  useEffect(() => {
+    if (lastSyncedRef.current === config) return;
+    lastSyncedRef.current = config;
+    setUrl(config?.webhook_url ?? '');
+  }, [config?.webhook_url]);
+  useEffect(() => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      onConfigChange({ ...envConfig, [channelKey]: undefined });
+      return;
+    }
+    try {
+      new URL(trimmed);
+      onConfigChange({ ...envConfig, [channelKey]: { webhook_url: trimmed } });
+    } catch {
+      onConfigChange({ ...envConfig, [channelKey]: undefined });
+    }
+  }, [url]);
+  return (
+    <div className="space-y-2">
+      <Label>Webhook URL</Label>
+      <Input placeholder={placeholder} value={url} onChange={(e) => setUrl(e.target.value)} type="url" />
     </div>
   );
 }

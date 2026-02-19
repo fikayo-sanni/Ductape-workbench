@@ -94,7 +94,9 @@ const updateApp = async <T extends Record<string, any>>(data: {
   component?: string;
 }): Promise<AppResponse> => {
   const { app_id, user_id, public_key, component, payload } = data;
-  const response = await apiClient.put<AppResponse>(`/apps/v1/${app_id}`, {...payload, component }, {
+  // Use top-level component only when provided; otherwise keep payload.component (e.g. action_bulk from CreateSharedVariableModal)
+  const body = component !== undefined ? { ...payload, component } : payload;
+  const response = await apiClient.put<AppResponse>(`/apps/v1/${app_id}`, body, {
     params: { user_id, public_key },
   });
   return response.data;

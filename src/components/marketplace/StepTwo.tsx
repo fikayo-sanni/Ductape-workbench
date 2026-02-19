@@ -1,24 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Settings, Loader } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIntegration } from '@/context/integration-context';
 import { useQuery } from '@tanstack/react-query';
 import productServices from '@/services/productServices';
 import { useAuth } from '@/store/useAuth';
-import { useEffect } from 'react';
 import { useDuctape } from '@/hooks/useDuctape';
 import { toast } from 'react-hot-toast';
+
+const variableSchema = z.object({ key: z.string(), value: z.string() });
 
 const mapEnvironmentsSchema = z.object({
   isSelected: z.boolean().default(false),
   product_env_slug: z.string(),
   app_env_slug: z.string(),
+  variables: z.array(variableSchema).optional().default([]),
 });
 
 const formSchema = z.object({
@@ -95,18 +98,26 @@ export default function StepTwo({ goToPreviousStep, handleFinish, app }: StepTwo
 
   // Update form when product environments are loaded
   useEffect(() => {
-    if (productEnvs.length > 0) {
+    if (productEnvs.length > 0 && appEnvs.length > 0) {
       const defaultEnvironments = integrationData.environmentMappings.length > 0
-        ? integrationData.environmentMappings
-        : productEnvs.map((env: any) => ({
-            isSelected: true,
-            product_env_slug: env.slug,
-            app_env_slug: env.slug,
-          }));
+        ? integrationData.environmentMappings.map((m: any) => ({
+            ...m,
+            variables: m.variables ?? [],
+          }))
+        : productEnvs.map((env: any) => {
+            const appEnv = appEnvs.find((a: any) => a.slug === env.slug);
+            const variables = (appEnv?.base_url_variables ?? []).map((v: { key: string }) => ({ key: v.key, value: '' }));
+            return {
+              isSelected: true,
+              product_env_slug: env.slug,
+              app_env_slug: env.slug,
+              variables,
+            };
+          });
 
       form.reset({ environments: defaultEnvironments });
     }
-  }, [productEnvs.length, integrationData.environmentMappings.length]);
+  }, [productEnvs.length, appEnvs.length, integrationData.environmentMappings.length]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setEnvironmentMappings(values.environments);
@@ -120,13 +131,13 @@ export default function StepTwo({ goToPreviousStep, handleFinish, app }: StepTwo
     try {
       setIsSubmitting(true);
 
-      // Build environment mappings for integration
+      // Build environment mappings for integration (include base_url variable values)
       const envs = values.environments
         .filter((mapping: any) => mapping.isSelected)
         .map((mapping: any) => ({
           app_env_slug: mapping.app_env_slug,
           product_env_slug: mapping.product_env_slug,
-          variables: [],
+          variables: (mapping.variables ?? []).filter((v: { key: string; value: string }) => v.key).map((v: { key: string; value: string }) => ({ key: v.key, value: v.value })),
         }));
 
       const integrationDetails = {
@@ -214,28 +225,73 @@ export default function StepTwo({ goToPreviousStep, handleFinish, app }: StepTwo
                     <FormField
                       control={form.control}
                       name={`environments.${index}.app_env_slug`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel className="text-grey-700">App Environment</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Select environment" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {appEnvs.map((env: any) => (
-                                <SelectItem key={env.slug} value={env.slug}>
-                                  {env.env_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const selectedAppEnv = appEnvs.find((e: any) => e.slug === field.value);
+                        const baseUrlVars = selectedAppEnv?.base_url_variables ?? [];
+                        return (
+                          <FormItem className="flex-1">
+                            <FormLabel className="text-grey-700">App Environment</FormLabel>
+                            <Select
+                              onValueChange={(val) => {
+                                field.onChange(val);
+                                const env = appEnvs.find((e: any) => e.slug === val);
+                                const vars = (env?.base_url_variables ?? []).map((v: { key: string }) => ({ key: v.key, value: '' }));
+                                form.setValue(`environments.${index}.variables`, vars);
+                              }}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-10">
+                                  <SelectValue placeholder="Select environment" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {appEnvs.map((env: any) => (
+                                  <SelectItem key={env.slug} value={env.slug}>
+                                    {env.env_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
+                  {/* Base URL variables for parameterized envs (e.g. https://{{prefix}}-checkout.example.com) */}
+                  {(() => {
+                    const selectedSlug = form.watch(`environments.${index}.app_env_slug`);
+                    const selectedAppEnv = appEnvs.find((e: any) => e.slug === selectedSlug);
+                    const baseUrlVars = selectedAppEnv?.base_url_variables ?? [];
+                    if (baseUrlVars.length === 0) return null;
+                    return (
+                      <div className="mt-3 pl-12 space-y-2 border-l-2 border-grey-200 dark:border-grey-700">
+                        <p className="text-xs font-medium text-grey-600 dark:text-grey-400 mt-1">Base URL variables</p>
+                        {baseUrlVars.map((v: { key: string }, vIdx: number) => (
+                          <FormField
+                            key={v.key}
+                            control={form.control}
+                            name={`environments.${index}.variables.${vIdx}.value`}
+                            render={({ field: vField }) => (
+                              <FormItem className="ml-2">
+                                <FormLabel className="text-xs text-grey-600">{v.key}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder={`Value for {{${v.key}}}`}
+                                    {...vField}
+                                    value={vField.value ?? ''}
+                                    className="h-9"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
