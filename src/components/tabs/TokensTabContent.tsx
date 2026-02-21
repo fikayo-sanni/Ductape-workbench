@@ -46,6 +46,7 @@ import { useAuth } from "@/store/useAuth";
 import toast from "react-hot-toast";
 import tokensServices, { type PublishableKeyScopeItem } from "@/services/tokensServices";
 import productServices from "@/services/productServices";
+import { PUBLISHABLE_SCOPE_MODULES, getMethodsForModule } from "@/constants/publishableKeyScope";
 import { MarkdownEditor } from "../ui/markdown-editor";
 import { connectDuctapeWorkspace, SDKProxyService } from "@/helpers/ductape";
 import { IProduct } from "@/types/product";
@@ -611,7 +612,7 @@ export default function TokensTabContent() {
   const [publishableKeyLoading, setPublishableKeyLoading] = useState(false);
   const [publishableKeyAction, setPublishableKeyAction] = useState<'idle' | 'regenerate' | 'revoke'>('idle');
   const [copiedPublishableKey, setCopiedPublishableKey] = useState(false);
-  const [publishableKeySampleTab, setPublishableKeySampleTab] = useState<'react' | 'vanilla' | 'vue'>('react');
+  const [publishableKeySampleTab, setPublishableKeySampleTab] = useState<'react' | 'vanilla' | 'vue' | 'node'>('react');
   const [showScopeEditor, setShowScopeEditor] = useState(false);
   const [scopeDraft, setScopeDraft] = useState<PublishableKeyScopeItem[]>([]);
   const [scopeSaving, setScopeSaving] = useState(false);
@@ -623,6 +624,7 @@ export default function TokensTabContent() {
       const res = await tokensServices.getPublishableKey({
         workspace_id: currentWorkspaceId,
         user_id: user._id,
+        public_key: user.public_key ?? '',
       });
       if (res.status && res.data?.publishable_key) {
         setPublishableKey(res.data.publishable_key);
@@ -665,6 +667,7 @@ export default function TokensTabContent() {
       const res = await tokensServices.regeneratePublishableKey({
         workspace_id: currentWorkspaceId,
         user_id: user._id,
+        public_key: user.public_key ?? '',
       });
       if (res.status && res.data?.publishable_key) {
         setPublishableKey(res.data.publishable_key);
@@ -680,30 +683,54 @@ export default function TokensTabContent() {
     }
   };
 
+  /** Convert backend scope (allowlist) to blacklist for UI: for each module, disallowed = all exposable minus allowed. */
+  const scopeToBlacklist = useCallback((scope: PublishableKeyScopeItem[]): PublishableKeyScopeItem[] => {
+    return scope
+      .filter((e) => String(e.module).trim())
+      .map((e) => {
+        const allowed = new Set(Array.isArray(e.methods) ? e.methods : []);
+        const disallowed = getMethodsForModule(e.module).filter((m) => !allowed.has(m));
+        return { module: String(e.module).trim(), methods: disallowed };
+      });
+  }, []);
+
+  /** Convert blacklist (UI) to backend scope (allowlist): for each module, allowed = all exposable minus disallowed. */
+  const blacklistToScope = useCallback((blacklist: PublishableKeyScopeItem[]): PublishableKeyScopeItem[] => {
+    return blacklist
+      .filter((e) => String(e.module).trim())
+      .map((e) => {
+        const disallowed = new Set(Array.isArray(e.methods) ? e.methods : []);
+        const allowed = getMethodsForModule(e.module).filter((m) => !disallowed.has(m));
+        return { module: String(e.module).trim(), methods: allowed };
+      })
+      .filter((e) => e.methods.length > 0);
+  }, []);
+
   const handleOpenScopeEditor = () => {
-    setScopeDraft(JSON.parse(JSON.stringify(publishableKeyScope)));
+    setScopeDraft(scopeToBlacklist(publishableKeyScope));
     setShowScopeEditor(true);
   };
 
   const handleSavePublishableKeyScope = async () => {
     if (!currentWorkspaceId || !user?._id || !publishableKey) return;
-    const scope = scopeDraft.filter((e) => String(e.module).trim()).map((e) => ({ module: String(e.module).trim(), methods: Array.isArray(e.methods) ? e.methods : [] }));
+    const scope = blacklistToScope(scopeDraft);
     setScopeSaving(true);
     try {
       const res = await tokensServices.updatePublishableKeyScope({
         workspace_id: currentWorkspaceId,
         user_id: user._id,
+        public_key: user.public_key ?? '',
         scope,
       });
       if (res.status) {
         setPublishableKeyScope(scope);
         setShowScopeEditor(false);
-        toast.success('Scope updated.');
+        toast.success('Blacklist updated.');
       } else {
-        toast.error('Failed to update scope');
+        toast.error('Failed to update blacklist');
       }
     } catch (e) {
-      toast.error('Failed to update scope');
+      toast.error('Failed to update blacklist');
     } finally {
       setScopeSaving(false);
     }
@@ -716,6 +743,7 @@ export default function TokensTabContent() {
       await tokensServices.revokePublishableKey({
         workspace_id: currentWorkspaceId,
         user_id: user._id,
+        public_key: user.public_key ?? '',
       });
       setPublishableKey(null);
       toast.success('Publishable key revoked.');
@@ -928,16 +956,16 @@ export default function TokensTabContent() {
               </div>
             </div>
 
-            {/* Scope */}
+            {/* Blacklist (disallowed functionality) */}
             {publishableKey && (
               <div className="p-6 border-t border-grey-400">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-grey-600 uppercase tracking-wide">
-                    Scope (allowed functionality)
+                    Blacklist (disallowed functionality)
                   </label>
                   {!showScopeEditor ? (
                     <Button size="sm" variant="outline" onClick={handleOpenScopeEditor} className="h-7 text-xs">
-                      Edit scope
+                      Edit blacklist
                     </Button>
                   ) : (
                     <div className="flex gap-1">
@@ -946,7 +974,7 @@ export default function TokensTabContent() {
                       </Button>
                       <Button size="sm" onClick={handleSavePublishableKeyScope} disabled={scopeSaving} className="h-7 text-xs gap-1">
                         {scopeSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                        Save scope
+                        Save blacklist
                       </Button>
                     </div>
                   )}
@@ -954,55 +982,118 @@ export default function TokensTabContent() {
                 {!showScopeEditor ? (
                   <div className="bg-white rounded-lg border border-grey-300 p-3 text-sm">
                     {publishableKeyScope.length === 0 ? (
-                      <p className="text-grey-500">Default: restricted (no create/update/fetch of primitives; query and read operations allowed).</p>
+                      <p className="text-grey-500">Default: no execution methods allowed. Add modules below and disallow specific methods to allow the rest.</p>
                     ) : (
                       <ul className="space-y-1.5">
-                        {publishableKeyScope.map((entry, i) => (
-                          <li key={i} className="flex items-baseline gap-2">
-                            <span className="font-mono font-medium text-grey">{entry.module}</span>
-                            <span className="text-grey-500">:</span>
-                            <span className="text-grey-600">{Array.isArray(entry.methods) ? entry.methods.join(", ") : ""}</span>
-                          </li>
-                        ))}
+                        {publishableKeyScope.map((entry, i) => {
+                          const allExposable = getMethodsForModule(entry.module);
+                          const allowed = Array.isArray(entry.methods) ? entry.methods : [];
+                          const disallowed = allExposable.filter((m) => !allowed.includes(m));
+                          return (
+                            <li key={i} className="flex items-baseline gap-2">
+                              <span className="font-mono font-medium text-grey">{entry.module}</span>
+                              <span className="text-grey-500">:</span>
+                              <span className="text-grey-600">
+                                {disallowed.length === 0 ? "(none disallowed)" : `disallowed: ${disallowed.join(", ")}`}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
                 ) : (
                   <div className="bg-white rounded-lg border border-grey-300 p-3 space-y-3">
-                    <p className="text-xs text-grey-500">When non-empty, only these module.methods are allowed. Empty = default restricted scope.</p>
-                    {scopeDraft.map((entry, i) => (
-                      <div key={i} className="flex gap-2 items-center flex-wrap">
-                        <Input
-                          placeholder="module (e.g. databases)"
-                          value={entry.module}
-                          onChange={(e) => {
-                            const next = [...scopeDraft];
-                            next[i] = { ...next[i], module: e.target.value.trim() };
-                            setScopeDraft(next);
-                          }}
-                          className="w-36 h-8 text-sm font-mono"
-                        />
-                        <Input
-                          placeholder="methods (comma-separated, e.g. query, list)"
-                          value={Array.isArray(entry.methods) ? entry.methods.join(", ") : ""}
-                          onChange={(e) => {
-                            const next = [...scopeDraft];
-                            next[i] = { ...next[i], methods: e.target.value.split(",").map((m) => m.trim()).filter(Boolean) };
-                            setScopeDraft(next);
-                          }}
-                          className="flex-1 min-w-[180px] h-8 text-sm"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          onClick={() => setScopeDraft(scopeDraft.filter((_, j) => j !== i))}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                    <p className="text-xs text-grey-500">Methods listed here are disallowed for this key. All other execution methods for the module remain allowed. Add a module and select methods to disallow.</p>
+                    {scopeDraft.map((entry, i) => {
+                      const methodsForModule = getMethodsForModule(entry.module);
+                      const selectedMethods = Array.isArray(entry.methods) ? entry.methods : [];
+                      const availableToAdd = methodsForModule.filter((m) => !selectedMethods.includes(m));
+                      return (
+                        <div key={i} className="flex gap-2 items-start flex-wrap border-b border-grey-200 pb-3 last:border-0 last:pb-0">
+                          <div className="flex gap-2 items-center flex-wrap min-w-0">
+                            <Select
+                              value={entry.module || '_none'}
+                              onValueChange={(v) => {
+                                const next = [...scopeDraft];
+                                next[i] = { module: v === '_none' ? '' : v, methods: [] };
+                                setScopeDraft(next);
+                              }}
+                            >
+                              <SelectTrigger className="w-40 h-8 text-sm font-mono">
+                                <SelectValue placeholder="Module" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_none">Select module</SelectItem>
+                                {PUBLISHABLE_SCOPE_MODULES.map((mod) => (
+                                  <SelectItem key={mod} value={mod}>
+                                    {mod}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value="_add"
+                              onValueChange={(v) => {
+                                if (v === '_add' || !v) return;
+                                const next = [...scopeDraft];
+                                const methods = Array.isArray(next[i].methods) ? [...next[i].methods] : [];
+                                if (!methods.includes(v)) methods.push(v);
+                                next[i] = { ...next[i], methods };
+                                setScopeDraft(next);
+                              }}
+                              disabled={!entry.module || availableToAdd.length === 0}
+                            >
+                              <SelectTrigger className="w-48 h-8 text-sm">
+                                <SelectValue placeholder={entry.module ? "Disallow method…" : "Select module first"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_add">
+                                  {entry.module ? (availableToAdd.length === 0 ? "All disallowed" : "Disallow method…") : "Select module first"}
+                                </SelectItem>
+                                {availableToAdd.map((method) => (
+                                  <SelectItem key={method} value={method}>
+                                    {method}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 items-center min-w-0">
+                            {selectedMethods.map((method) => (
+                              <Badge
+                                key={method}
+                                variant="secondary"
+                                className="font-mono text-xs py-0.5 pr-1 gap-0.5"
+                              >
+                                {method}
+                                <button
+                                  type="button"
+                                  className="ml-0.5 rounded hover:bg-grey-300 p-0.5"
+                                  onClick={() => {
+                                    const next = [...scopeDraft];
+                                    next[i] = { ...next[i], methods: selectedMethods.filter((m) => m !== method) };
+                                    setScopeDraft(next);
+                                  }}
+                                  aria-label={`Allow ${method} (remove from blacklist)`}
+                                >
+                                  <span className="text-grey-600 leading-none">×</span>
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 shrink-0"
+                            onClick={() => setScopeDraft(scopeDraft.filter((_, j) => j !== i))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                     <Button
                       type="button"
                       size="sm"
@@ -1011,18 +1102,18 @@ export default function TokensTabContent() {
                       onClick={() => setScopeDraft([...scopeDraft, { module: "", methods: [] }])}
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Add module
+                      Add module to blacklist
                     </Button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Code samples — aligned with docs/docs/frontend/*/getting-started */}
+            {/* Code samples — init + query + mutation for React, Vanilla, Vue, Node */}
             <div className="p-6 border-t border-grey-400">
-              <h3 className="text-sm font-medium text-grey mb-3">Init with publishable key (frontend SDK)</h3>
+              <h3 className="text-sm font-medium text-grey mb-3">Init and mutation examples (query + insert / upload)</h3>
               <div className="flex gap-1 mb-2">
-                {(['react', 'vanilla', 'vue'] as const).map((tab) => (
+                {(['react', 'vanilla', 'vue', 'node'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setPublishableKeySampleTab(tab)}
@@ -1031,56 +1122,113 @@ export default function TokensTabContent() {
                       publishableKeySampleTab === tab ? 'bg-primary text-white' : 'bg-grey-100 text-grey-600 hover:bg-grey-200'
                     )}
                   >
-                    {tab}
+                    {tab === 'node' ? 'Node.js' : tab}
                   </button>
                 ))}
               </div>
               <div className="bg-grey-100 dark:bg-grey-800 rounded-lg p-4 border border-grey-300 overflow-x-auto">
                 <pre className="text-sm font-mono text-grey dark:text-grey-100 leading-relaxed whitespace-pre">
-                  {publishableKeySampleTab === 'react' && `// @ductape/react (docs: frontend/react/getting-started)
+                  {publishableKeySampleTab === 'react' && `// React — init with publishable key
 import { DuctapeProvider } from '@ductape/react';
 
 function App() {
   return (
-    <DuctapeProvider
-      config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}
-      autoConnect={false}
-    >
+    <DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }} autoConnect={false}>
       <YourApp />
     </DuctapeProvider>
   );
 }
 
-// In any child:
+// Query (read)
 import { useDatabaseQuery } from '@ductape/react';
-const { data, isLoading } = useDatabaseQuery('users', { table: 'users', limit: 10 });`}
-                  {publishableKeySampleTab === 'vanilla' && `// @ductape/client (docs: frontend/client/getting-started)
+const { data } = useDatabaseQuery('users', { table: 'users', limit: 10 });
+
+// Mutation (insert)
+import { useDatabaseInsert } from '@ductape/react';
+const { mutate } = useDatabaseInsert({ onSuccess: () => console.log('Inserted') });
+mutate({ table: 'users', data: { name: 'Jane', email: 'jane@example.com' } });
+
+// Mutation (upload) — use client from useDuctape()
+import { useDuctape } from '@ductape/react';
+const { client } = useDuctape();
+const result = await client.storage.upload({ storage: 'my-storage', fileName: 'doc.pdf', file: fileBlob });`}
+                  {publishableKeySampleTab === 'vanilla' && `// Vanilla JS — init with publishable key
 import { Ductape } from '@ductape/client';
 
-const ductape = new Ductape({
-  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
-});
+const ductape = new Ductape({ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY });
 
+// Query (read)
 const result = await ductape.databases.query({ table: 'users', limit: 10 });
-console.log(result.rows);`}
-                  {publishableKeySampleTab === 'vue' && `// @ductape/vue (docs: frontend/vue/getting-started)
+console.log(result.rows);
+
+// Mutation (insert)
+const inserted = await ductape.databases.insert({
+  table: 'users',
+  data: { name: 'Jane', email: 'jane@example.com' },
+});
+console.log('Inserted:', inserted.rows[0]);
+
+// Mutation (upload)
+const uploadResult = await ductape.storage.upload({
+  storage: 'my-storage',
+  fileName: 'doc.pdf',
+  file: fileInputElement.files[0],
+});
+console.log('Uploaded:', uploadResult);`}
+                  {publishableKeySampleTab === 'vue' && `// Vue 3 — init with publishable key
 import { createApp } from 'vue';
 import { createDuctape } from '@ductape/vue';
 import App from './App.vue';
 
 const app = createApp(App);
-const ductape = createDuctape({
-  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
-  autoConnect: false,
-});
-app.use(ductape);
+app.use(createDuctape({ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY, autoConnect: false }));
 app.mount('#app');
 
-// In components: const { data, isLoading } = useDatabaseQuery(['users'], { table: 'users', limit: 10 });`}
+// In a component (query + mutation)
+import { useDatabaseQuery, useDatabaseInsert, useDuctape } from '@ductape/vue';
+
+const { data } = useDatabaseQuery(['users'], { table: 'users', limit: 10 });
+
+const { mutate } = useDatabaseInsert({ onSuccess: () => console.log('Inserted') });
+function addUser() {
+  mutate({ table: 'users', data: { name: 'Jane', email: 'jane@example.com' } });
+}
+
+// Upload: get client from useDuctape()
+const { client } = useDuctape();
+const result = await client.storage.upload({ storage: 'my-storage', fileName: 'doc.pdf', file: file });`}
+                  {publishableKeySampleTab === 'node' && `// Node.js (server) — use accessKey; mutations allowed
+const { Ductape } = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+  product: process.env.DUCTAPE_PRODUCT ?? 'my-product',
+  env: process.env.DUCTAPE_ENV ?? 'prd',
+});
+
+// Query (read)
+const result = await ductape.databases.query({ table: 'users', limit: 10 });
+console.log(result.rows);
+
+// Mutation (insert)
+const inserted = await ductape.databases.insert({
+  table: 'users',
+  data: { name: 'Jane', email: 'jane@example.com' },
+});
+console.log('Inserted:', inserted.rows[0]);
+
+// Mutation (upload) — e.g. from multipart request
+const uploadResult = await ductape.storage.upload({
+  storage: 'my-storage',
+  fileName: 'doc.pdf',
+  buffer: fileBuffer,
+  mimeType: 'application/pdf',
+});
+console.log('Uploaded:', uploadResult);`}
                 </pre>
               </div>
               <p className="mt-2 text-xs text-grey-500">
-                Only <code className="bg-grey-100 px-1 rounded">publishableKey</code> is required. The client sends <code className="bg-grey-100 px-1 rounded">X-Publishable-Key</code>. Allowed operations are limited by this key&apos;s scope (see Scope above).
+                Frontend: only <code className="bg-grey-100 px-1 rounded">publishableKey</code> (sends <code className="bg-grey-100 px-1 rounded">X-Publishable-Key</code>). Node: use <code className="bg-grey-100 px-1 rounded">accessKey</code> on the server. Scope limits what the publishable key can call.
               </p>
             </div>
           </div>

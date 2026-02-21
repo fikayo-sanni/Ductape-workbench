@@ -16,9 +16,11 @@ export interface CodeSidebarProps {
   subtitle?: string;
   tag?: string;
   onClose?: () => void;
-  // Option 1: Dynamic code generation
-  generateCodeSections?: (language: string, env?: string) => CodeSection[];
+  // Option 1: Dynamic code generation (runtime: 'vanilla' | 'react' | 'node' for frontend/backend variants)
+  generateCodeSections?: (language: string, env?: string, runtime?: string) => CodeSection[];
   environments?: Array<{ slug: string; env_name?: string }>;
+  /** When true, show Runtime selector (Vanilla JS, React, Node.js) and pass to generateCodeSections */
+  showRuntimeSelector?: boolean;
   // Option 2: Simple static code
   language?: string;
   code?: string;
@@ -36,6 +38,7 @@ export default function CodeSidebar({
   onClose,
   generateCodeSections,
   environments = [],
+  showRuntimeSelector = false,
   language: staticLanguage,
   code: staticCode,
   additionalControls,
@@ -44,6 +47,7 @@ export default function CodeSidebar({
   sectionFooter,
 }: CodeSidebarProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<string>(staticLanguage || 'typescript');
+  const [selectedRuntime, setSelectedRuntime] = useState<string>('node');
   const [selectedEnv, setSelectedEnv] = useState<string>(
     environments[0]?.slug || 'prd'
   );
@@ -51,11 +55,11 @@ export default function CodeSidebar({
   const [showTransactions, setShowTransactions] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
 
-  // Use static code if provided, otherwise use generateCodeSections
+  // Use static code if provided, otherwise use generateCodeSections (pass runtime when showRuntimeSelector)
   const sections: CodeSection[] = staticCode
     ? [{ title: 'Code', code: staticCode }]
     : generateCodeSections
-    ? generateCodeSections(selectedLanguage, selectedEnv)
+    ? generateCodeSections(selectedLanguage, selectedEnv, showRuntimeSelector ? selectedRuntime : undefined)
     : [];
 
   const copySection = (code: string, sectionTitle: string) => {
@@ -160,6 +164,25 @@ export default function CodeSidebar({
                     {env.env_name || env.slug}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Runtime Selector (Vanilla / React / Node) */}
+        {generateCodeSections && showRuntimeSelector && (
+          <div>
+            <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+              Runtime
+            </Label>
+            <Select value={selectedRuntime} onValueChange={setSelectedRuntime}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vanilla">Vanilla JS (frontend)</SelectItem>
+                <SelectItem value="react">React (frontend)</SelectItem>
+                <SelectItem value="node">Node.js (server)</SelectItem>
               </SelectContent>
             </Select>
           </div>

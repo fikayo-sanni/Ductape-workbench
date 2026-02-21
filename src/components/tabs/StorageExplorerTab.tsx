@@ -826,10 +826,90 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
   const storageProvider = storage.provider || storage.type || 'cloud';
 
   // Generate code examples for storage operations
-  const generateCodeSections = useCallback((language: string, env?: string) => {
+  const generateCodeSections = useCallback((language: string, env?: string, runtime?: string) => {
     const storageTag = storage.tag;
     const productTag = storage.productTag || 'your_product';
     const envSlug = env || storage.env.slug || 'prd';
+
+    // Frontend / Node runtime-specific examples (init + upload mutation)
+    if (runtime === 'vanilla') {
+      return [
+        {
+          title: 'Init (Vanilla JS, publishable key)',
+          code: `import { Ductape } from '@ductape/client';
+
+const ductape = new Ductape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+});`,
+        },
+        {
+          title: 'Mutation (upload)',
+          code: `// e.g. from <input type="file" />
+const file = fileInputElement.files[0];
+const result = await ductape.storage.upload({
+  storage: '${storageTag}',
+  fileName: file.name,
+  file,
+});
+console.log('Uploaded:', result);`,
+        },
+      ];
+    }
+    if (runtime === 'react') {
+      return [
+        {
+          title: 'Init (React, publishable key)',
+          code: `import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}>
+  <YourApp />
+</DuctapeProvider>`,
+        },
+        {
+          title: 'Mutation (upload)',
+          code: `import { useDuctape } from '@ductape/react';
+
+const { client } = useDuctape();
+// e.g. from file input or drag-drop
+const result = await client.storage.upload({
+  storage: '${storageTag}',
+  fileName: file.name,
+  file,
+});
+console.log('Uploaded:', result);`,
+        },
+      ];
+    }
+    if (runtime === 'node') {
+      return [
+        {
+          title: 'Init (Node.js, access key)',
+          code: language === 'typescript'
+            ? `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`
+            : `const { Ductape } = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`,
+        },
+        {
+          title: 'Mutation (upload)',
+          code: `const result = await ductape.storage.upload({
+  product: '${productTag}',
+  env: '${envSlug}',
+  storage: '${storageTag}',
+  fileName: 'example.txt',
+  buffer: Buffer.from('Hello, Ductape!'),
+  mimeType: 'text/plain',
+});
+console.log('Uploaded:', result);`,
+        },
+      ];
+    }
 
     const initSection = language === 'typescript'
       ? {
@@ -1931,6 +2011,7 @@ console.log('Files by type:', stats.byType);`,
           tag={storage.tag}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
+          showRuntimeSelector
           environments={[
             { slug: storage.env.slug, env_name: storage.env.slug.toUpperCase() },
           ]}

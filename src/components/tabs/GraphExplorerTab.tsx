@@ -1078,14 +1078,96 @@ await ductape.init();`,
   };
 
   // Generate code sections for Graph CodeSidebar (main view - graph operations)
-  const generateGraphCodeSections = (language: string, env?: string) => {
+  const generateGraphCodeSections = (language: string, env?: string, runtime?: string) => {
     const envSlug = env || graph.env.slug;
     const productTag = graph.tag.split(':')[0] || 'your-product';
+    const graphTag = graph.tag;
     const labelName = selectedLabel?.name || 'Person';
     const relTypeName = selectedRelType?.type || 'KNOWS';
 
-    // Generate sample properties based on selected label
     const sampleProperties = selectedLabel?.properties?.length
+      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(', ')
+      : "name: 'value'";
+
+    // Frontend / Node runtime-specific examples (init + createNode mutation)
+    if (runtime === 'vanilla') {
+      return [
+        {
+          title: 'Init (Vanilla JS, publishable key)',
+          code: `import { Ductape } from '@ductape/client';
+
+const ductape = new Ductape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+});`,
+        },
+        {
+          title: 'Mutation (create node)',
+          code: `const node = await ductape.graph.query({
+  graph: '${graphTag}',
+  operation: 'createNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${samplePropertiesForOperations} },
+  },
+});
+console.log('Created:', node);`,
+        },
+      ];
+    }
+    if (runtime === 'react') {
+      return [
+        {
+          title: 'Init (React, publishable key)',
+          code: `import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}>
+  <YourApp />
+</DuctapeProvider>`,
+        },
+        {
+          title: 'Mutation (create node)',
+          code: `import { useDuctape } from '@ductape/react';
+
+const { client } = useDuctape();
+const node = await client.graph.query({
+  graph: '${graphTag}',
+  operation: 'createNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${samplePropertiesForOperations} },
+  },
+});
+console.log('Created:', node);`,
+        },
+      ];
+    }
+    if (runtime === 'node') {
+      return [
+        {
+          title: 'Init (Node.js, access key)',
+          code: language === 'typescript'
+            ? `import Ductape from '@ductape/sdk';\n\nconst ductape = new Ductape({ accessKey: process.env.DUCTAPE_ACCESS_KEY });`
+            : `const { Ductape } = require('@ductape/sdk');\n\nconst ductape = new Ductape({ accessKey: process.env.DUCTAPE_ACCESS_KEY });`,
+        },
+        {
+          title: 'Mutation (create node)',
+          code: `const node = await ductape.graph.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  graph: '${graphTag}',
+  operation: 'createNode',
+  options: {
+    labels: ['${labelName}'],
+    properties: { ${samplePropertiesForOperations} },
+  },
+});
+console.log('Created:', node);`,
+        },
+      ];
+    }
+
+    // Generate sample properties based on selected label (for non-runtime mode)
+    const samplePropertiesForOperations = selectedLabel?.properties?.length
       ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(',\n      ')
       : "name: 'value'";
 
@@ -1101,7 +1183,7 @@ await ductape.init();`,
   operation: 'findNodes',
   options: {
     labels: ['${labelName}'],
-    properties: { ${sampleProperties} },
+    properties: { ${samplePropertiesForOperations} },
     limit: 100,
   },
 });`,
@@ -1132,7 +1214,7 @@ await ductape.init();`,
   options: {
     labels: ['${labelName}'],
     properties: {
-      ${sampleProperties},
+      ${samplePropertiesForOperations},
       createdAt: new Date().toISOString(),
     },
   },
@@ -1149,8 +1231,8 @@ await ductape.init();`,
   operation: 'updateNode',
   options: {
     labels: ['${labelName}'],
-    properties: { ${sampleProperties} },
-    updates: { ${sampleProperties} },
+    properties: { ${samplePropertiesForOperations} },
+    updates: { ${samplePropertiesForOperations} },
   },
 });`,
           },
@@ -1165,7 +1247,7 @@ await ductape.init();`,
   operation: 'deleteNode',
   options: {
     labels: ['${labelName}'],
-    properties: { ${sampleProperties} },
+    properties: { ${samplePropertiesForOperations} },
     detach: true, // Also delete connected relationships
   },
 });`,
@@ -1182,7 +1264,7 @@ await ductape.init();`,
   options: {
     labels: ['${labelName}'],
     // Optional: filter by properties
-    // properties: { ${sampleProperties} },
+    // properties: { ${samplePropertiesForOperations} },
   },
 });`,
           },
@@ -1216,8 +1298,8 @@ await ductape.init();`,
   operation: 'createRelationship',
   options: {
     type: '${relTypeName}',
-    fromNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
-    toNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    fromNode: { labels: ['${labelName}'], properties: { ${samplePropertiesForOperations} } },
+    toNode: { labels: ['${labelName}'], properties: { ${samplePropertiesForOperations} } },
     properties: { since: new Date().toISOString() },
   },
 });`,
@@ -1249,7 +1331,7 @@ await ductape.init();`,
   graph: '${graph.tag}',
   operation: 'traverse',
   options: {
-    startNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    startNode: { labels: ['${labelName}'], properties: { ${samplePropertiesForOperations} } },
     direction: 'outgoing',
     maxDepth: 3,
     // Optional: filter by relationship type
@@ -1267,8 +1349,8 @@ await ductape.init();`,
   graph: '${graph.tag}',
   operation: 'shortestPath',
   options: {
-    startNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
-    endNode: { labels: ['${labelName}'], properties: { ${sampleProperties} } },
+    startNode: { labels: ['${labelName}'], properties: { ${samplePropertiesForOperations} } },
+    endNode: { labels: ['${labelName}'], properties: { ${samplePropertiesForOperations} } },
     maxDepth: 10,
     // Optional: filter by relationship type
     // relationshipTypes: ['${relTypeName}'],
@@ -5928,6 +6010,7 @@ await ductape.init();`,
           tag={graph.tag}
           onClose={() => setShowGraphCodeSidebar(false)}
           generateCodeSections={generateGraphCodeSections}
+          showRuntimeSelector
           environments={[{ slug: graph.env.slug, env_name: graph.env.slug.toUpperCase() }]}
           additionalControls={
             <div>
