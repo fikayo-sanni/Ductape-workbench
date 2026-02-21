@@ -573,7 +573,7 @@ export interface NotificationActivityQuery {
   product_tag: string;
   notifier_tag?: string;
   env?: string;
-  channel?: 'email' | 'push' | 'sms' | 'callback';
+  channel?: 'email' | 'push' | 'sms' | 'callback' | 'slack' | 'discord';
   status?: 'success' | 'fail' | 'processing';
   start_date?: string;
   end_date?: string;
@@ -756,7 +756,7 @@ export const fetchNotificationLogs = async (
     limit: 500,
   };
 
-  const types: Array<'email' | 'push' | 'sms' | 'callback'> = ['email', 'push', 'sms', 'callback'];
+  const types: Array<'email' | 'push' | 'sms' | 'callback' | 'slack' | 'discord'> = ['email', 'push', 'sms', 'callback', 'slack', 'discord'];
   const results = await Promise.all(
     types.map((type) =>
       fetchLogs(basePayload, {

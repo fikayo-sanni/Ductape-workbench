@@ -3010,11 +3010,81 @@ const complexQuery = await ductape.database.raw({
   };
 
   // Generate code examples for database operations
-  const generateCodeSections = (language: string, env?: string) => {
+  const generateCodeSections = (language: string, env?: string, runtime?: string) => {
     const tableName = selectedTable?.name || 'your_table';
     const envSlug = env || 'prd';
 
-    // Common sections for all operations
+    // Frontend / Node runtime-specific examples (init + mutation)
+    if (runtime === 'vanilla') {
+      return [
+        {
+          title: 'Init (Vanilla JS, publishable key)',
+          code: `import { Ductape } from '@ductape/client';
+
+const ductape = new Ductape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+});`,
+        },
+        {
+          title: 'Mutation (insert)',
+          code: `const inserted = await ductape.databases.insert({
+  table: '${tableName}',
+  data: { name: 'Jane', email: 'jane@example.com' },
+});
+console.log('Inserted:', inserted.rows?.[0]);`,
+        },
+      ];
+    }
+    if (runtime === 'react') {
+      return [
+        {
+          title: 'Init (React, publishable key)',
+          code: `import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}>
+  <YourApp />
+</DuctapeProvider>`,
+        },
+        {
+          title: 'Mutation (insert)',
+          code: `import { useDatabaseInsert } from '@ductape/react';
+
+const { mutate } = useDatabaseInsert({ onSuccess: () => console.log('Inserted') });
+mutate({
+  table: '${tableName}',
+  data: { name: 'Jane', email: 'jane@example.com' },
+});`,
+        },
+      ];
+    }
+    if (runtime === 'node') {
+      return [
+        {
+          title: 'Init (Node.js, access key)',
+          code: language === 'typescript'
+            ? `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`
+            : `const { Ductape } = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`,
+        },
+        {
+          title: 'Mutation (insert)',
+          code: `const inserted = await ductape.databases.insert({
+  table: '${tableName}',
+  data: { name: 'Jane', email: 'jane@example.com' },
+});
+console.log('Inserted:', inserted.rows?.[0]);`,
+        },
+      ];
+    }
+
+    // Common sections for all operations (no runtime selector)
     const initSection = language === 'typescript'
       ? {
           title: 'Init Ductape',
@@ -7295,6 +7365,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           tag={selectedTable.name}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
+          showRuntimeSelector
           environments={[{ slug: 'prd', env_name: 'Production' }, { slug: 'dev', env_name: 'Development' }]}
           additionalControlsAfterSection="Transactions (Optional)"
           additionalControls={

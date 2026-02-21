@@ -813,6 +813,7 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     const appTag = action?.appTag || 'your-app-tag';
     const actionTag = formData.tag || action?.tag || 'action-tag';
     const envSlug = env || customEnvs.find(e => e.active)?.slug || 'production';
+    const productTagPlaceholder = productTag || 'integrated_product_tag_here';
 
     // Prepare enabled params, query for code examples
     const enabledParams = params.filter(p => p.enabled && p.key);
@@ -913,6 +914,7 @@ const ductape = new Ductape({
           {
             title: 'Input',
             code: `const payload = {
+  product: '${productTagPlaceholder}',
   env: '${envSlug}',
   app: '${appTag}',
   action: '${actionTag}',
@@ -924,7 +926,7 @@ ${generateFlatInput('    ')}
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.action.run(payload);
+            code: `const result = await ductape.actions.run(payload);
 console.log('Action result:', result);`
           }
         ];
@@ -942,6 +944,7 @@ const ductape = new Ductape({
           {
             title: 'Input',
             code: `const payload = {
+  product: '${productTagPlaceholder}',
   env: '${envSlug}',
   app: '${appTag}',
   action: '${actionTag}',
@@ -953,7 +956,7 @@ ${generateFlatInput('    ')}
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.action.run(payload);
+            code: `const result = await ductape.actions.run(payload);
 console.log('Action result:', result);`
           }
         ];
@@ -973,6 +976,7 @@ ductape = Ductape(
           {
             title: 'Input',
             code: `payload_data = {
+    'product': '${productTagPlaceholder}',
     'env': '${envSlug}',
     'app': '${appTag}',
     'action': '${actionTag}',
@@ -1021,6 +1025,7 @@ input.put("headers", headers);
 input.put("body", ${typeof bodyObj === 'string' ? `"${bodyObj}"` : JSON.stringify(bodyObj)});
 ` : ''}
 ActionRequest request = new ActionRequest.Builder()
+    .product("${productTagPlaceholder}")
     .env("${envSlug}")
     .app("${appTag}")
     .event("${actionTag}")
@@ -1050,6 +1055,7 @@ ductape = Ductape::Client.new(
           {
             title: 'Input',
             code: `payload = {
+  product: '${productTagPlaceholder}',
   env: '${envSlug}',
   app: '${appTag}',
   event: '${actionTag}',
@@ -1093,6 +1099,7 @@ $ductape = new Client([
           {
             title: 'Input',
             code: `$payload = [
+    'product' => '${productTagPlaceholder}',
     'env' => '${envSlug}',
     'app' => '${appTag}',
     'event' => '${actionTag}',
@@ -1147,6 +1154,7 @@ ${enabledHeaders.map(h => `        "${h.key}" to "${getParamValue(h.key, h.value
 ` : ''}}
 
 val request = ActionRequest(
+    product = "${productTagPlaceholder}",
     env = "${envSlug}",
     app = "${appTag}",
     event = "${actionTag}",
@@ -1193,6 +1201,7 @@ ${enabledHeaders.map(h => `        "${h.key}": "${getParamValue(h.key, h.value)}
 }
 
 request := &ductape.ActionRequest{
+    Product: "${productTagPlaceholder}",
     Env:     "${envSlug}",
     App:     "${appTag}",
     Event:   "${actionTag}",

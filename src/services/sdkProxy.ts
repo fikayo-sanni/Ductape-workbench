@@ -12,6 +12,13 @@
 import apiClient from '@/config/axiosinstance';
 import { encryptProxyPayload } from '@/utils/proxyEncryption';
 
+/** Gzip a string (for large sdk-proxy bodies to avoid 413 at gateways). */
+async function gzipString(str: string): Promise<Blob> {
+  const blob = new Blob([str], { type: 'application/json' });
+  const stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+  return await new Response(stream).blob();
+}
+
 /**
  * Configuration for the SDK Proxy Service
  */
@@ -96,20 +103,30 @@ export class SDKProxyService {
     };
     const encryptedPayload = encryptProxyPayload(sensitiveData, this.config.public_key);
 
+    const body = {
+      encrypted_payload: encryptedPayload,
+      workspace_id: this.config.workspace_id,
+      user_id: this.config.user_id,
+      public_key: this.config.public_key,
+    };
+
+    // Compress large bodies so they get past gateway body limits (avoids 413)
+    const GZIP_THRESHOLD = 200 * 1024; // 200KB
+    const bodyStr = JSON.stringify(body);
+
     try {
+      const headers: Record<string, string> = {
+        'x-access-token': this.config.token,
+      };
+      let payload: typeof body | Blob = body;
+      if (bodyStr.length > GZIP_THRESHOLD && typeof CompressionStream !== 'undefined') {
+        payload = await gzipString(bodyStr);
+        headers['Content-Encoding'] = 'gzip';
+      }
       const response = await apiClient.post<SDKProxyResponse<T>>(
         '/proxy/v1/sdk-proxy/execute',
-        {
-          encrypted_payload: encryptedPayload,
-          workspace_id: this.config.workspace_id,
-          user_id: this.config.user_id,
-          public_key: this.config.public_key,
-        },
-        {
-          headers: {
-            'x-access-token': this.config.token,
-          },
-        }
+        payload,
+        { headers }
       );
 
       if (!response.data.status) {

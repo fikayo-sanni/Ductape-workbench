@@ -144,6 +144,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   const [showIntelligenceTypeDialog, setShowIntelligenceTypeDialog] = useState(false);
   const [showResilienceTypeDialog, setShowResilienceTypeDialog] = useState(false);
   const [showJobsCodeDialog, setShowJobsCodeDialog] = useState(false);
+  const [showWorkflowsCodeDialog, setShowWorkflowsCodeDialog] = useState(false);
+  const [selectedWorkflowFn, setSelectedWorkflowFn] = useState<string>('define');
   const [selectedJobType, setSelectedJobType] = useState<string>('app-action');
 
   // Inline component creation state (null = not creating, string = type being created)
@@ -498,6 +500,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Jobs: "Add job" opens code sample sidebar (Dispatching Jobs)
     if (type === 'job') {
       setShowJobsCodeDialog(true);
+      return;
+    }
+    // Workflows: "Add" opens code sample sidebar (Defining & Executing Workflows)
+    if (type === 'workflow') {
+      setShowWorkflowsCodeDialog(true);
       return;
     }
 
@@ -2543,6 +2550,351 @@ const job = await ductape.notifications.dispatch({
             };
 
             return jobTypeSections[selectedJobType] || jobTypeSections['app-action'];
+          }}
+        />
+      )}
+
+      {/* Workflows Code Sidebar */}
+      {showWorkflowsCodeDialog && (
+        <CodeSidebar
+          title="Workflow API"
+          subtitle="Define, execute, and manage workflows with ductape.workflow.*. Select a function below for sample code."
+          tag={product?.tag}
+          onClose={() => setShowWorkflowsCodeDialog(false)}
+          environments={product?.envs || []}
+          additionalControls={
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+                  Workflow function
+                </Label>
+                <Select value={selectedWorkflowFn} onValueChange={setSelectedWorkflowFn}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="define">define</SelectItem>
+                    <SelectItem value="execute">execute</SelectItem>
+                    <SelectItem value="fetchAll">fetchAll</SelectItem>
+                    <SelectItem value="fetch">fetch</SelectItem>
+                    <SelectItem value="create">create</SelectItem>
+                    <SelectItem value="update">update</SelectItem>
+                    <SelectItem value="delete">delete</SelectItem>
+                    <SelectItem value="dispatch">dispatch</SelectItem>
+                    <SelectItem value="signal">signal</SelectItem>
+                    <SelectItem value="query">query</SelectItem>
+                    <SelectItem value="status">status</SelectItem>
+                    <SelectItem value="cancel">cancel</SelectItem>
+                    <SelectItem value="replay">replay</SelectItem>
+                    <SelectItem value="restart">restart</SelectItem>
+                    <SelectItem value="resume">resume</SelectItem>
+                    <SelectItem value="replayFromStep">replayFromStep</SelectItem>
+                    <SelectItem value="history">history</SelectItem>
+                    <SelectItem value="stepDetail">stepDetail</SelectItem>
+                    <SelectItem value="relatedExecutions">relatedExecutions</SelectItem>
+                    <SelectItem value="compare">compare</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <a
+                href="https://docs.ductape.app/workflows/overview"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View workflow documentation
+              </a>
+            </div>
+          }
+          generateCodeSections={(language, env) => {
+            const productTag = product?.tag || 'your-product';
+            const envSlug = env || 'prd';
+            const workflowFnSections: Record<string, Array<{ title: string; code: string }>> = {
+              define: [
+                {
+                  title: 'Define a workflow (code-first)',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.define({
+  product: '${productTag}',
+  tag: 'order-processing-workflow',
+  name: 'Order Processing Workflow',
+  description: 'Validate, pay, and fulfill orders',
+  input: {
+    orderId: { type: 'string', required: true },
+    customerId: { type: 'string', required: true },
+    items: { type: 'array', required: true },
+    total: { type: 'number', required: true },
+  },
+  handler: async (ctx) => {
+    const validated = await ctx.step('validate-order', async () => ({
+      valid: true,
+      orderId: ctx.input.orderId,
+    }));
+    const payment = await ctx.step('process-payment', async () => ({
+      success: true,
+      transactionId: \`TXN-\${Date.now()}\`,
+    }));
+    return { orderId: ctx.input.orderId, transactionId: payment.transactionId };
+  },
+});`,
+                },
+              ],
+              execute: [
+                {
+                  title: 'Execute a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.execute({
+  product: '${productTag}',
+  env: '${envSlug}',
+  tag: 'order-processing-workflow',
+  input: {
+    orderId: 'ORD-001',
+    customerId: 'cust-123',
+    items: [{ productId: 'P1', quantity: 2, price: 29.99 }],
+    total: 59.98,
+  },
+});
+
+console.log('Status:', result.status);
+console.log('Output:', result.output);`,
+                },
+              ],
+              fetchAll: [
+                {
+                  title: 'List all workflows',
+                  code: `import ductape from '@ductape/sdk';
+
+const workflows = await ductape.workflow.fetchAll('${productTag}');
+
+for (const w of workflows || []) {
+  console.log(w.tag, '-', w.name);
+}`,
+                },
+              ],
+              fetch: [
+                {
+                  title: 'Fetch a workflow by tag',
+                  code: `import ductape from '@ductape/sdk';
+
+const workflow = await ductape.workflow.fetch('order-processing-workflow', '${productTag}');
+
+if (workflow) {
+  console.log(workflow.name, workflow.steps?.length, 'steps');
+}`,
+                },
+              ],
+              create: [
+                {
+                  title: 'Create workflow from JSON schema',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.create('${productTag}', {
+  tag: 'manual-workflow',
+  name: 'Manual Workflow',
+  steps: [
+    { tag: 'step-1', type: 'action', event: 'run', input: {} },
+    { tag: 'step-2', type: 'action', event: 'run', input: {} },
+  ],
+  envs: [{ slug: '${envSlug}' }],
+});`,
+                },
+              ],
+              update: [
+                {
+                  title: 'Update a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.update('order-processing-workflow', '${productTag}', {
+  name: 'Order Processing (v2)',
+  description: 'Updated description',
+});`,
+                },
+              ],
+              delete: [
+                {
+                  title: 'Delete a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.delete('old-workflow-tag', '${productTag}');`,
+                },
+              ],
+              dispatch: [
+                {
+                  title: 'Dispatch workflow as job',
+                  code: `import ductape from '@ductape/sdk';
+
+const job = await ductape.workflow.dispatch({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow: 'order-processing-workflow',
+  input: { orderId: 'ORD-1', customerId: 'c1', items: [], total: 0 },
+});
+
+console.log('Job ID:', job.job_id);`,
+                },
+              ],
+              signal: [
+                {
+                  title: 'Send signal to a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.signal({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+  signal: 'approve',
+  payload: { comment: 'Approved by admin' },
+});`,
+                },
+              ],
+              query: [
+                {
+                  title: 'Query workflow (e.g. getStatus)',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.query({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+  query: 'getStatus',
+});
+
+console.log(result);`,
+                },
+              ],
+              status: [
+                {
+                  title: 'Get workflow run status',
+                  code: `import ductape from '@ductape/sdk';
+
+const status = await ductape.workflow.status({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});
+
+console.log(status?.status, status?.completed_steps);`,
+                },
+              ],
+              cancel: [
+                {
+                  title: 'Cancel a workflow run',
+                  code: `import ductape from '@ductape/sdk';
+
+await ductape.workflow.cancel({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});`,
+                },
+              ],
+              replay: [
+                {
+                  title: 'Replay a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.replay({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});`,
+                },
+              ],
+              restart: [
+                {
+                  title: 'Restart a workflow',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.restart({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});`,
+                },
+              ],
+              resume: [
+                {
+                  title: 'Resume from checkpoint',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.resume({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+  from_step: 'checkpoint-1',
+  state: { /* saved state */ },
+});`,
+                },
+              ],
+              replayFromStep: [
+                {
+                  title: 'Replay from a specific step',
+                  code: `import ductape from '@ductape/sdk';
+
+const result = await ductape.workflow.replayFromStep({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+  from_step: 'step-2',
+});`,
+                },
+              ],
+              history: [
+                {
+                  title: 'Get workflow run history',
+                  code: `import ductape from '@ductape/sdk';
+
+const history = await ductape.workflow.history({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});
+
+console.log(history.steps);`,
+                },
+              ],
+              stepDetail: [
+                {
+                  title: 'Get step detail',
+                  code: `import ductape from '@ductape/sdk';
+
+const detail = await ductape.workflow.stepDetail({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+  step_tag: 'validate-order',
+});`,
+                },
+              ],
+              relatedExecutions: [
+                {
+                  title: 'Get related executions',
+                  code: `import ductape from '@ductape/sdk';
+
+const related = await ductape.workflow.relatedExecutions({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflow_id: 'your-workflow-run-id',
+});`,
+                },
+              ],
+              compare: [
+                {
+                  title: 'Compare two workflow runs',
+                  code: `import ductape from '@ductape/sdk';
+
+const comparison = await ductape.workflow.compare({
+  product: '${productTag}',
+  env: '${envSlug}',
+  workflows: ['workflow-run-id-1', 'workflow-run-id-2'],
+});`,
+                },
+              ],
+            };
+            return workflowFnSections[selectedWorkflowFn] || workflowFnSections['define'];
           }}
         />
       )}
