@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Coins, Clock, Zap, TrendingUp, Edit, Trash2, FileText, Download, CheckCircle, XCircle, AlertCircle, Calendar, Users, Package, HardDrive, ShoppingBag, ChevronDown, ChevronRight, DollarSign, Receipt, Clock1, Signal } from 'lucide-react';
+import { Plus, Coins, Clock, Zap, TrendingUp, Edit, Trash2, FileText, Download, CheckCircle, XCircle, AlertCircle, Calendar, Users, Package, HardDrive, ShoppingBag, ChevronDown, ChevronRight, DollarSign, Receipt, Clock1, Signal, ArrowLeft, Check } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,8 +36,290 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { Pricing, PricingMode, PaymentInterval, PricingPlan } from '@/types/pricing';
 import { useWorkbenchStore } from '@/stores/workbench-store';
+import BillingsInfo from '../billing-form';
 
 export type PricingBundle = Pricing;
+
+export type Plan = {
+  name: string;
+  price: number;
+  users: number | string;
+  storage: string;
+  apiRequests: string;
+  support: string;
+  features?: string[];
+  current?: boolean;
+  bestValue?: boolean;
+  overage: {
+    api: string;
+    storage: string;
+    users: string;
+  };
+};
+
+// pricingPlans
+
+const pricingPlans: Plan[] = [
+  {
+    name: "Starter",
+    price: 49,
+    users: 5,
+    storage: "25 GB",
+    apiRequests: "250,000",
+    support: "Email support",
+    features: [],
+    overage: {
+      api: "$0.10 per 1,000 requests",
+      storage: "$0.50 per GB",
+      users: "$5 per additional user",
+    },
+  },
+
+  {
+    name: "Professional",
+    price: 99,
+    users: 10,
+    storage: "50 GB",
+    apiRequests: "500,000",
+    support: "Priority email support",
+    features: ["Advanced analytics"],
+    overage: {
+      api: "$0.08 per 1,000 requests",
+      storage: "$0.40 per GB",
+      users: "$4 per additional user",
+    },
+  },
+
+  {
+    name: "Enterprise",
+    price: 199,
+    users: 20,
+    storage: "100 GB",
+    apiRequests: "1,000,000",
+    support: "24/7 priority support",
+    current: true,
+    features: [
+      "Advanced analytics & reports",
+      "Custom integrations",
+      "SLA guarantee",
+    ],
+    overage: {
+      api: "$0.05 per 1,000 requests",
+      storage: "$0.30 per GB",
+      users: "$3 per additional user",
+    },
+  },
+
+  {
+    name: "Ultimate",
+    price: 399,
+    users: "Unlimited",
+    storage: "500 GB",
+    apiRequests: "5M",
+    support: "Dedicated",
+    bestValue: true,
+    features: [
+      "Everything in Enterprise",
+      "White-label options",
+      "Dedicated account manager",
+      "Custom contract terms",
+      "On-premise deployment option",
+      "Priority feature requests",
+    ],
+    overage: {
+      api: "$0.03 per 1,000 requests",
+      storage: "$0.20 per GB",
+      users: "Unlimited (no overage)",
+    },
+  },
+];
+
+const tierPlans = pricingPlans.filter(
+  (plan) => !plan.bestValue
+);
+
+const highlightedPlan = pricingPlans.find(
+  (plan) => plan.bestValue
+);
+
+const PlanCard = ({ plan, onSelect }) => {
+  return (
+    <div
+      onClick={onSelect}
+      className={`cursor-pointer relative bg-white max-w-[322px] w-auto rounded-lg p-5 transition-all hover:shadow-lg
+      ${
+        plan.current
+          ? "border-2 border-primary"
+          : "border border-grey-400 hover:border-primary"
+      }`}
+    >
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-[20px] font-bold text-grey">
+            {plan.name}
+          </h3>
+
+          {plan.current && (
+            <Badge className="bg-primary/20 text-primary">
+              Current Plan
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex items-baseline gap-1">
+          <span className="text-[40px] font-bold text-grey">
+            ${plan.price}
+          </span>
+          <span className="text-grey-600 text-sm">
+            /month
+          </span>
+        </div>
+      </div>
+
+      <ul className="space-y-2 mb-4">
+
+        <li className="flex items-start gap-2 text-sm py-1">
+          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+          <span className="font-medium text-base text-[#78797A]">{plan.apiRequests} API requests/month</span>
+        </li>
+
+        <li className="flex items-start gap-2 text-sm py-1">
+          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+          <span className="font-medium text-base text-[#78797A]">{plan.storage} storage</span>
+        </li>
+
+        <li className="flex items-start gap-2 text-sm py-1">
+          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+          <span className="font-medium text-base text-[#78797A]">{plan.users} users</span>
+        </li>
+
+        <li className="flex items-start gap-2 text-sm py-1">
+          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+          <span className="font-medium text-base text-[#78797A]">{plan.support}</span>
+        </li>
+
+        {plan.features?.map((feature, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">{feature}</span>
+          </li>
+        ))}
+
+      </ul>
+
+      <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
+        <p className="text-xs font-semibold text-[#78797A] mb-1">
+          Overage Pricing:
+        </p>
+
+        <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
+          <li>• API: {plan.overage.api}</li>
+          <li>• Storage: {plan.overage.storage}</li>
+          <li>• Users: {plan.overage.users}</li>
+        </ul>
+      </div>
+
+      <Button
+        disabled={plan.current}
+        className="mt-auto w-full text-[12px] font-semibold text-grey"
+        variant="outline"
+      >
+        {plan.current
+          ? "Current Plan"
+          : `Upgrade to ${plan.name}`}
+      </Button>
+    </div>
+  );
+};
+
+const UltimatePlanCard = ({ plan, onSelect }) => {
+  return (
+    <div className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 mt-4" onClick={onSelect}>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-[20px] font-bold text-grey">
+              {plan.name}
+            </h3>
+            <Badge className="bg-[#391484] text-white">
+              Best Value
+            </Badge>
+          </div>
+
+          <div className="flex items-baseline gap-1">
+            <span className="text-[40px] font-bold text-grey">
+              ${plan.price}
+            </span>
+            <span className="text-grey-600 text-sm">
+              /month
+            </span>
+          </div>
+        </div>
+
+        <Button className="bg-[#391484] hover:bg-[#391484]/80">
+          Upgrade to Ultimate
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
+                    <p className="text-[24px] font-bold text-grey">{plan.apiRequests}/month</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
+                    <p className="text-[24px] font-bold text-grey">{plan.storage}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
+                    <p className="text-[24px] font-bold text-grey">{plan.users}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-grey-600 mb-1 font-bold">Support</p>
+                    <p className="text-[24px] font-bold text-grey">{plan.support}</p>
+                  </div>
+                </div>
+
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Everything in Enterprise</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">White-label options</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Dedicated account manager</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Custom contract terms</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">On-premise deployment option</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm py-1">
+                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+                    <span className="font-medium text-base text-[#78797A]">Priority feature requests</span>
+                  </li>
+                </ul>
+
+                <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4 mt-3">
+                  <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
+                  <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
+                    <li>• API: $0.03 per 1,000 requests</li>
+                    <li>• Storage: $0.20 per GB</li>
+                    <li>• Users: Unlimited (no overage)</li>
+                  </ul>
+                </div>
+
+      
+    </div>
+  );
+};
 
 
 // Bundle customer subscription interface
@@ -714,6 +996,8 @@ export default function PricingTabContent() {
 
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [planDetailOpen, setPlanDetailOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -973,9 +1257,9 @@ const handleEditClick = (bundle: React.SetStateAction<Pricing | null>) => {
 });
 
 
-console.log("total incomes", {totalIncomeData, isLoadingIncome});
+// console.log("total incomes", {totalIncomeData, isLoadingIncome});
 const incomeData = totalIncomeData?.data;
-console.log("total expense", {totalExpenseData, isLoadingExpense});
+// console.log("total expense", {totalExpenseData, isLoadingExpense});
 const expenseData = totalExpenseData?.data;
 
   const { data: bundleData, isLoading } = useQuery({
@@ -1052,6 +1336,12 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
     : 0;
 
   const totalRevenue = incomeRecords.reduce((sum, record) => sum + record.revenue, 0);
+
+  const handleBackToPlans = () => {
+  setPlanDetailOpen(false);
+  setUpgradePlanOpen(true);
+  setSelectedPlan(null);
+};
 
   return (
     <div className="bg-grey-100">
@@ -2416,237 +2706,30 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
               
 
               {/* Plans Grid */}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Starter Plan */}
-                <div className="bg-white max-w-[322px] w-auto rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
-                  <div className="mb-4">
-                    <h3 className="text-[20px] font-bold text-grey mb-1">Starter</h3>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[40px] font-bold text-grey">$49</span>
-                      <span className="text-grey-600 text-sm">/month</span>
-                    </div>
-                  </div>
+ {tierPlans.map((plan) => (
+    <PlanCard
+      key={plan.name}
+      plan={plan}
+      onSelect={() => {
+        setSelectedPlan(plan);
+        setPlanDetailOpen(true);
+      }}
+    />
+  ))}
+</div>
 
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">250,000 API requests/month</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">25 GB storage</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">5 users</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">Email support</span>
-                    </li>
-                  </ul>
-
-                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
-                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-                      <li>• API: $0.10 per 1,000 requests</li>
-                      <li>• Storage: $0.50 per GB</li>
-                      <li>• Users: $5 per additional user</li>
-                    </ul>
-                  </div>
-
-                  <Button variant="outline" className="w-full text-[12px] font-semibold text-grey mt-32" disabled>
-                    Downgrade to Starter
-                  </Button>
-                </div>
-
-                {/* Professional Plan */}
-                <div className="bg-white max-w-[322px] w-auto rounded-lg border border-grey-400 p-5 hover:border-primary hover:shadow-md transition-all">
-                  <div className="mb-4">
-                    <h3 className="text-[20px] font-bold text-grey mb-1">Professional</h3>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[40px] font-bold text-grey">$99</span>
-                      <span className="text-grey-600 text-sm">/month</span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">500,000 API requests/month</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">50 GB storage</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">10 users</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">Priority email support</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">Advanced analytics</span>
-                    </li>
-                  </ul>
-
-                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
-                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-                      <li>• API: $0.08 per 1,000 requests</li>
-                      <li>• Storage: $0.40 per GB</li>
-                      <li>• Users: $4 per additional user</li>
-                    </ul>
-                  </div>
-
-                  <Button variant="outline" className="w-full text-[12px] font-semibold text-grey mt-22" disabled>
-                    Downgrade to Professional
-                  </Button>
-                </div>
-
-                {/* Enterprise Plan (Current) */}
-                <div className="bg-white max-w-[322px] w-auto rounded-lg border-2 border-primary p-5 hover:border-primary hover:shadow-md transition-all">
-                  
-
-                  <div className="mb-4 mt-2">
-                    <div className="flex gap-2 items-center">
-                    <h3 className="text-[20px] font-bold text-grey mb-1">Enterprise</h3>
-                    <Badge className="bg-primary/20 text-primary">
-                    Current Plan
-                  </Badge>
-                  </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[40px] font-bold text-grey">$199</span>
-                      <span className="text-grey-600 text-sm">/month</span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">1,000,000 API requests/month</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">100 GB storage</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">20 users</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">24/7 priority support</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">Advanced analytics & reports</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">Custom integrations</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm py-1">
-                      <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-                      <span className="font-medium text-base text-[#78797A]">SLA guarantee</span>
-                    </li>
-                  </ul>
-
-                  <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
-                    <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
-                    <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-                      <li>• API: $0.05 per 1,000 requests</li>
-                      <li>• Storage: $0.30 per GB</li>
-                      <li>• Users: $3 per additional user</li>
-                    </ul>
-                  </div>
-
-                  <Button className="w-full text-[12px] font-semibold text-grey mt-50" disabled>
-                    Current Plan
-                  </Button>
-                </div>
-              </div>
-
-              {/* Ultimate Plan */}
-              <div className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 hover:border-[#391484] hover:shadow-md transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-[20px] font-bold text-grey">Ultimate</h3>
-                      <Badge className="bg-[#391484] text-white">Best Value</Badge>
-                    </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[40px] font-bold text-grey">$399</span>
-                      <span className="text-grey-600 text-[14px]">/month</span>
-                    </div>
-                  </div>
-                  <Button className="bg-[#391484] hover:bg-[#391484]/80">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Upgrade to Ultimate
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
-                    <p className="text-[24px] font-bold text-grey">5M/month</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
-                    <p className="text-[24px] font-bold text-grey">500 GB</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
-                    <p className="text-[24px] font-bold text-grey">Unlimited</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-grey-600 mb-1 font-bold">Support</p>
-                    <p className="text-[24px] font-bold text-grey">Dedicated</p>
-                  </div>
-                </div>
-
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">Everything in Enterprise</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">White-label options</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">Dedicated account manager</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">Custom contract terms</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">On-premise deployment option</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm py-1">
-                    <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-                    <span className="font-medium text-base text-[#78797A]">Priority feature requests</span>
-                  </li>
-                </ul>
-
-                <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4 mt-3">
-                  <p className="text-xs font-semibold text-[#78797A] mb-1">Overage Pricing:</p>
-                  <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-                    <li>• API: $0.03 per 1,000 requests</li>
-                    <li>• Storage: $0.20 per GB</li>
-                    <li>• Users: Unlimited (no overage)</li>
-                  </ul>
-                </div>
-
+{highlightedPlan && (
+  <UltimatePlanCard
+    plan={highlightedPlan}
+    onSelect={() => {
+      setSelectedPlan(highlightedPlan);
+      setPlanDetailOpen(true);
+    }}
+  />
+)}
                 
-              </div>
-
               {/* Footer Info */}
               <div className="bg-primary/15 rounded-lg border border-primary/50 p-4 mt-2">
                 <div className="flex items-start gap-3">
@@ -2865,6 +2948,104 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={planDetailOpen} onOpenChange={setPlanDetailOpen}>
+  <DialogContent className="max-w-[1088px] max-h-[90vh] overflow-y-auto">
+
+    {selectedPlan && (
+      
+       <section className="flex flex-col justify-center py-3 w-full pb-10">
+       <button
+  onClick={handleBackToPlans}
+  className="flex items-center gap-2"
+>
+  <ArrowLeft
+    width={17}
+    height={12}
+    className="dark:invert"
+  />
+  <p className="text-sm font-semibold text-grey-800 dark:text-grey">
+    Back
+  </p>
+</button>
+        <DialogHeader>
+          <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
+            Upgrade Workspace from Starter to{' '}
+            {selectedPlan.name}
+          </DialogTitle>
+          <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
+            {selectedPlan.name} plan details
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className=" mb-10 mt-1 py-5 px-10 bg-white border border-grey-400 rounded-[5px] flex items-start justify-between">
+            <div className=" w-full text-sm flex justify-between items-start">
+        <ul className="space-y-2 my-4 text-base font-medium text-grey">
+
+          <li className="flex gap-2">
+            <div className="flex items-center gap-1">
+                    <div>
+                      <CheckCircle className="w-4 h-4 text-green font-bold" />
+                    </div>
+            {selectedPlan.apiRequests} API requests/month
+            </div>
+          </li>
+
+          <li className="flex gap-2">
+            <div className="flex items-center gap-1">
+                    <div>
+                      <CheckCircle className="w-4 h-4 text-green font-bold" />
+                    </div>
+            {selectedPlan.storage} storage
+            </div>
+          </li>
+
+          <li className="flex gap-2">
+            <div className="flex items-center gap-1">
+                    <div>
+                      <CheckCircle className="w-4 h-4 text-green font-bold" />
+                    </div>
+            {selectedPlan.users} users
+            </div>
+          </li>
+
+          <li className="flex gap-2">
+            <div className="flex items-center gap-1">
+                    <div>
+                      <CheckCircle className="w-4 h-4 text-green font-bold" />
+                    </div>
+            {selectedPlan.support}
+            </div>
+          </li>
+
+          {selectedPlan.features?.map((feature, i) => (
+            <li key={i} className="flex gap-2">
+              <div className="flex items-center gap-1">
+                    <div>
+                      <CheckCircle className="w-4 h-4 text-green font-bold" />
+                    </div>
+              {feature}
+              </div>
+            </li>
+          ))}
+
+        </ul>
+        <div className="space-y-2 my-4">
+          <p className="font-bold text-[40px] text-grey">${selectedPlan.price}<span className="font-bold text-sm text-grey">/month</span></p>
+        </div>
+        </div>
+        </div>
+
+        <div className="w-full mt-6 text-grey">
+          <>
+            <BillingsInfo />
+          </>
+        </div>
+      </section>
+    )}
+
+  </DialogContent>
+</Dialog>
       </div>
     </div>
   );
