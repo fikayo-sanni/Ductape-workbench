@@ -1089,6 +1089,10 @@ await ductape.init();`,
       ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(', ')
       : "name: 'value'";
 
+    const samplePropertiesForOperations = selectedLabel?.properties?.length
+      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(',\n      ')
+      : "name: 'value'";
+
     // Frontend / Node runtime-specific examples (init + createNode mutation)
     if (runtime === 'vanilla') {
       return [
@@ -1165,11 +1169,6 @@ console.log('Created:', node);`,
         },
       ];
     }
-
-    // Generate sample properties based on selected label (for non-runtime mode)
-    const samplePropertiesForOperations = selectedLabel?.properties?.length
-      ? selectedLabel.properties.slice(0, 2).map(p => `${p.name}: '${p.type === 'string' ? 'value' : p.type === 'number' ? '1' : 'true'}'`).join(',\n      ')
-      : "name: 'value'";
 
     if (language === 'typescript' || language === 'javascript') {
       const operations: Record<string, { title: string; code: string }[]> = {
