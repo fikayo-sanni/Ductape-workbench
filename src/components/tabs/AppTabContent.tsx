@@ -210,9 +210,10 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   const constantsCount = selectedVersion?.constants?.length || 0;
   const webhooksCount = selectedVersion?.webhooks?.length || (currentApp as any)?.webhooks_count || 0;
 
-  // Fetch app dashboard analytics
+  // Fetch app dashboard analytics (logs filtered by parent_tag = app tag)
   const { data: dashboardMetrics, isLoading: isLoadingMetrics } = useAppDashboard({
     app_id: currentApp?._id || '',
+    app_tag: (currentApp as any)?.tag,
     version: selectedVersionTag || undefined,
     app_env: selectedVersion?.envs?.find((e: any) => e.active)?.slug,
     groupBy: 'day',
@@ -373,6 +374,14 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       }
     }
   }, [selectedVersion?.actions, selectedAction?._pendingRestore, selectedAction?.tag, currentApp, selectedVersionTag, selectedVersion]);
+
+  // Keep selectedAction.envs in sync when selectedVersion.envs loads or updates (e.g. after refresh)
+  useEffect(() => {
+    if (!selectedAction || selectedAction._pendingRestore || !selectedVersion?.envs?.length) return;
+    const envs = selectedVersion.envs;
+    if (selectedAction.envs?.length === envs.length && selectedAction.envs?.every((e: any, i: number) => e.slug === envs[i]?.slug)) return;
+    setSelectedAction(prev => prev && !prev._pendingRestore ? { ...prev, envs } : prev);
+  }, [selectedVersion?.envs, selectedAction?.tag]);
 
   // Resolve pending webhook restoration after data loads
   useEffect(() => {

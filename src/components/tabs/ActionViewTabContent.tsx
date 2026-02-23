@@ -195,13 +195,15 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     }
   }, [action]);
 
-  // Initialize customEnvs from app environments (only if no persisted state)
+  // Initialize customEnvs from app environments when they become available (e.g. after refresh).
+  // Only skip when we have persisted customEnvs for the current key; otherwise envs can be
+  // lost if stateKey was wrong on first mount (e.g. action.appTag was undefined during restore).
   useEffect(() => {
-    // Skip if we have persisted state
-    if (persistedState) return;
+    if (environments.length === 0) return;
+    const hasPersistedEnvs = persistedState?.customEnvs?.length > 0;
+    if (hasPersistedEnvs && customEnvs.length > 0) return;
 
-    if (environments.length > 0 && customEnvs.length === 0) {
-      // Find if any env is marked as active, otherwise default to first one
+    if (customEnvs.length === 0 || customEnvs.every(ce => environments.some((e: any) => e.slug === ce.slug)) === false) {
       const activeEnvIndex = environments.findIndex((env: any) => env.active);
       const defaultActiveIndex = activeEnvIndex >= 0 ? activeEnvIndex : 0;
 
@@ -212,9 +214,8 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
       }));
       setCustomEnvs(envs);
 
-      // Set the active environment's base URL
       const activeEnv = environments[defaultActiveIndex];
-      if (activeEnv?.base_url) {
+      if (activeEnv?.base_url && !baseUrl) {
         setBaseUrl(activeEnv.base_url);
       }
     }
