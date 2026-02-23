@@ -33,6 +33,8 @@ interface AuthContext {
 
 interface UseAppDashboardConfig extends BaseAnalyticsConfig {
   app_id: string;
+  /** App tag for logs filter (parent_tag in logs table) */
+  app_tag?: string;
   version?: string;
   app_env?: string;
   groupBy?: 'hour' | 'day' | 'week' | 'month';
@@ -58,6 +60,7 @@ export function useAppDashboard(config: UseAppDashboardConfig) {
 
   const {
     app_id,
+    app_tag,
     version,
     app_env,
     groupBy = 'day',
@@ -69,13 +72,13 @@ export function useAppDashboard(config: UseAppDashboardConfig) {
   } = config;
 
   return useQuery<AppDashboardMetrics, Error>({
-    queryKey: ['app-dashboard', app_id, version, app_env, groupBy, start_date, end_date],
+    queryKey: ['app-dashboard', app_id, app_tag, version, app_env, groupBy, start_date, end_date],
     queryFn: () =>
       logsServices.fetchAppDashboard(
         currentWorkspaceId || '',
         user?._id || '',
         user?.public_key || '',
-        { app_id, version, app_env, groupBy, start_date, end_date }
+        { app_id, app_tag, version, app_env, groupBy, start_date, end_date }
       ),
     enabled: enabled && !!app_id && !!currentWorkspaceId && !!user?._id,
     staleTime,

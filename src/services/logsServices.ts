@@ -778,6 +778,8 @@ export const fetchNotificationLogs = async (
 
 export interface AppDashboardQuery {
   app_id: string;
+  /** App tag (e.g. domain/tag) – used as parent_tag when querying logs table */
+  app_tag?: string;
   version?: string;
   app_env?: string;
   groupBy?: 'hour' | 'day' | 'week' | 'month';
@@ -843,7 +845,7 @@ export const fetchAppDashboard = async (
   public_key: string,
   query: AppDashboardQuery
 ): Promise<AppDashboardMetrics> => {
-  const { app_id, version, app_env, groupBy = 'day', start_date, end_date } = query;
+  const { app_id, app_tag, version, app_env, groupBy = 'day', start_date, end_date } = query;
 
   // Calculate date range (default 7 days)
   const today = new Date();
@@ -853,18 +855,23 @@ export const fetchAppDashboard = async (
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(today.getDate() - 14);
 
-  // Fetch current period data
+  const basePayload = {
+    component: 'app',
+    app_id,
+    ...(app_tag && { parent_tag: app_tag }),
+    app_env,
+    version,
+    groupBy,
+    limit: 1000,
+  };
+
+  // Fetch current period data (logs table filtered by parent_tag = app tag when provided)
   const currentResponse = await fetchLogs(
     { workspace_id, user_id, public_key },
     {
-      component: 'app',
-      app_id,
-      app_env,
-      version,
-      groupBy,
+      ...basePayload,
       start_date: start_date || formatDate(weekAgo),
       end_date: end_date || formatDate(today),
-      limit: 1000, // Get more logs for aggregation
     }
   );
 
@@ -872,21 +879,16 @@ export const fetchAppDashboard = async (
   const previousResponse = await fetchLogs(
     { workspace_id, user_id, public_key },
     {
-      component: 'app',
-      app_id,
-      app_env,
-      version,
-      groupBy,
+      ...basePayload,
       start_date: formatDate(twoWeeksAgo),
       end_date: formatDate(weekAgo),
-      limit: 1000,
     }
   );
 
   const currentData = currentResponse.data;
   const previousData = previousResponse.data;
 
-  // Process current period metrics
+  // Process current period metrics from logs table
   const currentLogs = currentData?.logs?.data || [];
   const previousLogs = previousData?.logs?.data || [];
 
@@ -913,13 +915,16 @@ export const fetchAppDashboard = async (
   const currentAvgLatency = calculateAvgLatency(currentLogs);
   const previousAvgLatency = calculateAvgLatency(previousLogs);
 
-  // Process method distribution
+  // Request by method – from logs
   const requestsByMethod = calculateMethodDistribution(currentLogs);
 
-  // Process daily activity
-  const dailyActivity = processDailyActivity(currentData?.usageData?.requestsOverTime || []);
+  // Request activity (last 7 days) – from logs when usageData is missing
+  const usageOverTime = currentData?.usageData?.requestsOverTime || [];
+  const dailyActivity = usageOverTime.length > 0
+    ? processDailyActivity(usageOverTime)
+    : processDailyActivityFromLogs(currentLogs);
 
-  // Process top endpoints
+  // Top endpoints – from logs
   const topEndpoints = calculateTopEndpoints(currentLogs);
 
   // Count active endpoints and webhook events
@@ -1039,6 +1044,45 @@ function processDailyActivity(requestsOverTime: any[]): Array<{ date: string; da
       failures: item.failureCount || 0,
     };
   });
+}
+
+/** Build last 7 days activity from logs array when usageData.requestsOverTime is not returned */
+function processDailyActivityFromLogs(logs: any[]): Array<{ date: string; day: string; requests: number; success: number; failures: number }> {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const byDate: Record<string, { requests: number; success: number; failures: number }> = {};
+
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = formatDate(d);
+    byDate[key] = { requests: 0, success: 0, failures: 0 };
+  }
+
+  logs.forEach(log => {
+    const ts = log.timestamp;
+    const key = ts ? formatDate(new Date(ts)) : null;
+    if (!key || !byDate[key]) return;
+    byDate[key].requests += 1;
+    if (log.status === 'success' || log.successful_execution) {
+      byDate[key].success += 1;
+    } else {
+      byDate[key].failures += 1;
+    }
+  });
+
+  return Object.entries(byDate)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateStr, counts]) => {
+      const date = new Date(dateStr);
+      return {
+        date: dateStr,
+        day: dayNames[date.getDay()],
+        requests: counts.requests,
+        success: counts.success,
+        failures: counts.failures,
+      };
+    });
 }
 
 function calculateTopEndpoints(logs: any[]): Array<{ name: string; tag: string; method: string; calls: number; avgLatency: number; successRate: number }> {
