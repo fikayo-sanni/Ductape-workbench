@@ -109,6 +109,27 @@ const resendVerificationOTP = async (data: { user_id: string }): Promise<{ statu
   return response.data;
 };
 
+/** Exchange encrypted OAuth callback token for user session (Google/GitHub login). */
+const exchangeOAuthToken = async (encryptedToken: string): Promise<LoginResponse> => {
+  const response = await apiClient.post<LoginResponse>("/users/v1/auth/oauth-session", {
+    token: encryptedToken,
+  });
+  const result = response.data.data.result;
+  localStorage.setItem("token", result.auth_token);
+  const user: User = {
+    _id: result._id,
+    email: result.email,
+    firstname: result.firstname,
+    lastname: result.lastname,
+    active: result.active,
+    auth_token: result.auth_token,
+    public_key: result.public_key,
+    workspaces: result.workspaces,
+  };
+  localStorage.setItem("user", JSON.stringify(user));
+  return response.data;
+};
+
 const createAuth = async (data: {
   workspace_id: string;
   user_id: string;
@@ -142,5 +163,6 @@ export const authServices = {
   signup,
   verifyEmail,
   resendVerificationOTP,
+  exchangeOAuthToken,
   createAuth,
 };
