@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Plus,
   Coins,
@@ -1174,6 +1174,19 @@ export default function PricingTabContent() {
     },
   });
 
+  useEffect(() => {
+    if (editingBundle) {
+      form.reset({
+        name: editingBundle.name,
+        pricing_mode: editingBundle.pricing_mode as PricingMode,
+        interval: editingBundle.interval as PaymentInterval,
+        unit_price: editingBundle.unit_price,
+        currency: editingBundle.currency,
+      });
+    }
+  }, [editingBundle, form]);
+
+
   // Update form when editing bundle changes
   const handleFormOpen = () => {
     if (editingBundle) {
@@ -1208,7 +1221,7 @@ export default function PricingTabContent() {
         form.reset();
       }
 
-      queryClient.invalidateQueries({queryKey: ['pricingBundles']});
+      queryClient.invalidateQueries({queryKey: ['bundles']});
     },
     onError: error => {
       console.error('Error creating bundle:', error);
@@ -2636,6 +2649,7 @@ export default function PricingTabContent() {
                   onClick={() => {
                     setBundleFormOpen(false);
                     setEditingBundle(null);
+                    form.reset();
                   }}
                 >
                   Cancel
