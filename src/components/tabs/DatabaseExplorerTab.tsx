@@ -2375,44 +2375,140 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     setShowQueryBuilder(false);
   };
 
-  // Generate code sections for action CodeSidebar
-  const generateActionCodeSections = (language: string, env?: string) => {
+  // Generate code sections for action CodeSidebar (Runtime: Vanilla JS / React / Node.js)
+  const generateActionCodeSections = (language: string, env?: string, runtime?: string) => {
     if (!selectedAction) return [];
 
     const envSlug = env || database.env.slug;
+    const productTag = database.tag.split(':')[0] || 'your-product';
     const inputParams = selectedAction.parameters.length > 0
       ? selectedAction.parameters.reduce((acc, p) => {
           acc[p.name] = p.defaultValue;
           return acc;
         }, {} as Record<string, any>)
       : {};
-
     const inputString = JSON.stringify(inputParams, null, 4).split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n');
 
-    if (language === 'typescript' || language === 'javascript') {
+    if (language !== 'typescript' && language !== 'javascript') return [];
+
+    // Frontend: Vanilla JS (publishable key)
+    if (runtime === 'vanilla') {
       return [
         {
-          title: 'Execute Database Action',
-          code: `await ductape.database.execute({
-  product: '${database.tag.split(':')[0] || 'your-product'}',
+          title: 'Init (Vanilla JS, publishable key)',
+          code: `import { Ductape } from '@ductape/client';
+
+const ductape = new Ductape({
+  publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+  product: '${productTag}',
+  env: '${envSlug}',
+});`,
+        },
+        {
+          title: 'Execute database action',
+          code: `const result = await ductape.databases.execute({
+  database: '${database.tag}',
+  action: '${selectedAction.tag}',
+  input: ${inputString}
+});
+console.log('Result:', result);`,
+        },
+      ];
+    }
+
+    // Frontend: React (hooks)
+    if (runtime === 'react') {
+      return [
+        {
+          title: 'Setup (Provider)',
+          code: `import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider
+  config={{
+    publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
+    product: '${productTag}',
+    env: '${envSlug}',
+  }}
+>
+  <YourApp />
+</DuctapeProvider>`,
+        },
+        {
+          title: 'Run action (useMutation)',
+          code: `import { useMutation } from '@ductape/react';
+
+function RunDatabaseAction() {
+  const { mutate, data, isLoading } = useMutation(
+    async (client) =>
+      client.databases.execute({
+        database: '${database.tag}',
+        action: '${selectedAction.tag}',
+        input: ${inputString},
+      })
+  );
+
+  return (
+    <button onClick={() => mutate(undefined)} disabled={isLoading}>
+      {isLoading ? 'Running...' : 'Run action'}
+    </button>
+  );
+}`,
+        },
+      ];
+    }
+
+    // Runtime: Node.js (SDK, access key)
+    if (runtime === 'node') {
+      return [
+        {
+          title: 'Init (Node.js, access key)',
+          code: language === 'typescript'
+            ? `import Ductape from '@ductape/sdk';
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`
+            : `const Ductape = require('@ductape/sdk');
+
+const ductape = new Ductape({
+  accessKey: process.env.DUCTAPE_ACCESS_KEY,
+});`,
+        },
+        {
+          title: 'Execute database action',
+          code: `const result = await ductape.database.execute({
+  product: '${productTag}',
+  env: '${envSlug}',
+  database: '${database.tag}',
+  action: '${selectedAction.tag}',
+  input: ${inputString}
+});
+console.log('Result:', result);`,
+        },
+      ];
+    }
+
+    // Fallback when no runtime selector: same as Node
+    return [
+      {
+        title: 'Execute database action',
+        code: `await ductape.database.execute({
+  product: '${productTag}',
   env: '${envSlug}',
   database: '${database.tag}',
   action: '${selectedAction.tag}',
   input: ${inputString}
 });`,
-        },
-        {
-          title: 'Initialize Ductape (collapsible)',
-          code: `import Ductape from '@ductape/sdk';
+      },
+      {
+        title: 'Initialize Ductape',
+        code: `import Ductape from '@ductape/sdk';
 
 const ductape = new Ductape({
   accessKey: 'your-access-key',
 });`,
-        },
-      ];
-    }
-
-    return [];
+      },
+    ];
   };
 
   // Use SDK actions if available, otherwise fall back to local saved actions
@@ -3014,74 +3110,227 @@ const complexQuery = await ductape.database.raw({
     const tableName = selectedTable?.name || 'your_table';
     const envSlug = env || 'prd';
 
-    // Frontend / Node runtime-specific examples (init + mutation)
+    // Build operation-specific code sections (shared by runtime and non-runtime paths)
+    const buildOperationSections = (): Array<{ title: string; code: string }> => {
+    const opSections: Array<{ title: string; code: string }> = [];
+    switch (selectedOperation) {
+      case 'query':
+        opSections.push(
+          { title: 'Basic Query', code: generateQueryCode(tableName, envSlug, language) },
+          { title: 'Advanced Filtering', code: `// Query with comparison operators based on ${tableName} schema\n${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanced query')}` }
+        );
+        break;
+      case 'insert':
+        opSections.push({ title: `Insert into ${tableName}`, code: generateInsertCode(tableName, envSlug, language) });
+        break;
+      case 'update':
+        opSections.push({ title: `Update ${tableName}`, code: generateUpdateCode(tableName, envSlug, language) });
+        break;
+      case 'delete':
+        opSections.push({ title: `Delete from ${tableName}`, code: generateDeleteCode(tableName, envSlug, language) });
+        break;
+      case 'aggregate':
+        opSections.push({ title: `Aggregate ${tableName}`, code: generateAggregateCode(tableName, envSlug, language) });
+        break;
+      case 'aggregate-conditional':
+        opSections.push({ title: `Aggregate ${tableName} with Conditions`, code: generateAggregateConditionalCode(tableName, envSlug, language) });
+        break;
+      case 'groupBy':
+        opSections.push({ title: `Group By in ${tableName}`, code: generateGroupByCode(tableName, envSlug, language) });
+        break;
+      case 'upsert':
+        opSections.push({ title: `Upsert into ${tableName}`, code: generateUpsertCode(tableName, envSlug, language) });
+        break;
+      case 'count':
+        opSections.push({ title: `Count Records in ${tableName}`, code: generateCountCode(tableName, envSlug, language) });
+        break;
+      case 'sum':
+        opSections.push({ title: `Sum Values in ${tableName}`, code: generateSumCode(tableName, envSlug, language) });
+        break;
+      case 'avg':
+        opSections.push({ title: `Average Values in ${tableName}`, code: generateAvgCode(tableName, envSlug, language) });
+        break;
+      case 'min':
+        opSections.push({ title: `Minimum Value in ${tableName}`, code: generateMinCode(tableName, envSlug, language) });
+        break;
+      case 'max':
+        opSections.push({ title: `Maximum Value in ${tableName}`, code: generateMaxCode(tableName, envSlug, language) });
+        break;
+      case 'raw':
+        opSections.push({ title: `Raw SQL Query on ${tableName}`, code: generateRawCode(tableName, envSlug, language) });
+        break;
+      default:
+        opSections.push({ title: 'Query Records', code: generateQueryCode(tableName, envSlug, language) });
+    }
+    return opSections;
+  };
+
+    // Runtime-specific: Init + operation sections (query, insert, update, delete, etc. from Operation Type dropdown)
     if (runtime === 'vanilla') {
-      return [
-        {
-          title: 'Init (Vanilla JS, publishable key)',
-          code: `import { Ductape } from '@ductape/client';
+      const init = {
+        title: 'Init (Vanilla JS, publishable key)',
+        code: `import { Ductape } from '@ductape/client';
 
 const ductape = new Ductape({
   publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY,
 });`,
-        },
-        {
-          title: 'Mutation (insert)',
-          code: `const inserted = await ductape.databases.insert({
-  table: '${tableName}',
-  data: { name: 'Jane', email: 'jane@example.com' },
-});
-console.log('Inserted:', inserted.rows?.[0]);`,
-        },
-      ];
+      };
+      const operationSections = buildOperationSections().map(s => ({
+        ...s,
+        code: s.code.replace(/ductape\.database\./g, 'ductape.databases.'),
+      }));
+      return [init, ...operationSections];
     }
     if (runtime === 'react') {
-      return [
-        {
-          title: 'Init (React, publishable key)',
-          code: `import { DuctapeProvider } from '@ductape/react';
+      const productPlaceholder = database?.productTag || 'your-product';
+      const init = {
+        title: 'Setup (Provider + session)',
+        code: `// Wrap your app with DuctapeProvider (e.g. in main.tsx).
+// With publishable key, pass session from your backend in every action call.
 
-<DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}>
-  <YourApp />
+import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider
+  config={{
+    publishableKey: 'your-publishable-key',
+    product: '${productPlaceholder}',
+    env: '${envSlug}',
+  }}
+>
+  <App />
 </DuctapeProvider>`,
-        },
-        {
-          title: 'Mutation (insert)',
-          code: `import { useDatabaseInsert } from '@ductape/react';
+      };
+      // React: use hooks (useDatabaseQuery, useDatabaseInsert, useDatabaseUpdate, useDatabaseDelete, useMutation)
+      const buildReactOperationSections = (): Array<{ title: string; code: string }> => {
+        switch (selectedOperation) {
+          case 'query':
+            return [
+              { title: 'Basic Query', code: `import { useDatabaseQuery } from '@ductape/react';
 
-const { mutate } = useDatabaseInsert({ onSuccess: () => console.log('Inserted') });
-mutate({
-  table: '${tableName}',
-  data: { name: 'Jane', email: 'jane@example.com' },
-});`,
-        },
-      ];
+function ${tableName.replace(/-/g, '_')}List() {
+  const { data, isLoading, error } = useDatabaseQuery(
+    ['${tableName}', 'list'],
+    { table: '${tableName}', limit: 10 }
+  );
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <ul>
+      {data?.rows?.map((row, i) => (
+        <li key={row.id ?? i}>{JSON.stringify(row)}</li>
+      ))}
+    </ul>
+  );
+}` },
+              { title: 'Query with filters', code: `import { useDatabaseQuery } from '@ductape/react';
+
+const { data, isLoading } = useDatabaseQuery(
+  ['${tableName}', 'active'],
+  { table: '${tableName}', where: { status: 'active' }, limit: 10 }
+);` },
+            ];
+          case 'insert':
+            return [{ title: `Insert into ${tableName}`, code: `import { useDatabaseInsert } from '@ductape/react';
+
+function Create${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { mutate, isLoading } = useDatabaseInsert({
+    onSuccess: () => console.log('Inserted'),
+  });
+
+  return (
+    <button
+      onClick={() => mutate({ table: '${tableName}', data: { name: 'Jane', email: 'jane@example.com' } })}
+      disabled={isLoading}
+    >
+      Create row
+    </button>
+  );
+}` }];
+          case 'update':
+            return [{ title: `Update ${tableName}`, code: `import { useDatabaseUpdate } from '@ductape/react';
+
+function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { mutate, isLoading } = useDatabaseUpdate();
+
+  return (
+    <button
+      onClick={() => mutate({
+        table: '${tableName}',
+        where: { id: 1 },
+        data: { name: 'Updated Name', status: 'active' },
+      })}
+      disabled={isLoading}
+    >
+      Update row
+    </button>
+  );
+}` }];
+          case 'delete':
+            return [{ title: `Delete from ${tableName}`, code: `import { useDatabaseDelete } from '@ductape/react';
+
+function Delete${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { mutate, isLoading } = useDatabaseDelete();
+
+  return (
+    <button
+      onClick={() => mutate({ table: '${tableName}', where: { id: 1 } })}
+      disabled={isLoading}
+    >
+      Delete row
+    </button>
+  );
+}` }];
+          case 'upsert':
+            return [{ title: `Upsert into ${tableName}`, code: `import { useMutation } from '@ductape/react';
+
+const { mutate, isLoading } = useMutation(async (client) =>
+  client.databases.upsert({ table: '${tableName}', data: { id: 1, name: 'Jane' }, conflictColumns: ['id'] })
+);` }];
+          case 'count':
+            return [{ title: `Count ${tableName}`, code: `import { useMutation } from '@ductape/react';
+
+const { mutate, data, isLoading } = useMutation(async (client) =>
+  client.databases.count({ table: '${tableName}' })
+);` }];
+          default:
+            // sum, avg, min, max, aggregate, groupBy, raw: use useMutation with client.databases
+            return [{
+              title: `${selectedOperation} – use useMutation`,
+              code: `import { useMutation } from '@ductape/react';
+
+// Run any database operation via client.databases inside useMutation:
+const { mutate, data, isLoading } = useMutation(async (client) => {
+  return await client.databases.query({ table: '${tableName}', limit: 10 });
+  // Or: client.databases.count({ table: '${tableName}' })
+  // Or: client.databases.sum({ table: '${tableName}', column: 'amount' })
+});
+
+// Trigger: <button onClick={() => mutate(undefined)} disabled={isLoading}>Run</button>
+`,
+            }];
+        }
+      };
+      const reactSections = buildReactOperationSections();
+      return [init, ...reactSections];
     }
     if (runtime === 'node') {
-      return [
-        {
-          title: 'Init (Node.js, access key)',
-          code: language === 'typescript'
-            ? `import Ductape from '@ductape/sdk';
+      const init = {
+        title: 'Init (Node.js, access key)',
+        code: language === 'typescript'
+          ? `import Ductape from '@ductape/sdk';
 
 const ductape = new Ductape({
   accessKey: process.env.DUCTAPE_ACCESS_KEY,
 });`
-            : `const { Ductape } = require('@ductape/sdk');
+          : `const Ductape = require('@ductape/sdk');
 
 const ductape = new Ductape({
   accessKey: process.env.DUCTAPE_ACCESS_KEY,
 });`,
-        },
-        {
-          title: 'Mutation (insert)',
-          code: `const inserted = await ductape.databases.insert({
-  table: '${tableName}',
-  data: { name: 'Jane', email: 'jane@example.com' },
-});
-console.log('Inserted:', inserted.rows?.[0]);`,
-        },
-      ];
+      };
+      return [init, ...buildOperationSections()];
     }
 
     // Common sections for all operations (no runtime selector)
@@ -3137,124 +3386,7 @@ const result = await ductape.database.transaction(
 );`,
     };
 
-    // Generate operation-specific examples based on selected operation
-    const operationSections: Array<{ title: string; code: string }> = [];
-
-    switch (selectedOperation) {
-      case 'query':
-        operationSections.push(
-          {
-            title: 'Basic Query',
-            code: generateQueryCode(tableName, envSlug, language),
-          },
-          {
-            title: 'Advanced Filtering',
-            code: `// Query with comparison operators based on ${tableName} schema
-${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanced query')}`,
-          }
-        );
-        break;
-
-      case 'insert':
-        operationSections.push({
-          title: `Insert into ${tableName}`,
-          code: generateInsertCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'update':
-        operationSections.push({
-          title: `Update ${tableName}`,
-          code: generateUpdateCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'delete':
-        operationSections.push({
-          title: `Delete from ${tableName}`,
-          code: generateDeleteCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'aggregate':
-        operationSections.push({
-          title: `Aggregate ${tableName}`,
-          code: generateAggregateCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'aggregate-conditional':
-        operationSections.push({
-          title: `Aggregate ${tableName} with Conditions`,
-          code: generateAggregateConditionalCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'groupBy':
-        operationSections.push({
-          title: `Group By in ${tableName}`,
-          code: generateGroupByCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'upsert':
-        operationSections.push({
-          title: `Upsert into ${tableName}`,
-          code: generateUpsertCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'count':
-        operationSections.push({
-          title: `Count Records in ${tableName}`,
-          code: generateCountCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'sum':
-        operationSections.push({
-          title: `Sum Values in ${tableName}`,
-          code: generateSumCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'avg':
-        operationSections.push({
-          title: `Average Values in ${tableName}`,
-          code: generateAvgCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'min':
-        operationSections.push({
-          title: `Minimum Value in ${tableName}`,
-          code: generateMinCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'max':
-        operationSections.push({
-          title: `Maximum Value in ${tableName}`,
-          code: generateMaxCode(tableName, envSlug, language),
-        });
-        break;
-
-      case 'raw':
-        operationSections.push({
-          title: `Raw SQL Query on ${tableName}`,
-          code: generateRawCode(tableName, envSlug, language),
-        });
-        break;
-
-      default:
-        // Default to showing query examples
-        operationSections.push({
-          title: 'Query Records',
-          code: generateQueryCode(tableName, envSlug, language),
-        });
-    }
-
-    return [initSection, connectSection, transactionSection, ...operationSections];
+    return [initSection, connectSection, transactionSection, ...buildOperationSections()];
   };
 
   const getValueDisplay = (value: any, rowIndex?: number, columnName?: string) => {
@@ -7367,7 +7499,6 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           generateCodeSections={generateCodeSections}
           showRuntimeSelector
           environments={[{ slug: 'prd', env_name: 'Production' }, { slug: 'dev', env_name: 'Development' }]}
-          additionalControlsAfterSection="Transactions (Optional)"
           additionalControls={
             <div>
               <Label className="text-sm font-semibold text-grey-700 mb-2 block">
@@ -7375,7 +7506,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
               </Label>
               <Select value={selectedOperation} onValueChange={(value: any) => setSelectedOperation(value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Select operation" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="query">Query / Read</SelectItem>
@@ -7399,7 +7530,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
         />
       )}
 
-      {/* Code Sidebar for Actions */}
+      {/* Code Sidebar for Actions (Runtime: Vanilla / React / Node, same as App action examples) */}
       {showActionCodeSidebar && selectedAction && (
         <CodeSidebar
           title={selectedAction.name}
@@ -7407,6 +7538,7 @@ ${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanc
           tag={`${database.tag}:${selectedAction.tag}`}
           onClose={() => setShowActionCodeSidebar(false)}
           generateCodeSections={generateActionCodeSections}
+          showRuntimeSelector
           environments={[{ slug: database.env.slug, env_name: database.env.slug.toUpperCase() }]}
         />
       )}
