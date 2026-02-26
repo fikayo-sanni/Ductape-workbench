@@ -809,8 +809,8 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     return result;
   };
 
-  // Generate SDK code sections for CodeSidebar component
-  const generateCodeSections = (language: string, env?: string) => {
+  // Generate SDK code sections for CodeSidebar component (language, env, runtime for React/Vanilla/Node)
+  const generateCodeSections = (language: string, env?: string, runtime?: string) => {
     const appTag = action?.appTag || 'your-app-tag';
     const actionTag = formData.tag || action?.tag || 'action-tag';
     const envSlug = env || customEnvs.find(e => e.active)?.slug || 'production';
@@ -900,6 +900,97 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
 
       return flatEntries.join(',\n');
     };
+
+    // React (useActionRun / useActionQuery) samples when Runtime is "React" — based on Action Hooks docs
+    if (runtime === 'react' && (language === 'typescript' || language === 'javascript')) {
+      const importStmt = language === 'typescript'
+        ? "import { useActionRun } from '@ductape/react';\nimport { session } from './config'; // session from your backend"
+        : "const { useActionRun } = require('@ductape/react');\nconst { session } = require('./config');";
+      const componentName = (actionTag as string).split(/[-:]/).map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join('') || 'ActionRunner';
+      const reactInputBlock = generateFlatInput('        ');
+      return [
+        {
+          title: 'Setup (Provider + session)',
+          code: `// Wrap your app with DuctapeProvider (e.g. in main.tsx).
+// With publishable key, pass session from your backend in every action call.
+
+import { DuctapeProvider } from '@ductape/react';
+
+<DuctapeProvider
+  config={{
+    publishableKey: 'your-publishable-key',
+    product: '${productTagPlaceholder}',
+    env: '${envSlug}',
+  }}
+>
+  <App />
+</DuctapeProvider>`
+        },
+        {
+          title: 'Run action (useActionRun)',
+          code: `${importStmt}
+
+function ${componentName}() {
+  const { mutate, isLoading, error, data } = useActionRun({
+    onSuccess: (result) => {
+      console.log('Result:', result);
+    },
+  });
+
+  const handleRun = () => {
+    mutate({
+      app: '${appTag}',
+      action: '${actionTag}',
+      input: {
+${reactInputBlock}
+      },
+      session,
+    });
+  };
+
+  return (
+    <div>
+      <button onClick={handleRun} disabled={isLoading}>
+        {isLoading ? 'Running...' : 'Run action'}
+      </button>
+      {error && <p className="error">{error.message}</p>}
+      {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
+    </div>
+  );
+}`
+        },
+        {
+          title: 'Query action (useActionQuery)',
+          code: `import { useActionQuery } from '@ductape/react';
+import { session } from './config';
+
+// For read-only actions; refetch when query key or options change.
+function ${componentName}Query() {
+  const { data, isLoading, error, refetch } = useActionQuery(
+    ['${actionTag}'],
+    {
+      app: '${appTag}',
+      action: '${actionTag}',
+      input: {
+${reactInputBlock}
+      },
+      session,
+    }
+  );
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div>
+      <button onClick={() => refetch()}>Refresh</button>
+      <pre>{data ? JSON.stringify(data, null, 2) : 'No data'}</pre>
+    </div>
+  );
+}`
+        },
+      ];
+    }
 
     switch (language) {
       case 'javascript':
@@ -2328,6 +2419,7 @@ println!("Action result: {:?}", result);`
           tag={formData.tag}
           onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
+          showRuntimeSelector
           environments={customEnvs.map(env => ({
             slug: env.slug,
             env_name: environments.find((e: any) => e.slug === env.slug)?.env_name || env.slug
