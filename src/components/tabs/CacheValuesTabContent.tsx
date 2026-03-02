@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { fetchCacheDashboard, CacheDashboardMetrics } from '@/services/logsServices';
 
@@ -829,10 +829,10 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                 </div>
               </div>
 
-              {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
+              {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab / StorageExplorerTab */}
               <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
                   {isLoadingCacheDashboard && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
                 </div>
                 {isLoadingCacheDashboard ? (
@@ -847,13 +847,15 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                 ) : (
                   <div className="space-y-3">
                     {(() => {
-                      const normalized = getLast7DaysNormalized(metrics.weeklyStats.dailyTrend, (d) => (d.reads ?? 0) + (d.writes ?? 0));
-                      const maxActivity = Math.max(...normalized.map((d) => d.value), 1);
-                      return normalized.map((day) => {
+                      const timeline = getLast7CalendarDays(dashboardMetrics?.dailyActivity ?? [], (d) =>
+                        (d.gets ?? 0) + (d.sets ?? 0)
+                      );
+                      const maxActivity = Math.max(...timeline.map((d) => d.value), 1);
+                      return timeline.map((day) => {
                         const percentage = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
                         return (
                           <div key={day.date} className="flex items-center gap-3">
-                            <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                            <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
                             <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                               <div
                                 className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"

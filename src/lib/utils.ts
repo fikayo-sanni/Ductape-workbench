@@ -34,37 +34,45 @@ export function formatActivityDateLabel(isoDate: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
 /**
- * Use activity timeline from API as-is (last 7 calendar days from backend).
- * Backend returns { date: YYYY-MM-DD, sessions?: number, operations?: number }[].
- * When API has entries, use them directly (avoids client/server timezone mismatch).
- * When API returns empty, show last 7 calendar days with 0 so the chart still renders.
+ * Always return the last 7 calendar days with activity values. Days present in the API
+ * use their value; days without activity show 0. Backend may return
+ * { date: YYYY-MM-DD, sessions?: number }[] or { day: "Mon", ... }[].
+ * Uses local date for keys so they match typical API responses; also looks up by day name.
  */
 export function getLast7CalendarDays<T extends { date?: string; day?: string }>(
   apiData: T[] | undefined | null,
   getValue: (entry: T) => number
 ): Array<{ date: string; label: string; value: number }> {
-  const list = apiData ?? [];
-  if (list.length > 0) {
-    return list.map((entry) => {
-      const key = (entry.date ?? entry.day ?? '').trim() || 'Unknown';
-      return {
-        date: key,
-        label: /^\d{4}-\d{2}-\d{2}$/.test(key) ? formatActivityDateLabel(key) : key,
-        value: getValue(entry),
-      };
-    });
-  }
+  const mapByDate = new Map<string, number>();
+  const mapByDayName = new Map<string, number>();
+  (apiData ?? []).forEach((entry) => {
+    const key = (entry.date ?? entry.day ?? '').trim();
+    if (!key) return;
+    const val = (mapByDate.get(key) ?? 0) + getValue(entry);
+    mapByDate.set(key, val);
+    if (DAY_NAMES.includes(key as (typeof DAY_NAMES)[number])) {
+      mapByDayName.set(key, (mapByDayName.get(key) ?? 0) + getValue(entry));
+    }
+  });
+
   const result: Array<{ date: string; label: string; value: number }> = [];
   const now = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${dayNum}`;
+    const dayName = DAY_NAMES[d.getDay()];
+    const value = mapByDate.get(dateStr) ?? mapByDayName.get(dayName) ?? 0;
     result.push({
       date: dateStr,
       label: formatActivityDateLabel(dateStr),
-      value: 0,
+      value,
     });
   }
   return result;

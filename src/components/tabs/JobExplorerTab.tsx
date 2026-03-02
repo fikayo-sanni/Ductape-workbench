@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
@@ -255,9 +255,6 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
     });
   }, [runs]);
 
-  const normalizedWeekly = getLast7DaysNormalized(weeklyTrend, (d) => d.executions ?? 0);
-  const maxActivity = Math.max(...normalizedWeekly.map((d) => d.value), 1);
-
   const handleRefresh = async () => {
     await refetch();
     toast.success('Job data refreshed');
@@ -431,27 +428,31 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
               </div>
 
               <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-                <h2 className="text-lg font-semibold text-grey mb-4">Activity timeline (7 days)</h2>
+                <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (Last 7 Days)</h2>
                 <div className="space-y-3">
-                  {normalizedWeekly.map((day) => {
-                    const pct = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
-                    return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white drop-shadow-sm">
-                              {day.value} runs
-                            </span>
+                  {(() => {
+                    const timeline = getLast7CalendarDays(weeklyTrend, (d) => d.executions ?? 0);
+                    const maxActivity = Math.max(...timeline.map((d) => d.value), 1);
+                    return timeline.map((day) => {
+                      const pct = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
+                      return (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
+                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                {day.value.toLocaleString()} runs
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

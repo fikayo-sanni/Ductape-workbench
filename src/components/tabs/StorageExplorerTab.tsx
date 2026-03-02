@@ -72,8 +72,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays, getLast7DaysNormalized } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import { SDKProxyService, SDKProxyConfig } from '@/services/sdkProxy';
@@ -480,6 +481,40 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
     }
   }, [fetchDashboardMetrics, storage.productTag, storage.tag, storage.env.slug]);
 
+  // Last 7 days activity from logs (same pattern as DatabaseExplorerTab Activity Timeline)
+  const toYYYYMMDD = (d: Date) => d.toISOString().split('T')[0];
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 6);
+  const { data: storageActivityData, isLoading: isLoadingActivity } = useQuery<StorageDashboardMetrics | null>({
+    queryKey: ['storage-activity', storage.productTag, storage.tag, storage.env.slug],
+    queryFn: async () => {
+      if (!storage.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
+        return null;
+      }
+      try {
+        return await logsServices.fetchStorageDashboard(
+          currentWorkspaceId,
+          user._id,
+          user.public_key,
+          {
+            product_tag: storage.productTag,
+            storage_tag: storage.tag,
+            env: storage.env.slug,
+            groupBy: 'day',
+            start_date: toYYYYMMDD(startDate),
+            end_date: toYYYYMMDD(endDate),
+          }
+        );
+      } catch (error) {
+        console.error('[StorageExplorer] Error fetching storage activity:', error);
+        return null;
+      }
+    },
+    enabled: !!storage.productTag && !!currentWorkspaceId && !!user?._id,
+    staleTime: 60000,
+  });
+
   /**
    * Fetch storage stats from SDK stats() API
    * This provides accurate total file counts and breakdown by type
@@ -856,29 +891,155 @@ console.log('Uploaded:', result);`,
       ];
     }
     if (runtime === 'react') {
-      return [
-        {
-          title: 'Init (React, publishable key)',
-          code: `import { DuctapeProvider } from '@ductape/react';
+      const init = {
+        title: 'Setup (Provider + session)',
+        code: `import { DuctapeProvider } from '@ductape/react';
 
-<DuctapeProvider config={{ publishableKey: import.meta.env.VITE_PUBLISHABLE_KEY }}>
-  <YourApp />
+// Session token: from your backend (e.g. ductape.sessions.start at login).
+<DuctapeProvider
+  config={{
+    publishableKey: 'your-publishable-key',
+    product: '${productTag}',
+    env: '${envSlug}',
+  }}
+>
+  <App />
 </DuctapeProvider>`,
-        },
-        {
-          title: 'Mutation (upload)',
-          code: `import { useDuctape } from '@ductape/react';
+      };
+      const buildReactStorageSections = (): { title: string; code: string }[] => {
+        switch (selectedStorageOperation) {
+          case 'read':
+            return [{
+              title: 'Read file from disk (useReadFile)',
+              code: `import { useReadFile } from '@ductape/react';
 
-const { client } = useDuctape();
-// e.g. from file input or drag-drop
-const result = await client.storage.upload({
+// Read a local File/Blob (e.g. from <input type="file" />). Does not call storage.
+const { readFile, data, isLoading, error, reset } = useReadFile();
+
+// Read selected file or a Blob
+await readFile(file); // or readFile(blob, { fileName: 'example.txt' });
+
+// data: { fileName, mimeType, data (base64) }`,
+            }];
+          case 'upload':
+            return [{
+              title: 'Upload (useUpload)',
+              code: `import { useUpload } from '@ductape/react';
+
+const { upload, isUploading, progress, error, result } = useUpload();
+
+await upload({
   storage: '${storageTag}',
-  fileName: file.name,
-  file,
+  fileName: 'path/to/file.txt',
+  data: file, // File or Blob (e.g. from input or useReadFile().data)
+  mimeType: file.type || 'application/octet-stream',
+  session, // from your backend
 });
-console.log('Uploaded:', result);`,
-        },
-      ];
+
+// progress.percentage, result after success`,
+            }];
+          case 'list':
+            return [{
+              title: 'List files (useListFiles)',
+              code: `import { useListFiles } from '@ductape/react';
+
+const { mutate: listFiles, data, isLoading, error } = useListFiles();
+
+listFiles({
+  storage: '${storageTag}',
+  prefix: 'uploads/',
+  limit: 20,
+  session,
+});
+
+// data.files, data.nextToken`,
+            }];
+          case 'download':
+            return [{
+              title: 'Download (useDownload)',
+              code: `import { useDownload } from '@ductape/react';
+
+const { mutate: downloadFile, data, isLoading, error } = useDownload({
+  onSuccess: (result) => {
+    if (result?.data) {
+      // Decode base64 and save (e.g. create blob, trigger download)
+      const blob = new Blob([...], { type: result.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  },
+});
+
+downloadFile({
+  storage: '${storageTag}',
+  fileName: 'path/to/file.txt',
+  session,
+});`,
+            }];
+          case 'delete':
+            return [{
+              title: 'Delete file (useStorageDelete)',
+              code: `import { useStorageDelete } from '@ductape/react';
+
+const { mutate: deleteFile, isLoading, error } = useStorageDelete({
+  onSuccess: () => { /* e.g. refresh list */ },
+});
+
+deleteFile({
+  storage: '${storageTag}',
+  fileName: 'path/to/file.txt',
+  session,
+});`,
+            }];
+          case 'signedUrl':
+            return [{
+              title: 'Signed URL (useSignedUrl)',
+              code: `import { useSignedUrl } from '@ductape/react';
+
+const { mutate: getSignedUrl, data: signedUrlData, isLoading, error } = useSignedUrl();
+
+getSignedUrl({
+  storage: '${storageTag}',
+  fileName: 'path/to/file.txt',
+  expiresIn: 3600,
+  session,
+});
+
+// signedUrlData.url`,
+            }];
+          case 'stats':
+            return [{
+              title: 'Storage stats (useMutation)',
+              code: `import { useMutation } from '@ductape/react';
+
+const { mutate, data, isLoading } = useMutation(async (client) =>
+  client.storage.stats({ storage: '${storageTag}', prefix: '' })
+);
+
+mutate(undefined);
+// data: { totalFiles, totalSize, byType }`,
+            }];
+          default:
+            return [{
+              title: 'Upload (useUpload)',
+              code: `import { useUpload } from '@ductape/react';
+
+const { upload, isUploading, progress } = useUpload();
+await upload({
+  storage: '${storageTag}',
+  fileName: 'example.txt',
+  data: new Blob(['Hello'], { type: 'text/plain' }),
+  mimeType: 'text/plain',
+  session,
+});`,
+            }];
+        }
+      };
+      return [init, ...buildReactStorageSections()];
     }
     if (runtime === 'node') {
       return [
@@ -1625,13 +1786,13 @@ console.log('Files by type:', stats.byType);`,
               </div>
             </div>
 
-            {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
-            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
+            {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab */}
+            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
-                {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
+                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
-              {isLoadingMetrics ? (
+              {isLoadingActivity ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4, 5, 6, 7].map((i) => (
                     <div key={i} className="flex items-center gap-3">
@@ -1643,13 +1804,16 @@ console.log('Files by type:', stats.byType);`,
               ) : (
                 <div className="space-y-3">
                   {(() => {
-                    const normalized = getLast7DaysNormalized(weeklyStats.activityTimeline ?? [], (d) => d.sessions ?? 0);
-                    const maxOperations = Math.max(...normalized.map((d) => d.value), 1);
-                    return normalized.map((day) => {
+                    const timeline = getLast7CalendarDays(
+                      storageActivityData?.activityTimeline ?? [],
+                      (d) => d.sessions ?? 0
+                    );
+                    const maxOperations = Math.max(...timeline.map((d) => d.value), 1);
+                    return timeline.map((day) => {
                       const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
                       return (
                         <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
                           <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                             <div
                               className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"

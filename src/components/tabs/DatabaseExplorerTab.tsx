@@ -3186,7 +3186,8 @@ const ductape = new Ductape({
       const init = {
         title: 'Setup (Provider + session)',
         code: `// Wrap your app with DuctapeProvider (e.g. in main.tsx).
-// With publishable key, pass session from your backend in every action call.
+// Session: your backend calls ductape.sessions.start() (e.g. at login) and returns the token.
+// Frontend gets that token (e.g. useAuth().sessionToken) and passes \`session\` in every request below.
 
 import { DuctapeProvider } from '@ductape/react';
 
@@ -3208,9 +3209,10 @@ import { DuctapeProvider } from '@ductape/react';
               { title: 'Basic Query', code: `import { useDatabaseQuery } from '@ductape/react';
 
 function ${tableName.replace(/-/g, '_')}List() {
+  const { sessionToken } = useAuth(); // session from your backend
   const { data, isLoading, error } = useDatabaseQuery(
     ['${tableName}', 'list'],
-    { table: '${tableName}', limit: 10 }
+    { table: '${tableName}', limit: 10, session: sessionToken }
   );
 
   if (isLoading) return <div>Loading...</div>;
@@ -3226,22 +3228,24 @@ function ${tableName.replace(/-/g, '_')}List() {
 }` },
               { title: 'Query with filters', code: `import { useDatabaseQuery } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { data, isLoading } = useDatabaseQuery(
   ['${tableName}', 'active'],
-  { table: '${tableName}', where: { status: 'active' }, limit: 10 }
+  { table: '${tableName}', where: { status: 'active' }, limit: 10, session: sessionToken }
 );` },
             ];
           case 'insert':
             return [{ title: `Insert into ${tableName}`, code: `import { useDatabaseInsert } from '@ductape/react';
 
 function Create${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseInsert({
     onSuccess: () => console.log('Inserted'),
   });
 
   return (
     <button
-      onClick={() => mutate({ table: '${tableName}', data: { name: 'Jane', email: 'jane@example.com' } })}
+      onClick={() => mutate({ table: '${tableName}', data: { name: 'Jane', email: 'jane@example.com' }, session: sessionToken })}
       disabled={isLoading}
     >
       Create row
@@ -3252,6 +3256,7 @@ function Create${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
             return [{ title: `Update ${tableName}`, code: `import { useDatabaseUpdate } from '@ductape/react';
 
 function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseUpdate();
 
   return (
@@ -3260,6 +3265,7 @@ function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
         table: '${tableName}',
         where: { id: 1 },
         data: { name: 'Updated Name', status: 'active' },
+        session: sessionToken,
       })}
       disabled={isLoading}
     >
@@ -3271,11 +3277,12 @@ function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
             return [{ title: `Delete from ${tableName}`, code: `import { useDatabaseDelete } from '@ductape/react';
 
 function Delete${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseDelete();
 
   return (
     <button
-      onClick={() => mutate({ table: '${tableName}', where: { id: 1 } })}
+      onClick={() => mutate({ table: '${tableName}', where: { id: 1 }, session: sessionToken })}
       disabled={isLoading}
     >
       Delete row
@@ -3285,14 +3292,16 @@ function Delete${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
           case 'upsert':
             return [{ title: `Upsert into ${tableName}`, code: `import { useMutation } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { mutate, isLoading } = useMutation(async (client) =>
-  client.databases.upsert({ table: '${tableName}', data: { id: 1, name: 'Jane' }, conflictColumns: ['id'] })
+  client.databases.upsert({ table: '${tableName}', data: { id: 1, name: 'Jane' }, conflictColumns: ['id'], session: sessionToken })
 );` }];
           case 'count':
             return [{ title: `Count ${tableName}`, code: `import { useMutation } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { mutate, data, isLoading } = useMutation(async (client) =>
-  client.databases.count({ table: '${tableName}' })
+  client.databases.count({ table: '${tableName}', session: sessionToken })
 );` }];
           default:
             // sum, avg, min, max, aggregate, groupBy, raw: use useMutation with client.databases
@@ -3300,11 +3309,11 @@ const { mutate, data, isLoading } = useMutation(async (client) =>
               title: `${selectedOperation} – use useMutation`,
               code: `import { useMutation } from '@ductape/react';
 
-// Run any database operation via client.databases inside useMutation:
+const { sessionToken } = useAuth();
 const { mutate, data, isLoading } = useMutation(async (client) => {
-  return await client.databases.query({ table: '${tableName}', limit: 10 });
-  // Or: client.databases.count({ table: '${tableName}' })
-  // Or: client.databases.sum({ table: '${tableName}', column: 'amount' })
+  return await client.databases.query({ table: '${tableName}', limit: 10, session: sessionToken });
+  // Or: client.databases.count({ table: '${tableName}', session: sessionToken })
+  // Or: client.databases.sum({ table: '${tableName}', column: 'amount', session: sessionToken })
 });
 
 // Trigger: <button onClick={() => mutate(undefined)} disabled={isLoading}>Run</button>

@@ -464,114 +464,6 @@ interface Expenditure {
   created_at: string;
 }
 
-const DUMMY_EXPENDITURES: Expenditure[] = [
-  // Ductape Platform Subscription
-  {
-    _id: 'exp_1',
-    reference_number: 'DTP-2024-001',
-    vendor_name: 'Ductape',
-    category: ExpenditureCategory.DUCTAPE_SUBSCRIPTION,
-    amount: 199,
-    currency: 'USD',
-    status: ExpenditureStatus.PAID,
-    due_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    paid_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Ductape Enterprise Plan - Monthly subscription',
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-
-  // Bundle Subscriptions with other workspaces
-  {
-    _id: 'exp_2',
-    reference_number: 'BUN-2024-001',
-    vendor_name: 'Acme Corp Workspace',
-    category: ExpenditureCategory.BUNDLE_SUBSCRIPTION,
-    amount: 99,
-    currency: 'USD',
-    status: ExpenditureStatus.PAID,
-    due_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    paid_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Professional API Bundle',
-    workspace_id: 'ws_acme_001',
-    bundle_name: 'Professional API Bundle',
-    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'exp_3',
-    reference_number: 'BUN-2024-002',
-    vendor_name: 'TechFlow Solutions',
-    category: ExpenditureCategory.BUNDLE_SUBSCRIPTION,
-    amount: 149,
-    currency: 'USD',
-    status: ExpenditureStatus.PENDING,
-    due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Enterprise Integration Bundle',
-    workspace_id: 'ws_techflow_001',
-    bundle_name: 'Enterprise Integration Bundle',
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-
-  // Usage-based billing with other workspaces
-  {
-    _id: 'exp_4',
-    reference_number: 'USG-2024-001',
-    vendor_name: 'DataStream Inc',
-    category: ExpenditureCategory.USAGE_BASED,
-    amount: 45.50,
-    currency: 'USD',
-    status: ExpenditureStatus.PAID,
-    due_date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-    paid_date: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'API usage charges - 4,550 requests',
-    workspace_id: 'ws_datastream_001',
-    usage_count: 4550,
-    created_at: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'exp_5',
-    reference_number: 'USG-2024-002',
-    vendor_name: 'CloudSync Services',
-    category: ExpenditureCategory.USAGE_BASED,
-    amount: 78.25,
-    currency: 'USD',
-    status: ExpenditureStatus.PAID,
-    due_date: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    paid_date: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Storage and sync - 7,825 requests',
-    workspace_id: 'ws_cloudsync_001',
-    usage_count: 7825,
-    created_at: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'exp_6',
-    reference_number: 'USG-2024-003',
-    vendor_name: 'API Gateway Pro',
-    category: ExpenditureCategory.USAGE_BASED,
-    amount: 124.00,
-    currency: 'USD',
-    status: ExpenditureStatus.OVERDUE,
-    due_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Gateway services - 12,400 requests',
-    workspace_id: 'ws_apigateway_001',
-    usage_count: 12400,
-    created_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'exp_7',
-    reference_number: 'BUN-2024-003',
-    vendor_name: 'FinTech Partners',
-    category: ExpenditureCategory.BUNDLE_SUBSCRIPTION,
-    amount: 299,
-    currency: 'USD',
-    status: ExpenditureStatus.PENDING,
-    due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Premium Financial API Bundle',
-    workspace_id: 'ws_fintech_001',
-    bundle_name: 'Premium Financial API Bundle',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 // Income types
 interface IncomeRecord {
   _id: string;
@@ -975,7 +867,6 @@ type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'GHS' | 'ZAR';
 export default function PricingTabContent() {
   const {currentWorkspaceId, user} = useAuth();
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
-  const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
   const { billingView, setBillingView } = useWorkbenchStore();
   // Monthly drill-down state
@@ -1069,7 +960,7 @@ export default function PricingTabContent() {
 
     onSuccess: () => {
       toast.success('Bundle deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+      queryClient.invalidateQueries({ queryKey: ['bundles'] });
     },
 
     onError: error => {
@@ -1138,7 +1029,7 @@ export default function PricingTabContent() {
         form.reset();
       }
 
-       queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+       queryClient.invalidateQueries({ queryKey: ['bundles'] });
       
     },
     onError: error => {
@@ -1311,10 +1202,6 @@ const activePricings = pricingData?.pricings?.filter(pricing => pricing.is_activ
     }))
     .sort((a, b) => b.value - a.value); // Sort by subscription count descending
 
-  // Calculate expenditure stats
-  const totalExpenditureAmount = expenditures.reduce((sum, exp) => sum + exp.amount, 0);
-  
-
   // Prepare expenditure category distribution for pie chart
 const categoryDistribution = expenseData?.categoryBreakdown;
 const filterDistribution = categoryDistribution?.filter(item => item.amount > 0);
@@ -1358,7 +1245,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                 Manage your pricing bundles, track income and expenses
               </p>
             </div>
-            <Button className="gap-2 my-auto" onClick={handleAddBundle}>
+            <Button className="gap-2 my-auto" onClick={handleAddBundle} disabled>
               <Plus className="h-4 w-4" />
               New Bundle
             </Button>
@@ -1382,15 +1269,18 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     YOUR BILLING SUMMARY
                   </p>
                   <p className="text-sm text-grey-600">
-                $199.00/month • Renews on January 24, 2025
-              </p>
+                    {expenseData != null
+                      ? `${expenseData.currency ?? 'USD'} • Total spending`
+                      : '—'}
+                  </p>
                 </div>
               </div>
 
               <div className="pt-4">
                 <p className="text-grey text-[32px] font-bold pb-1">
-                  $
-                  {expenseData?.totalSpending.toFixed(2)}
+                  {expenseData?.totalSpending != null
+                    ? `${expenseData.currency === 'USD' ? '$' : ''}${expenseData.totalSpending.toFixed(2)}`
+                    : '—'}
                 </p>
                 <p className="text-xs text-primary font-semibold">
                   TOTAL AMOUNT DUE
@@ -1399,7 +1289,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
             </div>
 
             <span className="text-sm font-bold text-primary bg-[#0846A6] bg-opacity-15 px-2 py-1 rounded-[5px] ml-auto uppercase">
-              Enterprise
+              {expenseData ? 'Plan' : '—'}
             </span>
           </div>
 
@@ -1415,8 +1305,9 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   Current Plan Billing
                 </p>
                 <p className="text-[20px] text-grey font-bold">
-                  ${' '}
-                  {199.00.toFixed(2)}
+                  {expenseData?.totalSpending != null
+                    ? `${expenseData.currency === 'USD' ? '$' : ''}${expenseData.totalSpending.toFixed(2)}`
+                    : '—'}
                 </p>
               </div>
             </div>
@@ -1432,7 +1323,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   Next Billing Date
                 </p>
                 <p className="text-[20px] text-grey font-bold">
-                 March 1, 2025
+                  —
                 </p>
               </div>
             </div>
@@ -1473,22 +1364,19 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   <Zap className="h-4 w-4 text-blue-500" />
                   <span className="text-sm font-semibold text-grey">API Requests</span>
                 </div>
-                <span className="text-xs text-grey-600">115% used</span>
+                <span className="text-xs text-grey-600">—</span>
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="bg-grey-300 h-2 rounded-full" style={{ width: '0%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
-                1,150,000 / 1,000,000 requests
+                No usage data
               </p>
-              <div className="bg-primary/10 border border-primary/20 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-primary/80">
-                  Overage: +150,000 requests
-                </p>
-                <p className="text-xs text-primary/60">
-                  $7.50 @ $0.05/1K
+              <div className="bg-grey-100 border border-grey-200 rounded px-2 py-1">
+                <p className="text-xs text-grey-600">
+                  Usage data from API when available
                 </p>
               </div>
             </div>
@@ -1500,22 +1388,19 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   <HardDrive className="h-4 w-4 text-green-500" />
                   <span className="text-sm font-semibold text-grey">Storage</span>
                 </div>
-                <span className="text-xs text-grey-600">108% used</span>
+                <span className="text-xs text-grey-600">—</span>
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-[#00875A] h-2 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="bg-grey-300 h-2 rounded-full" style={{ width: '0%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
-                108 GB / 100 GB
+                No usage data
               </p>
-              <div className="bg-[#00875A]/  border border-[#00875A]/20 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-[#00875A]/70">
-                  Overage: +8 GB
-                </p>
-                <p className="text-xs text-[#00875A]/60">
-                  $2.40 @ $0.30/GB
+              <div className="bg-grey-100 border border-grey-200 rounded px-2 py-1">
+                <p className="text-xs text-grey-600">
+                  Usage data from API when available
                 </p>
               </div>
             </div>
@@ -1527,22 +1412,19 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                   <Users className="h-4 w-4 text-orange-500" />
                   <span className="text-sm font-semibold text-grey">Users</span>
                 </div>
-                <span className="text-xs text-grey-600">8 / 20</span>
+                <span className="text-xs text-grey-600">—</span>
               </div>
               <div className="mb-2">
                 <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: '40%' }}></div>
+                  <div className="bg-grey-300 h-2 rounded-full" style={{ width: '0%' }}></div>
                 </div>
               </div>
               <p className="text-xs text-grey-600 mb-1">
-                12 user slots remaining
+                No usage data
               </p>
-              <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
-                <p className="text-xs font-semibold text-orange-700">
-                  No overage
-                </p>
-                <p className="text-xs text-orange-600">
-                  Within plan limits
+              <div className="bg-grey-100 border border-grey-200 rounded px-2 py-1">
+                <p className="text-xs text-grey-600">
+                  Usage data from API when available
                 </p>
               </div>
             </div>
@@ -1572,8 +1454,21 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
-                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
+                    {isLoadingExpense ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-grey-600 py-8">
+                          Loading expenses…
+                        </TableCell>
+                      </TableRow>
+                    ) : (expenseData?.recentExpenses ?? []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-grey-600 py-8">
+                          No expenses recorded yet. Billing reports will appear here once generated for this workspace.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                    (expenseData?.recentExpenses ?? []).map((expenditure) => (
+                      <TableRow key={expenditure.reference} className="hover:bg-grey-100 transition-colors">
                         <TableCell>
                           <span className="font-medium text-grey">{expenditure.reference}</span>
                         </TableCell>
@@ -1618,7 +1513,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
               </div>
@@ -2259,7 +2154,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     <ShoppingBag className="h-5 w-5 text-red" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">${expenseData?.totalSpending.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-grey">${(expenseData?.totalSpending ?? 0).toLocaleString()}</p>
                     <p className="text-sm text-grey-600">Total Spending</p>
                   </div>
                 </div>
@@ -2271,7 +2166,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     <CheckCircle className="h-5 w-5 text-green" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{expenseData?.paid}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.paid ?? 0}</p>
                     <p className="text-sm text-grey-600">Paid</p>
                   </div>
                 </div>
@@ -2283,7 +2178,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     <AlertCircle className="h-5 w-5 text-yellow" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{expenseData?.pending}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.pending ?? 0}</p>
                     <p className="text-sm text-grey-600">Pending</p>
                   </div>
                 </div>
@@ -2295,7 +2190,7 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
                     <XCircle className="h-5 w-5 text-orange" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-grey">{expenseData?.issues}</p>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.issues ?? 0}</p>
                     <p className="text-sm text-grey-600">Issues</p>
                   </div>
                 </div>
@@ -2950,11 +2845,11 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
         </Dialog>
 
         <Dialog open={planDetailOpen} onOpenChange={setPlanDetailOpen}>
-  <DialogContent className="max-w-[1088px] max-h-[90vh] overflow-y-auto">
+  <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
 
     {selectedPlan && (
       
-       <section className="flex flex-col justify-center py-3 w-full pb-10">
+       <section className="flex flex-col justify-center py-2 w-full pb-6">
        <button
   onClick={handleBackToPlans}
   className="flex items-center gap-2"
@@ -2969,18 +2864,18 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
   </p>
 </button>
         <DialogHeader>
-          <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
+          <DialogTitle className="!text-lg !text-grey !font-semibold !pt-2">
             Upgrade Workspace from Starter to{' '}
             {selectedPlan.name}
           </DialogTitle>
-          <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
+          <DialogDescription className="!text-sm !text-grey pt-2">
             {selectedPlan.name} plan details
           </DialogDescription>
         </DialogHeader>
 
-        <div className=" mb-10 mt-1 py-5 px-10 bg-white border border-grey-400 rounded-[5px] flex items-start justify-between">
+        <div className="mb-6 mt-1 py-4 px-5 bg-white border border-grey-400 rounded-md flex items-start justify-between">
             <div className=" w-full text-sm flex justify-between items-start">
-        <ul className="space-y-2 my-4 text-base font-medium text-grey">
+        <ul className="space-y-1.5 my-3 text-sm font-medium text-grey">
 
           <li className="flex gap-2">
             <div className="flex items-center gap-1">
@@ -3030,13 +2925,13 @@ const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
           ))}
 
         </ul>
-        <div className="space-y-2 my-4">
-          <p className="font-bold text-[40px] text-grey">${selectedPlan.price}<span className="font-bold text-sm text-grey">/month</span></p>
+        <div className="space-y-1 my-3">
+          <p className="font-bold text-2xl text-grey">${selectedPlan.price}<span className="font-bold text-xs text-grey">/month</span></p>
         </div>
         </div>
         </div>
 
-        <div className="w-full mt-6 text-grey">
+        <div className="w-full mt-4 text-grey">
           <>
             <BillingsInfo />
           </>
