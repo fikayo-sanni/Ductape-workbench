@@ -12,6 +12,7 @@ import { useThemeStore } from './stores/theme-store';
 import { useLoginModalStore } from './stores/login-modal-store';
 import { useAuth } from './store/useAuth';
 import { authServices } from './services/authServices';
+import { triggerOnboardingForNewUser } from '@/utils/onboarding';
 import toast from 'react-hot-toast';
 
 // Create a client
@@ -57,6 +58,7 @@ function App() {
           });
           window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
           closeLoginModal();
+          triggerOnboardingForNewUser();
           toast.success('Login successful');
           window.location.reload();
         })
