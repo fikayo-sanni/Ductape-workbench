@@ -11,7 +11,10 @@ export interface Domain {
 export interface MarketplaceApp {
   _id: string;
   app_name: string;
-  domain_name: string;
+  domain_name?: string;
+  tag?: string;
+  domains?: string[];
+  author?: string;
   description?: string;
   logo?: string;
   latest_version: string;
@@ -52,6 +55,18 @@ const fetchAppByDomains = async (
   return response.data;
 };
 
+const fetchAppPublicByTag = async (tag: string): Promise<AppResponse> => {
+  const response = await apiClient.get<AppResponse>(`/apps/v1/fetch/tag`, {
+    params: { tag },
+  });
+  return response.data;
+};
+
+const fetchPublicAppsByWorkspace = async (workspace_id: string): Promise<AppsResponse> => {
+  const response = await apiClient.get<AppsResponse>(`/apps/v1/workspace/public/${workspace_id}`);
+  return response.data;
+};
+
 const fetchApp = async (data: {
   app_id: string;
   user_id: string;
@@ -67,6 +82,8 @@ const fetchApp = async (data: {
 const marketplaceServices = {
   fetchDomains,
   fetchAppByDomains,
+  fetchAppPublicByTag,
+  fetchPublicAppsByWorkspace,
   fetchApp,
 };
 

@@ -281,8 +281,8 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   }, [setSidebarCollapsed]);
 
   const isNoSQL = database.type?.toLowerCase().includes('mongo') ||
-                  database.type?.toLowerCase().includes('redis') ||
-                  database.type?.toLowerCase().includes('cassandra');
+    database.type?.toLowerCase().includes('redis') ||
+    database.type?.toLowerCase().includes('cassandra');
 
   // Establish database connection first before any queries
   const { data: connectionResult, isLoading: isConnecting, error: connectionError, isSuccess: isConnected } = useQuery({
@@ -446,6 +446,9 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     persistedState?.isSidebarCollapsed || false
   );
+  const [sidebarWidth, setSidebarWidth] = useState<number>(
+    persistedState?.sidebarWidth || 256
+  );
   const [selectedTable, setSelectedTableInternal] = useState<typeof tables[0] | null>(() => {
     if (persistedState?.selectedTableName) {
       return tables.find(t => t.name === persistedState.selectedTableName) || null;
@@ -600,6 +603,7 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     const stateToSave = {
       sidebarView,
       isSidebarCollapsed,
+      sidebarWidth,
       selectedTableName: selectedTable?.name,
       selectedMigrationId: selectedMigration?.id,
       selectedActionTag: selectedAction?.tag,
@@ -623,6 +627,7 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     stateKey,
     sidebarView,
     isSidebarCollapsed,
+    sidebarWidth,
     selectedTable,
     selectedMigration,
     selectedAction,
@@ -1909,10 +1914,10 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     setEditColumnForm({
       name: columnName,
       type: columnName.includes('id') ? 'integer' :
-            columnName.includes('email') ? 'string' :
-            columnName.includes('active') || columnName.includes('is_') ? 'boolean' :
+        columnName.includes('email') ? 'string' :
+          columnName.includes('active') || columnName.includes('is_') ? 'boolean' :
             columnName.includes('price') || columnName.includes('amount') ? 'decimal' :
-            columnName.includes('date') || columnName.includes('time') || columnName.includes('at') ? 'datetime' : 'string',
+              columnName.includes('date') || columnName.includes('time') || columnName.includes('at') ? 'datetime' : 'string',
       nullable: true,
       defaultValue: undefined,
       hasDefaultValue: false,
@@ -2383,9 +2388,9 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     const productTag = database.tag.split(':')[0] || 'your-product';
     const inputParams = selectedAction.parameters.length > 0
       ? selectedAction.parameters.reduce((acc, p) => {
-          acc[p.name] = p.defaultValue;
-          return acc;
-        }, {} as Record<string, any>)
+        acc[p.name] = p.defaultValue;
+        return acc;
+      }, {} as Record<string, any>)
       : {};
     const inputString = JSON.stringify(inputParams, null, 4).split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n');
 
@@ -2840,13 +2845,13 @@ console.log('Conditional stats:', conditionalStats);`;
     }
   }`
       : statusCol
-      ? `  where: {
+        ? `  where: {
     $AND: {
       ${aggCol}: { $GT: 0 },
       ${statusCol}: { $IN: ['active', 'pending'] }
     }
   }`
-      : `  where: {
+        : `  where: {
     $AND: {
       ${aggCol}: { $GT: 0 },
       ${allCols[1] || 'status'}: 'active'
@@ -2949,8 +2954,8 @@ console.log('Filtered count:', filteredCount);`;
     const whereCondition = statusCol
       ? `{ ${statusCol}: 'active' }`
       : activeCol
-      ? `{ ${activeCol}: true }`
-      : `{ ${sumCol}: { $GT: 0 } }`;
+        ? `{ ${activeCol}: true }`
+        : `{ ${sumCol}: { $GT: 0 } }`;
 
     return `// Sum column values
 const total = await ductape.database.sum({
@@ -2987,8 +2992,8 @@ console.log('Filtered total:', filteredTotal);`;
     const whereCondition = statusCol
       ? `{ ${statusCol}: 'active' }`
       : activeCol
-      ? `{ ${activeCol}: true }`
-      : `{ ${avgCol}: { $GT: 0 } }`;
+        ? `{ ${activeCol}: true }`
+        : `{ ${avgCol}: { $GT: 0 } }`;
 
     return `// Calculate average
 const average = await ductape.database.avg({
@@ -3024,8 +3029,8 @@ console.log('Filtered average:', filteredAverage);`;
     const whereCondition = statusCol
       ? `{ ${statusCol}: 'active' }`
       : activeCol
-      ? `{ ${activeCol}: true }`
-      : `{ ${minCol}: { $GT: 0 } }`;
+        ? `{ ${activeCol}: true }`
+        : `{ ${minCol}: { $GT: 0 } }`;
 
     return `// Find minimum value
 const minimum = await ductape.database.min({
@@ -3061,8 +3066,8 @@ console.log('Filtered minimum:', filteredMin);`;
     const whereCondition = statusCol
       ? `{ ${statusCol}: 'active' }`
       : activeCol
-      ? `{ ${activeCol}: true }`
-      : `{ ${maxCol}: { $GT: 0 } }`;
+        ? `{ ${activeCol}: true }`
+        : `{ ${maxCol}: { $GT: 0 } }`;
 
     return `// Find maximum value
 const maximum = await ductape.database.max({
@@ -3112,58 +3117,58 @@ const complexQuery = await ductape.database.raw({
 
     // Build operation-specific code sections (shared by runtime and non-runtime paths)
     const buildOperationSections = (): Array<{ title: string; code: string }> => {
-    const opSections: Array<{ title: string; code: string }> = [];
-    switch (selectedOperation) {
-      case 'query':
-        opSections.push(
-          { title: 'Basic Query', code: generateQueryCode(tableName, envSlug, language) },
-          { title: 'Advanced Filtering', code: `// Query with comparison operators based on ${tableName} schema\n${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanced query')}` }
-        );
-        break;
-      case 'insert':
-        opSections.push({ title: `Insert into ${tableName}`, code: generateInsertCode(tableName, envSlug, language) });
-        break;
-      case 'update':
-        opSections.push({ title: `Update ${tableName}`, code: generateUpdateCode(tableName, envSlug, language) });
-        break;
-      case 'delete':
-        opSections.push({ title: `Delete from ${tableName}`, code: generateDeleteCode(tableName, envSlug, language) });
-        break;
-      case 'aggregate':
-        opSections.push({ title: `Aggregate ${tableName}`, code: generateAggregateCode(tableName, envSlug, language) });
-        break;
-      case 'aggregate-conditional':
-        opSections.push({ title: `Aggregate ${tableName} with Conditions`, code: generateAggregateConditionalCode(tableName, envSlug, language) });
-        break;
-      case 'groupBy':
-        opSections.push({ title: `Group By in ${tableName}`, code: generateGroupByCode(tableName, envSlug, language) });
-        break;
-      case 'upsert':
-        opSections.push({ title: `Upsert into ${tableName}`, code: generateUpsertCode(tableName, envSlug, language) });
-        break;
-      case 'count':
-        opSections.push({ title: `Count Records in ${tableName}`, code: generateCountCode(tableName, envSlug, language) });
-        break;
-      case 'sum':
-        opSections.push({ title: `Sum Values in ${tableName}`, code: generateSumCode(tableName, envSlug, language) });
-        break;
-      case 'avg':
-        opSections.push({ title: `Average Values in ${tableName}`, code: generateAvgCode(tableName, envSlug, language) });
-        break;
-      case 'min':
-        opSections.push({ title: `Minimum Value in ${tableName}`, code: generateMinCode(tableName, envSlug, language) });
-        break;
-      case 'max':
-        opSections.push({ title: `Maximum Value in ${tableName}`, code: generateMaxCode(tableName, envSlug, language) });
-        break;
-      case 'raw':
-        opSections.push({ title: `Raw SQL Query on ${tableName}`, code: generateRawCode(tableName, envSlug, language) });
-        break;
-      default:
-        opSections.push({ title: 'Query Records', code: generateQueryCode(tableName, envSlug, language) });
-    }
-    return opSections;
-  };
+      const opSections: Array<{ title: string; code: string }> = [];
+      switch (selectedOperation) {
+        case 'query':
+          opSections.push(
+            { title: 'Basic Query', code: generateQueryCode(tableName, envSlug, language) },
+            { title: 'Advanced Filtering', code: `// Query with comparison operators based on ${tableName} schema\n${generateQueryCode(tableName, envSlug, language).replace('Basic Query', 'Advanced query')}` }
+          );
+          break;
+        case 'insert':
+          opSections.push({ title: `Insert into ${tableName}`, code: generateInsertCode(tableName, envSlug, language) });
+          break;
+        case 'update':
+          opSections.push({ title: `Update ${tableName}`, code: generateUpdateCode(tableName, envSlug, language) });
+          break;
+        case 'delete':
+          opSections.push({ title: `Delete from ${tableName}`, code: generateDeleteCode(tableName, envSlug, language) });
+          break;
+        case 'aggregate':
+          opSections.push({ title: `Aggregate ${tableName}`, code: generateAggregateCode(tableName, envSlug, language) });
+          break;
+        case 'aggregate-conditional':
+          opSections.push({ title: `Aggregate ${tableName} with Conditions`, code: generateAggregateConditionalCode(tableName, envSlug, language) });
+          break;
+        case 'groupBy':
+          opSections.push({ title: `Group By in ${tableName}`, code: generateGroupByCode(tableName, envSlug, language) });
+          break;
+        case 'upsert':
+          opSections.push({ title: `Upsert into ${tableName}`, code: generateUpsertCode(tableName, envSlug, language) });
+          break;
+        case 'count':
+          opSections.push({ title: `Count Records in ${tableName}`, code: generateCountCode(tableName, envSlug, language) });
+          break;
+        case 'sum':
+          opSections.push({ title: `Sum Values in ${tableName}`, code: generateSumCode(tableName, envSlug, language) });
+          break;
+        case 'avg':
+          opSections.push({ title: `Average Values in ${tableName}`, code: generateAvgCode(tableName, envSlug, language) });
+          break;
+        case 'min':
+          opSections.push({ title: `Minimum Value in ${tableName}`, code: generateMinCode(tableName, envSlug, language) });
+          break;
+        case 'max':
+          opSections.push({ title: `Maximum Value in ${tableName}`, code: generateMaxCode(tableName, envSlug, language) });
+          break;
+        case 'raw':
+          opSections.push({ title: `Raw SQL Query on ${tableName}`, code: generateRawCode(tableName, envSlug, language) });
+          break;
+        default:
+          opSections.push({ title: 'Query Records', code: generateQueryCode(tableName, envSlug, language) });
+      }
+      return opSections;
+    };
 
     // Runtime-specific: Init + operation sections (query, insert, update, delete, etc. from Operation Type dropdown)
     if (runtime === 'vanilla') {
@@ -3186,7 +3191,8 @@ const ductape = new Ductape({
       const init = {
         title: 'Setup (Provider + session)',
         code: `// Wrap your app with DuctapeProvider (e.g. in main.tsx).
-// With publishable key, pass session from your backend in every action call.
+// Session: your backend calls ductape.sessions.start() (e.g. at login) and returns the token.
+// Frontend gets that token (e.g. useAuth().sessionToken) and passes \`session\` in every request below.
 
 import { DuctapeProvider } from '@ductape/react';
 
@@ -3205,12 +3211,14 @@ import { DuctapeProvider } from '@ductape/react';
         switch (selectedOperation) {
           case 'query':
             return [
-              { title: 'Basic Query', code: `import { useDatabaseQuery } from '@ductape/react';
+              {
+                title: 'Basic Query', code: `import { useDatabaseQuery } from '@ductape/react';
 
 function ${tableName.replace(/-/g, '_')}List() {
+  const { sessionToken } = useAuth(); // session from your backend
   const { data, isLoading, error } = useDatabaseQuery(
     ['${tableName}', 'list'],
-    { table: '${tableName}', limit: 10 }
+    { table: '${tableName}', limit: 10, session: sessionToken }
   );
 
   if (isLoading) return <div>Loading...</div>;
@@ -3224,24 +3232,28 @@ function ${tableName.replace(/-/g, '_')}List() {
     </ul>
   );
 }` },
-              { title: 'Query with filters', code: `import { useDatabaseQuery } from '@ductape/react';
+              {
+                title: 'Query with filters', code: `import { useDatabaseQuery } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { data, isLoading } = useDatabaseQuery(
   ['${tableName}', 'active'],
-  { table: '${tableName}', where: { status: 'active' }, limit: 10 }
+  { table: '${tableName}', where: { status: 'active' }, limit: 10, session: sessionToken }
 );` },
             ];
           case 'insert':
-            return [{ title: `Insert into ${tableName}`, code: `import { useDatabaseInsert } from '@ductape/react';
+            return [{
+              title: `Insert into ${tableName}`, code: `import { useDatabaseInsert } from '@ductape/react';
 
 function Create${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseInsert({
     onSuccess: () => console.log('Inserted'),
   });
 
   return (
     <button
-      onClick={() => mutate({ table: '${tableName}', data: { name: 'Jane', email: 'jane@example.com' } })}
+      onClick={() => mutate({ table: '${tableName}', data: { name: 'Jane', email: 'jane@example.com' }, session: sessionToken })}
       disabled={isLoading}
     >
       Create row
@@ -3249,9 +3261,11 @@ function Create${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
   );
 }` }];
           case 'update':
-            return [{ title: `Update ${tableName}`, code: `import { useDatabaseUpdate } from '@ductape/react';
+            return [{
+              title: `Update ${tableName}`, code: `import { useDatabaseUpdate } from '@ductape/react';
 
 function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseUpdate();
 
   return (
@@ -3260,6 +3274,7 @@ function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
         table: '${tableName}',
         where: { id: 1 },
         data: { name: 'Updated Name', status: 'active' },
+        session: sessionToken,
       })}
       disabled={isLoading}
     >
@@ -3268,14 +3283,16 @@ function Update${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
   );
 }` }];
           case 'delete':
-            return [{ title: `Delete from ${tableName}`, code: `import { useDatabaseDelete } from '@ductape/react';
+            return [{
+              title: `Delete from ${tableName}`, code: `import { useDatabaseDelete } from '@ductape/react';
 
 function Delete${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCase())}() {
+  const { sessionToken } = useAuth();
   const { mutate, isLoading } = useDatabaseDelete();
 
   return (
     <button
-      onClick={() => mutate({ table: '${tableName}', where: { id: 1 } })}
+      onClick={() => mutate({ table: '${tableName}', where: { id: 1 }, session: sessionToken })}
       disabled={isLoading}
     >
       Delete row
@@ -3283,16 +3300,20 @@ function Delete${tableName.replace(/-/g, '_').replace(/\b\w/g, c => c.toUpperCas
   );
 }` }];
           case 'upsert':
-            return [{ title: `Upsert into ${tableName}`, code: `import { useMutation } from '@ductape/react';
+            return [{
+              title: `Upsert into ${tableName}`, code: `import { useMutation } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { mutate, isLoading } = useMutation(async (client) =>
-  client.databases.upsert({ table: '${tableName}', data: { id: 1, name: 'Jane' }, conflictColumns: ['id'] })
+  client.databases.upsert({ table: '${tableName}', data: { id: 1, name: 'Jane' }, conflictColumns: ['id'], session: sessionToken })
 );` }];
           case 'count':
-            return [{ title: `Count ${tableName}`, code: `import { useMutation } from '@ductape/react';
+            return [{
+              title: `Count ${tableName}`, code: `import { useMutation } from '@ductape/react';
 
+const { sessionToken } = useAuth();
 const { mutate, data, isLoading } = useMutation(async (client) =>
-  client.databases.count({ table: '${tableName}' })
+  client.databases.count({ table: '${tableName}', session: sessionToken })
 );` }];
           default:
             // sum, avg, min, max, aggregate, groupBy, raw: use useMutation with client.databases
@@ -3300,11 +3321,11 @@ const { mutate, data, isLoading } = useMutation(async (client) =>
               title: `${selectedOperation} – use useMutation`,
               code: `import { useMutation } from '@ductape/react';
 
-// Run any database operation via client.databases inside useMutation:
+const { sessionToken } = useAuth();
 const { mutate, data, isLoading } = useMutation(async (client) => {
-  return await client.databases.query({ table: '${tableName}', limit: 10 });
-  // Or: client.databases.count({ table: '${tableName}' })
-  // Or: client.databases.sum({ table: '${tableName}', column: 'amount' })
+  return await client.databases.query({ table: '${tableName}', limit: 10, session: sessionToken });
+  // Or: client.databases.count({ table: '${tableName}', session: sessionToken })
+  // Or: client.databases.sum({ table: '${tableName}', column: 'amount', session: sessionToken })
 });
 
 // Trigger: <button onClick={() => mutate(undefined)} disabled={isLoading}>Run</button>
@@ -3336,21 +3357,21 @@ const ductape = new Ductape({
     // Common sections for all operations (no runtime selector)
     const initSection = language === 'typescript'
       ? {
-          title: 'Init Ductape',
-          code: `import Ductape from "@ductape/sdk"
+        title: 'Init Ductape',
+        code: `import Ductape from "@ductape/sdk"
 
 const ductape = new Ductape({
   accessKey: 'your-access-key',
 });`,
-        }
+      }
       : {
-          title: 'Init Ductape',
-          code: `const Ductape = require("@ductape/sdk")
+        title: 'Init Ductape',
+        code: `const Ductape = require("@ductape/sdk")
 
 const ductape = new Ductape({
   accessKey: 'your-access-key',
 });`,
-        };
+      };
 
     const connectSection = {
       title: 'Database Connection',
@@ -3688,10 +3709,36 @@ const result = await ductape.database.transaction(
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
       {/* Sidebar */}
-      <div className={cn(
-        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
-        isSidebarCollapsed ? 'w-14' : 'w-64'
-      )}>
+      <div
+        className={cn(
+          "bg-white border-r border-grey-300 flex flex-col transition-all duration-300 relative z-10",
+          isSidebarCollapsed ? "w-14" : ""
+        )}
+        style={{ width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px` }}
+      >
+        {!isSidebarCollapsed && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary z-50 transition-colors"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.pageX;
+              const startWidth = sidebarWidth;
+
+              const handleMouseMove = (mouseEvent: MouseEvent) => {
+                const newWidth = Math.max(200, Math.min(600, startWidth + (mouseEvent.pageX - startX)));
+                setSidebarWidth(newWidth);
+              };
+
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+        )}
         {/* Header - Fixed */}
         <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
           <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
@@ -3756,7 +3803,7 @@ const result = await ductape.database.transaction(
                     Migrations
                   </button>
                 )}
-{/* Actions tab hidden for now */}
+                {/* Actions tab hidden for now */}
               </div>
 
               {/* Search */}
@@ -3811,201 +3858,201 @@ const result = await ductape.database.transaction(
                   <GitBranch className="h-5 w-5" />
                 </button>
               )}
-{/* Actions icon hidden for now */}
+              {/* Actions icon hidden for now */}
             </div>
           ) : (
-          <>
-          <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-              {sidebarView === 'tables' && `${isNoSQL ? 'Collections' : 'Tables'} (${filteredTables.length})`}
-              {sidebarView === 'migrations' && `Migrations (${filteredMigrations.length})`}
-              {sidebarView === 'actions' && `Actions (${filteredActions.length})`}
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={handleSidebarRefresh}
-                disabled={isSidebarRefreshing}
-                className="text-grey-600 hover:text-primary transition-colors"
-                title="Refresh list"
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
-              </button>
-              {sidebarView === 'tables' && (
-                <button
-                  onClick={() => setShowCreateTableDialog(true)}
-                  className="text-grey-600 hover:text-primary transition-colors"
-                  title={`Create new ${isNoSQL ? 'collection' : 'table'}`}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {sidebarView === 'actions' && (
-                <button
-                  onClick={() => {
-                    // Reset query builder state
-                    setQueryBuilderOperation('query');
-                    setQueryBuilderTable('');
-                    setQueryBuilderColumns([]);
-                    setQueryBuilderWhere([]);
-                    setQueryBuilderOrderBy(null);
-                    setQueryBuilderLimit('25');
-                    setQueryBuilderOffset('0');
-                    setQueryBuilderData([]);
-                    setQueryBuilderAggColumn('');
-                    setQueryBuilderRawSql('');
-                    setQueryBuilderReturning([]);
-                    setGeneratedQuery(null);
-                    setQueryTestResult(null);
-                    setSelectedAction(null);
-                    // Show query builder
-                    setShowQueryBuilder(true);
-                  }}
-                  className="text-grey-600 hover:text-primary transition-colors"
-                  title="Create new action"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Tables List */}
-          {sidebarView === 'tables' && (
-            <div className="space-y-1">
-              {isLoadingTables ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-                  <span className="ml-2 text-sm text-grey-600">Loading {isNoSQL ? 'collections' : 'tables'}...</span>
+            <>
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                  {sidebarView === 'tables' && `${isNoSQL ? 'Collections' : 'Tables'} (${filteredTables.length})`}
+                  {sidebarView === 'migrations' && `Migrations (${filteredMigrations.length})`}
+                  {sidebarView === 'actions' && `Actions (${filteredActions.length})`}
                 </div>
-              ) : (
-                filteredTables.map((table) => (
+                <div className="flex gap-1">
                   <button
-                    key={table.name}
-                    onClick={() => setSelectedTable(table)}
-                    className={cn(
-                      'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
-                      selectedTable?.name === table.name
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-grey hover:bg-grey-100'
-                    )}
+                    onClick={handleSidebarRefresh}
+                    disabled={isSidebarRefreshing}
+                    className="text-grey-600 hover:text-primary transition-colors"
+                    title="Refresh list"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Table className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{table.name}</span>
-                    </div>
-                    <span className="text-xs text-grey-600 flex-shrink-0">
-                      {'rowCount' in table && table.rowCount != null ? table.rowCount : 'documentCount' in table && table.documentCount != null ? table.documentCount : '-'}
-                    </span>
+                    <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
                   </button>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Migrations List */}
-          {sidebarView === 'migrations' && !isNoSQL && (
-            <div className="space-y-1">
-              {filteredMigrations.map((migration) => (
-                <button
-                  key={migration.tag}
-                  onClick={() => setSelectedMigration(migration)}
-                  className={cn(
-                    'w-full px-2 py-2 rounded text-sm transition-colors text-left',
-                    selectedMigration?.tag === migration.tag
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
+                  {sidebarView === 'tables' && (
+                    <button
+                      onClick={() => setShowCreateTableDialog(true)}
+                      className="text-grey-600 hover:text-primary transition-colors"
+                      title={`Create new ${isNoSQL ? 'collection' : 'table'}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                   )}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <GitBranch className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate font-medium">{migration.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-grey-600 ml-5 min-w-0">
-                    <span className={cn(
-                      'px-1.5 py-0.5 rounded flex-shrink-0',
-                      migration.status === 'completed' ? 'bg-green/10 text-green' : 'bg-yellow/10 text-yellow'
-                    )}>
-                      {migration.status}
-                    </span>
-                    <span className="truncate" title={migration.tag}>{migration.tag}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Actions List */}
-          {sidebarView === 'actions' && (
-            <div className="space-y-1">
-              {filteredActions.length === 0 ? (
-                <div className="px-2 py-4 text-center">
-                  <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
-                  <p className="text-xs text-grey">No saved actions yet</p>
-                  <p className="text-xs text-grey mt-1">
-                    Build a query and save it as an action
-                  </p>
+                  {sidebarView === 'actions' && (
+                    <button
+                      onClick={() => {
+                        // Reset query builder state
+                        setQueryBuilderOperation('query');
+                        setQueryBuilderTable('');
+                        setQueryBuilderColumns([]);
+                        setQueryBuilderWhere([]);
+                        setQueryBuilderOrderBy(null);
+                        setQueryBuilderLimit('25');
+                        setQueryBuilderOffset('0');
+                        setQueryBuilderData([]);
+                        setQueryBuilderAggColumn('');
+                        setQueryBuilderRawSql('');
+                        setQueryBuilderReturning([]);
+                        setGeneratedQuery(null);
+                        setQueryTestResult(null);
+                        setSelectedAction(null);
+                        // Show query builder
+                        setShowQueryBuilder(true);
+                      }}
+                      className="text-grey-600 hover:text-primary transition-colors"
+                      title="Create new action"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-              ) : (
-                filteredActions.map((action) => (
-                  <div
-                    key={action.id}
-                    className={cn(
-                      'px-2 py-2 rounded text-sm transition-colors cursor-pointer',
-                      selectedAction?.id === action.id
-                        ? 'bg-primary/10 border border-primary/20'
-                        : 'hover:bg-grey-100'
-                    )}
-                    onClick={() => handleLoadAction(action)}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Bookmark className="h-3.5 w-3.5 flex-shrink-0 text-grey" />
-                        <span className="truncate font-medium text-grey">{action.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenExecuteActionModal(action);
-                          }}
-                          className="p-1 text-grey hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                          title="Execute with parameters"
-                        >
-                          <Play className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteAction(action);
-                          }}
-                          className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
-                          title="Delete action"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+              </div>
+
+              {/* Tables List */}
+              {sidebarView === 'tables' && (
+                <div className="space-y-1">
+                  {isLoadingTables ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                      <span className="ml-2 text-sm text-grey-600">Loading {isNoSQL ? 'collections' : 'tables'}...</span>
                     </div>
-                    <div className="flex items-center gap-1 flex-wrap ml-5">
-                      <span className={cn('px-1.5 py-0.5 rounded text-xs', DATABASE_OPERATIONS[action.operation as DatabaseOperation]?.color || 'bg-grey-100 text-grey')}>
-                        {action.operation}
-                      </span>
-                      {action.parameters.length > 0 && (
-                        <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                          {action.parameters.length} param{action.parameters.length !== 1 ? 's' : ''}
+                  ) : (
+                    filteredTables.map((table) => (
+                      <button
+                        key={table.name}
+                        onClick={() => setSelectedTable(table)}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
+                          selectedTable?.name === table.name
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-grey hover:bg-grey-100'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Table className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{table.name}</span>
+                        </div>
+                        <span className="text-xs text-grey-600 flex-shrink-0">
+                          {'rowCount' in table && table.rowCount != null ? table.rowCount : 'documentCount' in table && table.documentCount != null ? table.documentCount : '-'}
                         </span>
-                      )}
-                    </div>
-                    {action.description && (
-                      <div className="text-xs text-grey mt-1 truncate ml-5">
-                        {action.description}
-                      </div>
-                    )}
-                  </div>
-                ))
+                      </button>
+                    ))
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          </>
+
+              {/* Migrations List */}
+              {sidebarView === 'migrations' && !isNoSQL && (
+                <div className="space-y-1">
+                  {filteredMigrations.map((migration) => (
+                    <button
+                      key={migration.tag}
+                      onClick={() => setSelectedMigration(migration)}
+                      className={cn(
+                        'w-full px-2 py-2 rounded text-sm transition-colors text-left',
+                        selectedMigration?.tag === migration.tag
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-grey hover:bg-grey-100'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <GitBranch className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate font-medium">{migration.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-grey-600 ml-5 min-w-0">
+                        <span className={cn(
+                          'px-1.5 py-0.5 rounded flex-shrink-0',
+                          migration.status === 'completed' ? 'bg-green/10 text-green' : 'bg-yellow/10 text-yellow'
+                        )}>
+                          {migration.status}
+                        </span>
+                        <span className="truncate" title={migration.tag}>{migration.tag}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Actions List */}
+              {sidebarView === 'actions' && (
+                <div className="space-y-1">
+                  {filteredActions.length === 0 ? (
+                    <div className="px-2 py-4 text-center">
+                      <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
+                      <p className="text-xs text-grey">No saved actions yet</p>
+                      <p className="text-xs text-grey mt-1">
+                        Build a query and save it as an action
+                      </p>
+                    </div>
+                  ) : (
+                    filteredActions.map((action) => (
+                      <div
+                        key={action.id}
+                        className={cn(
+                          'px-2 py-2 rounded text-sm transition-colors cursor-pointer',
+                          selectedAction?.id === action.id
+                            ? 'bg-primary/10 border border-primary/20'
+                            : 'hover:bg-grey-100'
+                        )}
+                        onClick={() => handleLoadAction(action)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Bookmark className="h-3.5 w-3.5 flex-shrink-0 text-grey" />
+                            <span className="truncate font-medium text-grey">{action.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenExecuteActionModal(action);
+                              }}
+                              className="p-1 text-grey hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                              title="Execute with parameters"
+                            >
+                              <Play className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAction(action);
+                              }}
+                              className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
+                              title="Delete action"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap ml-5">
+                          <span className={cn('px-1.5 py-0.5 rounded text-xs', DATABASE_OPERATIONS[action.operation as DatabaseOperation]?.color || 'bg-grey-100 text-grey')}>
+                            {action.operation}
+                          </span>
+                          {action.parameters.length > 0 && (
+                            <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
+                              {action.parameters.length} param{action.parameters.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        {action.description && (
+                          <div className="text-xs text-grey mt-1 truncate ml-5">
+                            {action.description}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -4118,23 +4165,23 @@ const result = await ductape.database.transaction(
                     return timeline.map((day) => {
                       const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
 
-                    return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white drop-shadow-sm">
-                              {day.value.toLocaleString()} operations
-                            </span>
+                      return (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
+                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-xs font-semibold text-white drop-shadow-sm">
+                                {day.value.toLocaleString()} operations
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  });
+                      );
+                    });
                   })()}
                 </div>
               )}
@@ -4992,117 +5039,391 @@ const result = await ductape.database.transaction(
                 </div>
               </div>
             ) : (
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Query Builder Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-grey">Query Builder</h2>
-                  <p className="text-sm text-grey">Build database queries and save them as reusable actions</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestQuery}
-                    disabled={!generatedQuery || isTestingQuery}
-                    className="gap-2"
-                  >
-                    {isTestingQuery ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    Test Query
-                  </Button>
-{/* Save as Action button hidden for now */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowQueryBuilder(false)}
-                    className="gap-2 text-grey"
-                  >
-                    <X className="h-4 w-4" />
-                    Close
-                  </Button>
-                </div>
-              </div>
-
-              {/* Operation Selection */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4">
-                <Label className="text-sm font-semibold text-grey mb-3 block">Operation Type</Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {Object.entries(DATABASE_OPERATIONS).map(([op, config]) => (
-                    <button
-                      key={op}
-                      onClick={() => setQueryBuilderOperation(op as DatabaseOperation)}
-                      className={cn(
-                        'p-3 rounded-lg border text-left transition-colors',
-                        queryBuilderOperation === op
-                          ? 'border-primary bg-primary/5'
-                          : 'border-grey-400 hover:border-grey-400 hover:bg-grey-50'
-                      )}
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Query Builder Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-grey">Query Builder</h2>
+                    <p className="text-sm text-grey">Build database queries and save them as reusable actions</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestQuery}
+                      disabled={!generatedQuery || isTestingQuery}
+                      className="gap-2"
                     >
-                      <div className={cn('text-xs font-semibold uppercase mb-1', config.color.split(' ')[1])}>
-                        {config.label}
-                      </div>
-                      <div className="text-xs text-grey">{config.description}</div>
-                    </button>
-                  ))}
+                      {isTestingQuery ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                      Test Query
+                    </Button>
+                    {/* Save as Action button hidden for now */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowQueryBuilder(false)}
+                      className="gap-2 text-grey"
+                    >
+                      <X className="h-4 w-4" />
+                      Close
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Query Configuration */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4">
-                <Label className="text-sm font-semibold text-grey mb-3 block">Query Configuration</Label>
-
-                <div className="space-y-4">
-                  {/* Table Selection */}
-                  {queryBuilderOperation !== 'raw' && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">Table *</Label>
-                      <Select value={queryBuilderTable} onValueChange={setQueryBuilderTable}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a table..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tables && tables.length > 0 ? (
-                            tables.filter(table => table?.name).map((table) => (
-                              <SelectItem key={table.name} value={table.name}>
-                                {table.name}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="__no_tables__" disabled>No tables available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Query-specific fields */}
-                  {queryBuilderOperation === 'query' && (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-xs text-grey mb-2 block">Limit</Label>
-                          <Input
-                            type="number"
-                            value={queryBuilderLimit}
-                            onChange={(e) => setQueryBuilderLimit(e.target.value)}
-                            placeholder="25"
-                          />
+                {/* Operation Selection */}
+                <div className="bg-white rounded-lg border border-grey-400 p-4">
+                  <Label className="text-sm font-semibold text-grey mb-3 block">Operation Type</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(DATABASE_OPERATIONS).map(([op, config]) => (
+                      <button
+                        key={op}
+                        onClick={() => setQueryBuilderOperation(op as DatabaseOperation)}
+                        className={cn(
+                          'p-3 rounded-lg border text-left transition-colors',
+                          queryBuilderOperation === op
+                            ? 'border-primary bg-primary/5'
+                            : 'border-grey-400 hover:border-grey-400 hover:bg-grey-50'
+                        )}
+                      >
+                        <div className={cn('text-xs font-semibold uppercase mb-1', config.color.split(' ')[1])}>
+                          {config.label}
                         </div>
-                        <div>
-                          <Label className="text-xs text-grey mb-2 block">Offset</Label>
-                          <Input
-                            type="number"
-                            value={queryBuilderOffset}
-                            onChange={(e) => setQueryBuilderOffset(e.target.value)}
-                            placeholder="0"
-                          />
-                        </div>
+                        <div className="text-xs text-grey">{config.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Query Configuration */}
+                <div className="bg-white rounded-lg border border-grey-400 p-4">
+                  <Label className="text-sm font-semibold text-grey mb-3 block">Query Configuration</Label>
+
+                  <div className="space-y-4">
+                    {/* Table Selection */}
+                    {queryBuilderOperation !== 'raw' && (
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">Table *</Label>
+                        <Select value={queryBuilderTable} onValueChange={setQueryBuilderTable}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a table..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tables && tables.length > 0 ? (
+                              tables.filter(table => table?.name).map((table) => (
+                                <SelectItem key={table.name} value={table.name}>
+                                  {table.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="__no_tables__" disabled>No tables available</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
                       </div>
+                    )}
 
+                    {/* Query-specific fields */}
+                    {queryBuilderOperation === 'query' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs text-grey mb-2 block">Limit</Label>
+                            <Input
+                              type="number"
+                              value={queryBuilderLimit}
+                              onChange={(e) => setQueryBuilderLimit(e.target.value)}
+                              placeholder="25"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-grey mb-2 block">Offset</Label>
+                            <Input
+                              type="number"
+                              value={queryBuilderOffset}
+                              onChange={(e) => setQueryBuilderOffset(e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
+                          {queryBuilderWhere.map((condition, idx) => {
+                            const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
+                            const columnType: ColumnType = selectedColumn?.type || 'string';
+                            const operators = OPERATORS_BY_TYPE[columnType];
+                            const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
+
+                            return (
+                              <div key={idx} className="flex gap-2 mb-2">
+                                {/* Column Dropdown */}
+                                <Select
+                                  value={condition.column}
+                                  onValueChange={(v) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].column = v;
+                                    // Reset operator and value when column changes
+                                    const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
+                                    const newType = newColumn?.type || 'string';
+                                    const newOperators = OPERATORS_BY_TYPE[newType];
+                                    if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
+                                      newWhere[idx].operator = '=';
+                                    }
+                                    newWhere[idx].value = '';
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Select column..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {queryBuilderTableColumns.length > 0 ? (
+                                      queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
+                                        <SelectItem key={col.name} value={col.name}>
+                                          <span className="flex items-center gap-2">
+                                            {col.name}
+                                            <span className="text-xs text-grey-400">({col.type})</span>
+                                          </span>
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+
+                                {/* Operator Dropdown - Dynamic based on column type */}
+                                <Select
+                                  value={condition.operator}
+                                  onValueChange={(v) => {
+                                    const newWhere = [...queryBuilderWhere];
+                                    newWhere[idx].operator = v;
+                                    // Clear value if operator doesn't need one
+                                    if (['IS NULL', 'IS NOT NULL'].includes(v)) {
+                                      newWhere[idx].value = '';
+                                    }
+                                    setQueryBuilderWhere(newWhere);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {operators.map((op) => (
+                                      <SelectItem key={op.value} value={op.value}>
+                                        {op.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                {/* Value Input - Dynamic based on column type */}
+                                {needsValue && (
+                                  columnType === 'boolean' ? (
+                                    <Select
+                                      value={condition.value}
+                                      onValueChange={(v) => {
+                                        const newWhere = [...queryBuilderWhere];
+                                        newWhere[idx].value = v;
+                                        setQueryBuilderWhere(newWhere);
+                                      }}
+                                    >
+                                      <SelectTrigger className="flex-1">
+                                        <SelectValue placeholder="Select value..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="true">true</SelectItem>
+                                        <SelectItem value="false">false</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : columnType === 'number' ? (
+                                    <Input
+                                      type="number"
+                                      value={condition.value}
+                                      onChange={(e) => {
+                                        const newWhere = [...queryBuilderWhere];
+                                        newWhere[idx].value = e.target.value;
+                                        setQueryBuilderWhere(newWhere);
+                                      }}
+                                      placeholder="Enter number..."
+                                      className="flex-1"
+                                    />
+                                  ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                    <Input
+                                      type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                      value={condition.value}
+                                      onChange={(e) => {
+                                        const newWhere = [...queryBuilderWhere];
+                                        newWhere[idx].value = e.target.value;
+                                        setQueryBuilderWhere(newWhere);
+                                      }}
+                                      className="flex-1"
+                                    />
+                                  ) : (
+                                    <Input
+                                      value={condition.value}
+                                      onChange={(e) => {
+                                        const newWhere = [...queryBuilderWhere];
+                                        newWhere[idx].value = e.target.value;
+                                        setQueryBuilderWhere(newWhere);
+                                      }}
+                                      placeholder="Enter value..."
+                                      className="flex-1"
+                                    />
+                                  )
+                                )}
+
+                                {/* Placeholder for alignment when no value needed */}
+                                {!needsValue && <div className="flex-1" />}
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            );
+                          })}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
+                            disabled={!queryBuilderTable}
+                          >
+                            + Add Condition
+                          </Button>
+                          {!queryBuilderTable && queryBuilderWhere.length === 0 && (
+                            <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Insert/Update Data fields */}
+                    {(queryBuilderOperation === 'insert' || queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') && (
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">Data</Label>
+                        {queryBuilderData.map((data, idx) => {
+                          const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === data.column);
+                          const columnType: ColumnType = selectedColumn?.type || 'string';
+
+                          return (
+                            <div key={idx} className="flex gap-2 mb-2">
+                              {/* Column Dropdown */}
+                              <Select
+                                value={data.column}
+                                onValueChange={(v) => {
+                                  const newData = [...queryBuilderData];
+                                  newData[idx].column = v;
+                                  newData[idx].value = '';
+                                  setQueryBuilderData(newData);
+                                }}
+                              >
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder="Select column..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {queryBuilderTableColumns.length > 0 ? (
+                                    queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
+                                      <SelectItem key={col.name} value={col.name}>
+                                        <span className="flex items-center gap-2">
+                                          {col.name}
+                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                        </span>
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Value Input - Dynamic based on column type */}
+                              {columnType === 'boolean' ? (
+                                <Select
+                                  value={data.value}
+                                  onValueChange={(v) => {
+                                    const newData = [...queryBuilderData];
+                                    newData[idx].value = v;
+                                    setQueryBuilderData(newData);
+                                  }}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Select value..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="true">true</SelectItem>
+                                    <SelectItem value="false">false</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : columnType === 'number' ? (
+                                <Input
+                                  type="number"
+                                  value={data.value}
+                                  onChange={(e) => {
+                                    const newData = [...queryBuilderData];
+                                    newData[idx].value = e.target.value;
+                                    setQueryBuilderData(newData);
+                                  }}
+                                  placeholder="Enter number..."
+                                  className="flex-1"
+                                />
+                              ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                <Input
+                                  type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                  value={data.value}
+                                  onChange={(e) => {
+                                    const newData = [...queryBuilderData];
+                                    newData[idx].value = e.target.value;
+                                    setQueryBuilderData(newData);
+                                  }}
+                                  className="flex-1"
+                                />
+                              ) : (
+                                <Input
+                                  value={data.value}
+                                  onChange={(e) => {
+                                    const newData = [...queryBuilderData];
+                                    newData[idx].value = e.target.value;
+                                    setQueryBuilderData(newData);
+                                  }}
+                                  placeholder="Enter value..."
+                                  className="flex-1"
+                                />
+                              )}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setQueryBuilderData(queryBuilderData.filter((_, i) => i !== idx))}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQueryBuilderData([...queryBuilderData, { column: '', value: '' }])}
+                          disabled={!queryBuilderTable}
+                        >
+                          + Add Field
+                        </Button>
+                        {!queryBuilderTable && queryBuilderData.length === 0 && (
+                          <p className="text-xs text-grey-400 mt-1">Select a table first to add fields</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Where conditions for update/delete/upsert */}
+                    {(queryBuilderOperation === 'update' || queryBuilderOperation === 'delete' || queryBuilderOperation === 'upsert') && (
                       <div>
                         <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
                         {queryBuilderWhere.map((condition, idx) => {
@@ -5113,13 +5434,11 @@ const result = await ductape.database.transaction(
 
                           return (
                             <div key={idx} className="flex gap-2 mb-2">
-                              {/* Column Dropdown */}
                               <Select
                                 value={condition.column}
                                 onValueChange={(v) => {
                                   const newWhere = [...queryBuilderWhere];
                                   newWhere[idx].column = v;
-                                  // Reset operator and value when column changes
                                   const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
                                   const newType = newColumn?.type || 'string';
                                   const newOperators = OPERATORS_BY_TYPE[newType];
@@ -5136,26 +5455,24 @@ const result = await ductape.database.transaction(
                                 <SelectContent>
                                   {queryBuilderTableColumns.length > 0 ? (
                                     queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
-                                    <SelectItem key={col.name} value={col.name}>
-                                      <span className="flex items-center gap-2">
-                                        {col.name}
-                                        <span className="text-xs text-grey-400">({col.type})</span>
-                                      </span>
-                                    </SelectItem>
-                                  ))
+                                      <SelectItem key={col.name} value={col.name}>
+                                        <span className="flex items-center gap-2">
+                                          {col.name}
+                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                        </span>
+                                      </SelectItem>
+                                    ))
                                   ) : (
-                                    <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
+                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
                                   )}
                                 </SelectContent>
                               </Select>
 
-                              {/* Operator Dropdown - Dynamic based on column type */}
                               <Select
                                 value={condition.operator}
                                 onValueChange={(v) => {
                                   const newWhere = [...queryBuilderWhere];
                                   newWhere[idx].operator = v;
-                                  // Clear value if operator doesn't need one
                                   if (['IS NULL', 'IS NOT NULL'].includes(v)) {
                                     newWhere[idx].value = '';
                                   }
@@ -5174,7 +5491,6 @@ const result = await ductape.database.transaction(
                                 </SelectContent>
                               </Select>
 
-                              {/* Value Input - Dynamic based on column type */}
                               {needsValue && (
                                 columnType === 'boolean' ? (
                                   <Select
@@ -5230,7 +5546,6 @@ const result = await ductape.database.transaction(
                                 )
                               )}
 
-                              {/* Placeholder for alignment when no value needed */}
                               {!needsValue && <div className="flex-1" />}
 
                               <Button
@@ -5255,537 +5570,269 @@ const result = await ductape.database.transaction(
                           <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
                         )}
                       </div>
-                    </>
-                  )}
+                    )}
 
-                  {/* Insert/Update Data fields */}
-                  {(queryBuilderOperation === 'insert' || queryBuilderOperation === 'update' || queryBuilderOperation === 'upsert') && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">Data</Label>
-                      {queryBuilderData.map((data, idx) => {
-                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === data.column);
-                        const columnType: ColumnType = selectedColumn?.type || 'string';
+                    {/* Aggregation column for sum/avg/min/max */}
+                    {['sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">Column to Aggregate *</Label>
+                        <Select
+                          value={queryBuilderAggColumn}
+                          onValueChange={setQueryBuilderAggColumn}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select column to aggregate..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {queryBuilderTableColumns.length > 0 ? (
+                              queryBuilderTableColumns
+                                .filter((col: any) => col.type === 'number' && col?.name)
+                                .map((col: any) => (
+                                  <SelectItem key={col.name} value={col.name}>
+                                    {col.name}
+                                  </SelectItem>
+                                ))
+                            ) : (
+                              <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
-                        return (
-                          <div key={idx} className="flex gap-2 mb-2">
-                            {/* Column Dropdown */}
-                            <Select
-                              value={data.column}
-                              onValueChange={(v) => {
-                                const newData = [...queryBuilderData];
-                                newData[idx].column = v;
-                                newData[idx].value = '';
-                                setQueryBuilderData(newData);
-                              }}
-                            >
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select column..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {queryBuilderTableColumns.length > 0 ? (
-                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
-                                    <SelectItem key={col.name} value={col.name}>
-                                      <span className="flex items-center gap-2">
-                                        {col.name}
-                                        <span className="text-xs text-grey-400">({col.type})</span>
-                                      </span>
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
-                                )}
-                              </SelectContent>
-                            </Select>
+                    {/* Where conditions for count and aggregation operations */}
+                    {['count', 'sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">Where Conditions (Optional)</Label>
+                        {queryBuilderWhere.map((condition, idx) => {
+                          const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
+                          const columnType: ColumnType = selectedColumn?.type || 'string';
+                          const operators = OPERATORS_BY_TYPE[columnType];
+                          const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
 
-                            {/* Value Input - Dynamic based on column type */}
-                            {columnType === 'boolean' ? (
+                          return (
+                            <div key={idx} className="flex gap-2 mb-2">
                               <Select
-                                value={data.value}
+                                value={condition.column}
                                 onValueChange={(v) => {
-                                  const newData = [...queryBuilderData];
-                                  newData[idx].value = v;
-                                  setQueryBuilderData(newData);
+                                  const newWhere = [...queryBuilderWhere];
+                                  newWhere[idx].column = v;
+                                  const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
+                                  const newType = newColumn?.type || 'string';
+                                  const newOperators = OPERATORS_BY_TYPE[newType];
+                                  if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
+                                    newWhere[idx].operator = '=';
+                                  }
+                                  newWhere[idx].value = '';
+                                  setQueryBuilderWhere(newWhere);
                                 }}
                               >
                                 <SelectTrigger className="flex-1">
-                                  <SelectValue placeholder="Select value..." />
+                                  <SelectValue placeholder="Select column..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="true">true</SelectItem>
-                                  <SelectItem value="false">false</SelectItem>
+                                  {queryBuilderTableColumns.length > 0 ? (
+                                    queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
+                                      <SelectItem key={col.name} value={col.name}>
+                                        <span className="flex items-center gap-2">
+                                          {col.name}
+                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                        </span>
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                  )}
                                 </SelectContent>
                               </Select>
-                            ) : columnType === 'number' ? (
-                              <Input
-                                type="number"
-                                value={data.value}
-                                onChange={(e) => {
-                                  const newData = [...queryBuilderData];
-                                  newData[idx].value = e.target.value;
-                                  setQueryBuilderData(newData);
-                                }}
-                                placeholder="Enter number..."
-                                className="flex-1"
-                              />
-                            ) : (columnType === 'date' || columnType === 'datetime') ? (
-                              <Input
-                                type={columnType === 'date' ? 'date' : 'datetime-local'}
-                                value={data.value}
-                                onChange={(e) => {
-                                  const newData = [...queryBuilderData];
-                                  newData[idx].value = e.target.value;
-                                  setQueryBuilderData(newData);
-                                }}
-                                className="flex-1"
-                              />
-                            ) : (
-                              <Input
-                                value={data.value}
-                                onChange={(e) => {
-                                  const newData = [...queryBuilderData];
-                                  newData[idx].value = e.target.value;
-                                  setQueryBuilderData(newData);
-                                }}
-                                placeholder="Enter value..."
-                                className="flex-1"
-                              />
-                            )}
 
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setQueryBuilderData(queryBuilderData.filter((_, i) => i !== idx))}
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueryBuilderData([...queryBuilderData, { column: '', value: '' }])}
-                        disabled={!queryBuilderTable}
-                      >
-                        + Add Field
-                      </Button>
-                      {!queryBuilderTable && queryBuilderData.length === 0 && (
-                        <p className="text-xs text-grey-400 mt-1">Select a table first to add fields</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Where conditions for update/delete/upsert */}
-                  {(queryBuilderOperation === 'update' || queryBuilderOperation === 'delete' || queryBuilderOperation === 'upsert') && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">Where Conditions</Label>
-                      {queryBuilderWhere.map((condition, idx) => {
-                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
-                        const columnType: ColumnType = selectedColumn?.type || 'string';
-                        const operators = OPERATORS_BY_TYPE[columnType];
-                        const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
-
-                        return (
-                          <div key={idx} className="flex gap-2 mb-2">
-                            <Select
-                              value={condition.column}
-                              onValueChange={(v) => {
-                                const newWhere = [...queryBuilderWhere];
-                                newWhere[idx].column = v;
-                                const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
-                                const newType = newColumn?.type || 'string';
-                                const newOperators = OPERATORS_BY_TYPE[newType];
-                                if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
-                                  newWhere[idx].operator = '=';
-                                }
-                                newWhere[idx].value = '';
-                                setQueryBuilderWhere(newWhere);
-                              }}
-                            >
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select column..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {queryBuilderTableColumns.length > 0 ? (
-                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
-                                    <SelectItem key={col.name} value={col.name}>
-                                      <span className="flex items-center gap-2">
-                                        {col.name}
-                                        <span className="text-xs text-grey-400">({col.type})</span>
-                                      </span>
+                              <Select
+                                value={condition.operator}
+                                onValueChange={(v) => {
+                                  const newWhere = [...queryBuilderWhere];
+                                  newWhere[idx].operator = v;
+                                  if (['IS NULL', 'IS NOT NULL'].includes(v)) {
+                                    newWhere[idx].value = '';
+                                  }
+                                  setQueryBuilderWhere(newWhere);
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {operators.map((op) => (
+                                    <SelectItem key={op.value} value={op.value}>
+                                      {op.label}
                                     </SelectItem>
-                                  ))
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {needsValue && (
+                                columnType === 'boolean' ? (
+                                  <Select
+                                    value={condition.value}
+                                    onValueChange={(v) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = v;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue placeholder="Select value..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="true">true</SelectItem>
+                                      <SelectItem value="false">false</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : columnType === 'number' ? (
+                                  <Input
+                                    type="number"
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    placeholder="Enter number..."
+                                    className="flex-1"
+                                  />
+                                ) : (columnType === 'date' || columnType === 'datetime') ? (
+                                  <Input
+                                    type={columnType === 'date' ? 'date' : 'datetime-local'}
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    className="flex-1"
+                                  />
                                 ) : (
-                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
-                                )}
-                              </SelectContent>
-                            </Select>
+                                  <Input
+                                    value={condition.value}
+                                    onChange={(e) => {
+                                      const newWhere = [...queryBuilderWhere];
+                                      newWhere[idx].value = e.target.value;
+                                      setQueryBuilderWhere(newWhere);
+                                    }}
+                                    placeholder="Enter value..."
+                                    className="flex-1"
+                                  />
+                                )
+                              )}
 
-                            <Select
-                              value={condition.operator}
-                              onValueChange={(v) => {
-                                const newWhere = [...queryBuilderWhere];
-                                newWhere[idx].operator = v;
-                                if (['IS NULL', 'IS NOT NULL'].includes(v)) {
-                                  newWhere[idx].value = '';
-                                }
-                                setQueryBuilderWhere(newWhere);
-                              }}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {operators.map((op) => (
-                                  <SelectItem key={op.value} value={op.value}>
-                                    {op.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {!needsValue && <div className="flex-1" />}
 
-                            {needsValue && (
-                              columnType === 'boolean' ? (
-                                <Select
-                                  value={condition.value}
-                                  onValueChange={(v) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = v;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                >
-                                  <SelectTrigger className="flex-1">
-                                    <SelectValue placeholder="Select value..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="true">true</SelectItem>
-                                    <SelectItem value="false">false</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              ) : columnType === 'number' ? (
-                                <Input
-                                  type="number"
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  placeholder="Enter number..."
-                                  className="flex-1"
-                                />
-                              ) : (columnType === 'date' || columnType === 'datetime') ? (
-                                <Input
-                                  type={columnType === 'date' ? 'date' : 'datetime-local'}
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  className="flex-1"
-                                />
-                              ) : (
-                                <Input
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  placeholder="Enter value..."
-                                  className="flex-1"
-                                />
-                              )
-                            )}
-
-                            {!needsValue && <div className="flex-1" />}
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
-                        disabled={!queryBuilderTable}
-                      >
-                        + Add Condition
-                      </Button>
-                      {!queryBuilderTable && queryBuilderWhere.length === 0 && (
-                        <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Aggregation column for sum/avg/min/max */}
-                  {['sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">Column to Aggregate *</Label>
-                      <Select
-                        value={queryBuilderAggColumn}
-                        onValueChange={setQueryBuilderAggColumn}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select column to aggregate..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {queryBuilderTableColumns.length > 0 ? (
-                            queryBuilderTableColumns
-                              .filter((col: any) => col.type === 'number' && col?.name)
-                              .map((col: any) => (
-                                <SelectItem key={col.name} value={col.name}>
-                                  {col.name}
-                                </SelectItem>
-                              ))
-                          ) : (
-                            <SelectItem value="__select_table__" disabled>Select a table first</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Where conditions for count and aggregation operations */}
-                  {['count', 'sum', 'avg', 'min', 'max'].includes(queryBuilderOperation) && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">Where Conditions (Optional)</Label>
-                      {queryBuilderWhere.map((condition, idx) => {
-                        const selectedColumn = queryBuilderTableColumns.find((c: any) => c.name === condition.column);
-                        const columnType: ColumnType = selectedColumn?.type || 'string';
-                        const operators = OPERATORS_BY_TYPE[columnType];
-                        const needsValue = !['IS NULL', 'IS NOT NULL'].includes(condition.operator);
-
-                        return (
-                          <div key={idx} className="flex gap-2 mb-2">
-                            <Select
-                              value={condition.column}
-                              onValueChange={(v) => {
-                                const newWhere = [...queryBuilderWhere];
-                                newWhere[idx].column = v;
-                                const newColumn = queryBuilderTableColumns.find((c: any) => c.name === v);
-                                const newType = newColumn?.type || 'string';
-                                const newOperators = OPERATORS_BY_TYPE[newType];
-                                if (!newOperators.find(op => op.value === newWhere[idx].operator)) {
-                                  newWhere[idx].operator = '=';
-                                }
-                                newWhere[idx].value = '';
-                                setQueryBuilderWhere(newWhere);
-                              }}
-                            >
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select column..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {queryBuilderTableColumns.length > 0 ? (
-                                  queryBuilderTableColumns.filter((col: any) => col?.name).map((col: any) => (
-                                    <SelectItem key={col.name} value={col.name}>
-                                      <span className="flex items-center gap-2">
-                                        {col.name}
-                                        <span className="text-xs text-grey-400">({col.type})</span>
-                                      </span>
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
-                                )}
-                              </SelectContent>
-                            </Select>
-
-                            <Select
-                              value={condition.operator}
-                              onValueChange={(v) => {
-                                const newWhere = [...queryBuilderWhere];
-                                newWhere[idx].operator = v;
-                                if (['IS NULL', 'IS NOT NULL'].includes(v)) {
-                                  newWhere[idx].value = '';
-                                }
-                                setQueryBuilderWhere(newWhere);
-                              }}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {operators.map((op) => (
-                                  <SelectItem key={op.value} value={op.value}>
-                                    {op.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-
-                            {needsValue && (
-                              columnType === 'boolean' ? (
-                                <Select
-                                  value={condition.value}
-                                  onValueChange={(v) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = v;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                >
-                                  <SelectTrigger className="flex-1">
-                                    <SelectValue placeholder="Select value..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="true">true</SelectItem>
-                                    <SelectItem value="false">false</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              ) : columnType === 'number' ? (
-                                <Input
-                                  type="number"
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  placeholder="Enter number..."
-                                  className="flex-1"
-                                />
-                              ) : (columnType === 'date' || columnType === 'datetime') ? (
-                                <Input
-                                  type={columnType === 'date' ? 'date' : 'datetime-local'}
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  className="flex-1"
-                                />
-                              ) : (
-                                <Input
-                                  value={condition.value}
-                                  onChange={(e) => {
-                                    const newWhere = [...queryBuilderWhere];
-                                    newWhere[idx].value = e.target.value;
-                                    setQueryBuilderWhere(newWhere);
-                                  }}
-                                  placeholder="Enter value..."
-                                  className="flex-1"
-                                />
-                              )
-                            )}
-
-                            {!needsValue && <div className="flex-1" />}
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
-                        disabled={!queryBuilderTable}
-                      >
-                        + Add Condition
-                      </Button>
-                      {!queryBuilderTable && queryBuilderWhere.length === 0 && (
-                        <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Raw SQL */}
-                  {queryBuilderOperation === 'raw' && (
-                    <div>
-                      <Label className="text-xs text-grey mb-2 block">SQL Query *</Label>
-                      <Textarea
-                        value={queryBuilderRawSql}
-                        onChange={(e) => setQueryBuilderRawSql(e.target.value)}
-                        placeholder="SELECT * FROM users WHERE id = $1"
-                        rows={4}
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Generated Query Preview */}
-              {generatedQuery && (
-                <div className="bg-white rounded-lg border border-grey-400 p-4">
-                  <Label className="text-sm font-semibold text-grey mb-3 block">Generated Query</Label>
-                  <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey">
-                    {JSON.stringify(generatedQuery, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {/* Test Results */}
-              {queryTestResult && (
-                <div className={cn(
-                  'rounded-lg border p-4',
-                  queryTestResult.success
-                    ? 'bg-green/5 border-green/20'
-                    : 'bg-red/5 border-red/20'
-                )}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {queryTestResult.success ? (
-                      <Check className="h-4 w-4 text-green" />
-                    ) : (
-                      <X className="h-4 w-4 text-red" />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setQueryBuilderWhere(queryBuilderWhere.filter((_, i) => i !== idx))}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQueryBuilderWhere([...queryBuilderWhere, { column: '', operator: '=', value: '' }])}
+                          disabled={!queryBuilderTable}
+                        >
+                          + Add Condition
+                        </Button>
+                        {!queryBuilderTable && queryBuilderWhere.length === 0 && (
+                          <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                        )}
+                      </div>
                     )}
-                    <span className={cn('text-sm font-medium', queryTestResult.success ? 'text-green' : 'text-red')}>
-                      {queryTestResult.success ? 'Query executed successfully' : 'Query failed'}
-                    </span>
-                  </div>
-                  {queryTestResult.success && (
-                    <div className="text-xs text-grey">
-                      {queryTestResult.rowCount} rows returned in {queryTestResult.executionTime}ms
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Selected Action Details */}
-              {selectedAction && (
-                <div className="bg-white rounded-lg border border-grey-400 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-semibold text-grey">Selected Action: {selectedAction.name}</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenExecuteActionModal(selectedAction)}
-                      className="gap-2"
-                    >
-                      <Play className="h-3 w-3" />
-                      Execute
-                    </Button>
+                    {/* Raw SQL */}
+                    {queryBuilderOperation === 'raw' && (
+                      <div>
+                        <Label className="text-xs text-grey mb-2 block">SQL Query *</Label>
+                        <Textarea
+                          value={queryBuilderRawSql}
+                          onChange={(e) => setQueryBuilderRawSql(e.target.value)}
+                          placeholder="SELECT * FROM users WHERE id = $1"
+                          rows={4}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    )}
                   </div>
-                  {selectedAction.description && (
-                    <p className="text-sm text-grey mb-3">{selectedAction.description}</p>
-                  )}
-                  {selectedAction.parameters.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedAction.parameters.map((param) => (
-                        <span key={param.name} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs">
-                          <Settings2 className="h-3 w-3" />
-                          {`{{${param.name}}}`}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
+
+                {/* Generated Query Preview */}
+                {generatedQuery && (
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <Label className="text-sm font-semibold text-grey mb-3 block">Generated Query</Label>
+                    <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey">
+                      {JSON.stringify(generatedQuery, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Test Results */}
+                {queryTestResult && (
+                  <div className={cn(
+                    'rounded-lg border p-4',
+                    queryTestResult.success
+                      ? 'bg-green/5 border-green/20'
+                      : 'bg-red/5 border-red/20'
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {queryTestResult.success ? (
+                        <Check className="h-4 w-4 text-green" />
+                      ) : (
+                        <X className="h-4 w-4 text-red" />
+                      )}
+                      <span className={cn('text-sm font-medium', queryTestResult.success ? 'text-green' : 'text-red')}>
+                        {queryTestResult.success ? 'Query executed successfully' : 'Query failed'}
+                      </span>
+                    </div>
+                    {queryTestResult.success && (
+                      <div className="text-xs text-grey">
+                        {queryTestResult.rowCount} rows returned in {queryTestResult.executionTime}ms
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Action Details */}
+                {selectedAction && (
+                  <div className="bg-white rounded-lg border border-grey-400 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-sm font-semibold text-grey">Selected Action: {selectedAction.name}</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenExecuteActionModal(selectedAction)}
+                        className="gap-2"
+                      >
+                        <Play className="h-3 w-3" />
+                        Execute
+                      </Button>
+                    </div>
+                    {selectedAction.description && (
+                      <p className="text-sm text-grey mb-3">{selectedAction.description}</p>
+                    )}
+                    {selectedAction.parameters.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedAction.parameters.map((param) => (
+                          <span key={param.name} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+                            <Settings2 className="h-3 w-3" />
+                            {`{{${param.name}}}`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -6082,8 +6129,8 @@ const result = await ductape.database.transaction(
                               {column.type === 'enum' && column.enumValues?.length
                                 ? 'Select a default value from the enum values'
                                 : ['date', 'datetime', 'timestamp'].includes(column.type)
-                                ? 'Use $Now for current timestamp, or enter a specific value'
-                                : 'Enter a default value for this column'}
+                                  ? 'Use $Now for current timestamp, or enter a specific value'
+                                  : 'Enter a default value for this column'}
                             </p>
                           </>
                         )}
@@ -6506,8 +6553,8 @@ const result = await ductape.database.transaction(
                     <Input
                       id={col}
                       type={col.includes('date') || col.includes('time') ? 'datetime-local' :
-                            col.includes('price') || col.includes('amount') ? 'number' :
-                            col.includes('email') ? 'email' : 'text'}
+                        col.includes('price') || col.includes('amount') ? 'number' :
+                          col.includes('email') ? 'email' : 'text'}
                       value={formData[col] || ''}
                       onChange={(e) => setFormData({ ...formData, [col]: e.target.value })}
                       placeholder={`Enter ${col}`}
@@ -6594,8 +6641,8 @@ const result = await ductape.database.transaction(
                     <Input
                       id={`edit-${col}`}
                       type={col.includes('date') || col.includes('time') ? 'datetime-local' :
-                            col.includes('price') || col.includes('amount') ? 'number' :
-                            col.includes('email') ? 'email' : 'text'}
+                        col.includes('price') || col.includes('amount') ? 'number' :
+                          col.includes('email') ? 'email' : 'text'}
                       value={formData[col] || ''}
                       onChange={(e) => setFormData({ ...formData, [col]: e.target.value })}
                       disabled={isImmutableField}
@@ -6928,9 +6975,9 @@ const result = await ductape.database.transaction(
                           <p className="text-sm font-medium">{col}</p>
                           <p className="text-xs text-grey-600">
                             {col.includes('id') ? 'Integer, Primary Key' :
-                             col.includes('name') || col.includes('title') ? 'String' :
-                             col.includes('price') || col.includes('amount') ? 'Decimal' :
-                             col.includes('date') || col.includes('time') ? 'Datetime' : 'String'}
+                              col.includes('name') || col.includes('title') ? 'String' :
+                                col.includes('price') || col.includes('amount') ? 'Decimal' :
+                                  col.includes('date') || col.includes('time') ? 'Datetime' : 'String'}
                           </p>
                         </div>
                       </div>
@@ -7120,11 +7167,10 @@ const result = await ductape.database.transaction(
               {columns.filter(col => col !== 'id').map((col) => (
                 <label
                   key={col}
-                  className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    columnsToDelete.includes(col)
+                  className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${columnsToDelete.includes(col)
                       ? 'border-red-400 bg-red-50'
                       : 'border-grey-300 hover:bg-grey-50'
-                  }`}
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -7136,9 +7182,9 @@ const result = await ductape.database.transaction(
                     <p className="text-sm font-medium">{col}</p>
                     <p className="text-xs text-grey-600">
                       {col.includes('id') ? 'Integer' :
-                       col.includes('name') || col.includes('title') ? 'String' :
-                       col.includes('price') || col.includes('amount') ? 'Decimal' :
-                       col.includes('date') || col.includes('time') ? 'Datetime' : 'String'}
+                        col.includes('name') || col.includes('title') ? 'String' :
+                          col.includes('price') || col.includes('amount') ? 'Decimal' :
+                            col.includes('date') || col.includes('time') ? 'Datetime' : 'String'}
                     </p>
                   </div>
                   <Trash2 className={`h-4 w-4 ${columnsToDelete.includes(col) ? 'text-red-600' : 'text-grey-400'}`} />
@@ -7406,11 +7452,10 @@ const result = await ductape.database.transaction(
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="text-sm font-semibold text-grey">{index.name}</h4>
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                              index.type === 'PRIMARY' ? 'bg-blue-100 text-blue-700' :
-                              index.type === 'UNIQUE' || index.unique ? 'bg-purple-100 text-purple-700' :
-                              'bg-grey-100 text-grey-700'
-                            }`}>
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${index.type === 'PRIMARY' ? 'bg-blue-100 text-blue-700' :
+                                index.type === 'UNIQUE' || index.unique ? 'bg-purple-100 text-purple-700' :
+                                  'bg-grey-100 text-grey-700'
+                              }`}>
                               {index.type || (index.unique ? 'UNIQUE' : 'INDEX')}
                             </span>
                           </div>

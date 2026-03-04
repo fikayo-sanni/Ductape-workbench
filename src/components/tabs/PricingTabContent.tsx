@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Plus,
   Coins,
@@ -26,11 +26,11 @@ import {
   ArrowLeft,
   Check,
 } from 'lucide-react';
-import {useForm} from 'react-hook-form';
-import {zodResolver} from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import {Button} from '@/components/ui/button';
-import {Badge} from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -53,8 +53,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {Input} from '@/components/ui/input';
-import {Label} from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   LineChart,
   Line,
@@ -72,17 +72,17 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import {useMutation, useQueryClient, useQuery} from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
-import {useAuth} from '@/store/useAuth';
+import { useAuth } from '@/store/useAuth';
 import {
   Pricing,
   PricingMode,
   PaymentInterval,
   PricingPlan,
 } from '@/types/pricing';
-import {useWorkbenchStore} from '@/stores/workbench-store';
+import { useWorkbenchStore } from '@/stores/workbench-store';
 import BillingsInfo from '../billing-form';
 
 export type PricingBundle = Pricing;
@@ -185,16 +185,15 @@ const tierPlans = pricingPlans.filter(plan => !plan.bestValue);
 
 const highlightedPlan = pricingPlans.find(plan => plan.bestValue);
 
-const PlanCard = ({plan, onSelect}) => {
+const PlanCard = ({ plan, onSelect }) => {
   return (
     <div
       onClick={onSelect}
       className={`cursor-pointer relative bg-white max-w-[322px] w-auto rounded-lg p-5 transition-all hover:shadow-lg
-      ${
-        plan.current
+      ${plan.current
           ? 'border-2 border-primary'
           : 'border border-grey-400 hover:border-primary'
-      }`}
+        }`}
     >
       <div className="mb-4">
         <div className="flex items-center gap-2">
@@ -273,7 +272,7 @@ const PlanCard = ({plan, onSelect}) => {
   );
 };
 
-const UltimatePlanCard = ({plan, onSelect}) => {
+const UltimatePlanCard = ({ plan, onSelect }) => {
   return (
     <div
       className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 mt-4"
@@ -581,7 +580,7 @@ const DUMMY_EXPENDITURES: Expenditure[] = [
     reference_number: 'USG-2024-001',
     vendor_name: 'DataStream Inc',
     category: ExpenditureCategory.USAGE_BASED,
-    amount: 45.5,
+    amount: 45.50,
     currency: 'USD',
     status: ExpenditureStatus.PAID,
     due_date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
@@ -611,7 +610,7 @@ const DUMMY_EXPENDITURES: Expenditure[] = [
     reference_number: 'USG-2024-003',
     vendor_name: 'API Gateway Pro',
     category: ExpenditureCategory.USAGE_BASED,
-    amount: 124.0,
+    amount: 124.00,
     currency: 'USD',
     status: ExpenditureStatus.OVERDUE,
     due_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
@@ -1044,10 +1043,11 @@ type BundleFormValues = z.infer<typeof bundleFormSchema>;
 type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'GHS' | 'ZAR';
 
 export default function PricingTabContent() {
-  const {currentWorkspaceId, user} = useAuth();
+  const { currentWorkspaceId, user } = useAuth();
+  const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
-  const {billingView, setBillingView} = useWorkbenchStore();
+  const { billingView, setBillingView } = useWorkbenchStore();
   // Monthly drill-down state
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] =
@@ -1110,7 +1110,7 @@ export default function PricingTabContent() {
         per_month?: number;
       };
     }) => {
-      const {_id, user_id, public_key, workspace_id, ...pricingPlan} = data;
+      const { _id, user_id, public_key, workspace_id, ...pricingPlan } = data;
       return pricingServices.editBundles({
         _id,
         user_id,
@@ -1125,7 +1125,7 @@ export default function PricingTabContent() {
       toast.success('Bundle edited successfully');
 
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({queryKey: ['bundles']});
+      queryClient.invalidateQueries({ queryKey: ['bundles'] });
     },
 
     onError: (error: Error) => {
@@ -1143,7 +1143,7 @@ export default function PricingTabContent() {
 
     onSuccess: () => {
       toast.success('Bundle deleted successfully');
-      queryClient.invalidateQueries({queryKey: ['pricingBundles']});
+      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
     },
 
     onError: error => {
@@ -1221,7 +1221,8 @@ export default function PricingTabContent() {
         form.reset();
       }
 
-      queryClient.invalidateQueries({queryKey: ['bundles']});
+      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+
     },
     onError: error => {
       console.error('Error creating bundle:', error);
@@ -1273,7 +1274,7 @@ export default function PricingTabContent() {
         unit_price: bundleData.unit_price,
         currency: bundleData.currency,
         overage_price: bundleData.overage_price || 0,
-        ...(Object.keys(limits).length > 0 && {limits}),
+        ...(Object.keys(limits).length > 0 && { limits }),
       };
 
       // Call edit mutation
@@ -1320,7 +1321,7 @@ export default function PricingTabContent() {
     setBundleFormOpen(true);
   };
 
-  const {data: totalIncomeData, status: isLoadingIncome} = useQuery({
+  const { data: totalIncomeData, status: isLoadingIncome } = useQuery({
     queryKey: ['incomes', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchTotalIncome({
@@ -1331,7 +1332,7 @@ export default function PricingTabContent() {
     enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
   });
 
-  const {data: totalExpenseData, status: isLoadingExpense} = useQuery({
+  const { data: totalExpenseData, status: isLoadingExpense } = useQuery({
     queryKey: ['expenses', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchTotalExpense({
@@ -1347,7 +1348,7 @@ export default function PricingTabContent() {
   // console.log("total expense", {totalExpenseData, isLoadingExpense});
   const expenseData = totalExpenseData?.data;
 
-  const {data: bundleData, isLoading} = useQuery({
+  const { data: bundleData, isLoading } = useQuery({
     queryKey: ['bundles', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchBundles({
@@ -1359,7 +1360,7 @@ export default function PricingTabContent() {
   });
 
   const pricingData = bundleData?.data;
-  console.log('pricing bundles', {pricingData, isLoading});
+  console.log('pricing bundles', { pricingData, isLoading });
 
   const activePricings =
     pricingData?.pricings?.filter(pricing => pricing.is_active) || [];
@@ -1391,6 +1392,16 @@ export default function PricingTabContent() {
     }))
     .sort((a, b) => b.value - a.value); // Sort by subscription count descending
 
+  // Calculate expenditure stats
+  const totalExpenditureAmount = expenditures.reduce((sum, exp) => sum + exp.amount, 0);
+
+
+  // Prepare expenditure category distribution for pie chart
+  const categoryDistribution = expenseData?.categoryBreakdown;
+  const filterDistribution = categoryDistribution?.filter(item => item.amount > 0);
+  const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
+
+
   // Prepare revenue trend data
   const revenueTrendData = incomeRecords.map(record => ({
     month: record.month.split(' ')[0].substring(0, 3),
@@ -1406,7 +1417,7 @@ export default function PricingTabContent() {
   const revenueGrowth =
     previousMonthRevenue > 0
       ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) *
-        100
+      100
       : 0;
 
   const totalRevenue = incomeRecords.reduce(
@@ -1437,7 +1448,7 @@ export default function PricingTabContent() {
                 Manage your pricing bundles, track income and expenses
               </p>
             </div>
-            <Button className="gap-2 my-auto" onClick={handleAddBundle}>
+            <Button className="gap-2 my-auto" onClick={handleAddBundle} disabled>
               <Plus className="h-4 w-4" />
               New Bundle
             </Button>
@@ -1468,7 +1479,8 @@ export default function PricingTabContent() {
 
                     <div className="pt-4">
                       <p className="text-grey text-[32px] font-bold pb-1">
-                        ${expenseData?.totalSpending.toFixed(2)}
+                        $
+                        {expenseData?.totalSpending.toFixed(2)}
                       </p>
                       <p className="text-xs text-primary font-semibold">
                         TOTAL AMOUNT DUE
@@ -1483,19 +1495,28 @@ export default function PricingTabContent() {
 
                 <div className="flex flex-col ml-auto justify-between border-l border-l-[#8F92A1] pl-5 pr-10 border-opacity-[40%] w-1/3">
                   <div className="flex items-center">
-                    <FileText width={24} height={24} className="text-primary" />
+                    <FileText
+                      width={24}
+                      height={24}
+                      className="text-primary"
+                    />
                     <div className="pl-2">
                       <p className="text-grey-700 text-sm font-normal">
                         Current Plan Billing
                       </p>
                       <p className="text-[20px] text-grey font-bold">
-                        $ {(199.0).toFixed(2)}
+                        ${' '}
+                        {199.00.toFixed(2)}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center">
-                    <Clock width={24} height={24} className="text-primary" />
+                    <Clock
+                      width={24}
+                      height={24}
+                      className="text-primary"
+                    />
                     <div className="pl-2">
                       <p className="text-grey-700 text-sm font-normal">
                         Next Billing Date
@@ -1544,18 +1565,13 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-semibold text-grey">
-                        API Requests
-                      </span>
+                      <span className="text-sm font-semibold text-grey">API Requests</span>
                     </div>
                     <span className="text-xs text-grey-600">115% used</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-primary h-2 rounded-full"
-                        style={{width: '100%'}}
-                      ></div>
+                      <div className="bg-primary h-2 rounded-full" style={{ width: '100%' }}></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
@@ -1565,7 +1581,9 @@ export default function PricingTabContent() {
                     <p className="text-xs font-semibold text-primary/80">
                       Overage: +150,000 requests
                     </p>
-                    <p className="text-xs text-primary/60">$7.50 @ $0.05/1K</p>
+                    <p className="text-xs text-primary/60">
+                      $7.50 @ $0.05/1K
+                    </p>
                   </div>
                 </div>
 
@@ -1574,21 +1592,18 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <HardDrive className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-semibold text-grey">
-                        Storage
-                      </span>
+                      <span className="text-sm font-semibold text-grey">Storage</span>
                     </div>
                     <span className="text-xs text-grey-600">108% used</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-[#00875A] h-2 rounded-full"
-                        style={{width: '100%'}}
-                      ></div>
+                      <div className="bg-[#00875A] h-2 rounded-full" style={{ width: '100%' }}></div>
                     </div>
                   </div>
-                  <p className="text-xs text-grey-600 mb-1">108 GB / 100 GB</p>
+                  <p className="text-xs text-grey-600 mb-1">
+                    108 GB / 100 GB
+                  </p>
                   <div className="bg-[#00875A]/  border border-[#00875A]/20 rounded px-2 py-1">
                     <p className="text-xs font-semibold text-[#00875A]/70">
                       Overage: +8 GB
@@ -1604,18 +1619,13 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm font-semibold text-grey">
-                        Users
-                      </span>
+                      <span className="text-sm font-semibold text-grey">Users</span>
                     </div>
                     <span className="text-xs text-grey-600">8 / 20</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '40%'}}
-                      ></div>
+                      <div className="bg-orange-500 h-2 rounded-full" style={{ width: '40%' }}></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
@@ -1631,6 +1641,7 @@ export default function PricingTabContent() {
                   </div>
                 </div>
               </div>
+
             </section>
 
             <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
@@ -1653,11 +1664,8 @@ export default function PricingTabContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(expenseData?.recentExpenses ?? []).map(expenditure => (
-                      <TableRow
-                        key={expenditure.vendor}
-                        className="hover:bg-grey-100 transition-colors"
-                      >
+                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
+                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
                         <TableCell>
                           <span className="font-medium text-grey">
                             {expenditure.reference}
@@ -1727,7 +1735,7 @@ export default function PricingTabContent() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
               </div>
@@ -1844,7 +1852,7 @@ export default function PricingTabContent() {
                               </TableCell>
                               <TableCell>
                                 {bundle.pricing_mode ===
-                                PricingMode.RECURRING ? (
+                                  PricingMode.RECURRING ? (
                                   <div className="text-xs text-grey-700">
                                     <span className="font-mono font-semibold">
                                       $0.05
@@ -1955,7 +1963,7 @@ export default function PricingTabContent() {
                                                   customer.status === 'active'
                                                     ? 'default'
                                                     : customer.status ===
-                                                        'trialing'
+                                                      'trialing'
                                                       ? 'secondary'
                                                       : 'destructive'
                                                 }
@@ -2013,10 +2021,10 @@ export default function PricingTabContent() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis
                     dataKey="name"
-                    tick={{fontSize: 12}}
+                    tick={{ fontSize: 12 }}
                     stroke="#6B7280"
                   />
-                  <YAxis tick={{fontSize: 12}} stroke="#6B7280" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'white',
@@ -2138,10 +2146,10 @@ export default function PricingTabContent() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis
                     dataKey="month"
-                    tick={{fontSize: 12}}
+                    tick={{ fontSize: 12 }}
                     stroke="#6B7280"
                   />
-                  <YAxis tick={{fontSize: 12}} stroke="#6B7280" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'white',
@@ -2389,6 +2397,99 @@ export default function PricingTabContent() {
                 </Table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Expenditure Section */}
+        {billingView === 'expenses' && (
+          <div className="space-y-6">
+            {/* Stats */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
+                    <ShoppingBag className="h-5 w-5 text-red" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-grey">${expenseData?.totalSpending.toLocaleString()}</p>
+                    <p className="text-sm text-grey-600">Total Spending</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-green" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.paid}</p>
+                    <p className="text-sm text-grey-600">Paid</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-yellow/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-yellow" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.pending}</p>
+                    <p className="text-sm text-grey-600">Pending</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-orange/10 flex items-center justify-center">
+                    <XCircle className="h-5 w-5 text-orange" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-grey">{expenseData?.issues}</p>
+                    <p className="text-sm text-grey-600">Issues</p>
+                  </div>
+                </div>
+              </div>
+            </div> */}
+
+            {/* Category Distribution Chart */}
+            {/* <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-grey mb-4">Category Breakdown</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={filterDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    nameKey="category"
+                    label={(props: any) => {
+                      const { category, percentage } = props;
+                      return `${category || ''} ${percentage ? (percentage) : 0}%`;
+                    }}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="amount"
+                  >
+                    {(filterDistribution ?? []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div> */}
+
+            {/* Expenditures Table */}
+
           </div>
         )}
 
@@ -2977,7 +3078,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '100%'}}
+                        style={{ width: '100%' }}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">115% used</p>
@@ -3019,7 +3120,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '100%'}}
+                        style={{ width: '100%' }}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">108% used</p>
@@ -3059,7 +3160,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-green h-2 rounded-full"
-                        style={{width: '40%'}}
+                        style={{ width: '40%' }}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">40% used</p>
@@ -3087,29 +3188,29 @@ export default function PricingTabContent() {
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart
                     data={[
-                      {month: 'Jun', api: 800000, storage: 85, users: 7},
-                      {month: 'Jul', api: 850000, storage: 89, users: 7},
-                      {month: 'Aug', api: 920000, storage: 92, users: 8},
-                      {month: 'Sep', api: 980000, storage: 95, users: 8},
-                      {month: 'Oct', api: 1050000, storage: 102, users: 8},
-                      {month: 'Nov', api: 1150000, storage: 108, users: 8},
+                      { month: 'Jun', api: 800000, storage: 85, users: 7 },
+                      { month: 'Jul', api: 850000, storage: 89, users: 7 },
+                      { month: 'Aug', api: 920000, storage: 92, users: 8 },
+                      { month: 'Sep', api: 980000, storage: 95, users: 8 },
+                      { month: 'Oct', api: 1050000, storage: 102, users: 8 },
+                      { month: 'Nov', api: 1150000, storage: 108, users: 8 },
                     ]}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis
                       dataKey="month"
-                      tick={{fontSize: 12}}
+                      tick={{ fontSize: 12 }}
                       stroke="#6B7280"
                     />
                     <YAxis
                       yAxisId="left"
-                      tick={{fontSize: 12}}
+                      tick={{ fontSize: 12 }}
                       stroke="#6B7280"
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      tick={{fontSize: 12}}
+                      tick={{ fontSize: 12 }}
                       stroke="#6B7280"
                     />
                     <Tooltip
@@ -3221,20 +3322,27 @@ export default function PricingTabContent() {
 
         <Dialog open={planDetailOpen} onOpenChange={setPlanDetailOpen}>
           <DialogContent className="max-w-[1088px] max-h-[90vh] overflow-y-auto">
+
             {selectedPlan && (
+
               <section className="flex flex-col justify-center py-3 w-full pb-10">
                 <button
                   onClick={handleBackToPlans}
                   className="flex items-center gap-2"
                 >
-                  <ArrowLeft width={17} height={12} className="dark:invert" />
+                  <ArrowLeft
+                    width={17}
+                    height={12}
+                    className="dark:invert"
+                  />
                   <p className="text-sm font-semibold text-grey-800 dark:text-grey">
                     Back
                   </p>
                 </button>
                 <DialogHeader>
                   <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
-                    Upgrade Workspace from Starter to {selectedPlan.name}
+                    Upgrade Workspace from Starter to{' '}
+                    {selectedPlan.name}
                   </DialogTitle>
                   <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
                     {selectedPlan.name} plan details
@@ -3244,6 +3352,7 @@ export default function PricingTabContent() {
                 <div className=" mb-10 mt-1 py-5 px-10 bg-white border border-grey-400 rounded-[5px] flex items-start justify-between">
                   <div className=" w-full text-sm flex justify-between items-start">
                     <ul className="space-y-2 my-4 text-base font-medium text-grey">
+
                       <li className="flex gap-2">
                         <div className="flex items-center gap-1">
                           <div>
@@ -3290,14 +3399,10 @@ export default function PricingTabContent() {
                           </div>
                         </li>
                       ))}
+
                     </ul>
                     <div className="space-y-2 my-4">
-                      <p className="font-bold text-[40px] text-grey">
-                        ${selectedPlan.price}
-                        <span className="font-bold text-sm text-grey">
-                          /month
-                        </span>
-                      </p>
+                      <p className="font-bold text-[40px] text-grey">${selectedPlan.price}<span className="font-bold text-sm text-grey">/month</span></p>
                     </div>
                   </div>
                 </div>
@@ -3309,6 +3414,7 @@ export default function PricingTabContent() {
                 </div>
               </section>
             )}
+
           </DialogContent>
         </Dialog>
       </div>

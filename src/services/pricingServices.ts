@@ -54,13 +54,16 @@ const fetchTotalExpense = async (data: {
   user_id: string;
   public_key: string;
   workspace_id: string;
+  start_date?: string;
+  end_date?: string;
 }): Promise<TotalExpenseRecord> => {
-  const { user_id, public_key, workspace_id } = data;
-  const response = await apiClient.get<TotalExpenseRecord>( 
-    `/log/v1/expenses/stats/${workspace_id}`,
-    {
-      params: { public_key, user_id },
-    }
+  const { user_id, public_key, workspace_id, start_date, end_date } = data;
+  const params: Record<string, string> = { public_key, user_id };
+  if (start_date) params.start_date = start_date;
+  if (end_date) params.end_date = end_date;
+  const response = await apiClient.get<TotalExpenseRecord>(
+    `/pricing/v1/expenses/stats/${workspace_id}`,
+    { params }
   );
   return response.data;
 }

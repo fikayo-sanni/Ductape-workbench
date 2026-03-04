@@ -6,6 +6,7 @@ import {
   Globe,
   ChevronRight,
   ChevronDown,
+  Layout,
 } from 'lucide-react';
 
 interface Domain {
@@ -16,9 +17,9 @@ interface Domain {
 }
 
 interface MarketplaceSidebarProps {
-  domains: Domain[];
-  selectedDomain: string;
-  onDomainSelect: (domainId: string) => void;
+  domains: any[];
+  selectedDomain: string | null;
+  onDomainSelect: (id: string | null) => void;
   isMobileOpen: boolean;
   onMobileToggle: () => void;
 }
@@ -71,31 +72,31 @@ export default function MarketplaceSidebar({
             }
           }}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-2 text-left rounded-md transition-colors',
+            'w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl transition-all duration-200 group',
             isSelected
-              ? 'bg-primary text-white'
-              : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+              ? 'bg-primary text-white shadow-lg shadow-primary/20'
+              : 'text-grey-600 hover:bg-grey-100/50 hover:text-primary font-medium'
           )}
-          style={{ paddingLeft: `${12 + level * 16}px` }}
+          style={{ paddingLeft: `${16 + level * 16}px` }}
         >
           {hasChildren ? (
             isExpanded ? (
-              <ChevronDown className="h-4 w-4 flex-shrink-0" />
+              <ChevronDown className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
             ) : (
-              <ChevronRight className="h-4 w-4 flex-shrink-0" />
+              <ChevronRight className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
             )
           ) : (
-            <Globe className="h-4 w-4 flex-shrink-0" />
+            <Globe className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
           )}
-          <span className="truncate">
+          <span className="truncate text-sm tracking-tight">
             {getDomainDisplayName(domain.domain_name)}
           </span>
         </button>
 
         {/* Render children if expanded */}
         {hasChildren && isExpanded && (
-          <div className="mt-1">
-            {getChildDomains(domain._id).map(child => 
+          <div className="mt-2 space-y-1">
+            {getChildDomains(domain._id).map(child =>
               renderDomainItem(child, level + 1)
             )}
           </div>
@@ -109,7 +110,7 @@ export default function MarketplaceSidebar({
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden transition-all"
           onClick={onMobileToggle}
         />
       )}
@@ -117,45 +118,69 @@ export default function MarketplaceSidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          'w-64 bg-white border-r border-grey-400 flex flex-col transition-transform duration-200 z-50',
+          'w-72 bg-white border-r border-grey-400/30 flex flex-col transition-all duration-300 z-50',
           'md:translate-x-0 md:static md:z-auto',
-          isMobileOpen ? 'translate-x-0 fixed inset-y-0 left-0' : '-translate-x-full fixed inset-y-0 left-0'
+          isMobileOpen ? 'translate-x-0 fixed inset-y-0 left-0 shadow-2xl' : '-translate-x-full fixed inset-y-0 left-0'
         )}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-grey-400">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-grey">Categories</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onMobileToggle}
-              className="md:hidden"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* Mobile close button */}
+        <div className="p-4 border-b border-grey-400/30 md:hidden flex justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMobileToggle}
+            className="h-8 w-8 rounded-lg"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-4">
-          <div className="space-y-1">
-            {/* All Applications */}
+        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+          <div className="mb-8">
+            <h3 className="text-[10px] font-bold text-grey-700 uppercase tracking-widest mb-4 px-2">
+              Browse Categories
+            </h3>
+
             <button
-              onClick={() => onDomainSelect('all')}
+              onClick={() => onDomainSelect(null)}
               className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 text-left rounded-md transition-colors',
-                selectedDomain === 'all'
-                  ? 'bg-primary text-white'
-                  : 'text-grey-600 hover:bg-grey-100 hover:text-grey'
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
+                !selectedDomain
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
               )}
             >
-              <Globe className="h-4 w-4 flex-shrink-0" />
-              <span>All Applications</span>
+              <Layout className="h-4 w-4" />
+              All Applications
             </button>
+          </div>
 
-            {/* Domain Categories */}
-            {rootDomains.map(domain => renderDomainItem(domain))}
+          <div className="space-y-1">
+            <div className="h-[1px] bg-grey-400 mx-2 mb-4 opacity-50" />
+
+            {domains.map((domain: any) => (
+              <button
+                key={domain._id}
+                onClick={() => onDomainSelect(domain._id)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all group",
+                  selectedDomain === domain._id
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-grey-600 hover:bg-grey-100 hover:text-grey"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Globe className={cn(
+                    "h-4 w-4 transition-colors",
+                    selectedDomain === domain._id ? "text-white/80" : "text-grey-600 group-hover:text-primary"
+                  )} />
+                  <span className="truncate">{domain.domain_name}</span>
+                </div>
+                {selectedDomain === domain._id && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>

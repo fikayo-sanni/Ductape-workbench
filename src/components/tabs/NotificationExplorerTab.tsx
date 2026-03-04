@@ -56,7 +56,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useSDKProxy } from '@/services/sdkProxy';
 import toast from 'react-hot-toast';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn, getLast7CalendarDays } from '@/lib/utils';
 import {
   fetchNotificationLogs,
   fetchNotificationMessageLogs,
@@ -613,27 +613,17 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
     };
   }, [notificationLogs]);
 
-  // Activity timeline content (7 days normalized) — computed outside JSX to avoid IIFE parse issues
+  // Activity timeline content (last 7 calendar days, 0 for missing) — same as DatabaseExplorerTab / StorageExplorerTab
   const activityTimelineContent = useMemo(() => {
-    const normalized = getLast7DaysNormalized(weeklyStats.dailyTrend, (d) => d.sent ?? 0);
-    const hasAny = normalized.some((d) => d.value > 0);
-    if (!hasAny) {
-      return (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <BarChart3 className="h-12 w-12 text-grey-300 mb-3" />
-          <p className="text-sm text-grey-600 font-medium mb-1">No notification activity data available</p>
-          <p className="text-xs text-grey-500">Activity charts will appear once notifications are sent</p>
-        </div>
-      );
-    }
+    const timeline = getLast7CalendarDays(weeklyStats.dailyTrend, (d) => d.sent ?? 0);
+    const maxSent = Math.max(...timeline.map((d) => d.value), 1);
     return (
       <div className="space-y-3">
-        {normalized.map((day) => {
-          const maxSent = Math.max(...normalized.map((d) => d.value), 1);
+        {timeline.map((day) => {
           const percentage = maxSent > 0 ? (day.value / maxSent) * 100 : 0;
           return (
             <div key={day.date} className="flex items-center gap-3">
-              <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
+              <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
               <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
                 <div
                   className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
@@ -650,7 +640,7 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
         })}
         <div className="pt-4 border-t border-grey-200 flex justify-between text-sm">
           <span className="text-grey-600">Total messages</span>
-          <span className="font-semibold text-grey">{normalized.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
+          <span className="font-semibold text-grey">{timeline.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
         </div>
       </div>
     );
@@ -1132,10 +1122,10 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
               </div>
             </div>
 
-            {/* Activity Timeline (7 Days) - matches DatabaseExplorerTab style */}
+            {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab / StorageExplorerTab */}
             <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
+                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
                 {isLoadingNotificationLogs && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
               </div>
               {isLoadingNotificationLogs ? (

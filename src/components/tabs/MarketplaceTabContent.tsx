@@ -152,7 +152,7 @@ export default function MarketplaceTabContent() {
       <MarketplaceSidebar
         domains={domains}
         selectedDomain={selectedDomain}
-        onDomainSelect={setSelectedDomain}
+        onDomainSelect={(id) => setSelectedDomain(id || 'all')}
         isMobileOpen={isMobileSidebarOpen}
         onMobileToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />

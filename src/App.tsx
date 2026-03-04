@@ -4,10 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import WorkbenchLayout from './components/WorkbenchLayout';
 import LoginModal from './components/LoginModal';
+import MarketplacePublicLayout from './pages/MarketplacePublicLayout';
+import MarketplacePublicIndex from './pages/MarketplacePublicIndex';
+import MarketplacePublicAppPage from './pages/MarketplacePublicAppPage';
+import MarketplacePublicWorkspacePage from './pages/MarketplacePublicWorkspacePage';
 import { useThemeStore } from './stores/theme-store';
 import { useLoginModalStore } from './stores/login-modal-store';
 import { useAuth } from './store/useAuth';
 import { authServices } from './services/authServices';
+import { triggerOnboardingForNewUser } from '@/utils/onboarding';
 import toast from 'react-hot-toast';
 
 // Create a client
@@ -53,6 +58,7 @@ function App() {
           });
           window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
           closeLoginModal();
+          triggerOnboardingForNewUser();
           toast.success('Login successful');
           window.location.reload();
         })
@@ -69,6 +75,11 @@ function App() {
         <Toaster position="top-right" />
         <Routes>
           <Route path="/" element={<WorkbenchLayout />} />
+          <Route path="/marketplace" element={<MarketplacePublicLayout />}>
+            <Route index element={<MarketplacePublicIndex />} />
+            <Route path="app/:appTag" element={<MarketplacePublicAppPage />} />
+            <Route path="workspace/:workspaceTag" element={<MarketplacePublicWorkspacePage />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 

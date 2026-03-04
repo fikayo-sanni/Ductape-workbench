@@ -21,6 +21,9 @@ import {
 import {Button} from '@/components/ui/button';
 import {useState, useEffect} from 'react';
 import { Calendar, CreditCard, Loader } from 'lucide-react';
+import { fetchBillingInfo, saveBillingInfo, validateAndSaveCard } from '@/services/billingServices';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/store/useAuth';
 
 
 export interface addBillingPayload {
@@ -77,51 +80,104 @@ const formSchema = z.object({
   }),
 });
 
+const CARD_TYPES = ['Visa', 'Mastercard', 'Verve', 'AmericanExpress'] as const;
+
 const paymentSchema = z.object({
-  cardNumber: z.string().min(16, "Card number must be 16 digits").max(16, "Card number must be 16 digits").regex(/^\d+$/, "Card number must contain only numbers"),
+  cardNumber: z.string().min(16, "Card number must be 16 digits").max(19).regex(/^\d+$/, "Card number must contain only numbers"),
   expirationDate: z.string().regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "Expiration date must be in MM/YY format"),
   cvv: z.string().min(3, "CVV must be 3 digits").max(4, "CVV must be 3 or 4 digits").regex(/^\d+$/, "CVV must contain only numbers"),
+  cardType: z.enum(CARD_TYPES, { required_error: 'Select card type' }),
 });
 
+
+const emptyBilling = {
+  firstName: '',
+  lastName: '',
+  address: '',
+  addressLine: '',
+  city: '',
+  state: '',
+  postal: '',
+  country: '',
+};
 
 export default function BillingsInfo() {
   const [countryNames, setCountryNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingBilling, setLoadingBilling] = useState(true);
   const [isFormSubmitted, setIsFormSubmitted] = useState(false);
   const [billingDetails, setBillingDetails] = useState<addBillingPayload | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasSavedAddress, setHasSavedAddress] = useState(false);
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: emptyBilling,
+  });
 
+  // Load saved billing address when the form is shown
   useEffect(() => {
     setCountryNames(countryList.sort());
     setLoading(false);
   }, []);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      address: '',
-      addressLine: '',
-      city: '',
-      state: '',
-      postal: '',
-      country: '',
-    },
-  });
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingBilling(true);
+    fetchBillingInfo()
+      .then((info) => {
+        if (cancelled) return;
+        const hasAny = !!(
+          (info.firstName || info.lastName || info.addressLine1 || info.city || info.country)
+        );
+        setHasSavedAddress(hasAny);
+        form.reset({
+          firstName: info.firstName ?? '',
+          lastName: info.lastName ?? '',
+          address: info.addressLine1 ?? '',
+          addressLine: info.addressLine2 ?? '',
+          city: info.city ?? '',
+          state: info.stateProvince ?? '',
+          postal: info.postalZipCode ?? '',
+          country: info.country ?? '',
+        });
+        if (hasAny) {
+          setBillingDetails({
+            firstName: info.firstName ?? '',
+            lastName: info.lastName ?? '',
+            addressLine1: info.addressLine1 ?? '',
+            addressLine2: info.addressLine2 ?? '',
+            city: info.city ?? '',
+            stateProvince: info.stateProvince ?? '',
+            postalZipCode: info.postalZipCode ?? '',
+            country: info.country ?? '',
+          });
+          setIsFormSubmitted(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) form.reset(emptyBilling);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBilling(false);
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const { user } = useAuth();
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
       cardNumber: '',
       expirationDate: '',
       cvv: '',
+      cardType: undefined,
     },
   });
   
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     const payload: addBillingPayload = {
       firstName: values.firstName,
       lastName: values.lastName,
@@ -132,27 +188,51 @@ export default function BillingsInfo() {
       postalZipCode: values.postal,
       country: values.country,
     };
-    
-    setBillingDetails(payload);
-    setIsFormSubmitted(true);
+    try {
+      setLoadingBilling(true);
+      await saveBillingInfo({
+        ...payload,
+        addressLine2: payload.addressLine2 ?? '',
+      });
+      setBillingDetails(payload);
+      setIsFormSubmitted(true);
+      setHasSavedAddress(true);
+      toast.success('Billing address saved. You won’t need to re-enter it next time.');
+    } catch (e) {
+      console.error('Save billing info failed:', e);
+      toast.error('Failed to save billing address. Please try again.');
+    } finally {
+      setLoadingBilling(false);
+    }
   }
 
-  function onPaymentSubmit(values: z.infer<typeof paymentSchema>) {
+  async function onPaymentSubmit(values: z.infer<typeof paymentSchema>) {
+    const email = (user as any)?.email;
+    if (!email) {
+      toast.error('Please log in so we can save your card securely.');
+      return;
+    }
     setIsProcessing(true);
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      console.log("payment details", {
-        ...values,
-        billingDetails
+    try {
+      const [mm, yy] = values.expirationDate.split('/');
+      await validateAndSaveCard({
+        email,
+        card: {
+          number: values.cardNumber.replace(/\s/g, ''),
+          cvv: values.cvv,
+          expiry_month: parseInt(mm!, 10),
+          expiry_year: parseInt(yy!, 10),
+          type: values.cardType,
+        },
       });
-      
-      // Here you would typically make an API call to process the payment
-      alert("Payment processed successfully!");
+      toast.success('Card validated and saved. You can use it for future plan upgrades.');
+      paymentForm.reset({ cardNumber: '', expirationDate: '', cvv: '', cardType: undefined });
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Card validation failed. Check details and try again.';
+      toast.error(msg);
+    } finally {
       setIsProcessing(false);
-      
-      // You can add navigation or additional logic here
-    }, 2000);
+    }
   }
 
 //   const formatCardNumber = (value: string) => {
@@ -187,25 +267,34 @@ export default function BillingsInfo() {
     setIsFormSubmitted(false);
   };
 
+  if (loadingBilling && !billingDetails) {
+    return (
+      <div className="flex items-center justify-center py-8 text-grey-600">
+        <Loader className="h-5 w-5 animate-spin mr-2" />
+        Loading your billing information…
+      </div>
+    );
+  }
+
   return (
-    
         <div>
-            
             {!isFormSubmitted ? (
                 <section className="flex flex-col justify-center rounded-[5px] w-full">
-            <div>
-                <p className="font-bold text-grey text-[20px]">Billing Information</p>
-          <p className="text-sm text-grey">
-            Please confirm your billing details to continue. You only need to do this once.
+            <div className="mb-2">
+                <p className="font-semibold text-grey text-base">Billing Information</p>
+          <p className="text-xs text-grey mt-0.5">
+            {hasSavedAddress
+              ? 'Your saved billing address is shown below. Edit if needed, then continue to payment.'
+              : 'Enter your billing details once; we’ll save them for future plan changes and upgrades.'}
           </p>
           </div>
 
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-8 w-full pb-5"
+              className="space-y-4 w-full pb-3"
             >
-              <div className="flex items-center justify-start mt-5 w-full gap-5">
+              <div className="flex items-center justify-start mt-3 w-full gap-4">
                 <FormField
                   control={form.control}
                   name="firstName"
@@ -217,7 +306,7 @@ export default function BillingsInfo() {
                       <FormControl>
                         <Input
                           {...field}
-                          className="border border-grey-500 rounded w-full min-h-12"
+                          className="border border-grey-500 rounded w-full h-9"
                         />
                       </FormControl>
                       <FormMessage />
@@ -235,7 +324,7 @@ export default function BillingsInfo() {
                       <FormControl>
                         <Input
                           {...field}
-                          className="border border-grey-500 rounded w-full min-h-12"
+                          className="border border-grey-500 rounded w-full h-9"
                         />
                       </FormControl>
                       <FormMessage />
@@ -255,7 +344,7 @@ export default function BillingsInfo() {
                     <FormControl>
                       <Input
                         {...field}
-                        className="border border-grey-500 rounded max-w-full w-full min-h-12"
+                        className="border border-grey-500 rounded max-w-full w-full h-9"
                       />
                     </FormControl>
                     <FormMessage />
@@ -274,7 +363,7 @@ export default function BillingsInfo() {
                     <FormControl>
                       <Input
                         {...field}
-                        className="border border-grey-500 rounded w-full min-h-12"
+                        className="border border-grey-500 rounded w-full h-9"
                       />
                     </FormControl>
                     <FormMessage />
@@ -293,7 +382,7 @@ export default function BillingsInfo() {
                     <FormControl>
                       <Input
                         {...field}
-                        className="border border-grey-500 rounded w-full min-h-12"
+                        className="border border-grey-500 rounded w-full h-9"
                       />
                     </FormControl>
                     <FormMessage />
@@ -312,7 +401,7 @@ export default function BillingsInfo() {
                       defaultValue={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger className="border border-grey-500 rounded w-full min-h-12 text-grey font-semibold text-sm">
+                        <SelectTrigger className="border border-grey-500 rounded w-full h-9 text-grey font-semibold text-sm">
                           <SelectValue placeholder="Country/Region*" />
                         </SelectTrigger>
                       </FormControl>
@@ -339,7 +428,7 @@ export default function BillingsInfo() {
                 )}
               />
 
-              <div className="flex items-center justify-start mt-5 w-full gap-5 pb-10">
+              <div className="flex items-center justify-start mt-3 w-full gap-4 pb-4">
                 <FormField
                   control={form.control}
                   name="state"
@@ -351,7 +440,7 @@ export default function BillingsInfo() {
                       <FormControl>
                         <Input
                           {...field}
-                          className="border border-grey-500 rounded w-full min-h-12"
+                          className="border border-grey-500 rounded w-full h-9"
                         />
                       </FormControl>
                       <FormMessage />
@@ -369,7 +458,7 @@ export default function BillingsInfo() {
                       <FormControl>
                         <Input
                           {...field}
-                          className="border border-grey-500 rounded w-full min-h-12"
+                          className="border border-grey-500 rounded w-full h-9"
                         />
                       </FormControl>
                       <FormMessage />
@@ -380,19 +469,25 @@ export default function BillingsInfo() {
 
               <Button
                 type="submit"
-                className=" w-full min-h-12"
-                
+                className="w-full h-9"
+                disabled={loadingBilling}
               >
-               
-                Save and continue
+                {loadingBilling ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin mr-2" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save and continue'
+                )}
               </Button>
             </form>
           </Form>
           </section>
             ) : (
             <section className="text-grey">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold text-grey">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-base font-semibold text-grey">
                   Billing Information
                 </h2>
                 <Button 
@@ -404,11 +499,11 @@ export default function BillingsInfo() {
             Edit
           </Button>
               </div>
-              <div className="py-4">
-                <p className="text-[18px] font-bold uppercase">
+              <div className="py-2">
+                <p className="text-sm font-semibold uppercase">
                   {billingDetails?.firstName} {billingDetails?.lastName}
                 </p>
-                <div className="text-base font-medium py-2 pb-10 border-b border-grey-400">
+                <div className="text-sm font-medium py-2 pb-4 border-b border-grey-400">
                   <p>
                     {billingDetails?.addressLine1} /{' '}
                     {billingDetails?.addressLine2}
@@ -422,17 +517,41 @@ export default function BillingsInfo() {
               </div>
 
               {isFormSubmitted && (
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <p className="font-bold text-grey text-[20px]">Payment Information</p>
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="font-semibold text-grey text-base">Payment Information</p>
           </div>
-          
+          <p className="text-xs text-grey mb-3">
+            Your card is validated by Paystack before we save it. We never charge without your approval.
+          </p>
 
           <Form {...paymentForm}>
             <form
               onSubmit={paymentForm.handleSubmit(onPaymentSubmit)}
-              className="space-y-6 w-full"
+              className="space-y-4 w-full"
             >
+              <FormField
+                control={paymentForm.control}
+                name="cardType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-grey font-semibold">Card type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="border border-grey-500 rounded h-9">
+                          <SelectValue placeholder="Select card type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CARD_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               {/* Card Number - Full width */}
               <FormField
                 control={paymentForm.control}
@@ -453,7 +572,7 @@ export default function BillingsInfo() {
                           }}
                           value={field.value}
                           placeholder="1234 5678 9012 3456"
-                          className="border border-grey-500 rounded w-full min-h-12 pl-5"
+                          className="border border-grey-500 rounded w-full h-9 pl-5"
                           maxLength={19}
                         />
                       </div>
@@ -478,7 +597,7 @@ export default function BillingsInfo() {
                           <Input
                             {...field}
                             placeholder="MM/YY"
-                            className="border border-grey-500 rounded w-full min-h-12 pl-10"
+                            className="border border-grey-500 rounded w-full h-9 pl-10"
                             maxLength={5}
                             onChange={(e) => {
                               let value = e.target.value.replace(/\D/g, '');
@@ -510,7 +629,7 @@ export default function BillingsInfo() {
                             {...field}
                             type="password"
                             placeholder="cvv"
-                            className="border border-grey-500 rounded w-full min-h-12 pl-5"
+                            className="border border-grey-500 rounded w-full h-9 pl-5"
                             maxLength={4}
                           />
                         </div>
@@ -523,7 +642,7 @@ export default function BillingsInfo() {
 
               <Button
                 type="submit"
-                className="w-full min-h-12 mt-6"
+                className="w-full h-9 mt-4"
                 disabled={isProcessing}
               >
                 {isProcessing ? (
