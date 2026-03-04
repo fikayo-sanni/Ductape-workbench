@@ -4,8 +4,8 @@ import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
-  // Use relative paths for Electron file:// protocol
-  base: './',
+  // Use relative paths for Electron file:// protocol, absolute for web
+  base: process.env.VITE_ELECTRON === 'true' ? './' : '/',
   plugins: [
     react(),
     nodePolyfills({
