@@ -1735,7 +1735,7 @@ export default function PricingTabContent() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    )))}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
