@@ -558,8 +558,13 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     staleTime: 60000, // Cache for 1 minute
   });
 
-  // Sidebar collapsed state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Sidebar collapsed and width state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    persistedState?.isSidebarCollapsed || false
+  );
+  const [sidebarWidth, setSidebarWidth] = useState<number>(
+    persistedState?.sidebarWidth || 256
+  );
 
   // Use SDK data only - no fallback to dummy data
   // SDK returns { labels: [...] }, { types: [...] }, { indexes: [...] }, { constraints: [...] }, { actions: [...] }
@@ -606,10 +611,10 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     const isRelationship = (item: any) => {
       const hasType = typeof item.type === 'string' && item.type.length > 0;
       const hasStartEnd = (item.startNode && item.endNode) ||
-                         (item.start && item.end) ||
-                         (item.source && item.target) ||
-                         (item.startNodeId && item.endNodeId) ||
-                         (item.from && item.to);
+        (item.start && item.end) ||
+        (item.source && item.target) ||
+        (item.startNodeId && item.endNodeId) ||
+        (item.from && item.to);
       const looksLikeRelationship = hasType && !Array.isArray(item.labels);
       return hasType && (hasStartEnd || looksLikeRelationship);
     };
@@ -783,6 +788,8 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   useEffect(() => {
     const stateToSave = {
       sidebarView,
+      isSidebarCollapsed,
+      sidebarWidth,
       queryInput,
       queryResult,
       queryError,
@@ -813,6 +820,8 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   }, [
     stateKey,
     sidebarView,
+    isSidebarCollapsed,
+    sidebarWidth,
     queryInput,
     queryResult,
     queryError,
@@ -871,10 +880,10 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     const isRelationship = (item: any) => {
       const hasType = typeof item.type === 'string' && item.type.length > 0;
       const hasStartEnd = (item.startNode && item.endNode) ||
-                         (item.start && item.end) ||
-                         (item.source && item.target) ||
-                         (item.startNodeId && item.endNodeId) ||
-                         (item.from && item.to);
+        (item.start && item.end) ||
+        (item.source && item.target) ||
+        (item.startNodeId && item.endNodeId) ||
+        (item.from && item.to);
       // Also check if it explicitly has relationship-like structure (has type but no labels)
       const looksLikeRelationship = hasType && !Array.isArray(item.labels);
       return hasType && (hasStartEnd || looksLikeRelationship);
@@ -1040,9 +1049,9 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     const envSlug = env || graph.env.slug;
     const inputParams = selectedAction.parameters.length > 0
       ? selectedAction.parameters.reduce((acc, p) => {
-          acc[p.name] = p.defaultValue;
-          return acc;
-        }, {} as Record<string, any>)
+        acc[p.name] = p.defaultValue;
+        return acc;
+      }, {} as Record<string, any>)
       : {};
 
     const inputString = JSON.stringify(inputParams, null, 4).split('\n').map((line, i) => i === 0 ? line : '    ' + line).join('\n');
@@ -1621,9 +1630,9 @@ await ductape.init();`,
       options
     };
   }, [queryBuilderOperation, queryBuilderLabel, queryBuilderRelType, queryBuilderDirection,
-      queryBuilderWhere, queryBuilderLimit, queryBuilderSkip, queryBuilderOrderBy,
-      queryBuilderMaxDepth, queryBuilderNodeId, queryBuilderFromNode, queryBuilderToNode,
-      queryBuilderProperties, queryBuilderRawQuery, graph.type]);
+    queryBuilderWhere, queryBuilderLimit, queryBuilderSkip, queryBuilderOrderBy,
+    queryBuilderMaxDepth, queryBuilderNodeId, queryBuilderFromNode, queryBuilderToNode,
+    queryBuilderProperties, queryBuilderRawQuery, graph.type]);
 
   // Update generated query when builder state changes
   useEffect(() => {
@@ -2554,13 +2563,40 @@ await ductape.init();`,
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
-      {/* Sidebar */}
-      <div className={cn(
-        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
-        isSidebarCollapsed ? 'w-14' : 'w-64'
-      )}>
-        {/* Header - Fixed */}
+    <div className="h-full flex bg-grey-100 relative">
+      <div
+        className={cn(
+          "bg-white border-r border-grey-300 flex flex-col transition-all duration-300 relative z-10",
+          isSidebarCollapsed ? "w-14" : ""
+        )}
+        style={{ width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px` }}
+      >
+        {!isSidebarCollapsed && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary z-50 transition-colors"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.pageX;
+              const startWidth = sidebarWidth;
+
+              const handleMouseMove = (mouseEvent: MouseEvent) => {
+                const newWidth = Math.max(200, Math.min(600, startWidth + (mouseEvent.pageX - startX)));
+                setSidebarWidth(newWidth);
+              };
+
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+        )}
+        {/* Sidebar Header */}
+        <div className="h-14 border-b border-grey-300 flex items-center justify-between px-4 sticky top-0 bg-white z-10 hidden">
+        </div>
         <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
           <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2 mb-3')}>
             <button
@@ -2677,196 +2713,196 @@ await ductape.init();`,
               </button>
             </div>
           ) : (
-          <>
-          <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-              {sidebarView === 'labels' && `Node Labels (${filteredLabels.length})`}
-              {sidebarView === 'relationships' && `Relationship Types (${filteredRelationships.length})`}
-              {sidebarView === 'actions' && `Saved Actions (${filteredActions.length})`}
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={handleSidebarRefresh}
-                disabled={isSidebarRefreshing}
-                className="text-grey-600 hover:text-primary transition-colors"
-                title="Refresh list"
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
-              </button>
-              {sidebarView === 'labels' && (
-                <button
-                  onClick={() => setShowAddNodeModal(true)}
-                  className="text-grey-600 hover:text-primary transition-colors"
-                  title="Create new node"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {sidebarView === 'relationships' && (
-                <button
-                  onClick={() => setShowAddRelationshipModal(true)}
-                  className="text-grey-600 hover:text-primary transition-colors"
-                  title="Create new relationship"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Loading States */}
-          {(sidebarView === 'labels' && isLoadingLabels) && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-              <span className="ml-2 text-sm text-grey-500">Loading labels...</span>
-            </div>
-          )}
-          {(sidebarView === 'relationships' && isLoadingRelTypes) && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-              <span className="ml-2 text-sm text-grey-500">Loading relationships...</span>
-            </div>
-          )}
-          {(sidebarView === 'actions' && isLoadingActions) && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-              <span className="ml-2 text-sm text-grey-500">Loading actions...</span>
-            </div>
-          )}
-
-          {/* Labels List */}
-          {sidebarView === 'labels' && !isLoadingLabels && (
-            <div className="space-y-1">
-              {filteredLabels.map((label) => (
-                <button
-                  key={label.name}
-                  onClick={() => {
-                    setSelectedLabel(label);
-                    setSelectedRelType(null);
-                    // Execute query and show results in table/graph view
-                    setQueryAndExecute(getFindNodesQuery(label.name));
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
-                    selectedLabel?.name === label.name
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', label.color)}></span>
-                    <span className="truncate">{label.name}</span>
-                  </div>
-                  <span className="text-xs text-grey flex-shrink-0">
-                    {label.count.toLocaleString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Relationships List */}
-          {sidebarView === 'relationships' && !isLoadingRelTypes && (
-            <div className="space-y-1">
-              {filteredRelationships.map((rel) => (
-                <button
-                  key={rel.type}
-                  onClick={() => {
-                    setSelectedRelType(rel);
-                    setSelectedLabel(null);
-                    // Execute query and show results in table/graph view
-                    setQueryAndExecute(getFindRelationshipsQuery(rel.type));
-                  }}
-                  className={cn(
-                    'w-full px-2 py-2 rounded text-sm transition-colors text-left',
-                    selectedRelType?.type === rel.type
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-grey hover:bg-grey-100'
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium truncate">{rel.type}</span>
-                    <span className="text-xs text-grey">{rel.count.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-grey">
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.fromLabels?.join(', ') || '-'}</span>
-                    <ArrowRight className="h-3 w-3" />
-                    <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.toLabels?.join(', ') || '-'}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Actions List */}
-          {sidebarView === 'actions' && !isLoadingActions && (
-            <div className="space-y-1">
-              {filteredActions.length === 0 ? (
-                <div className="px-2 py-4 text-center">
-                  <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
-                  <p className="text-xs text-grey">No saved actions yet</p>
-                  <p className="text-xs text-grey mt-1">
-                    Write a query and click "Save as Action"
-                  </p>
+            <>
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                  {sidebarView === 'labels' && `Node Labels (${filteredLabels.length})`}
+                  {sidebarView === 'relationships' && `Relationship Types (${filteredRelationships.length})`}
+                  {sidebarView === 'actions' && `Saved Actions (${filteredActions.length})`}
                 </div>
-              ) : (
-                filteredActions.map((action) => (
-                  <div
-                    key={action.id}
-                    className={cn(
-                      'px-2 py-2 rounded text-sm transition-colors cursor-pointer',
-                      selectedAction?.id === action.id
-                        ? 'bg-primary/10 border border-primary/20'
-                        : 'hover:bg-grey-100'
-                    )}
-                    onClick={() => handleLoadAction(action)}
+                <div className="flex gap-1">
+                  <button
+                    onClick={handleSidebarRefresh}
+                    disabled={isSidebarRefreshing}
+                    className="text-grey-600 hover:text-primary transition-colors"
+                    title="Refresh list"
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-grey truncate">{action.name}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenExecuteActionModal(action);
-                          }}
-                          className="p-1 text-grey hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                          title="Execute with parameters"
-                        >
-                          <Play className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteAction(action.tag);
-                          }}
-                          className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
-                          title="Delete action"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                        {action.operation}
-                      </span>
-                      {action.parameters.length > 0 && (
-                        <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
-                          {action.parameters.length} param{action.parameters.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                    {action.description && (
-                      <div className="text-xs text-grey mt-1 truncate">
-                        {action.description}
-                      </div>
-                    )}
-                  </div>
-                ))
+                    <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+                  </button>
+                  {sidebarView === 'labels' && (
+                    <button
+                      onClick={() => setShowAddNodeModal(true)}
+                      className="text-grey-600 hover:text-primary transition-colors"
+                      title="Create new node"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {sidebarView === 'relationships' && (
+                    <button
+                      onClick={() => setShowAddRelationshipModal(true)}
+                      className="text-grey-600 hover:text-primary transition-colors"
+                      title="Create new relationship"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Loading States */}
+              {(sidebarView === 'labels' && isLoadingLabels) && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+                  <span className="ml-2 text-sm text-grey-500">Loading labels...</span>
+                </div>
               )}
-            </div>
-          )}
-          </>
+              {(sidebarView === 'relationships' && isLoadingRelTypes) && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+                  <span className="ml-2 text-sm text-grey-500">Loading relationships...</span>
+                </div>
+              )}
+              {(sidebarView === 'actions' && isLoadingActions) && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+                  <span className="ml-2 text-sm text-grey-500">Loading actions...</span>
+                </div>
+              )}
+
+              {/* Labels List */}
+              {sidebarView === 'labels' && !isLoadingLabels && (
+                <div className="space-y-1">
+                  {filteredLabels.map((label) => (
+                    <button
+                      key={label.name}
+                      onClick={() => {
+                        setSelectedLabel(label);
+                        setSelectedRelType(null);
+                        // Execute query and show results in table/graph view
+                        setQueryAndExecute(getFindNodesQuery(label.name));
+                      }}
+                      className={cn(
+                        'w-full flex items-center justify-between px-2 py-2 rounded text-sm transition-colors',
+                        selectedLabel?.name === label.name
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-grey hover:bg-grey-100'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', label.color)}></span>
+                        <span className="truncate">{label.name}</span>
+                      </div>
+                      <span className="text-xs text-grey flex-shrink-0">
+                        {label.count.toLocaleString()}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Relationships List */}
+              {sidebarView === 'relationships' && !isLoadingRelTypes && (
+                <div className="space-y-1">
+                  {filteredRelationships.map((rel) => (
+                    <button
+                      key={rel.type}
+                      onClick={() => {
+                        setSelectedRelType(rel);
+                        setSelectedLabel(null);
+                        // Execute query and show results in table/graph view
+                        setQueryAndExecute(getFindRelationshipsQuery(rel.type));
+                      }}
+                      className={cn(
+                        'w-full px-2 py-2 rounded text-sm transition-colors text-left',
+                        selectedRelType?.type === rel.type
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-grey hover:bg-grey-100'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium truncate">{rel.type}</span>
+                        <span className="text-xs text-grey">{rel.count.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-grey">
+                        <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.fromLabels?.join(', ') || '-'}</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className="px-1.5 py-0.5 bg-grey-100 rounded">{rel.toLabels?.join(', ') || '-'}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Actions List */}
+              {sidebarView === 'actions' && !isLoadingActions && (
+                <div className="space-y-1">
+                  {filteredActions.length === 0 ? (
+                    <div className="px-2 py-4 text-center">
+                      <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
+                      <p className="text-xs text-grey">No saved actions yet</p>
+                      <p className="text-xs text-grey mt-1">
+                        Write a query and click "Save as Action"
+                      </p>
+                    </div>
+                  ) : (
+                    filteredActions.map((action) => (
+                      <div
+                        key={action.id}
+                        className={cn(
+                          'px-2 py-2 rounded text-sm transition-colors cursor-pointer',
+                          selectedAction?.id === action.id
+                            ? 'bg-primary/10 border border-primary/20'
+                            : 'hover:bg-grey-100'
+                        )}
+                        onClick={() => handleLoadAction(action)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-grey truncate">{action.name}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenExecuteActionModal(action);
+                              }}
+                              className="p-1 text-grey hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                              title="Execute with parameters"
+                            >
+                              <Play className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAction(action.tag);
+                              }}
+                              className="p-1 text-grey hover:text-red hover:bg-red/10 rounded transition-colors"
+                              title="Delete action"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                            {action.operation}
+                          </span>
+                          {action.parameters.length > 0 && (
+                            <span className="px-1.5 py-0.5 bg-grey-100 rounded text-xs text-grey">
+                              {action.parameters.length} param{action.parameters.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        {action.description && (
+                          <div className="text-xs text-grey mt-1 truncate">
+                            {action.description}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -2911,7 +2947,7 @@ await ductape.init();`,
                     )}
                     Test Query
                   </Button>
-{/* Save as Action button hidden for now */}
+                  {/* Save as Action button hidden for now */}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -3176,8 +3212,8 @@ await ductape.init();`,
                                     </span>
                                   </SelectItem>
                                 )) || (
-                                  <SelectItem value="" disabled>Select a label first</SelectItem>
-                                )}
+                                    <SelectItem value="" disabled>Select a label first</SelectItem>
+                                  )}
                               </SelectContent>
                             </Select>
 
@@ -3759,135 +3795,135 @@ await ductape.init();`,
 
             {/* Query Editor - Collapsible (Shows below header when not collapsed) */}
             {!isQueryEditorCollapsed && (
-            <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
-              {/* Code Editor Container */}
-              <div className="rounded-lg overflow-hidden border border-grey-300 dark:border-[#2a2a2a] shadow-sm">
-                {/* Editor Header */}
-                <div className="flex items-center justify-between px-4 py-2 bg-grey-100 dark:bg-[#1a1a1a] border-b border-grey-300 dark:border-[#2a2a2a]">
-                  <div className="flex items-center gap-3">
-                    {/* Traffic light dots */}
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                    </div>
-                    <div className="h-4 w-px bg-grey-300 dark:bg-[#3a3a3a]" />
-                    <Label className="text-sm font-semibold text-grey dark:text-grey-200">
-                      Graph Adapter Query
-                    </Label>
-                    <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
-                      {graph.type}
-                    </span>
-                    <span className="text-xs text-grey-500 dark:text-grey-400">
-                      {getQueryLanguageName(graph.type)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setQueryInput(getDefaultQuery())}
-                      className="text-grey hover:text-grey dark:hover:text-white"
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleExecuteQuery()}
-                      disabled={isExecuting}
-                      className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {isExecuting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Running...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4" />
-                          Run
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsQueryEditorCollapsed(true)}
-                      className="gap-1.5 text-grey-500 hover:text-grey"
-                      title="Collapse query editor"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                {/* Editor Body */}
-                <div className="relative">
-                  {/* Line numbers gutter */}
-                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-grey-100 dark:bg-[#1a1a1a] border-r border-grey-300 dark:border-[#2a2a2a] flex flex-col pt-3 text-right pr-3 text-xs text-grey-400 dark:text-grey-600 font-mono select-none pointer-events-none overflow-hidden">
-                    {Array.from({ length: Math.max(10, queryInput.split('\n').length + 2) }, (_, i) => (
-                      <div key={i} style={{ lineHeight: '1.6', height: '1.6em' }}>{i + 1}</div>
-                    ))}
-                  </div>
-                  <textarea
-                    value={queryInput}
-                    onChange={(e) => setQueryInput(e.target.value)}
-                    placeholder={getDefaultQuery()}
-                    spellCheck={false}
-                    className="w-full min-h-[160px] max-h-[500px] pl-14 pr-4 py-3 font-mono text-sm resize-y focus:outline-none bg-white dark:bg-[#0d0d0d] text-black dark:text-[#d4d4d4] placeholder-grey-400 dark:placeholder-grey-600 selection:bg-blue-500/20 dark:selection:bg-blue-500/30 caret-black dark:caret-white"
-                    style={{
-                      lineHeight: '1.6',
-                      tabSize: 2,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Query Statistics Bar - Shows after execution */}
-              {queryResult && (
-                <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-100 dark:bg-[#1a1a1a] rounded-lg border border-grey-300 dark:border-[#2a2a2a]">
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs text-grey">
-                      <span className="font-semibold text-grey">{smartRowCount.count}</span> {smartRowCount.type === 'relationships' ? 'relationships' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
-                      {'nodesIncluded' in smartRowCount && (
-                        <span className="text-grey-400 ml-1">(+{smartRowCount.nodesIncluded} nodes enriched)</span>
-                      )}
-                    </span>
-                    {queryResult.statistics && (
-                      <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-300 border-l border-grey-400 dark:border-grey-600 pl-4">
-                        {queryResult.statistics.nodesCreated > 0 && (
-                          <span><span className="font-medium text-green-600 dark:text-green-400">{queryResult.statistics.nodesCreated}</span> nodes+</span>
-                        )}
-                        {queryResult.statistics.nodesDeleted > 0 && (
-                          <span><span className="font-medium text-red-600 dark:text-red-400">{queryResult.statistics.nodesDeleted}</span> nodes-</span>
-                        )}
-                        {queryResult.statistics.relationshipsCreated > 0 && (
-                          <span><span className="font-medium text-blue-600 dark:text-blue-400">{queryResult.statistics.relationshipsCreated}</span> rels+</span>
-                        )}
-                        {queryResult.statistics.relationshipsDeleted > 0 && (
-                          <span><span className="font-medium text-orange-600 dark:text-orange-400">{queryResult.statistics.relationshipsDeleted}</span> rels-</span>
-                        )}
-                        {queryResult.statistics.propertiesSet > 0 && (
-                          <span><span className="font-medium text-purple-600 dark:text-purple-400">{queryResult.statistics.propertiesSet}</span> props</span>
-                        )}
-                        {queryResult.statistics.labelsAdded > 0 && (
-                          <span><span className="font-medium text-yellow-600 dark:text-yellow-400">{queryResult.statistics.labelsAdded}</span> labels</span>
-                        )}
-                        {Object.values(queryResult.statistics).every((v: any) => v === 0) && (
-                          <span className="text-grey">read-only</span>
-                        )}
+              <div className="flex-shrink-0 bg-white dark:bg-[#0a0a0a] border-b border-grey-400 dark:border-[#1a1a1a] p-4">
+                {/* Code Editor Container */}
+                <div className="rounded-lg overflow-hidden border border-grey-300 dark:border-[#2a2a2a] shadow-sm">
+                  {/* Editor Header */}
+                  <div className="flex items-center justify-between px-4 py-2 bg-grey-100 dark:bg-[#1a1a1a] border-b border-grey-300 dark:border-[#2a2a2a]">
+                    <div className="flex items-center gap-3">
+                      {/* Traffic light dots */}
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                        <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                        <div className="w-3 h-3 rounded-full bg-green-500" />
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {queryResult.columns?.map((col: string) => (
-                      <span key={col} className="px-1.5 py-0.5 bg-white dark:bg-grey-700 border border-grey-300 dark:border-grey-600 rounded font-mono text-grey dark:text-grey-200">
-                        {col}
+                      <div className="h-4 w-px bg-grey-300 dark:bg-[#3a3a3a]" />
+                      <Label className="text-sm font-semibold text-grey dark:text-grey-200">
+                        Graph Adapter Query
+                      </Label>
+                      <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
+                        {graph.type}
                       </span>
-                    ))}
+                      <span className="text-xs text-grey-500 dark:text-grey-400">
+                        {getQueryLanguageName(graph.type)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQueryInput(getDefaultQuery())}
+                        className="text-grey hover:text-grey dark:hover:text-white"
+                      >
+                        Reset
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleExecuteQuery()}
+                        disabled={isExecuting}
+                        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {isExecuting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Run
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsQueryEditorCollapsed(true)}
+                        className="gap-1.5 text-grey-500 hover:text-grey"
+                        title="Collapse query editor"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Editor Body */}
+                  <div className="relative">
+                    {/* Line numbers gutter */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-grey-100 dark:bg-[#1a1a1a] border-r border-grey-300 dark:border-[#2a2a2a] flex flex-col pt-3 text-right pr-3 text-xs text-grey-400 dark:text-grey-600 font-mono select-none pointer-events-none overflow-hidden">
+                      {Array.from({ length: Math.max(10, queryInput.split('\n').length + 2) }, (_, i) => (
+                        <div key={i} style={{ lineHeight: '1.6', height: '1.6em' }}>{i + 1}</div>
+                      ))}
+                    </div>
+                    <textarea
+                      value={queryInput}
+                      onChange={(e) => setQueryInput(e.target.value)}
+                      placeholder={getDefaultQuery()}
+                      spellCheck={false}
+                      className="w-full min-h-[160px] max-h-[500px] pl-14 pr-4 py-3 font-mono text-sm resize-y focus:outline-none bg-white dark:bg-[#0d0d0d] text-black dark:text-[#d4d4d4] placeholder-grey-400 dark:placeholder-grey-600 selection:bg-blue-500/20 dark:selection:bg-blue-500/30 caret-black dark:caret-white"
+                      style={{
+                        lineHeight: '1.6',
+                        tabSize: 2,
+                      }}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
+
+                {/* Query Statistics Bar - Shows after execution */}
+                {queryResult && (
+                  <div className="mt-3 flex items-center justify-between px-3 py-2 bg-grey-100 dark:bg-[#1a1a1a] rounded-lg border border-grey-300 dark:border-[#2a2a2a]">
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-grey">
+                        <span className="font-semibold text-grey">{smartRowCount.count}</span> {smartRowCount.type === 'relationships' ? 'relationships' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
+                        {'nodesIncluded' in smartRowCount && (
+                          <span className="text-grey-400 ml-1">(+{smartRowCount.nodesIncluded} nodes enriched)</span>
+                        )}
+                      </span>
+                      {queryResult.statistics && (
+                        <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-300 border-l border-grey-400 dark:border-grey-600 pl-4">
+                          {queryResult.statistics.nodesCreated > 0 && (
+                            <span><span className="font-medium text-green-600 dark:text-green-400">{queryResult.statistics.nodesCreated}</span> nodes+</span>
+                          )}
+                          {queryResult.statistics.nodesDeleted > 0 && (
+                            <span><span className="font-medium text-red-600 dark:text-red-400">{queryResult.statistics.nodesDeleted}</span> nodes-</span>
+                          )}
+                          {queryResult.statistics.relationshipsCreated > 0 && (
+                            <span><span className="font-medium text-blue-600 dark:text-blue-400">{queryResult.statistics.relationshipsCreated}</span> rels+</span>
+                          )}
+                          {queryResult.statistics.relationshipsDeleted > 0 && (
+                            <span><span className="font-medium text-orange-600 dark:text-orange-400">{queryResult.statistics.relationshipsDeleted}</span> rels-</span>
+                          )}
+                          {queryResult.statistics.propertiesSet > 0 && (
+                            <span><span className="font-medium text-purple-600 dark:text-purple-400">{queryResult.statistics.propertiesSet}</span> props</span>
+                          )}
+                          {queryResult.statistics.labelsAdded > 0 && (
+                            <span><span className="font-medium text-yellow-600 dark:text-yellow-400">{queryResult.statistics.labelsAdded}</span> labels</span>
+                          )}
+                          {Object.values(queryResult.statistics).every((v: any) => v === 0) && (
+                            <span className="text-grey">read-only</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {queryResult.columns?.map((col: string) => (
+                        <span key={col} className="px-1.5 py-0.5 bg-white dark:bg-grey-700 border border-grey-300 dark:border-grey-600 rounded font-mono text-grey dark:text-grey-200">
+                          {col}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Collapsed Query Editor - Compact Bar (when results exist but editor is collapsed) */}
@@ -3958,386 +3994,559 @@ await ductape.init();`,
               )}
 
               {!isExecuting && queryResult && (
-            <div className="h-full flex flex-col">
-              {/* View Toggle Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1 bg-grey-100 p-1 rounded-lg">
-                  <button
-                    onClick={() => setResultsView('table')}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                      resultsView === 'table'
-                        ? 'bg-white text-grey shadow-sm'
-                        : 'text-grey hover:text-grey'
-                    )}
-                  >
-                    <Table2 className="h-3.5 w-3.5" />
-                    Table
-                  </button>
-                  <button
-                    onClick={() => setResultsView('graph')}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                      resultsView === 'graph'
-                        ? 'bg-white text-grey shadow-sm'
-                        : 'text-grey hover:text-grey'
-                    )}
-                  >
-                    <Network className="h-3.5 w-3.5" />
-                    Graph
-                    {graphData.nodes.length > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                        {graphData.nodes.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
+                <div className="h-full flex flex-col">
+                  {/* View Toggle Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1 bg-grey-100 p-1 rounded-lg">
+                      <button
+                        onClick={() => setResultsView('table')}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                          resultsView === 'table'
+                            ? 'bg-white text-grey shadow-sm'
+                            : 'text-grey hover:text-grey'
+                        )}
+                      >
+                        <Table2 className="h-3.5 w-3.5" />
+                        Table
+                      </button>
+                      <button
+                        onClick={() => setResultsView('graph')}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                          resultsView === 'graph'
+                            ? 'bg-white text-grey shadow-sm'
+                            : 'text-grey hover:text-grey'
+                        )}
+                      >
+                        <Network className="h-3.5 w-3.5" />
+                        Graph
+                        {graphData.nodes.length > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                            {graphData.nodes.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
 
-                {resultsView === 'graph' && graphData.nodes.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setGraphZoom(Math.max(0.5, graphZoom - 0.25))}
-                      className="h-7 w-7 p-0"
-                    >
-                      <ZoomOut className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="text-xs text-grey w-12 text-center">{Math.round(graphZoom * 100)}%</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setGraphZoom(Math.min(2, graphZoom + 0.25))}
-                      className="h-7 w-7 p-0"
-                    >
-                      <ZoomIn className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={resetGraphView}
-                      className="h-7 w-7 p-0"
-                      title="Reset view (zoom & pan)"
-                    >
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {resultsView === 'graph' && graphData.nodes.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setGraphZoom(Math.max(0.5, graphZoom - 0.25))}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ZoomOut className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="text-xs text-grey w-12 text-center">{Math.round(graphZoom * 100)}%</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setGraphZoom(Math.min(2, graphZoom + 0.25))}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ZoomIn className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetGraphView}
+                          className="h-7 w-7 p-0"
+                          title="Reset view (zoom & pan)"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Table View */}
-              {resultsView === 'table' && (
-                <div className="bg-white rounded-lg border border-grey-400 overflow-hidden flex-1">
-                  <div className="overflow-x-auto h-full">
-                    {(() => {
-                      // Use memoized table data - server returns paginated data directly
-                      const { allRelationships, allNodes, startIndex } = tableData;
+                  {/* Table View */}
+                  {resultsView === 'table' && (
+                    <div className="bg-white rounded-lg border border-grey-400 overflow-hidden flex-1">
+                      <div className="overflow-x-auto h-full">
+                        {(() => {
+                          // Use memoized table data - server returns paginated data directly
+                          const { allRelationships, allNodes, startIndex } = tableData;
 
-                      // Data is already paginated from server
-                      const relationships = allRelationships;
-                      const nodes = allRelationships.length > 0 ? [] : allNodes;
+                          // Data is already paginated from server
+                          const relationships = allRelationships;
+                          const nodes = allRelationships.length > 0 ? [] : allNodes;
 
-                      // Build node lookup map by ID for quick access
-                      const nodeMap = new Map<string, any>();
-                      allNodes.forEach((node: any) => {
-                        if (node.id) {
-                          nodeMap.set(node.id, node);
-                        }
-                      });
+                          // Build node lookup map by ID for quick access
+                          const nodeMap = new Map<string, any>();
+                          allNodes.forEach((node: any) => {
+                            if (node.id) {
+                              nodeMap.set(node.id, node);
+                            }
+                          });
 
-                      // Determine what to display based on data composition
-                      const hasRelationships = allRelationships.length > 0;
-                      const hasOnlyNodes = allNodes.length > 0 && allRelationships.length === 0;
+                          // Determine what to display based on data composition
+                          const hasRelationships = allRelationships.length > 0;
+                          const hasOnlyNodes = allNodes.length > 0 && allRelationships.length === 0;
 
-                      // If we have relationships, show relationship table (enriched with node data if available)
-                      if (hasRelationships) {
-                        // Get relationship properties
-                        const relProps = Array.from(new Set(relationships.flatMap((r: any) => Object.keys(r.properties || {})))) as string[];
+                          // If we have relationships, show relationship table (enriched with node data if available)
+                          if (hasRelationships) {
+                            // Get relationship properties
+                            const relProps = Array.from(new Set(relationships.flatMap((r: any) => Object.keys(r.properties || {})))) as string[];
 
-                        return (
-                          <div className="flex h-full">
-                            <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
-                              <table className="w-full">
-                                <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
-                                      #
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                      Type
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                      From Node
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                      To Node
-                                    </th>
-                                    {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop) => (
-                                      <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                        {prop}
-                                      </th>
-                                    ))}
-                                    {selectedNode && relProps.length > 2 && (
-                                      <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                        ...
-                                      </th>
-                                    )}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-grey-400">
-                                  {relationships.map((rel: any, idx: number) => {
-                                    // Get the start/end node IDs (handle all naming conventions)
-                                    const startNodeId = rel.startNode || rel.start || rel.source || rel.startNodeId || rel.from;
-                                    const endNodeId = rel.endNode || rel.end || rel.target || rel.endNodeId || rel.to;
-
-                                    // Get enriched node data if available
-                                    const startNode = nodeMap.get(startNodeId);
-                                    const endNode = nodeMap.get(endNodeId);
-
-                                    // Check if this relationship is selected
-                                    const isSelected = selectedNode?.isRelationship && selectedNode?.id === rel.id;
-
-                                    // Helper to render node info
-                                    const renderNodeCell = (nodeId: string, nodeData: any, onClick?: () => void) => {
-                                      if (nodeData) {
-                                        // Show enriched node data with label and key properties
-                                        const displayName = nodeData.properties?.name || nodeData.properties?.title || nodeData.properties?.id || nodeId?.split(':').pop();
-                                        const labels = nodeData.labels || [];
-                                        return (
-                                          <div
-                                            className={cn("space-y-1", onClick && "cursor-pointer hover:bg-grey-100 -m-2 p-2 rounded")}
-                                            onClick={(e) => {
-                                              if (onClick) {
-                                                e.stopPropagation();
-                                                onClick();
-                                              }
-                                            }}
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              {labels.map((label: string) => (
-                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
-                                                  {label}
-                                                </span>
-                                              ))}
-                                            </div>
-                                            <div className="text-sm font-medium text-grey">
-                                              {displayName}
-                                            </div>
-                                            {!selectedNode && nodeData.properties && Object.keys(nodeData.properties).length > 0 && (
-                                              <div className="text-xs text-grey-500 max-w-[200px]">
-                                                {Object.entries(nodeData.properties)
-                                                  .filter(([key]) => !['name', 'title', 'id'].includes(key))
-                                                  .slice(0, 2)
-                                                  .map(([key, val]) => (
-                                                    <span key={key} className="mr-2">
-                                                      <span className="text-grey-400">{key}:</span> {String(val).substring(0, 20)}{String(val).length > 20 ? '...' : ''}
-                                                    </span>
-                                                  ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      }
-                                      // Fallback to just showing the ID
-                                      return (
-                                        <span className="text-sm text-grey font-mono">
-                                          {nodeId?.split(':').pop() || nodeId}
-                                        </span>
-                                      );
-                                    };
-
-                                    return (
-                                      <tr
-                                        key={rel.id || idx}
-                                        className={cn(
-                                          "hover:bg-grey-50 transition-colors cursor-pointer",
-                                          isSelected && "bg-primary/5 hover:bg-primary/10"
-                                        )}
-                                        onClick={() => setSelectedNode(isSelected ? null : {
-                                          ...rel,
-                                          isRelationship: true,
-                                          startNodeData: startNode,
-                                          endNodeData: endNode,
-                                        })}
-                                      >
-                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top">
-                                          {startIndex + idx + 1}
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                          <span className="px-2 py-1 bg-blue/10 text-blue text-xs rounded-full font-medium">
-                                            {rel.type}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                          {renderNodeCell(startNodeId, startNode, startNode ? () => setSelectedNode({
-                                            ...startNode,
-                                            label: startNode.labels?.[0] || 'Node',
-                                            displayName: startNode.properties?.name || startNode.properties?.title || startNode.id
-                                          }) : undefined)}
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                          {renderNodeCell(endNodeId, endNode, endNode ? () => setSelectedNode({
-                                            ...endNode,
-                                            label: endNode.labels?.[0] || 'Node',
-                                            displayName: endNode.properties?.name || endNode.properties?.title || endNode.id
-                                          }) : undefined)}
-                                        </td>
-                                        {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop: string) => (
-                                          <td key={prop} className="px-4 py-3 text-sm text-grey align-top">
-                                            {rel.properties?.[prop] !== undefined ? (
-                                              typeof rel.properties[prop] === 'object'
-                                                ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(rel.properties[prop], null, 2)}</pre>
-                                                : typeof rel.properties[prop] === 'boolean'
-                                                  ? <span className={cn('px-2 py-0.5 rounded text-xs', rel.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(rel.properties[prop])}</span>
-                                                  : String(rel.properties[prop]).substring(0, 30) + (String(rel.properties[prop]).length > 30 ? '...' : '')
-                                            ) : (
-                                              <span className="text-grey-400">—</span>
-                                            )}
-                                          </td>
+                            return (
+                              <div className="flex h-full">
+                                <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
+                                  <table className="w-full">
+                                    <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                                          #
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                          Type
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                          From Node
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                          To Node
+                                        </th>
+                                        {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop) => (
+                                          <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                            {prop}
+                                          </th>
                                         ))}
                                         {selectedNode && relProps.length > 2 && (
-                                          <td className="px-4 py-3 text-sm text-grey-400 align-top">
-                                            +{relProps.length - 2} more
-                                          </td>
+                                          <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                            ...
+                                          </th>
                                         )}
                                       </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-grey-400">
+                                      {relationships.map((rel: any, idx: number) => {
+                                        // Get the start/end node IDs (handle all naming conventions)
+                                        const startNodeId = rel.startNode || rel.start || rel.source || rel.startNodeId || rel.from;
+                                        const endNodeId = rel.endNode || rel.end || rel.target || rel.endNodeId || rel.to;
 
-                            {/* Details Sidebar for Relationships */}
-                            {selectedNode && (
-                              <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
-                                <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
-                                      <Eye className="h-4 w-4" />
-                                      {selectedNode.isRelationship ? 'Relationship Details' : 'Node Details'}
-                                    </h4>
-                                    <button
-                                      onClick={() => setSelectedNode(null)}
-                                      className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
+                                        // Get enriched node data if available
+                                        const startNode = nodeMap.get(startNodeId);
+                                        const endNode = nodeMap.get(endNodeId);
 
-                                <div className="p-4 space-y-4">
-                                  {selectedNode.isRelationship ? (
-                                    <>
-                                      {/* Relationship Type */}
-                                      <div>
-                                        <div className="text-xs font-medium text-grey mb-2">Relationship Type</div>
-                                        <span className="px-3 py-1.5 bg-blue/10 text-blue text-sm rounded font-medium">
-                                          {selectedNode.type}
-                                        </span>
-                                      </div>
+                                        // Check if this relationship is selected
+                                        const isSelected = selectedNode?.isRelationship && selectedNode?.id === rel.id;
 
-                                      {/* Relationship ID */}
-                                      <div>
-                                        <div className="text-xs font-medium text-grey mb-2">Relationship ID</div>
-                                        <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
-                                          {selectedNode.id}
-                                        </div>
-                                      </div>
-
-                                      {/* Start Node */}
-                                      {selectedNode.startNodeData && (
-                                        <div>
-                                          <div className="text-xs font-medium text-grey mb-2">From Node</div>
-                                          <div
-                                            className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
-                                            onClick={() => setSelectedNode({
-                                              ...selectedNode.startNodeData,
-                                              label: selectedNode.startNodeData.labels?.[0] || 'Node',
-                                              displayName: selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id
-                                            })}
-                                          >
-                                            <div className="flex flex-wrap gap-1 mb-1">
-                                              {selectedNode.startNodeData.labels?.map((label: string) => (
-                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
-                                                  :{label}
-                                                </span>
-                                              ))}
-                                            </div>
-                                            <div className="text-sm font-medium text-grey">
-                                              {selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id}
-                                            </div>
-                                            <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* End Node */}
-                                      {selectedNode.endNodeData && (
-                                        <div>
-                                          <div className="text-xs font-medium text-grey mb-2">To Node</div>
-                                          <div
-                                            className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
-                                            onClick={() => setSelectedNode({
-                                              ...selectedNode.endNodeData,
-                                              label: selectedNode.endNodeData.labels?.[0] || 'Node',
-                                              displayName: selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id
-                                            })}
-                                          >
-                                            <div className="flex flex-wrap gap-1 mb-1">
-                                              {selectedNode.endNodeData.labels?.map((label: string) => (
-                                                <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
-                                                  :{label}
-                                                </span>
-                                              ))}
-                                            </div>
-                                            <div className="text-sm font-medium text-grey">
-                                              {selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id}
-                                            </div>
-                                            <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Relationship Properties */}
-                                      <div>
-                                        <div className="text-xs font-medium text-grey mb-2">
-                                          Properties ({Object.keys(selectedNode.properties || {}).length})
-                                        </div>
-                                        <div className="space-y-2">
-                                          {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
-                                            <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
-                                              <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
-                                                <span className="text-xs font-medium text-grey">{key}</span>
-                                              </div>
-                                              <div className="px-3 py-2">
-                                                {typeof value === 'object' ? (
-                                                  <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
-                                                    {JSON.stringify(value, null, 2)}
-                                                  </pre>
-                                                ) : typeof value === 'boolean' ? (
-                                                  <span className={cn(
-                                                    'px-2 py-0.5 rounded text-xs font-medium',
-                                                    value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
-                                                  )}>
-                                                    {String(value)}
-                                                  </span>
-                                                ) : (
-                                                  <span className="text-sm text-grey break-all">
-                                                    {String(value)}
-                                                  </span>
+                                        // Helper to render node info
+                                        const renderNodeCell = (nodeId: string, nodeData: any, onClick?: () => void) => {
+                                          if (nodeData) {
+                                            // Show enriched node data with label and key properties
+                                            const displayName = nodeData.properties?.name || nodeData.properties?.title || nodeData.properties?.id || nodeId?.split(':').pop();
+                                            const labels = nodeData.labels || [];
+                                            return (
+                                              <div
+                                                className={cn("space-y-1", onClick && "cursor-pointer hover:bg-grey-100 -m-2 p-2 rounded")}
+                                                onClick={(e) => {
+                                                  if (onClick) {
+                                                    e.stopPropagation();
+                                                    onClick();
+                                                  }
+                                                }}
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  {labels.map((label: string) => (
+                                                    <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                      {label}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                                <div className="text-sm font-medium text-grey">
+                                                  {displayName}
+                                                </div>
+                                                {!selectedNode && nodeData.properties && Object.keys(nodeData.properties).length > 0 && (
+                                                  <div className="text-xs text-grey-500 max-w-[200px]">
+                                                    {Object.entries(nodeData.properties)
+                                                      .filter(([key]) => !['name', 'title', 'id'].includes(key))
+                                                      .slice(0, 2)
+                                                      .map(([key, val]) => (
+                                                        <span key={key} className="mr-2">
+                                                          <span className="text-grey-400">{key}:</span> {String(val).substring(0, 20)}{String(val).length > 20 ? '...' : ''}
+                                                        </span>
+                                                      ))}
+                                                  </div>
                                                 )}
                                               </div>
-                                            </div>
-                                          ))}
-                                          {Object.keys(selectedNode.properties || {}).length === 0 && (
-                                            <div className="text-xs text-grey-400 italic">No properties</div>
-                                          )}
-                                        </div>
+                                            );
+                                          }
+                                          // Fallback to just showing the ID
+                                          return (
+                                            <span className="text-sm text-grey font-mono">
+                                              {nodeId?.split(':').pop() || nodeId}
+                                            </span>
+                                          );
+                                        };
+
+                                        return (
+                                          <tr
+                                            key={rel.id || idx}
+                                            className={cn(
+                                              "hover:bg-grey-50 transition-colors cursor-pointer",
+                                              isSelected && "bg-primary/5 hover:bg-primary/10"
+                                            )}
+                                            onClick={() => setSelectedNode(isSelected ? null : {
+                                              ...rel,
+                                              isRelationship: true,
+                                              startNodeData: startNode,
+                                              endNodeData: endNode,
+                                            })}
+                                          >
+                                            <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                              {startIndex + idx + 1}
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                              <span className="px-2 py-1 bg-blue/10 text-blue text-xs rounded-full font-medium">
+                                                {rel.type}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                              {renderNodeCell(startNodeId, startNode, startNode ? () => setSelectedNode({
+                                                ...startNode,
+                                                label: startNode.labels?.[0] || 'Node',
+                                                displayName: startNode.properties?.name || startNode.properties?.title || startNode.id
+                                              }) : undefined)}
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                              {renderNodeCell(endNodeId, endNode, endNode ? () => setSelectedNode({
+                                                ...endNode,
+                                                label: endNode.labels?.[0] || 'Node',
+                                                displayName: endNode.properties?.name || endNode.properties?.title || endNode.id
+                                              }) : undefined)}
+                                            </td>
+                                            {relProps.slice(0, selectedNode ? 2 : relProps.length).map((prop: string) => (
+                                              <td key={prop} className="px-4 py-3 text-sm text-grey align-top">
+                                                {rel.properties?.[prop] !== undefined ? (
+                                                  typeof rel.properties[prop] === 'object'
+                                                    ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(rel.properties[prop], null, 2)}</pre>
+                                                    : typeof rel.properties[prop] === 'boolean'
+                                                      ? <span className={cn('px-2 py-0.5 rounded text-xs', rel.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(rel.properties[prop])}</span>
+                                                      : String(rel.properties[prop]).substring(0, 30) + (String(rel.properties[prop]).length > 30 ? '...' : '')
+                                                ) : (
+                                                  <span className="text-grey-400">—</span>
+                                                )}
+                                              </td>
+                                            ))}
+                                            {selectedNode && relProps.length > 2 && (
+                                              <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                                +{relProps.length - 2} more
+                                              </td>
+                                            )}
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+
+                                {/* Details Sidebar for Relationships */}
+                                {selectedNode && (
+                                  <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
+                                    <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
+                                          <Eye className="h-4 w-4" />
+                                          {selectedNode.isRelationship ? 'Relationship Details' : 'Node Details'}
+                                        </h4>
+                                        <button
+                                          onClick={() => setSelectedNode(null)}
+                                          className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
                                       </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      {/* Node Labels */}
+                                    </div>
+
+                                    <div className="p-4 space-y-4">
+                                      {selectedNode.isRelationship ? (
+                                        <>
+                                          {/* Relationship Type */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">Relationship Type</div>
+                                            <span className="px-3 py-1.5 bg-blue/10 text-blue text-sm rounded font-medium">
+                                              {selectedNode.type}
+                                            </span>
+                                          </div>
+
+                                          {/* Relationship ID */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">Relationship ID</div>
+                                            <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
+                                              {selectedNode.id}
+                                            </div>
+                                          </div>
+
+                                          {/* Start Node */}
+                                          {selectedNode.startNodeData && (
+                                            <div>
+                                              <div className="text-xs font-medium text-grey mb-2">From Node</div>
+                                              <div
+                                                className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
+                                                onClick={() => setSelectedNode({
+                                                  ...selectedNode.startNodeData,
+                                                  label: selectedNode.startNodeData.labels?.[0] || 'Node',
+                                                  displayName: selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id
+                                                })}
+                                              >
+                                                <div className="flex flex-wrap gap-1 mb-1">
+                                                  {selectedNode.startNodeData.labels?.map((label: string) => (
+                                                    <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                      :{label}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                                <div className="text-sm font-medium text-grey">
+                                                  {selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id}
+                                                </div>
+                                                <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* End Node */}
+                                          {selectedNode.endNodeData && (
+                                            <div>
+                                              <div className="text-xs font-medium text-grey mb-2">To Node</div>
+                                              <div
+                                                className="bg-white rounded border border-grey-400 p-3 cursor-pointer hover:border-primary transition-colors"
+                                                onClick={() => setSelectedNode({
+                                                  ...selectedNode.endNodeData,
+                                                  label: selectedNode.endNodeData.labels?.[0] || 'Node',
+                                                  displayName: selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id
+                                                })}
+                                              >
+                                                <div className="flex flex-wrap gap-1 mb-1">
+                                                  {selectedNode.endNodeData.labels?.map((label: string) => (
+                                                    <span key={label} className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-medium">
+                                                      :{label}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                                <div className="text-sm font-medium text-grey">
+                                                  {selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id}
+                                                </div>
+                                                <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Relationship Properties */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">
+                                              Properties ({Object.keys(selectedNode.properties || {}).length})
+                                            </div>
+                                            <div className="space-y-2">
+                                              {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                                <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
+                                                  <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
+                                                    <span className="text-xs font-medium text-grey">{key}</span>
+                                                  </div>
+                                                  <div className="px-3 py-2">
+                                                    {typeof value === 'object' ? (
+                                                      <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
+                                                        {JSON.stringify(value, null, 2)}
+                                                      </pre>
+                                                    ) : typeof value === 'boolean' ? (
+                                                      <span className={cn(
+                                                        'px-2 py-0.5 rounded text-xs font-medium',
+                                                        value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
+                                                      )}>
+                                                        {String(value)}
+                                                      </span>
+                                                    ) : (
+                                                      <span className="text-sm text-grey break-all">
+                                                        {String(value)}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                              {Object.keys(selectedNode.properties || {}).length === 0 && (
+                                                <div className="text-xs text-grey-400 italic">No properties</div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {/* Node Labels */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">Labels</div>
+                                            <div className="flex flex-wrap gap-1">
+                                              {selectedNode.labels?.map((label: string) => (
+                                                <span
+                                                  key={label}
+                                                  className="px-2 py-1 bg-blue/10 text-blue text-xs rounded font-medium"
+                                                >
+                                                  :{label}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+
+                                          {/* Node ID */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">Node ID</div>
+                                            <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
+                                              {selectedNode.id}
+                                            </div>
+                                          </div>
+
+                                          {/* Node Properties */}
+                                          <div>
+                                            <div className="text-xs font-medium text-grey mb-2">
+                                              Properties ({Object.keys(selectedNode.properties || {}).length})
+                                            </div>
+                                            <div className="space-y-2">
+                                              {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                                <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
+                                                  <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
+                                                    <span className="text-xs font-medium text-grey">{key}</span>
+                                                  </div>
+                                                  <div className="px-3 py-2">
+                                                    {typeof value === 'object' ? (
+                                                      <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
+                                                        {JSON.stringify(value, null, 2)}
+                                                      </pre>
+                                                    ) : typeof value === 'boolean' ? (
+                                                      <span className={cn(
+                                                        'px-2 py-0.5 rounded text-xs font-medium',
+                                                        value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
+                                                      )}>
+                                                        {String(value)}
+                                                      </span>
+                                                    ) : (
+                                                      <span className="text-sm text-grey break-all">
+                                                        {String(value)}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                              {Object.keys(selectedNode.properties || {}).length === 0 && (
+                                                <div className="text-xs text-grey-400 italic">No properties</div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // For nodes only, show node table
+                          if (hasOnlyNodes) {
+                            const nodeProps = Array.from(new Set(nodes.flatMap((n: any) => Object.keys(n.properties || {})))) as string[];
+                            return (
+                              <div className="flex h-full">
+                                <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
+                                  <table className="w-full">
+                                    <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                                          #
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                          ID
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                          Labels
+                                        </th>
+                                        {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop) => (
+                                          <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                            {prop}
+                                          </th>
+                                        ))}
+                                        {selectedNode && nodeProps.length > 3 && (
+                                          <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                            ...
+                                          </th>
+                                        )}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-grey-400">
+                                      {nodes.map((node: any, idx: number) => {
+                                        const isSelected = selectedNode?.id === node.id;
+                                        return (
+                                          <tr
+                                            key={node.id || idx}
+                                            className={cn(
+                                              "hover:bg-grey-50 transition-colors cursor-pointer",
+                                              isSelected && "bg-primary/5 hover:bg-primary/10"
+                                            )}
+                                            onClick={() => setSelectedNode(isSelected ? null : {
+                                              ...node,
+                                              label: node.labels?.[0] || 'Node',
+                                              displayName: node.properties?.name || node.properties?.title || node.id
+                                            })}
+                                          >
+                                            <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                              {startIndex + idx + 1}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-grey font-mono align-top max-w-[200px] truncate" title={node.id}>
+                                              {node.id?.split(':').pop() || node.id}
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                              <div className="flex flex-wrap gap-1">
+                                                {node.labels?.map((label: string) => (
+                                                  <span key={label} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                                                    {label}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </td>
+                                            {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop: string) => (
+                                              <td key={prop} className="px-4 py-3 text-sm text-grey align-top max-w-[300px]">
+                                                {node.properties?.[prop] !== undefined ? (
+                                                  typeof node.properties[prop] === 'object'
+                                                    ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(node.properties[prop], null, 2)}</pre>
+                                                    : typeof node.properties[prop] === 'boolean'
+                                                      ? <span className={cn('px-2 py-0.5 rounded text-xs', node.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(node.properties[prop])}</span>
+                                                      : String(node.properties[prop]).substring(0, 50) + (String(node.properties[prop]).length > 50 ? '...' : '')
+                                                ) : (
+                                                  <span className="text-grey-400">—</span>
+                                                )}
+                                              </td>
+                                            ))}
+                                            {selectedNode && nodeProps.length > 3 && (
+                                              <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                                +{nodeProps.length - 3} more
+                                              </td>
+                                            )}
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+
+                                {/* Node Details Sidebar */}
+                                {selectedNode && (
+                                  <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
+                                    <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
+                                          <Eye className="h-4 w-4" />
+                                          Node Details
+                                        </h4>
+                                        <button
+                                          onClick={() => setSelectedNode(null)}
+                                          className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="p-4 space-y-4">
+                                      {/* Labels */}
                                       <div>
                                         <div className="text-xs font-medium text-grey mb-2">Labels</div>
                                         <div className="flex flex-wrap gap-1">
@@ -4360,7 +4569,7 @@ await ductape.init();`,
                                         </div>
                                       </div>
 
-                                      {/* Node Properties */}
+                                      {/* Properties */}
                                       <div>
                                         <div className="text-xs font-medium text-grey mb-2">
                                           Properties ({Object.keys(selectedNode.properties || {}).length})
@@ -4396,501 +4605,328 @@ await ductape.init();`,
                                           )}
                                         </div>
                                       </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      // For nodes only, show node table
-                      if (hasOnlyNodes) {
-                        const nodeProps = Array.from(new Set(nodes.flatMap((n: any) => Object.keys(n.properties || {})))) as string[];
-                        return (
-                          <div className="flex h-full">
-                            <div className={cn("overflow-x-auto", selectedNode ? "flex-1" : "w-full")}>
-                              <table className="w-full">
-                                <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
-                                      #
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                      ID
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                      Labels
-                                    </th>
-                                    {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop) => (
-                                      <th key={prop} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                        {prop}
-                                      </th>
-                                    ))}
-                                    {selectedNode && nodeProps.length > 3 && (
-                                      <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                        ...
-                                      </th>
-                                    )}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-grey-400">
-                                  {nodes.map((node: any, idx: number) => {
-                                    const isSelected = selectedNode?.id === node.id;
-                                    return (
-                                      <tr
-                                        key={node.id || idx}
-                                        className={cn(
-                                          "hover:bg-grey-50 transition-colors cursor-pointer",
-                                          isSelected && "bg-primary/5 hover:bg-primary/10"
-                                        )}
-                                        onClick={() => setSelectedNode(isSelected ? null : {
-                                          ...node,
-                                          label: node.labels?.[0] || 'Node',
-                                          displayName: node.properties?.name || node.properties?.title || node.id
-                                        })}
-                                      >
-                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top">
-                                          {startIndex + idx + 1}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-grey font-mono align-top max-w-[200px] truncate" title={node.id}>
-                                          {node.id?.split(':').pop() || node.id}
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                          <div className="flex flex-wrap gap-1">
-                                            {node.labels?.map((label: string) => (
-                                              <span key={label} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                                                {label}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </td>
-                                        {nodeProps.slice(0, selectedNode ? 3 : nodeProps.length).map((prop: string) => (
-                                          <td key={prop} className="px-4 py-3 text-sm text-grey align-top max-w-[300px]">
-                                            {node.properties?.[prop] !== undefined ? (
-                                              typeof node.properties[prop] === 'object'
-                                                ? <pre className="text-xs bg-grey-50 p-1 rounded overflow-auto max-h-20">{JSON.stringify(node.properties[prop], null, 2)}</pre>
-                                                : typeof node.properties[prop] === 'boolean'
-                                                  ? <span className={cn('px-2 py-0.5 rounded text-xs', node.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(node.properties[prop])}</span>
-                                                  : String(node.properties[prop]).substring(0, 50) + (String(node.properties[prop]).length > 50 ? '...' : '')
-                                            ) : (
-                                              <span className="text-grey-400">—</span>
-                                            )}
-                                          </td>
-                                        ))}
-                                        {selectedNode && nodeProps.length > 3 && (
-                                          <td className="px-4 py-3 text-sm text-grey-400 align-top">
-                                            +{nodeProps.length - 3} more
-                                          </td>
-                                        )}
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* Node Details Sidebar */}
-                            {selectedNode && (
-                              <div className="w-80 border-l border-grey-400 bg-grey-50 overflow-y-auto flex-shrink-0">
-                                <div className="sticky top-0 bg-grey-50 border-b border-grey-400 p-4">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold text-grey flex items-center gap-2">
-                                      <Eye className="h-4 w-4" />
-                                      Node Details
-                                    </h4>
-                                    <button
-                                      onClick={() => setSelectedNode(null)}
-                                      className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
+                              </div>
+                            );
+                          }
 
-                                <div className="p-4 space-y-4">
-                                  {/* Labels */}
-                                  <div>
-                                    <div className="text-xs font-medium text-grey mb-2">Labels</div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {selectedNode.labels?.map((label: string) => (
-                                        <span
-                                          key={label}
-                                          className="px-2 py-1 bg-blue/10 text-blue text-xs rounded font-medium"
-                                        >
-                                          :{label}
+                          // Fallback for column-based format or raw data
+                          return null;
+                        })() || (queryResult.columns?.length > 0 ? (
+                          // Column-based format (original format)
+                          <table className="w-full">
+                            <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
+                                  #
+                                </th>
+                                {queryResult.columns.map((col: string) => (
+                                  <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
+                                    {col}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-grey-400">
+                              {queryResult.data.map((row: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-grey-50 transition-colors">
+                                  <td className="px-4 py-3 text-sm text-grey font-mono align-top">
+                                    {idx + 1}
+                                  </td>
+                                  {queryResult.columns.map((col: string) => (
+                                    <td key={col} className="px-4 py-3 align-top">
+                                      {row[col]?.labels ? (
+                                        renderNodeValue(row[col])
+                                      ) : row[col]?.type && row[col]?.startNode ? (
+                                        renderRelationshipValue(row[col])
+                                      ) : (
+                                        <span className="text-sm text-grey">
+                                          {typeof row[col] === 'object'
+                                            ? JSON.stringify(row[col], null, 2)
+                                            : String(row[col] ?? '')}
                                         </span>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Node ID */}
-                                  <div>
-                                    <div className="text-xs font-medium text-grey mb-2">Node ID</div>
-                                    <div className="font-mono text-xs text-grey bg-white px-3 py-2 rounded border border-grey-400 break-all">
-                                      {selectedNode.id}
-                                    </div>
-                                  </div>
-
-                                  {/* Properties */}
-                                  <div>
-                                    <div className="text-xs font-medium text-grey mb-2">
-                                      Properties ({Object.keys(selectedNode.properties || {}).length})
-                                    </div>
-                                    <div className="space-y-2">
-                                      {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
-                                        <div key={key} className="bg-white rounded border border-grey-400 overflow-hidden">
-                                          <div className="px-3 py-1.5 bg-grey-100 border-b border-grey-400">
-                                            <span className="text-xs font-medium text-grey">{key}</span>
-                                          </div>
-                                          <div className="px-3 py-2">
-                                            {typeof value === 'object' ? (
-                                              <pre className="text-xs text-grey font-mono whitespace-pre-wrap break-all">
-                                                {JSON.stringify(value, null, 2)}
-                                              </pre>
-                                            ) : typeof value === 'boolean' ? (
-                                              <span className={cn(
-                                                'px-2 py-0.5 rounded text-xs font-medium',
-                                                value ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey'
-                                              )}>
-                                                {String(value)}
-                                              </span>
-                                            ) : (
-                                              <span className="text-sm text-grey break-all">
-                                                {String(value)}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
-                                      {Object.keys(selectedNode.properties || {}).length === 0 && (
-                                        <div className="text-xs text-grey-400 italic">No properties</div>
                                       )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      // Fallback for column-based format or raw data
-                      return null;
-                    })() || (queryResult.columns?.length > 0 ? (
-                      // Column-based format (original format)
-                      <table className="w-full">
-                        <thead className="bg-grey-50 border-b border-grey-400 sticky top-0">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider w-12">
-                              #
-                            </th>
-                            {queryResult.columns.map((col: string) => (
-                              <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-grey uppercase tracking-wider">
-                                {col}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-grey-400">
-                          {queryResult.data.map((row: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-grey-50 transition-colors">
-                              <td className="px-4 py-3 text-sm text-grey font-mono align-top">
-                                {idx + 1}
-                              </td>
-                              {queryResult.columns.map((col: string) => (
-                                <td key={col} className="px-4 py-3 align-top">
-                                  {row[col]?.labels ? (
-                                    renderNodeValue(row[col])
-                                  ) : row[col]?.type && row[col]?.startNode ? (
-                                    renderRelationshipValue(row[col])
-                                  ) : (
-                                    <span className="text-sm text-grey">
-                                      {typeof row[col] === 'object'
-                                        ? JSON.stringify(row[col], null, 2)
-                                        : String(row[col] ?? '')}
-                                    </span>
-                                  )}
-                                </td>
+                                    </td>
+                                  ))}
+                                </tr>
                               ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      // Raw JSON fallback
-                      <div className="p-4">
-                        <pre className="text-xs text-grey overflow-auto max-h-[500px] bg-grey-50 p-4 rounded">
-                          {JSON.stringify(queryResult.data, null, 2)}
-                        </pre>
+                            </tbody>
+                          </table>
+                        ) : (
+                          // Raw JSON fallback
+                          <div className="p-4">
+                            <pre className="text-xs text-grey overflow-auto max-h-[500px] bg-grey-50 p-4 rounded">
+                              {JSON.stringify(queryResult.data, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Pagination Controls - Server-side pagination */}
-                  {queryResult?.data?.length > 0 && lastExecutedQuery && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-grey-400 bg-grey-50">
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-grey">
-                          Showing {queryResult.data.length} results (Page {tablePage})
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-grey">Rows per page:</span>
-                          <Select
-                            value={String(tablePageSize)}
-                            onValueChange={(v) => handlePageSizeChange(Number(v))}
-                            disabled={isExecuting}
-                          >
-                            <SelectTrigger className="w-[70px] h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="10">10</SelectItem>
-                              <SelectItem value="20">20</SelectItem>
-                              <SelectItem value="50">50</SelectItem>
-                              <SelectItem value="100">100</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      {/* Pagination Controls - Server-side pagination */}
+                      {queryResult?.data?.length > 0 && lastExecutedQuery && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-grey-400 bg-grey-50">
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm text-grey">
+                              Showing {queryResult.data.length} results (Page {tablePage})
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-grey">Rows per page:</span>
+                              <Select
+                                value={String(tablePageSize)}
+                                onValueChange={(v) => handlePageSizeChange(Number(v))}
+                                disabled={isExecuting}
+                              >
+                                <SelectTrigger className="w-[70px] h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="10">10</SelectItem>
+                                  <SelectItem value="20">20</SelectItem>
+                                  <SelectItem value="50">50</SelectItem>
+                                  <SelectItem value="100">100</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePageChange(1)}
+                              disabled={tablePage === 1 || isExecuting}
+                            >
+                              First
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePageChange(Math.max(1, tablePage - 1))}
+                              disabled={tablePage === 1 || isExecuting}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm text-grey px-2">
+                              Page {tablePage}
+                              {isExecuting && <Loader2 className="h-3 w-3 animate-spin inline ml-2" />}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePageChange(tablePage + 1)}
+                              disabled={isExecuting || queryResult.data.length < tablePageSize}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(1)}
-                          disabled={tablePage === 1 || isExecuting}
-                        >
-                          First
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(Math.max(1, tablePage - 1))}
-                          disabled={tablePage === 1 || isExecuting}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="text-sm text-grey px-2">
-                          Page {tablePage}
-                          {isExecuting && <Loader2 className="h-3 w-3 animate-spin inline ml-2" />}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(tablePage + 1)}
-                          disabled={isExecuting || queryResult.data.length < tablePageSize}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Graph Visualization View */}
-              {resultsView === 'graph' && (
-                <div className="bg-white rounded-lg border border-grey-400 flex-1 flex">
-                  {graphData.nodes.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="text-center">
-                        <Network className="h-12 w-12 text-grey-300 mx-auto mb-3" />
-                        <h4 className="text-sm font-medium text-grey mb-1">No Graph Data</h4>
-                        <p className="text-xs text-grey">
-                          Query results don't contain nodes or relationships to visualize
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex">
-                      {/* Graph Canvas */}
-                      <div
-                        className="flex-1 relative overflow-hidden"
-                        onMouseDown={handlePanStart}
-                        onMouseMove={handlePanMove}
-                        onMouseUp={handlePanEnd}
-                        onMouseLeave={handlePanEnd}
-                        onWheel={handleWheel}
-                        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-                      >
-                        <svg
-                          className="w-full h-full"
-                          viewBox="0 0 800 600"
-                          preserveAspectRatio="xMidYMid meet"
-                          style={{
-                            transform: `translate(${graphPan.x}px, ${graphPan.y}px) scale(${graphZoom})`,
-                            transformOrigin: 'center center',
-                          }}
-                        >
-                          <defs>
-                            <marker
-                              id="arrowhead"
-                              markerWidth="10"
-                              markerHeight="7"
-                              refX="9"
-                              refY="3.5"
-                              orient="auto"
-                            >
-                              <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
-                            </marker>
-                          </defs>
-
-                          {/* Edges - use memoized positions */}
-                          {graphData.edges.map((edge, i) => {
-                            const source = nodePositionsMap.get(edge.source);
-                            const target = nodePositionsMap.get(edge.target);
-                            if (!source || !target) return null;
-
-                            const midX = (source.x + target.x) / 2;
-                            const midY = (source.y + target.y) / 2;
-
-                            return (
-                              <g key={edge.id || i}>
-                                <line
-                                  x1={source.x}
-                                  y1={source.y}
-                                  x2={target.x}
-                                  y2={target.y}
-                                  stroke="#D1D5DB"
-                                  strokeWidth="2"
-                                  markerEnd="url(#arrowhead)"
-                                />
-                                <text
-                                  x={midX}
-                                  y={midY - 5}
-                                  textAnchor="middle"
-                                  className="text-[10px] fill-grey"
-                                >
-                                  {edge.type}
-                                </text>
-                              </g>
-                            );
-                          })}
-
-                          {/* Nodes - use memoized positioned nodes */}
-                          {positionedNodes.map((node) => {
-                            const colors = getNodeColor(node.label);
-                            const isSelected = selectedNode?.id === node.id;
-
-                            return (
-                              <g
-                                key={node.id}
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedNode(isSelected ? null : node);
-                                }}
-                              >
-                                <circle
-                                  cx={node.x}
-                                  cy={node.y}
-                                  r={isSelected ? 32 : 28}
-                                  fill={colors.bg}
-                                  stroke={isSelected ? '#000' : colors.border}
-                                  strokeWidth={isSelected ? 3 : 2}
-                                />
-                                <text
-                                  x={node.x}
-                                  y={node.y - 5}
-                                  textAnchor="middle"
-                                  className="text-[10px] font-medium pointer-events-none"
-                                  fill={colors.text}
-                                >
-                                  {node.label}
-                                </text>
-                                <text
-                                  x={node.x}
-                                  y={node.y + 8}
-                                  textAnchor="middle"
-                                  className="text-[9px] pointer-events-none"
-                                  fill={colors.text}
-                                  opacity={0.8}
-                                >
-                                  {node.displayName?.substring(0, 10)}
-                                </text>
-                              </g>
-                            );
-                          })}
-                        </svg>
-
-                        {/* Legend */}
-                        <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg border border-grey-400 p-2">
-                          <div className="text-[10px] font-medium text-grey mb-1">Legend</div>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.from(new Set(graphData.nodes.map(n => n.label))).map(label => {
-                              const colors = getNodeColor(label);
-                              return (
-                                <div key={label} className="flex items-center gap-1">
-                                  <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{ backgroundColor: colors.bg }}
-                                  />
-                                  <span className="text-[10px] text-grey">{label}</span>
-                                </div>
-                              );
-                            })}
+                  {/* Graph Visualization View */}
+                  {resultsView === 'graph' && (
+                    <div className="bg-white rounded-lg border border-grey-400 flex-1 flex">
+                      {graphData.nodes.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center">
+                          <div className="text-center">
+                            <Network className="h-12 w-12 text-grey-300 mx-auto mb-3" />
+                            <h4 className="text-sm font-medium text-grey mb-1">No Graph Data</h4>
+                            <p className="text-xs text-grey">
+                              Query results don't contain nodes or relationships to visualize
+                            </p>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Node Details Panel */}
-                      {selectedNode && (
-                        <div className="w-64 border-l border-grey-400 bg-grey-50 p-4 overflow-y-auto">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-semibold text-grey">Node Details</h4>
-                            <button
-                              onClick={() => setSelectedNode(null)}
-                              className="text-grey-400 hover:text-grey"
+                      ) : (
+                        <div className="flex-1 flex">
+                          {/* Graph Canvas */}
+                          <div
+                            className="flex-1 relative overflow-hidden"
+                            onMouseDown={handlePanStart}
+                            onMouseMove={handlePanMove}
+                            onMouseUp={handlePanEnd}
+                            onMouseLeave={handlePanEnd}
+                            onWheel={handleWheel}
+                            style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+                          >
+                            <svg
+                              className="w-full h-full"
+                              viewBox="0 0 800 600"
+                              preserveAspectRatio="xMidYMid meet"
+                              style={{
+                                transform: `translate(${graphPan.x}px, ${graphPan.y}px) scale(${graphZoom})`,
+                                transformOrigin: 'center center',
+                              }}
                             >
-                              ×
-                            </button>
-                          </div>
+                              <defs>
+                                <marker
+                                  id="arrowhead"
+                                  markerWidth="10"
+                                  markerHeight="7"
+                                  refX="9"
+                                  refY="3.5"
+                                  orient="auto"
+                                >
+                                  <polygon points="0 0, 10 3.5, 0 7" fill="#9CA3AF" />
+                                </marker>
+                              </defs>
 
-                          <div className="space-y-3">
-                            <div>
-                              <div className="text-xs text-grey mb-1">Labels</div>
-                              <div className="flex flex-wrap gap-1">
-                                {selectedNode.labels?.map((label: string) => (
-                                  <span
-                                    key={label}
-                                    className="px-2 py-0.5 bg-blue/10 text-blue text-xs rounded"
+                              {/* Edges - use memoized positions */}
+                              {graphData.edges.map((edge, i) => {
+                                const source = nodePositionsMap.get(edge.source);
+                                const target = nodePositionsMap.get(edge.target);
+                                if (!source || !target) return null;
+
+                                const midX = (source.x + target.x) / 2;
+                                const midY = (source.y + target.y) / 2;
+
+                                return (
+                                  <g key={edge.id || i}>
+                                    <line
+                                      x1={source.x}
+                                      y1={source.y}
+                                      x2={target.x}
+                                      y2={target.y}
+                                      stroke="#D1D5DB"
+                                      strokeWidth="2"
+                                      markerEnd="url(#arrowhead)"
+                                    />
+                                    <text
+                                      x={midX}
+                                      y={midY - 5}
+                                      textAnchor="middle"
+                                      className="text-[10px] fill-grey"
+                                    >
+                                      {edge.type}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* Nodes - use memoized positioned nodes */}
+                              {positionedNodes.map((node) => {
+                                const colors = getNodeColor(node.label);
+                                const isSelected = selectedNode?.id === node.id;
+
+                                return (
+                                  <g
+                                    key={node.id}
+                                    className="cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedNode(isSelected ? null : node);
+                                    }}
                                   >
-                                    :{label}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
+                                    <circle
+                                      cx={node.x}
+                                      cy={node.y}
+                                      r={isSelected ? 32 : 28}
+                                      fill={colors.bg}
+                                      stroke={isSelected ? '#000' : colors.border}
+                                      strokeWidth={isSelected ? 3 : 2}
+                                    />
+                                    <text
+                                      x={node.x}
+                                      y={node.y - 5}
+                                      textAnchor="middle"
+                                      className="text-[10px] font-medium pointer-events-none"
+                                      fill={colors.text}
+                                    >
+                                      {node.label}
+                                    </text>
+                                    <text
+                                      x={node.x}
+                                      y={node.y + 8}
+                                      textAnchor="middle"
+                                      className="text-[9px] pointer-events-none"
+                                      fill={colors.text}
+                                      opacity={0.8}
+                                    >
+                                      {node.displayName?.substring(0, 10)}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
 
-                            <div>
-                              <div className="text-xs text-grey mb-1">ID</div>
-                              <div className="font-mono text-xs text-grey bg-white px-2 py-1 rounded border border-grey-400">
-                                {selectedNode.id}
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="text-xs text-grey mb-2">Properties</div>
-                              <div className="space-y-1">
-                                {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
-                                  <div key={key} className="bg-white rounded border border-grey-400 p-2">
-                                    <div className="text-[10px] text-grey">{key}</div>
-                                    <div className="text-xs text-grey font-mono truncate">
-                                      {JSON.stringify(value)}
+                            {/* Legend */}
+                            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg border border-grey-400 p-2">
+                              <div className="text-[10px] font-medium text-grey mb-1">Legend</div>
+                              <div className="flex flex-wrap gap-2">
+                                {Array.from(new Set(graphData.nodes.map(n => n.label))).map(label => {
+                                  const colors = getNodeColor(label);
+                                  return (
+                                    <div key={label} className="flex items-center gap-1">
+                                      <div
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: colors.bg }}
+                                      />
+                                      <span className="text-[10px] text-grey">{label}</span>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
+
+                          {/* Node Details Panel */}
+                          {selectedNode && (
+                            <div className="w-64 border-l border-grey-400 bg-grey-50 p-4 overflow-y-auto">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-semibold text-grey">Node Details</h4>
+                                <button
+                                  onClick={() => setSelectedNode(null)}
+                                  className="text-grey-400 hover:text-grey"
+                                >
+                                  ×
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div>
+                                  <div className="text-xs text-grey mb-1">Labels</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {selectedNode.labels?.map((label: string) => (
+                                      <span
+                                        key={label}
+                                        className="px-2 py-0.5 bg-blue/10 text-blue text-xs rounded"
+                                      >
+                                        :{label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="text-xs text-grey mb-1">ID</div>
+                                  <div className="font-mono text-xs text-grey bg-white px-2 py-1 rounded border border-grey-400">
+                                    {selectedNode.id}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="text-xs text-grey mb-2">Properties</div>
+                                  <div className="space-y-1">
+                                    {Object.entries(selectedNode.properties || {}).map(([key, value]) => (
+                                      <div key={key} className="bg-white rounded border border-grey-400 p-2">
+                                        <div className="text-[10px] text-grey">{key}</div>
+                                        <div className="text-xs text-grey font-mono truncate">
+                                          {JSON.stringify(value)}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
             </div>
           </>
         ) : (

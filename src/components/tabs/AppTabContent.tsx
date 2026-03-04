@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { IApp } from '@/types/app';
 import {
   Zap,
@@ -33,7 +33,10 @@ import {
   Rocket,
   Loader2,
   Box,
+  ArrowLeft,
+  Copy,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn, getLast7DaysNormalized } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
@@ -75,6 +78,7 @@ import InlineWebhookForm from '@/components/forms/InlineWebhookForm';
 interface AppTabContentProps {
   app?: IApp;
   appId?: string;
+  isMarketplace?: boolean;
 }
 
 // Sidebar view types - Overview is the main dashboard, others are resource categories
@@ -90,7 +94,7 @@ interface FolderTreeNode {
   actions: any[];
 }
 
-export default function AppTabContent({ app, appId }: AppTabContentProps) {
+export default function AppTabContent({ app, appId, isMarketplace }: AppTabContentProps) {
   const { openTab, tabs, activeTabId } = useWorkbenchStore();
   const { currentWorkspaceId, user } = useAuth();
   const queryClient = useQueryClient();
@@ -162,6 +166,52 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
 
   // State for creating a new webhook inline
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+
+  // Resizable sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState<number>(
+    persistedState?.sidebarWidth || 256
+  );
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (isResizing) {
+      const newWidth = e.clientX;
+      if (newWidth > 150 && newWidth < 600) {
+        setSidebarWidth(newWidth);
+      }
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, resize, stopResizing]);
 
   // Note: State reset when switching apps is handled by the key prop in TabContent.tsx
   // which forces a complete remount of this component
@@ -409,17 +459,17 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
   useEffect(() => {
     // Don't persist if we don't have a valid stateKey
     if (!stateKey || stateKey === 'app-tab-state-undefined') return;
-
     const stateToSave = {
-      selectedVersionTag,
       sidebarView,
-      expandedFolders: Array.from(expandedFolders),
-      selectedActionTag: selectedAction?.tag || null,
-      selectedWebhookTag: selectedWebhook?.tag || null,
+      selectedVersionTag,
       isSidebarCollapsed,
+      expandedFolders: Array.from(expandedFolders),
+      selectedActionTag: selectedAction?.tag || selectedAction?._id,
+      selectedWebhookTag: selectedWebhook?.tag || selectedWebhook?._id,
+      sidebarWidth,
     };
     localStorage.setItem(stateKey, JSON.stringify(stateToSave));
-  }, [stateKey, selectedVersionTag, sidebarView, expandedFolders, selectedAction?.tag, selectedWebhook?.tag, isSidebarCollapsed]);
+  }, [sidebarView, selectedVersionTag, expandedFolders, selectedAction, selectedWebhook, stateKey, isSidebarCollapsed, sidebarWidth]);
 
   // Show skeleton loading state while fetching or when data is incomplete
   if ((isLoading && !currentApp) || (currentApp && !currentApp.app_name)) {
@@ -535,9 +585,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
       const hasChildren = folder.children.length > 0 || folder.actions.length > 0;
       const matchingActions = searchQuery
         ? folder.actions.filter(a =>
-            a.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            a.tag?.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+          a.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
         : folder.actions;
 
       return (
@@ -883,9 +933,9 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     // Filter webhooks based on search query
     const displayedWebhooks = searchQuery
       ? webhooks.filter((webhook: any) =>
-          webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : webhooks;
 
     return (
@@ -1118,11 +1168,11 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     const requestsByMethod = hasMetrics && dashboardMetrics.requestsByMethod.length > 0
       ? dashboardMetrics.requestsByMethod
       : [
-          { method: 'GET', count: 0, percentage: 0 },
-          { method: 'POST', count: 0, percentage: 0 },
-          { method: 'PUT', count: 0, percentage: 0 },
-          { method: 'DELETE', count: 0, percentage: 0 },
-        ].filter(m => m.count > 0 || !hasMetrics);
+        { method: 'GET', count: 0, percentage: 0 },
+        { method: 'POST', count: 0, percentage: 0 },
+        { method: 'PUT', count: 0, percentage: 0 },
+        { method: 'DELETE', count: 0, percentage: 0 },
+      ].filter(m => m.count > 0 || !hasMetrics);
 
     // Normalize to last 7 days (Mon–Sun) with 0 for days that have no activity
     const recentActivity = getLast7DaysNormalized(
@@ -1133,19 +1183,19 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
     // Use real top endpoints or fallback to action-based placeholders
     const topEndpoints = hasMetrics && dashboardMetrics.topEndpoints.length > 0
       ? dashboardMetrics.topEndpoints.slice(0, 5).map(ep => ({
-          name: ep.name,
-          tag: ep.tag,
-          method: ep.method,
-          calls: ep.calls,
-          avgLatency: `${ep.avgLatency}ms`,
-        }))
+        name: ep.name,
+        tag: ep.tag,
+        method: ep.method,
+        calls: ep.calls,
+        avgLatency: `${ep.avgLatency}ms`,
+      }))
       : (selectedVersion?.actions || []).slice(0, 5).map((action: any) => ({
-          name: action.name || action.tag,
-          tag: action.tag,
-          method: action.method || 'GET',
-          calls: 0,
-          avgLatency: '0ms',
-        }));
+        name: action.name || action.tag,
+        tag: action.tag,
+        method: action.method || 'GET',
+        calls: 0,
+        avgLatency: '0ms',
+      }));
 
     const renderMetricCard = (
       title: string,
@@ -1283,6 +1333,21 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                     Publish
                   </Button>
                 )}
+                {selectedVersion && selectedVersion.status === 'public' && (
+                  <Button
+                    onClick={() => {
+                      const url = `${window.location.origin}/marketplace/app/${currentApp?.tag}`;
+                      navigator.clipboard.writeText(url);
+                      toast.success('Marketplace URL copied to clipboard');
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="w-36"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Share
+                  </Button>
+                )}
                 {selectedVersion && (
                   <Button onClick={handleIntegrateApp} size="sm" variant="outline" className="w-36">
                     <Plug className="h-4 w-4 mr-1" />
@@ -1294,65 +1359,77 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
           </div>
 
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {renderMetricCard(
-              'Total Requests',
-              apiAnalytics.totalRequests.current.toLocaleString(),
-              apiAnalytics.totalRequests.change,
-              <Activity className="h-5 w-5 text-blue-600" />,
-              'bg-blue-500/10',
-              undefined,
-              isLoadingMetrics
-            )}
-            {renderMetricCard(
-              'Success Rate',
-              apiAnalytics.successRate.current.toFixed(1),
-              apiAnalytics.successRate.change,
-              <CheckCircle className="h-5 w-5 text-green" />,
-              'bg-green/10',
-              '%',
-              isLoadingMetrics
-            )}
-            {renderMetricCard(
-              'Avg Latency',
-              apiAnalytics.avgLatency.current,
-              apiAnalytics.avgLatency.change,
-              <Clock className="h-5 w-5 text-orange-600" />,
-              'bg-orange-500/10',
-              undefined,
-              isLoadingMetrics
-            )}
-            {renderMetricCard(
-              'Error Rate',
-              apiAnalytics.errorRate.current.toFixed(1),
-              apiAnalytics.errorRate.change,
-              <XCircle className="h-5 w-5 text-red-500" />,
-              'bg-red-500/10',
-              '%',
-              isLoadingMetrics
-            )}
-            {renderMetricCard(
-              'Active Endpoints',
-              actionsCount,
-              0,
-              <Zap className="h-5 w-5 text-primary" />,
-              'bg-primary/10',
-              undefined,
-              false // Actions count is not from metrics
-            )}
-            {renderMetricCard(
-              'Webhook Events',
-              apiAnalytics.webhookEvents.current.toLocaleString(),
-              apiAnalytics.webhookEvents.change,
-              <Webhook className="h-5 w-5 text-purple-600" />,
-              'bg-purple-500/10',
-              undefined,
-              isLoadingMetrics
-            )}
-          </div>
+          < div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4" >
+            {
+              renderMetricCard(
+                'Total Requests',
+                apiAnalytics.totalRequests.current.toLocaleString(),
+                apiAnalytics.totalRequests.change,
+                < Activity className="h-5 w-5 text-blue-600" />,
+                'bg-blue-500/10',
+                undefined,
+                isLoadingMetrics
+              )
+            }
+            {
+              renderMetricCard(
+                'Success Rate',
+                apiAnalytics.successRate.current.toFixed(1),
+                apiAnalytics.successRate.change,
+                <CheckCircle className="h-5 w-5 text-green" />,
+                'bg-green/10',
+                '%',
+                isLoadingMetrics
+              )
+            }
+            {
+              renderMetricCard(
+                'Avg Latency',
+                apiAnalytics.avgLatency.current,
+                apiAnalytics.avgLatency.change,
+                <Clock className="h-5 w-5 text-orange-600" />,
+                'bg-orange-500/10',
+                undefined,
+                isLoadingMetrics
+              )
+            }
+            {
+              renderMetricCard(
+                'Error Rate',
+                apiAnalytics.errorRate.current.toFixed(1),
+                apiAnalytics.errorRate.change,
+                <XCircle className="h-5 w-5 text-red-500" />,
+                'bg-red-500/10',
+                '%',
+                isLoadingMetrics
+              )
+            }
+            {
+              renderMetricCard(
+                'Active Endpoints',
+                actionsCount,
+                0,
+                <Zap className="h-5 w-5 text-primary" />,
+                'bg-primary/10',
+                undefined,
+                false // Actions count is not from metrics
+              )
+            }
+            {
+              renderMetricCard(
+                'Webhook Events',
+                apiAnalytics.webhookEvents.current.toLocaleString(),
+                apiAnalytics.webhookEvents.change,
+                <Webhook className="h-5 w-5 text-purple-600" />,
+                'bg-purple-500/10',
+                undefined,
+                isLoadingMetrics
+              )
+            }
+          </div >
 
           {/* Request Activity Timeline */}
-          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+          < div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6" >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-grey">Request Activity (Last 7 Days)</h2>
               {isLoadingMetrics && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
@@ -1386,7 +1463,7 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                 );
               })}
             </div>
-          </div>
+          </div >
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Requests by Method */}
@@ -1408,32 +1485,32 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                   ))}
                 </div>
               ) : requestsByMethod.length > 0 ? (
-              <div className="space-y-4">
-                {requestsByMethod.map((item) => (
-                  <div key={item.method} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(item.method))}>
-                        {item.method}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-grey-600 font-medium">{item.count.toLocaleString()}</span>
-                        <span className="text-grey-700 dark:text-grey font-bold min-w-[3rem] text-right">{item.percentage}%</span>
+                <div className="space-y-4">
+                  {requestsByMethod.map((item) => (
+                    <div key={item.method} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={cn('px-2 py-0.5 rounded text-xs font-bold', getMethodColor(item.method))}>
+                          {item.method}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-grey-600 font-medium">{item.count.toLocaleString()}</span>
+                          <span className="text-grey-700 dark:text-grey font-bold min-w-[3rem] text-right">{item.percentage}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-grey-200 dark:bg-grey-700 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-500',
+                            item.method === 'GET' ? 'bg-green' :
+                              item.method === 'POST' ? 'bg-blue' :
+                                item.method === 'PUT' ? 'bg-orange-500' : 'bg-red'
+                          )}
+                          style={{ width: `${item.percentage}%` }}
+                        ></div>
                       </div>
                     </div>
-                    <div className="h-2 bg-grey-200 dark:bg-grey-700 rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-500',
-                          item.method === 'GET' ? 'bg-green' :
-                          item.method === 'POST' ? 'bg-blue' :
-                          item.method === 'PUT' ? 'bg-orange-500' : 'bg-red'
-                        )}
-                        style={{ width: `${item.percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <Activity className="h-8 w-8 text-grey-400 mx-auto mb-2" />
@@ -1517,8 +1594,8 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
                     <span className={cn(
                       'px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide border',
                       env.slug === 'production' ? 'bg-green/10 text-green border-green/20' :
-                      env.slug === 'staging' ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' :
-                      'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                        env.slug === 'staging' ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' :
+                          'bg-blue-500/10 text-blue-600 border-blue-500/20'
                     )}>
                       {env.env_name || env.slug}
                     </span>
@@ -1560,19 +1637,26 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div >
+      </div >
     );
   };
 
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className={cn(
+      "flex bg-grey-100",
+      isMarketplace ? "h-full" : "h-[calc(100vh-8rem)]"
+    )}>
       {/* Sidebar */}
-      <div className={cn(
-        "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300",
-        isSidebarCollapsed ? "w-14" : "w-64"
-      )}>
+      <div
+        ref={sidebarRef}
+        style={{ width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px` }}
+        className={cn(
+          "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300 relative",
+          isResizing && "transition-none"
+        )}
+      >
         {/* Header - Fixed */}
         <div className={cn("flex-shrink-0 border-b border-grey-400", isSidebarCollapsed ? "p-2" : "p-3")}>
           <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "gap-2")}>
@@ -1825,7 +1909,19 @@ export default function AppTabContent({ app, appId }: AppTabContentProps) {
               </button>
             </div>
           )}
+
         </div>
+
+        {/* Resizer Handle */}
+        {!isSidebarCollapsed && (
+          <div
+            onMouseDown={startResizing}
+            className={cn(
+              "absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/30 transition-colors z-20",
+              isResizing && "bg-primary/50"
+            )}
+          />
+        )}
       </div>
 
       {/* Main Content - Key on wrapper div ensures proper unmount/remount when content type changes */}
