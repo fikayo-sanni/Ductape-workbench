@@ -64,11 +64,6 @@ function WorkbenchContent() {
   // Trigger onboarding when user logs in/signs up but has no workspace
   // Only show after workspace fetch has completed and returned no workspaces
   useEffect(() => {
-    // Don't show if user has already completed onboarding
-    if (hasCompletedOnboarding) {
-      return;
-    }
-
     // Wait for the workspace fetch to complete before checking
     if (isLoading || !isFetched) {
       return;
@@ -77,13 +72,13 @@ function WorkbenchContent() {
     const hasNoWorkspace = !currentWorkspaceId && workspacesData?.data?.length === 0;
 
     if (user && hasNoWorkspace && !hasTriggeredOnboarding && !showLoginModal && !showCreateAccountModal) {
-        // Small delay to ensure DOM is ready
-        setTimeout(() => {
-          startOnboarding();
-          setHasTriggeredOnboarding(true);
-        }, 500);
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        startOnboarding();
+        setHasTriggeredOnboarding(true);
+      }, 500);
     }
-  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding, isLoading, isFetched, hasCompletedOnboarding]);
+  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding, isLoading, isFetched]);
 
 
   return (
@@ -118,9 +113,8 @@ function WorkbenchContent() {
           {/* Main Sidebar - Hidden when dashboard is active */}
           {activeView !== 'dashboard' && (
             <div
-              className={`${
-                sidebarCollapsed ? 'w-0' : 'w-full md:w-[280px]'
-              } transition-all duration-300 ease-in-out border-r border-grey-400 bg-white flex-shrink-0 overflow-hidden shadow-sm
+              className={`${sidebarCollapsed ? 'w-0' : 'w-full md:w-[280px]'
+                } transition-all duration-300 ease-in-out border-r border-grey-400 bg-white flex-shrink-0 overflow-hidden shadow-sm
               ${!sidebarCollapsed ? 'fixed md:relative inset-0 md:inset-auto z-30 md:z-0' : ''}`}
             >
               {/* Mobile Header - Show view selector on mobile */}
@@ -142,7 +136,7 @@ function WorkbenchContent() {
                     { id: 'products', label: 'Products' },
                     { id: 'apps', label: 'Apps' },
                     { id: 'environments', label: 'Envs' },
-                    {id: 'pricing', label: 'pricing'},
+                    { id: 'pricing', label: 'pricing' },
                     { id: 'partnership', label: 'Partners' },
                     { id: 'dashboard', label: 'Dashboard' },
                   ].map((view) => (
