@@ -26,9 +26,42 @@ interface ApiResponse<T> {
   data: T;
 }
 
+interface SaveBillingInfoParams {
+  userId: string;
+  publicKey: string;
+  token: string;
+}
+
+interface FetchBillingInfoParams {
+  userId: string;
+  publicKey: string;
+}
+
+interface InitializeTransactionParams {
+  userId: string;
+  publicKey: string;
+  authToken: string; // The JWT token from your headers
+}
+
+interface InitializeTransactionPayload {
+  email: string;
+  amount: number;
+  callback_url: string;
+}
+
+interface TransactionResponse {
+    status: boolean;
+    message: string;
+    data: {
+      authorization_url: string;
+      access_code: string;
+      reference: string;
+    }
+}
+
 /** Fetch saved billing address for the current user. Returns empty-style object if none. */
-export const fetchBillingInfo = async (): Promise<BillingInfo> => {
-  const response = await apiClient.get<ApiResponse<BillingInfo>>("/users/v1/billing/info");
+export const fetchBillingInfo = async (params: FetchBillingInfoParams): Promise<BillingInfo> => {
+  const response = await apiClient.get<ApiResponse<BillingInfo>>(`/users/v1/billing/info/?user_id=${params.userId}&public_key=${params.publicKey}`);
   const data = response.data?.data;
   if (!data) {
     return {
@@ -40,7 +73,7 @@ export const fetchBillingInfo = async (): Promise<BillingInfo> => {
       stateProvince: "",
       postalZipCode: "",
       country: "",
-    };
+    }
   }
   return {
     firstName: data.firstName ?? "",
@@ -55,17 +88,29 @@ export const fetchBillingInfo = async (): Promise<BillingInfo> => {
 };
 
 /** Save billing address for the current user. */
-export const saveBillingInfo = async (payload: BillingInfo): Promise<BillingInfo> => {
-  const response = await apiClient.post<ApiResponse<BillingInfo>>("/users/v1/billing/info", {
-    firstName: payload.firstName,
-    lastName: payload.lastName,
-    addressLine1: payload.addressLine1,
-    addressLine2: payload.addressLine2 ?? "",
-    city: payload.city,
-    stateProvince: payload.stateProvince,
-    postalZipCode: payload.postalZipCode,
-    country: payload.country,
-  });
+export const saveBillingInfo = async (
+  payload: BillingInfo,
+  params: SaveBillingInfoParams
+): Promise<BillingInfo> => {
+  const response = await apiClient.post<ApiResponse<BillingInfo>>(
+    `/users/v1/billing/info/?user_id=${params.userId}&public_key=${params.publicKey}`,
+    {
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      addressLine1: payload.addressLine1,
+      addressLine2: payload.addressLine2 ?? "",
+      city: payload.city,
+      stateProvince: payload.stateProvince,
+      postalZipCode: payload.postalZipCode,
+      country: payload.country,
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${params.token}`, // or whatever token format they expect
+        'Content-Type': 'application/json',
+      }
+    }
+  );
   return response.data?.data ?? payload;
 };
 
@@ -107,4 +152,30 @@ export const validateAndSaveCard = async (
   const data = response.data?.data;
   if (!data) throw new Error("Invalid response");
   return data;
+};
+
+export const initializeTransaction = async (
+  payload: InitializeTransactionPayload,
+  params: InitializeTransactionParams
+): Promise<TransactionResponse> => {
+  const response = await apiClient.post<ApiResponse<TransactionResponse>>(
+    `/pricing/v1/initialize-transaction/`,
+    {
+      email: payload.email,
+      amount: payload.amount,
+      callback_url: payload.callback_url,
+    },
+    {
+      params: {
+        user_id: params.userId,
+        public_key: params.publicKey
+      },
+      headers: {
+        'Authorization': `Bearer ${params.authToken}`,
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+
+  return response.data?.data;
 };
