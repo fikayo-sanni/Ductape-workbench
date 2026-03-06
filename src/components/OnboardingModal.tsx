@@ -26,6 +26,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import workspaceServices from '@/services/workspaceServices';
 import productServices from '@/services/productServices';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 interface OnboardingStep {
   id: string;
@@ -65,7 +66,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
           <li>• Configure authentication</li>
         </ul>
       </div>
-      <Button onClick={onNext} className="w-full">
+      <Button onClick={() => onNext()} className="w-full">
         Get Started
         <ArrowRight className="h-4 w-4 ml-2" />
       </Button>
@@ -120,7 +121,7 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
       toast.error('User authentication required');
       return;
     }
-    
+
     createWorkspace({
       name: formData.workspace_name,
       public_key: user.public_key,
@@ -181,8 +182,8 @@ function WorkspaceStep({ onNext, onBack }: { onNext: (data: any) => void; onBack
               </>
             ) : (
               <>
-            Create Workspace
-            <ArrowRight className="h-4 w-4 ml-2" />
+                Create Workspace
+                <ArrowRight className="h-4 w-4 ml-2" />
               </>
             )}
           </Button>
@@ -229,7 +230,7 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
       if (response?.data) {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         toast.success('Product created successfully!');
-        
+
         // Open the created product in a tab
         openTab({
           id: `product-${response.data._id}-${Date.now()}`,
@@ -238,7 +239,7 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
           itemId: response.data._id,
           data: response.data,
         });
-        
+
         onNext({ product: response.data });
         // Complete onboarding after product creation
         onComplete();
@@ -260,30 +261,13 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
       toast.error('Missing required data - please ensure workspace was created successfully');
       return;
     }
-    
-    console.log('Full workspace object:', workspace);
-    console.log('Workspace keys:', Object.keys(workspace));
-    
+
     // Generate tag safely
     const workspaceTag = workspace.workspace_name || workspace.name || 'workspace';
     const productTag = formData.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const fullTag = `${workspaceTag.toLowerCase().replace(/[^a-z0-9]+/g, '_')}:${productTag}`;
-    
-    console.log('Creating product with:', {
-      workspace_id: workspace._id,
-      user_id: user._id,
-      public_key: user.public_key,
-      payload: {
-        name: formData.product_name,
-        description: formData.description,
-        tag: fullTag,
-        workspace_id: workspace._id,
-        user_id: user._id,
-        public_key: user.public_key,
-      },
-    });
-     
-     createProduct({
+
+    createProduct({
       workspace_id: workspace._id,
       user_id: user._id,
       public_key: user.public_key,
@@ -351,8 +335,8 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
               </>
             ) : (
               <>
-            Create Product
-            <ArrowRight className="h-4 w-4 ml-2" />
+                Create Product
+                <ArrowRight className="h-4 w-4 ml-2" />
               </>
             )}
           </Button>
@@ -392,74 +376,8 @@ function CompletionStep({ onComplete }: { onComplete: () => void }) {
 }
 
 export default function OnboardingModal({ open, onComplete, onSkip }: OnboardingModalProps) {
-  const [currentStep, setCurrentStep] = useState(0);
+  const { currentStep, setCurrentStep, stepData, setStepData } = useOnboarding();
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [onboardingData, setOnboardingData] = useState<{
-    workspace?: any;
-    product?: any;
-    app?: any;
-    auth?: any;
-  }>({});
-
-  // Load onboarding progress from localStorage on mount
-  useEffect(() => {
-    const savedStep = localStorage.getItem('ductape-onboarding-step');
-    const savedData = localStorage.getItem('ductape-onboarding-data');
-    
-    if (savedStep) {
-      setCurrentStep(parseInt(savedStep));
-    }
-    
-    if (savedData) {
-      try {
-        setOnboardingData(JSON.parse(savedData));
-      } catch (error) {
-        console.error('Error parsing saved onboarding data:', error);
-      }
-    }
-  }, []);
-
-  // Save onboarding progress to localStorage
-  useEffect(() => {
-    localStorage.setItem('ductape-onboarding-step', currentStep.toString());
-    
-    // Create a safe copy of onboardingData to avoid cyclic references
-    const safeData = {
-      workspace: onboardingData.workspace ? {
-        _id: onboardingData.workspace._id,
-        workspace_id: onboardingData.workspace.workspace_id,
-        workspace_name: onboardingData.workspace.workspace_name,
-        description: onboardingData.workspace.description,
-        default: onboardingData.workspace.default,
-        created_at: onboardingData.workspace.created_at,
-        updated_at: onboardingData.workspace.updated_at
-      } : undefined,
-      product: onboardingData.product ? {
-        _id: onboardingData.product._id,
-        name: onboardingData.product.name,
-        description: onboardingData.product.description,
-        tag: onboardingData.product.tag,
-        workspace_id: onboardingData.product.workspace_id
-      } : undefined,
-      app: onboardingData.app ? {
-        _id: onboardingData.app._id,
-        app_name: onboardingData.app.app_name,
-        description: onboardingData.app.description,
-        tag: onboardingData.app.tag,
-        base_url: onboardingData.app.base_url,
-        workspace_id: onboardingData.app.workspace_id
-      } : undefined,
-      auth: onboardingData.auth ? {
-        _id: onboardingData.auth._id,
-        name: onboardingData.auth.name,
-        tag: onboardingData.auth.tag,
-        description: onboardingData.auth.description,
-        setup_type: onboardingData.auth.setup_type
-      } : undefined
-    };
-    
-    localStorage.setItem('ductape-onboarding-data', JSON.stringify(safeData));
-  }, [currentStep, onboardingData]);
 
   const steps: OnboardingStep[] = [
     {
@@ -492,31 +410,28 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
       description: 'You\'re ready to go!',
       icon: CheckCircle,
       component: CompletionStep,
-      completed: completedSteps.has(6),
+      completed: completedSteps.has(3),
     },
   ];
 
   const handleNext = (data?: any) => {
     setCompletedSteps(prev => new Set([...prev, currentStep]));
-    
+
     // Update onboarding data with new data
     if (data) {
-      setOnboardingData(prev => ({ ...prev, ...data }));
+      setStepData({ ...stepData, ...data });
     }
-    
+
     if (currentStep < steps.length - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(currentStep + 1);
     } else {
-      // Clear onboarding data when completed
-      localStorage.removeItem('ductape-onboarding-step');
-      localStorage.removeItem('ductape-onboarding-data');
       onComplete();
     }
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep(currentStep - 1);
     }
   };
 
@@ -524,7 +439,7 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
     onSkip();
   };
 
-  const currentStepData = steps[currentStep];
+  const currentStepData = steps[currentStep] || steps[0];
   const CurrentComponent = currentStepData.component;
 
   return (
@@ -532,9 +447,9 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
               <currentStepData.icon className="h-4 w-4 text-primary" />
-            </div>
+            </span>
             {currentStepData.title}
           </DialogTitle>
           <DialogDescription>
@@ -543,14 +458,14 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
         </DialogHeader>
 
         <div className="py-6">
-          <CurrentComponent 
-            onNext={handleNext} 
+          <CurrentComponent
+            onNext={handleNext}
             onBack={currentStep > 0 ? handleBack : undefined}
             onComplete={onComplete}
-            workspace={onboardingData.workspace}
-            product={onboardingData.product}
-            app={onboardingData.app}
-            auth={onboardingData.auth}
+            workspace={stepData.workspace}
+            product={stepData.product}
+            app={stepData.app}
+            auth={stepData.auth}
           />
         </div>
 
@@ -582,4 +497,3 @@ export default function OnboardingModal({ open, onComplete, onSkip }: Onboarding
     </Dialog>
   );
 }
-

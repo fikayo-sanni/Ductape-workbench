@@ -193,9 +193,6 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     );
   }, [tabId, activeCategory, searchQuery, isSidebarCollapsed, initialProduct?.name, initialProduct?.tag, initialProduct?._id, productId, initialProduct]);
 
-  // Check if product data is incomplete
-  const isProductDataIncomplete = initialProduct && (!initialProduct.envs || initialProduct.envs.length === 0 || !initialProduct.name);
-
   // Fetch product data if not provided or incomplete
   const { data: fetchedProductData, isLoading: isFetchingProduct, refetch } = useQuery({
     queryKey: ['product', productId],
@@ -217,6 +214,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   });
 
   const product = fetchedProductData || initialProduct;
+
+  // Check if product data is incomplete
+  const isProductDataIncomplete = !product || !product.tag || !product.name || !product.envs || product.envs.length === 0;
 
   // Fetch connected apps
   const { data: productAppsRes, status: productAppsStatus, refetch: refetchApps } = useQuery({
@@ -1302,11 +1302,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Filter by search if present
     const filteredResources = searchQuery
       ? resources.filter(
-          (item) =>
-            item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.app_name?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        (item) =>
+          item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.app_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : resources;
 
     const singularLabel = category.label.replace(/s$/, '').replace(/ies$/, 'y');
@@ -1714,6 +1714,19 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
   // Render main content based on active category
   const renderMainContent = () => {
+    // Show loader if product is loading or data is incomplete
+    if ((isFetchingProduct && isProductDataIncomplete) || !product) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+          <div>
+            <h3 className="text-lg font-medium text-grey">Loading product configuration...</h3>
+            <p className="text-sm text-grey-600">This will only take a moment</p>
+          </div>
+        </div>
+      );
+    }
+
     // Show inline forms if in create mode
     if (inlineCreateMode && product) {
       const productProps = {
@@ -2060,14 +2073,14 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       <CreateEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
-        productTag={String(product?.tag)}
+        productTag={product?.tag || ''}
         productId={String(product?._id)}
       />
 
       <UpdateProductEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
-        productTag={String(product?.tag)}
+        productTag={product?.tag || ''}
         productId={product?._id}
         environment={selectedEnvironment}
         onSuccess={() => {

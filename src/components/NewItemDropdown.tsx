@@ -45,13 +45,6 @@ const newItemOptions: NewItemOption[] = [
     description: 'Create a new application',
     category: 'app',
   },
-  {
-    id: 'auth',
-    label: 'Auth',
-    icon: Key,
-    description: 'Create authentication for an app',
-    category: 'app',
-  },
 
   // Product Items
   {

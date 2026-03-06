@@ -30,16 +30,34 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     if (completed === 'true') {
       setHasCompletedOnboarding(true);
     }
+
+    // Load partial progress if any
+    const savedStep = localStorage.getItem('ductape-onboarding-step');
+    const savedData = localStorage.getItem('ductape-onboarding-data');
+    if (savedStep) setCurrentStep(parseInt(savedStep));
+    if (savedData) {
+      try {
+        setStepData(JSON.parse(savedData));
+      } catch (e) {
+        console.error('Failed to parse onboarding data', e);
+      }
+    }
   }, []);
 
-  // Note: Removed automatic onboarding trigger based on 'ductape-is-new-user' flag.
-  // Onboarding is now triggered from WorkbenchLayout.tsx only after workspace fetch
-  // completes and confirms the user has no workspaces.
+  // Persist state changes
+  useEffect(() => {
+    if (isOnboarding) {
+      localStorage.setItem('ductape-onboarding-step', currentStep.toString());
+      localStorage.setItem('ductape-onboarding-data', JSON.stringify(stepData));
+    }
+  }, [currentStep, stepData, isOnboarding]);
 
   const startOnboarding = () => {
     setIsOnboarding(true);
     setCurrentStep(0);
     setStepData({});
+    localStorage.removeItem('ductape-onboarding-step');
+    localStorage.removeItem('ductape-onboarding-data');
   };
 
   const completeOnboarding = () => {
@@ -49,6 +67,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     setStepData({});
     localStorage.setItem('ductape-onboarding-completed', 'true');
     localStorage.removeItem('ductape-is-new-user');
+    localStorage.removeItem('ductape-onboarding-step');
+    localStorage.removeItem('ductape-onboarding-data');
   };
 
   const skipOnboarding = () => {
@@ -58,6 +78,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     setStepData({});
     localStorage.setItem('ductape-onboarding-completed', 'true');
     localStorage.removeItem('ductape-is-new-user');
+    localStorage.removeItem('ductape-onboarding-step');
+    localStorage.removeItem('ductape-onboarding-data');
   };
 
   const value: OnboardingContextType = {
@@ -69,7 +91,13 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     currentStep,
     setCurrentStep,
     stepData,
-    setStepData,
+    setStepData: (data) => {
+      // Ensure we don't accidentally pass event objects or other non-plain data
+      // React synthetic events have a nativeEvent property
+      if (data && typeof data === 'object' && !('nativeEvent' in data) && !('preventDefault' in data)) {
+        setStepData(prev => ({ ...prev, ...data }));
+      }
+    },
   };
 
   return (
