@@ -249,13 +249,13 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
             />
 
             <div className="text-end">
-  <div 
-    className="text-primary text-sm font-bold cursor-pointer"
-    onClick={() => setResetPasswordModal(true)} // Add this onClick handler
-  >
-    Forgot your password?
-  </div>
-</div>
+              <div
+                className="text-primary text-sm font-bold cursor-pointer"
+                onClick={() => setResetPasswordModal(true)} // Add this onClick handler
+              >
+                Forgot your password?
+              </div>
+            </div>
 
             <Button
               type="submit"
@@ -335,10 +335,10 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               Verify Your Email
             </DialogTitle>
             <DialogDescription className="text-grey-600 mt-2">
-              <div className="flex items-center gap-2 mt-2">
+              <span className="flex items-center gap-2 mt-2">
                 <Mail className="h-4 w-4" />
                 <span>We sent a 6-digit code to <strong>{userEmail}</strong></span>
-              </div>
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -398,25 +398,25 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
       </Dialog>
 
       <Dialog
-  open={resetPasswordModal}
-  onOpenChange={setResetPasswordModal}
->
-  <DialogContent className="sm:max-w-md">
-    
-    
-    <ResetPassword />
-    
-    {/* Add a close button */}
-    <DialogFooter>
-      <Button 
-        variant="outline" 
-        onClick={() => setResetPasswordModal(false)}
+        open={resetPasswordModal}
+        onOpenChange={setResetPasswordModal}
       >
-        Cancel
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+        <DialogContent className="sm:max-w-md">
+
+
+          <ResetPassword />
+
+          {/* Add a close button */}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setResetPasswordModal(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

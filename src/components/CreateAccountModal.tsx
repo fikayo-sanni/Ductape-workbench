@@ -454,22 +454,22 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
               </div>
 
               <div className="flex gap-4 items-center mt-6">
-                        {[
-                          { name: "google", label: "Google" },
-                          { name: "github", label: "GitHub" },
-                        ].map((provider) => (
-                          <Button
-                            key={provider.name}
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => {
-                              window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
-                            }}
-                          >
-                            <span className="capitalize">{provider.label}</span>
-                          </Button>
-                        ))}
-                      </div>
+                {[
+                  { name: "google", label: "Google" },
+                  { name: "github", label: "GitHub" },
+                ].map((provider) => (
+                  <Button
+                    key={provider.name}
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
+                    }}
+                  >
+                    <span className="capitalize">{provider.label}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
           </>
         ) : (
@@ -480,10 +480,10 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
                 Verify Your Email
               </DialogTitle>
               <DialogDescription className="text-grey-600 mt-2">
-                <div className="flex items-center gap-2 mt-2">
+                <span className="flex items-center gap-2 mt-2">
                   <Mail className="h-4 w-4" />
                   <span>We sent a 6-digit code to <strong>{userEmail}</strong></span>
-                </div>
+                </span>
               </DialogDescription>
             </DialogHeader>
 
