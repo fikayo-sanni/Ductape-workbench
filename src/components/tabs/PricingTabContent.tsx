@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Plus,
   Coins,
@@ -26,11 +26,11 @@ import {
   ArrowLeft,
   Check,
 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import {useForm} from 'react-hook-form';
+import {zodResolver} from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {Button} from '@/components/ui/button';
+import {Badge} from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -53,8 +53,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
 import {
   LineChart,
   Line,
@@ -72,305 +72,21 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import {useMutation, useQueryClient, useQuery} from '@tanstack/react-query';
 import pricingServices from '@/services/pricingServices';
 import toast from 'react-hot-toast';
-import { useAuth } from '@/store/useAuth';
+import {useAuth} from '@/store/useAuth';
 import {
   Pricing,
   PricingMode,
   PaymentInterval,
   PricingPlan,
+  BillingPlan,
 } from '@/types/pricing';
-import { useWorkbenchStore } from '@/stores/workbench-store';
+import {useWorkbenchStore} from '@/stores/workbench-store';
 import BillingsInfo from '../billing-form';
 
 export type PricingBundle = Pricing;
-
-export type Plan = {
-  name: string;
-  price: number;
-  users: number | string;
-  storage: string;
-  apiRequests: string;
-  support: string;
-  features?: string[];
-  current?: boolean;
-  bestValue?: boolean;
-  overage: {
-    api: string;
-    storage: string;
-    users: string;
-  };
-};
-
-// pricingPlans
-
-const pricingPlans: Plan[] = [
-  {
-    name: 'Starter',
-    price: 49,
-    users: 5,
-    storage: '25 GB',
-    apiRequests: '250,000',
-    support: 'Email support',
-    features: [],
-    overage: {
-      api: '$0.10 per 1,000 requests',
-      storage: '$0.50 per GB',
-      users: '$5 per additional user',
-    },
-  },
-
-  {
-    name: 'Professional',
-    price: 99,
-    users: 10,
-    storage: '50 GB',
-    apiRequests: '500,000',
-    support: 'Priority email support',
-    features: ['Advanced analytics'],
-    overage: {
-      api: '$0.08 per 1,000 requests',
-      storage: '$0.40 per GB',
-      users: '$4 per additional user',
-    },
-  },
-
-  {
-    name: 'Enterprise',
-    price: 199,
-    users: 20,
-    storage: '100 GB',
-    apiRequests: '1,000,000',
-    support: '24/7 priority support',
-    current: true,
-    features: [
-      'Advanced analytics & reports',
-      'Custom integrations',
-      'SLA guarantee',
-    ],
-    overage: {
-      api: '$0.05 per 1,000 requests',
-      storage: '$0.30 per GB',
-      users: '$3 per additional user',
-    },
-  },
-
-  {
-    name: 'Ultimate',
-    price: 399,
-    users: 'Unlimited',
-    storage: '500 GB',
-    apiRequests: '5M',
-    support: 'Dedicated',
-    bestValue: true,
-    features: [
-      'Everything in Enterprise',
-      'White-label options',
-      'Dedicated account manager',
-      'Custom contract terms',
-      'On-premise deployment option',
-      'Priority feature requests',
-    ],
-    overage: {
-      api: '$0.03 per 1,000 requests',
-      storage: '$0.20 per GB',
-      users: 'Unlimited (no overage)',
-    },
-  },
-];
-
-const tierPlans = pricingPlans.filter(plan => !plan.bestValue);
-
-const highlightedPlan = pricingPlans.find(plan => plan.bestValue);
-
-const PlanCard = ({ plan, onSelect }) => {
-  return (
-    <div
-      onClick={onSelect}
-      className={`cursor-pointer relative bg-white max-w-[322px] w-auto rounded-lg p-5 transition-all hover:shadow-lg
-      ${plan.current
-          ? 'border-2 border-primary'
-          : 'border border-grey-400 hover:border-primary'
-        }`}
-    >
-      <div className="mb-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-[20px] font-bold text-grey">{plan.name}</h3>
-
-          {plan.current && (
-            <Badge className="bg-primary/20 text-primary">Current Plan</Badge>
-          )}
-        </div>
-
-        <div className="flex items-baseline gap-1">
-          <span className="text-[40px] font-bold text-grey">${plan.price}</span>
-          <span className="text-grey-600 text-sm">/month</span>
-        </div>
-      </div>
-
-      <ul className="space-y-2 mb-4">
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            {plan.apiRequests} API requests/month
-          </span>
-        </li>
-
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            {plan.storage} storage
-          </span>
-        </li>
-
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            {plan.users} users
-          </span>
-        </li>
-
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            {plan.support}
-          </span>
-        </li>
-
-        {plan.features?.map((feature, i) => (
-          <li key={i} className="flex items-start gap-2 text-sm py-1">
-            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
-            <span className="font-medium text-base text-[#78797A]">
-              {feature}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
-        <p className="text-xs font-semibold text-[#78797A] mb-1">
-          Overage Pricing:
-        </p>
-
-        <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-          <li>• API: {plan.overage.api}</li>
-          <li>• Storage: {plan.overage.storage}</li>
-          <li>• Users: {plan.overage.users}</li>
-        </ul>
-      </div>
-
-      <Button
-        disabled={plan.current}
-        className="mt-auto w-full text-[12px] font-semibold text-grey"
-        variant="outline"
-      >
-        {plan.current ? 'Current Plan' : `Upgrade to ${plan.name}`}
-      </Button>
-    </div>
-  );
-};
-
-const UltimatePlanCard = ({ plan, onSelect }) => {
-  return (
-    <div
-      className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 mt-4"
-      onClick={onSelect}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-[20px] font-bold text-grey">{plan.name}</h3>
-            <Badge className="bg-[#391484] text-white">Best Value</Badge>
-          </div>
-
-          <div className="flex items-baseline gap-1">
-            <span className="text-[40px] font-bold text-grey">
-              ${plan.price}
-            </span>
-            <span className="text-grey-600 text-sm">/month</span>
-          </div>
-        </div>
-
-        <Button className="bg-[#391484] hover:bg-[#391484]/80">
-          Upgrade to Ultimate
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-          <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
-          <p className="text-[24px] font-bold text-grey">
-            {plan.apiRequests}/month
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
-          <p className="text-[24px] font-bold text-grey">{plan.storage}</p>
-        </div>
-        <div>
-          <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
-          <p className="text-[24px] font-bold text-grey">{plan.users}</p>
-        </div>
-        <div>
-          <p className="text-sm text-grey-600 mb-1 font-bold">Support</p>
-          <p className="text-[24px] font-bold text-grey">{plan.support}</p>
-        </div>
-      </div>
-
-      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            Everything in Enterprise
-          </span>
-        </li>
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            White-label options
-          </span>
-        </li>
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            Dedicated account manager
-          </span>
-        </li>
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            Custom contract terms
-          </span>
-        </li>
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            On-premise deployment option
-          </span>
-        </li>
-        <li className="flex items-start gap-2 text-sm py-1">
-          <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
-          <span className="font-medium text-base text-[#78797A]">
-            Priority feature requests
-          </span>
-        </li>
-      </ul>
-
-      <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4 mt-3">
-        <p className="text-xs font-semibold text-[#78797A] mb-1">
-          Overage Pricing:
-        </p>
-        <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
-          <li>• API: $0.03 per 1,000 requests</li>
-          <li>• Storage: $0.20 per GB</li>
-          <li>• Users: Unlimited (no overage)</li>
-        </ul>
-      </div>
-    </div>
-  );
-};
 
 // Bundle customer subscription interface
 interface BundleCustomer {
@@ -580,7 +296,7 @@ const DUMMY_EXPENDITURES: Expenditure[] = [
     reference_number: 'USG-2024-001',
     vendor_name: 'DataStream Inc',
     category: ExpenditureCategory.USAGE_BASED,
-    amount: 45.50,
+    amount: 45.5,
     currency: 'USD',
     status: ExpenditureStatus.PAID,
     due_date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
@@ -610,7 +326,7 @@ const DUMMY_EXPENDITURES: Expenditure[] = [
     reference_number: 'USG-2024-003',
     vendor_name: 'API Gateway Pro',
     category: ExpenditureCategory.USAGE_BASED,
-    amount: 124.00,
+    amount: 124.0,
     currency: 'USD',
     status: ExpenditureStatus.OVERDUE,
     due_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
@@ -1043,11 +759,11 @@ type BundleFormValues = z.infer<typeof bundleFormSchema>;
 type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'GHS' | 'ZAR';
 
 export default function PricingTabContent() {
-  const { currentWorkspaceId, user } = useAuth();
+  const {currentWorkspaceId, user} = useAuth();
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
-  const { billingView, setBillingView } = useWorkbenchStore();
+  const {billingView, setBillingView} = useWorkbenchStore();
   // Monthly drill-down state
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] =
@@ -1071,7 +787,7 @@ export default function PricingTabContent() {
 
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
   const [planDetailOpen, setPlanDetailOpen] = useState(false);
 
   const queryClient = useQueryClient();
@@ -1110,7 +826,7 @@ export default function PricingTabContent() {
         per_month?: number;
       };
     }) => {
-      const { _id, user_id, public_key, workspace_id, ...pricingPlan } = data;
+      const {_id, user_id, public_key, workspace_id, ...pricingPlan} = data;
       return pricingServices.editBundles({
         _id,
         user_id,
@@ -1125,7 +841,7 @@ export default function PricingTabContent() {
       toast.success('Bundle edited successfully');
 
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['bundles'] });
+      queryClient.invalidateQueries({queryKey: ['bundles']});
     },
 
     onError: (error: Error) => {
@@ -1143,7 +859,7 @@ export default function PricingTabContent() {
 
     onSuccess: () => {
       toast.success('Bundle deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
+      queryClient.invalidateQueries({queryKey: ['pricingBundles']});
     },
 
     onError: error => {
@@ -1186,7 +902,6 @@ export default function PricingTabContent() {
     }
   }, [editingBundle, form]);
 
-
   // Update form when editing bundle changes
   const handleFormOpen = () => {
     if (editingBundle) {
@@ -1221,8 +936,7 @@ export default function PricingTabContent() {
         form.reset();
       }
 
-      queryClient.invalidateQueries({ queryKey: ['pricingBundles'] });
-
+      queryClient.invalidateQueries({queryKey: ['pricingBundles']});
     },
     onError: error => {
       console.error('Error creating bundle:', error);
@@ -1274,7 +988,7 @@ export default function PricingTabContent() {
         unit_price: bundleData.unit_price,
         currency: bundleData.currency,
         overage_price: bundleData.overage_price || 0,
-        ...(Object.keys(limits).length > 0 && { limits }),
+        ...(Object.keys(limits).length > 0 && {limits}),
       };
 
       // Call edit mutation
@@ -1321,7 +1035,7 @@ export default function PricingTabContent() {
     setBundleFormOpen(true);
   };
 
-  const { data: totalIncomeData, status: isLoadingIncome } = useQuery({
+  const {data: totalIncomeData, status: isLoadingIncome} = useQuery({
     queryKey: ['incomes', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchTotalIncome({
@@ -1332,7 +1046,7 @@ export default function PricingTabContent() {
     enabled: !!user?._id && !!currentWorkspaceId, // Both conditions
   });
 
-  const { data: totalExpenseData, status: isLoadingExpense } = useQuery({
+  const {data: totalExpenseData, status: isLoadingExpense} = useQuery({
     queryKey: ['expenses', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchTotalExpense({
@@ -1348,7 +1062,7 @@ export default function PricingTabContent() {
   // console.log("total expense", {totalExpenseData, isLoadingExpense});
   const expenseData = totalExpenseData?.data;
 
-  const { data: bundleData, isLoading } = useQuery({
+  const {data: bundleData, isLoading} = useQuery({
     queryKey: ['bundles', user?._id, currentWorkspaceId],
     queryFn: () =>
       pricingServices.fetchBundles({
@@ -1360,7 +1074,7 @@ export default function PricingTabContent() {
   });
 
   const pricingData = bundleData?.data;
-  console.log('pricing bundles', { pricingData, isLoading });
+  // console.log('pricing bundles', {pricingData, isLoading});
 
   const activePricings =
     pricingData?.pricings?.filter(pricing => pricing.is_active) || [];
@@ -1375,6 +1089,293 @@ export default function PricingTabContent() {
       bundleSubscriptions.get(invoice.bundle_name)?.add(invoice.workspace_id);
     });
   });
+
+  // Get Billing Report
+  const {data: billingData, isLoading: billingDataLoading} = useQuery({
+    queryKey: ['billingReport', user?._id, currentWorkspaceId],
+    queryFn: () =>
+      pricingServices.fetchBillingReport({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        workspace_id: currentWorkspaceId || '',
+      }),
+    enabled: !!user?._id && !!currentWorkspaceId,
+  });
+
+  console.log('Billing Data', billingData);
+  console.log('Billing Data Load State', billingDataLoading);
+
+  // Get Billing Plans
+  const {data: billingPlans, isLoading: billingPlansLoading} = useQuery({
+    queryKey: ['billingPlans', user?._id],
+    queryFn: () =>
+      pricingServices.fetchBillingData({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      }),
+    enabled: !!user?._id && !!user?.public_key,
+  });
+
+  // console.log('Billing Plans', billingPlans);
+  console.log('Billing Plans Load State', billingPlansLoading);
+
+  const formatStorage = gb => {
+    if (gb === null || gb === undefined) return 'Unlimited';
+    if (gb >= 1000) return `${gb / 1000}TB`;
+    if (gb === 0) return '0GB';
+    return `${gb}GB`;
+  };
+
+  const formatNumber = num => {
+    if (num === null || num === undefined) return 'Unlimited';
+    return num.toLocaleString();
+  };
+
+  const pricingPlans = billingPlans?.data || [];
+
+  const currentPlan = 'Enterprise Plan';
+
+  const tierPlans = pricingPlans.filter(
+    plan => plan.name !== 'Enterprise Plan',
+  );
+
+  const highlightedPlan = pricingPlans.find(
+    plan => plan.name == 'Enterprise Plan',
+  );
+
+  const PlanCard = ({
+    plan,
+    onSelect,
+  }: {
+    plan: BillingPlan;
+    onSelect: () => void;
+  }) => {
+    const isCurrentPlan = plan.name === currentPlan;
+
+    return (
+      <div
+        onClick={onSelect}
+        className={`cursor-pointer relative bg-white max-w-[322px] w-auto rounded-lg p-5 transition-all hover:shadow-lg
+      ${
+        isCurrentPlan
+          ? 'border-2 border-primary'
+          : 'border border-grey-400 hover:border-primary'
+      }`}
+      >
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[20px] font-bold text-grey">{plan.name}</h3>
+
+            {isCurrentPlan && (
+              <Badge className="bg-primary/20 text-primary">Current Plan</Badge>
+            )}
+          </div>
+
+          <div className="flex items-baseline gap-1">
+            <span className="text-[40px] font-bold text-grey">
+              ${plan.monthlyPrice !== null ? plan.monthlyPrice : 'Custom'}
+            </span>
+            {plan.monthlyPrice !== null && (
+              <span className="text-grey-600 text-sm">/month</span>
+            )}
+          </div>
+          {plan.isPayAsYouGo && (
+            <span className="text-xs text-grey-600">Pay as you go</span>
+          )}
+        </div>
+
+        <ul className="space-y-2 mb-4">
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {formatNumber(plan.monthlyRequests)} API requests/month
+            </span>
+          </li>
+
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {formatStorage(plan.fileTransfer)} storage
+            </span>
+          </li>
+
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {plan.users !== null ? `${plan.users} users` : 'Unlimited users'}
+            </span>
+          </li>
+
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {plan.logsRetentionDays} days logs retention
+            </span>
+          </li>
+
+          {plan.customFeatures?.map((feature, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm py-1">
+              <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+              <span className="font-medium text-base text-[#78797A]">
+                {feature}
+              </span>
+            </li>
+          ))}
+
+          {plan.productLimits && (
+            <>
+              <li className="flex items-start gap-2 text-sm py-1">
+                <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+                <span className="font-medium text-base text-[#78797A]">
+                  {plan.productLimits.databases} databases
+                </span>
+              </li>
+              <li className="flex items-start gap-2 text-sm py-1">
+                <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
+                <span className="font-medium text-base text-[#78797A]">
+                  {plan.productLimits.caches} caches
+                </span>
+              </li>
+            </>
+          )}
+        </ul>
+
+        {plan.usagePricing && (
+          <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4">
+            <p className="text-xs font-semibold text-[#78797A] mb-1">
+              Overage Pricing:
+            </p>
+
+            <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
+              <li>
+                • API: ${plan.usagePricing.additionalRequestPrice} per request
+              </li>
+              <li>
+                • Storage: ${plan.usagePricing.additionalStoragePrice} per GB
+              </li>
+              {plan.usagePricing?.additionalUserPrice > 0 && (
+                <li>
+                  • Users: ${plan.usagePricing?.additionalUserPrice} per user
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {plan.marketplaceAccess && (
+          <div className="text-xs text-grey-600 mb-2">
+            Marketplace revenue share: {plan.marketplaceAccess.revenueShare}%
+          </div>
+        )}
+
+        <Button
+          disabled={isCurrentPlan}
+          className="mt-auto w-full text-[12px] font-semibold text-grey"
+          variant="outline"
+        >
+          {isCurrentPlan ? 'Current Plan' : `Upgrade to ${plan.name}`}
+        </Button>
+      </div>
+    );
+  };
+
+  const UltimatePlanCard = ({plan, onSelect}) => {
+    return (
+      <div
+        className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 mt-4"
+        onClick={onSelect}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-[20px] font-bold text-grey">{plan.name}</h3>
+              <Badge className="bg-[#391484] text-white">Best Value</Badge>
+            </div>
+
+            <div className="flex items-baseline gap-1">
+              <span className="text-[40px] font-bold text-grey">
+                ${plan.monthlyPrice !== null ? plan.monthlyPrice : 'Custom'}
+              </span>
+              {plan.monthlyPrice !== null && (
+                <span className="text-grey-600 text-sm">/month</span>
+              )}
+            </div>
+          </div>
+
+          <Button className="bg-[#391484] hover:bg-[#391484]/80">
+            Upgrade to {plan.name}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
+            <p className="text-[24px] font-bold text-grey">
+              {formatNumber(plan.monthlyRequests)}/month
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
+            <p className="text-[24px] font-bold text-grey">
+              {formatStorage(plan.fileTransfer)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
+            <p className="text-[24px] font-bold text-grey">
+              {plan.users !== null ? plan.users : 'Unlimited'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-grey-600 mb-1 font-bold">
+              Logs Retention
+            </p>
+            <p className="text-[24px] font-bold text-grey">
+              {plan.logsRetentionDays} days
+            </p>
+          </div>
+        </div>
+
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              Everything in Pro
+            </span>
+          </li>
+          {plan.customFeatures?.map((feature, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm py-1">
+              <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+              <span className="font-medium text-base text-[#78797A]">
+                {feature}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {plan.usagePricing && (
+          <div className="bg-[#78797A80]/15 rounded border border-[#78797A80]/15 p-2 mb-4 mt-3">
+            <p className="text-xs font-semibold text-[#78797A] mb-1">
+              Overage Pricing:
+            </p>
+            <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
+              <li>
+                • API: ${plan.usagePricing.additionalRequestPrice} per request
+              </li>
+              <li>
+                • Storage: ${plan.usagePricing.additionalStoragePrice} per GB
+              </li>
+              {plan.usagePricing.additionalUserPrice > 0 && (
+                <li>
+                  • Users: ${plan.usagePricing.additionalUserPrice} per user
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Prepare data for bundle subscription distribution chart
   const chartColors = [
@@ -1393,14 +1394,17 @@ export default function PricingTabContent() {
     .sort((a, b) => b.value - a.value); // Sort by subscription count descending
 
   // Calculate expenditure stats
-  const totalExpenditureAmount = expenditures.reduce((sum, exp) => sum + exp.amount, 0);
-
+  const totalExpenditureAmount = expenditures.reduce(
+    (sum, exp) => sum + exp.amount,
+    0,
+  );
 
   // Prepare expenditure category distribution for pie chart
   const categoryDistribution = expenseData?.categoryBreakdown;
-  const filterDistribution = categoryDistribution?.filter(item => item.amount > 0);
+  const filterDistribution = categoryDistribution?.filter(
+    item => item.amount > 0,
+  );
   const COLORS = ['#0088FE', '#8884d8', '#FFBB28', '#FF8042'];
-
 
   // Prepare revenue trend data
   const revenueTrendData = incomeRecords.map(record => ({
@@ -1417,7 +1421,7 @@ export default function PricingTabContent() {
   const revenueGrowth =
     previousMonthRevenue > 0
       ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) *
-      100
+        100
       : 0;
 
   const totalRevenue = incomeRecords.reduce(
@@ -1448,7 +1452,11 @@ export default function PricingTabContent() {
                 Manage your pricing bundles, track income and expenses
               </p>
             </div>
-            <Button className="gap-2 my-auto" onClick={handleAddBundle} disabled>
+            <Button
+              className="gap-2 my-auto"
+              onClick={handleAddBundle}
+              disabled
+            >
               <Plus className="h-4 w-4" />
               New Bundle
             </Button>
@@ -1479,8 +1487,7 @@ export default function PricingTabContent() {
 
                     <div className="pt-4">
                       <p className="text-grey text-[32px] font-bold pb-1">
-                        $
-                        {expenseData?.totalSpending.toFixed(2)}
+                        ${expenseData?.totalSpending.toFixed(2)}
                       </p>
                       <p className="text-xs text-primary font-semibold">
                         TOTAL AMOUNT DUE
@@ -1495,28 +1502,19 @@ export default function PricingTabContent() {
 
                 <div className="flex flex-col ml-auto justify-between border-l border-l-[#8F92A1] pl-5 pr-10 border-opacity-[40%] w-1/3">
                   <div className="flex items-center">
-                    <FileText
-                      width={24}
-                      height={24}
-                      className="text-primary"
-                    />
+                    <FileText width={24} height={24} className="text-primary" />
                     <div className="pl-2">
                       <p className="text-grey-700 text-sm font-normal">
                         Current Plan Billing
                       </p>
                       <p className="text-[20px] text-grey font-bold">
-                        ${' '}
-                        {199.00.toFixed(2)}
+                        $ {(199.0).toFixed(2)}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center">
-                    <Clock
-                      width={24}
-                      height={24}
-                      className="text-primary"
-                    />
+                    <Clock width={24} height={24} className="text-primary" />
                     <div className="pl-2">
                       <p className="text-grey-700 text-sm font-normal">
                         Next Billing Date
@@ -1565,13 +1563,18 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-semibold text-grey">API Requests</span>
+                      <span className="text-sm font-semibold text-grey">
+                        API Requests
+                      </span>
                     </div>
                     <span className="text-xs text-grey-600">115% used</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: '100%' }}></div>
+                      <div
+                        className="bg-primary h-2 rounded-full"
+                        style={{width: '100%'}}
+                      ></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
@@ -1581,9 +1584,7 @@ export default function PricingTabContent() {
                     <p className="text-xs font-semibold text-primary/80">
                       Overage: +150,000 requests
                     </p>
-                    <p className="text-xs text-primary/60">
-                      $7.50 @ $0.05/1K
-                    </p>
+                    <p className="text-xs text-primary/60">$7.50 @ $0.05/1K</p>
                   </div>
                 </div>
 
@@ -1592,18 +1593,21 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <HardDrive className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-semibold text-grey">Storage</span>
+                      <span className="text-sm font-semibold text-grey">
+                        Storage
+                      </span>
                     </div>
                     <span className="text-xs text-grey-600">108% used</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div className="bg-[#00875A] h-2 rounded-full" style={{ width: '100%' }}></div>
+                      <div
+                        className="bg-[#00875A] h-2 rounded-full"
+                        style={{width: '100%'}}
+                      ></div>
                     </div>
                   </div>
-                  <p className="text-xs text-grey-600 mb-1">
-                    108 GB / 100 GB
-                  </p>
+                  <p className="text-xs text-grey-600 mb-1">108 GB / 100 GB</p>
                   <div className="bg-[#00875A]/  border border-[#00875A]/20 rounded px-2 py-1">
                     <p className="text-xs font-semibold text-[#00875A]/70">
                       Overage: +8 GB
@@ -1619,13 +1623,18 @@ export default function PricingTabContent() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm font-semibold text-grey">Users</span>
+                      <span className="text-sm font-semibold text-grey">
+                        Users
+                      </span>
                     </div>
                     <span className="text-xs text-grey-600">8 / 20</span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
-                      <div className="bg-orange-500 h-2 rounded-full" style={{ width: '40%' }}></div>
+                      <div
+                        className="bg-orange-500 h-2 rounded-full"
+                        style={{width: '40%'}}
+                      ></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
@@ -1641,7 +1650,6 @@ export default function PricingTabContent() {
                   </div>
                 </div>
               </div>
-
             </section>
 
             <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
@@ -1664,8 +1672,11 @@ export default function PricingTabContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(expenseData?.recentExpenses ?? []).map((expenditure) => (
-                      <TableRow key={expenditure.vendor} className="hover:bg-grey-100 transition-colors">
+                    {(expenseData?.recentExpenses ?? []).map(expenditure => (
+                      <TableRow
+                        key={expenditure.vendor}
+                        className="hover:bg-grey-100 transition-colors"
+                      >
                         <TableCell>
                           <span className="font-medium text-grey">
                             {expenditure.reference}
@@ -1852,7 +1863,7 @@ export default function PricingTabContent() {
                               </TableCell>
                               <TableCell>
                                 {bundle.pricing_mode ===
-                                  PricingMode.RECURRING ? (
+                                PricingMode.RECURRING ? (
                                   <div className="text-xs text-grey-700">
                                     <span className="font-mono font-semibold">
                                       $0.05
@@ -1963,7 +1974,7 @@ export default function PricingTabContent() {
                                                   customer.status === 'active'
                                                     ? 'default'
                                                     : customer.status ===
-                                                      'trialing'
+                                                        'trialing'
                                                       ? 'secondary'
                                                       : 'destructive'
                                                 }
@@ -2021,10 +2032,10 @@ export default function PricingTabContent() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: 12 }}
+                    tick={{fontSize: 12}}
                     stroke="#6B7280"
                   />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <YAxis tick={{fontSize: 12}} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'white',
@@ -2146,10 +2157,10 @@ export default function PricingTabContent() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis
                     dataKey="month"
-                    tick={{ fontSize: 12 }}
+                    tick={{fontSize: 12}}
                     stroke="#6B7280"
                   />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
+                  <YAxis tick={{fontSize: 12}} stroke="#6B7280" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'white',
@@ -2489,7 +2500,6 @@ export default function PricingTabContent() {
             </div> */}
 
             {/* Expenditures Table */}
-
           </div>
         )}
 
@@ -3078,7 +3088,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-orange-500 h-2 rounded-full"
-                        style={{ width: '100%' }}
+                        style={{width: '100%'}}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">115% used</p>
@@ -3120,7 +3130,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-orange-500 h-2 rounded-full"
-                        style={{ width: '100%' }}
+                        style={{width: '100%'}}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">108% used</p>
@@ -3160,7 +3170,7 @@ export default function PricingTabContent() {
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-green h-2 rounded-full"
-                        style={{ width: '40%' }}
+                        style={{width: '40%'}}
                       ></div>
                     </div>
                     <p className="text-xs text-grey-600">40% used</p>
@@ -3188,29 +3198,29 @@ export default function PricingTabContent() {
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart
                     data={[
-                      { month: 'Jun', api: 800000, storage: 85, users: 7 },
-                      { month: 'Jul', api: 850000, storage: 89, users: 7 },
-                      { month: 'Aug', api: 920000, storage: 92, users: 8 },
-                      { month: 'Sep', api: 980000, storage: 95, users: 8 },
-                      { month: 'Oct', api: 1050000, storage: 102, users: 8 },
-                      { month: 'Nov', api: 1150000, storage: 108, users: 8 },
+                      {month: 'Jun', api: 800000, storage: 85, users: 7},
+                      {month: 'Jul', api: 850000, storage: 89, users: 7},
+                      {month: 'Aug', api: 920000, storage: 92, users: 8},
+                      {month: 'Sep', api: 980000, storage: 95, users: 8},
+                      {month: 'Oct', api: 1050000, storage: 102, users: 8},
+                      {month: 'Nov', api: 1150000, storage: 108, users: 8},
                     ]}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis
                       dataKey="month"
-                      tick={{ fontSize: 12 }}
+                      tick={{fontSize: 12}}
                       stroke="#6B7280"
                     />
                     <YAxis
                       yAxisId="left"
-                      tick={{ fontSize: 12 }}
+                      tick={{fontSize: 12}}
                       stroke="#6B7280"
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      tick={{ fontSize: 12 }}
+                      tick={{fontSize: 12}}
                       stroke="#6B7280"
                     />
                     <Tooltip
@@ -3322,99 +3332,250 @@ export default function PricingTabContent() {
 
         <Dialog open={planDetailOpen} onOpenChange={setPlanDetailOpen}>
           <DialogContent className="max-w-[1088px] max-h-[90vh] overflow-y-auto">
-
             {selectedPlan && (
-
               <section className="flex flex-col justify-center py-3 w-full pb-10">
                 <button
                   onClick={handleBackToPlans}
                   className="flex items-center gap-2"
                 >
-                  <ArrowLeft
-                    width={17}
-                    height={12}
-                    className="dark:invert"
-                  />
+                  <ArrowLeft width={17} height={12} className="dark:invert" />
                   <p className="text-sm font-semibold text-grey-800 dark:text-grey">
                     Back
                   </p>
                 </button>
                 <DialogHeader>
                   <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
-                    Upgrade Workspace from Starter to{' '}
-                    {selectedPlan.name}
+                    Upgrade Workspace from Starter to {selectedPlan.name}
                   </DialogTitle>
                   <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
                     {selectedPlan.name} plan details
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className=" mb-10 mt-1 py-5 px-10 bg-white border border-grey-400 rounded-[5px] flex items-start justify-between">
-                  <div className=" w-full text-sm flex justify-between items-start">
+                <div className="mb-10 mt-1 py-5 px-10 bg-white border border-grey-400 rounded-[5px] flex items-start justify-between">
+                  <div className="w-full text-sm flex justify-between items-start">
                     <ul className="space-y-2 my-4 text-base font-medium text-grey">
-
+                      {/* API Requests */}
                       <li className="flex gap-2">
                         <div className="flex items-center gap-1">
-                          <div>
-                            <CheckCircle className="w-4 h-4 text-green font-bold" />
-                          </div>
-                          {selectedPlan.apiRequests} API requests/month
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.monthlyRequests?.toLocaleString() ||
+                              'Unlimited'}{' '}
+                            API requests/month
+                          </span>
                         </div>
                       </li>
 
+                      {/* Storage */}
                       <li className="flex gap-2">
                         <div className="flex items-center gap-1">
-                          <div>
-                            <CheckCircle className="w-4 h-4 text-green font-bold" />
-                          </div>
-                          {selectedPlan.storage} storage
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.fileTransfer === 0
+                              ? '0GB'
+                              : selectedPlan.fileTransfer
+                                ? `${selectedPlan.fileTransfer}GB storage`
+                                : 'Unlimited storage'}
+                          </span>
                         </div>
                       </li>
 
+                      {/* Users */}
                       <li className="flex gap-2">
                         <div className="flex items-center gap-1">
-                          <div>
-                            <CheckCircle className="w-4 h-4 text-green font-bold" />
-                          </div>
-                          {selectedPlan.users} users
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.users !== null
+                              ? `${selectedPlan.users} users`
+                              : 'Unlimited users'}
+                          </span>
                         </div>
                       </li>
 
+                      {/* Apps */}
                       <li className="flex gap-2">
                         <div className="flex items-center gap-1">
-                          <div>
-                            <CheckCircle className="w-4 h-4 text-green font-bold" />
-                          </div>
-                          {selectedPlan.support}
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.apps !== null
+                              ? `${selectedPlan.apps} apps`
+                              : 'Unlimited apps'}
+                          </span>
                         </div>
                       </li>
 
-                      {selectedPlan.features?.map((feature, i) => (
+                      {/* Products */}
+                      <li className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.products !== null
+                              ? `${selectedPlan.products} products`
+                              : 'Unlimited products'}
+                          </span>
+                        </div>
+                      </li>
+
+                      {/* Logs Retention */}
+                      <li className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.logsRetentionDays} days logs retention
+                          </span>
+                        </div>
+                      </li>
+
+                      {/* Usage Data Retention */}
+                      <li className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4 text-green font-bold" />
+                          <span>
+                            {selectedPlan.usageDataRetentionDays} days usage
+                            data retention
+                          </span>
+                        </div>
+                      </li>
+
+                      {/* Product Limits - if they exist */}
+                      {selectedPlan.productLimits && (
+                        <>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.databases} databases
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.caches} caches
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.actions} actions
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.storageUnits}{' '}
+                                storage units
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.messageBrokers}{' '}
+                                message brokers
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.notifiers} notifiers
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.jobs} jobs
+                              </span>
+                            </div>
+                          </li>
+                          <li className="flex gap-2">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4 text-green font-bold" />
+                              <span>
+                                {selectedPlan.productLimits.cloudFunctions}{' '}
+                                cloud functions
+                              </span>
+                            </div>
+                          </li>
+                        </>
+                      )}
+
+                      {/* Marketplace Access */}
+                      {selectedPlan.marketplaceAccess && (
+                        <li className="flex gap-2">
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4 text-green font-bold" />
+                            <span>
+                              Marketplace{' '}
+                              {selectedPlan.marketplaceAccess.canPublish
+                                ? 'publishing'
+                                : 'access'}{' '}
+                              • {selectedPlan.marketplaceAccess.revenueShare}%
+                              revenue share
+                            </span>
+                          </div>
+                        </li>
+                      )}
+
+                      {/* Custom Features */}
+                      {selectedPlan.customFeatures?.map((feature, i) => (
                         <li key={i} className="flex gap-2">
                           <div className="flex items-center gap-1">
-                            <div>
-                              <CheckCircle className="w-4 h-4 text-green font-bold" />
-                            </div>
-                            {feature}
+                            <CheckCircle className="w-4 h-4 text-green font-bold" />
+                            <span>{feature}</span>
                           </div>
                         </li>
                       ))}
-
                     </ul>
+
+                    {/* Price Section */}
                     <div className="space-y-2 my-4">
-                      <p className="font-bold text-[40px] text-grey">${selectedPlan.price}<span className="font-bold text-sm text-grey">/month</span></p>
+                      <p className="font-bold text-[40px] text-grey">
+                        {selectedPlan.monthlyPrice !== null ? (
+                          <>
+                            ${selectedPlan.monthlyPrice}
+                            {selectedPlan.monthlyPrice > 0 && (
+                              <span className="font-bold text-sm text-grey">
+                                /month
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          'Custom Pricing'
+                        )}
+                      </p>
+                      {selectedPlan.isPayAsYouGo && (
+                        <p className="text-sm text-grey-600">
+                          Pay-as-you-go pricing
+                        </p>
+                      )}
+                      {selectedPlan.tag === 'enterprise' && (
+                        <p className="text-sm text-grey-600">
+                          Contact sales for pricing
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="w-full mt-6 text-grey">
                   <>
-                    <BillingsInfo />
+                    <BillingsInfo selectedPlan = {selectedPlan} />
                   </>
                 </div>
               </section>
             )}
-
           </DialogContent>
         </Dialog>
       </div>

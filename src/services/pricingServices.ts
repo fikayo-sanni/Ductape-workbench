@@ -1,5 +1,5 @@
 import apiClient from "@/config/axiosinstance";
-import { PricingApiResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse } from "@/types/pricing";
+import { PricingApiResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse, BillingResponse, BillingApiResponse } from "@/types/pricing";
 import toast from "react-hot-toast";
 
 const createBundle = async (data: {
@@ -129,6 +129,35 @@ const editBundles = async (data: {
   }
 };
 
+// Billing Report
+const fetchBillingReport = async (data: {
+  user_id: string;
+  public_key: string;
+  workspace_id: string;
+}): Promise<BillingResponse> => {
+  const { user_id, public_key, workspace_id } = data;
+  const response = await apiClient.get<BillingResponse>(
+    `/workspaces/workspaces/v1/billing/report/${workspace_id}`,
+    {
+      params: { user_id, public_key },
+    }
+  );
+  return response.data;
+};
+
+const fetchBillingData = async (data: {
+  user_id: string;
+  public_key: string;
+}): Promise<BillingApiResponse> => {
+  const { user_id, public_key } = data;
+  const response = await apiClient.get<BillingApiResponse>(
+    `/pricing/v1/subscription`,
+    {
+      params: { user_id, public_key },
+    }
+  );
+  return response.data;
+};
 
 const pricingServices = {
   createBundle,
@@ -137,6 +166,8 @@ const pricingServices = {
   fetchTotalExpense,
   deleteBundle,
   editBundles,
+  fetchBillingReport,
+  fetchBillingData,
 };
 
 export default pricingServices;

@@ -125,3 +125,194 @@ export interface DeletePricingResponse {
   meta: object,
   data: boolean
 }
+
+
+// Billing Report
+
+interface ResourceMetrics {
+  dbActions: number;
+  caches: number;
+  databases: number;
+  storageUnits: number;
+  messageBrokers: number;
+  notifiers: number;
+  jobs: number;
+  cloudFunctions: number;
+  apps: number;
+  products: number;
+  users: number;
+  requests: number;
+}
+
+interface WorkspaceDefaultEnv {
+  env_name: string;
+  slug: string;
+  description: string;
+  _id: string;
+}
+
+interface Workspace {
+  payment_status: string;
+  _id: string;
+  name: string;
+  description: string;
+  defaultEnvs: WorkspaceDefaultEnv[];
+  __v: number;
+}
+
+interface Subscription {
+  _id: string;
+  plan_id: string;
+  workspace_id: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  lastBillingDate: string;
+  nextBillingDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface MarketplaceAccess {
+  canPublish: boolean;
+  revenueShare: number;
+}
+
+interface UsagePricing {
+  additionalDatabasePrice: number;
+  additionalUserPrice: number;
+  additionalRequestPrice: number;
+  additionalStoragePrice: number;
+}
+
+interface ProductLimits {
+  caches: number;
+  databases: number;
+  actions: number;
+  storageUnits: number;
+  messageBrokers: number;
+  notifiers: number;
+  jobs: number;
+  cloudFunctions: number;
+  _id: string;
+}
+
+interface Plan {
+  marketplaceAccess: MarketplaceAccess;
+  usagePricing: UsagePricing;
+  _id: string;
+  name: string;
+  tag: string;
+  isEnterprise: boolean;
+  monthlyPrice: number;
+  description: string;
+  users: number;
+  monthlyRequests: number;
+  fileTransfer: number;
+  apps: number;
+  products: number;
+  logsRetentionDays: number;
+  usageDataRetentionDays: number;
+  productLimits: ProductLimits;
+  isPayAsYouGo: boolean;
+  customFeatures: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BillingReport {
+  resourceUsage: ResourceMetrics;
+  resourceCosts: ResourceMetrics;
+  _id: string;
+  workspace_id: Workspace;
+  subscription_id: Subscription;
+  plan_id: Plan;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  basePrice: number;
+  totalCost: number;
+  paid: boolean;
+  planChangeHistory: string[];
+  planChangeReports: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PlanChangeDetails {
+  changeDate: string;
+  effectiveDate: string;
+  oldPlanUsedAmount: number;
+  reason: string;
+}
+
+interface PreviousPlanReport {
+  billingReport: BillingReport;
+  planDetails: PlanChangeDetails;
+}
+
+interface PlanChangeHistory {
+  previousPlanReport: PreviousPlanReport;
+}
+
+interface BillingData {
+  currentBillingReport: BillingReport;
+  planChangeHistory: PlanChangeHistory;
+}
+
+export interface BillingResponse {
+  status: boolean;
+  meta: Record<string, any>;
+  message: string;
+  data: BillingData;
+}
+
+// Billing Plans
+
+interface ResourcePricing {
+  action: number;
+  cache: number;
+  database: number;
+  storage: number;
+  messageBroker: number;
+  notifier: number;
+  job: number;
+  cloudFunction: number;
+  log: number;
+  app: number;
+  product: number;
+  user: number;
+  _id: string;
+}
+
+export interface BillingPlan {
+  marketplaceAccess: MarketplaceAccess;
+  usagePricing: UsagePricing;
+  _id: string;
+  name: string;
+  tag: string;
+  isEnterprise: boolean;
+  monthlyPrice: number;
+  description: string;
+  users: number;
+  monthlyRequests: number;
+  fileTransfer: number;
+  apps: number;
+  products: number;
+  logsRetentionDays: number;
+  usageDataRetentionDays: number;
+  productLimits: ProductLimits;
+  isPayAsYouGo: boolean;
+  resourcePricing?: ResourcePricing;
+  customFeatures: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BillingApiResponse {
+  status: boolean;
+  meta: Record<string, unknown>;
+  data: BillingPlan[];
+}
+
