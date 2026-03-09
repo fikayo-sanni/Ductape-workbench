@@ -1,6 +1,8 @@
 import apiClient from "@/config/axiosinstance";
-import { PricingApiResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse, BillingResponse, BillingApiResponse } from "@/types/pricing";
+import { PricingApiResponse, ChangePlanRequest, ChangePlanResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse, BillingResponse, BillingApiResponse, SubscriptionResponse } from "@/types/pricing";
 import toast from "react-hot-toast";
+
+
 
 const createBundle = async (data: {
   user_id: string;
@@ -26,7 +28,7 @@ const fetchBundles = async (data: {
   workspace_id: string;
 }): Promise<PricingApiResponse> => {
   const { user_id, public_key, workspace_id } = data;
-  const response = await apiClient.get<PricingApiResponse>( 
+  const response = await apiClient.get<PricingApiResponse>(
     '/pricing/v1/workspace',
     {
       params: { user_id, public_key, workspace_id },
@@ -41,7 +43,7 @@ const fetchTotalIncome = async (data: {
   workspace_id: string;
 }): Promise<TotalIncomeRecord> => {
   const { user_id, public_key, workspace_id } = data;
-  const response = await apiClient.get<TotalIncomeRecord>( 
+  const response = await apiClient.get<TotalIncomeRecord>(
     `/log/v1/income/stats/${workspace_id}`,
     {
       params: { public_key, user_id },
@@ -69,29 +71,29 @@ const fetchTotalExpense = async (data: {
 }
 
 const deleteBundle = async (data: {
-    _id: string;
-    user_id: string;
-    public_key: string;
-    workspace_id?: string;
+  _id: string;
+  user_id: string;
+  public_key: string;
+  workspace_id?: string;
 }): Promise<DeletePricingResponse | null> => {
-    const { user_id, public_key, _id, workspace_id } = data;
-    try {
-        const response = await apiClient.delete<DeletePricingResponse>(
-            `/pricing/v1/delete/${_id}`,
-            {
-                params: {
-                    user_id,
-                    public_key,
-                    workspace_id,
-                },
-            }
-        );
+  const { user_id, public_key, _id, workspace_id } = data;
+  try {
+    const response = await apiClient.delete<DeletePricingResponse>(
+      `/pricing/v1/delete/${_id}`,
+      {
+        params: {
+          user_id,
+          public_key,
+          workspace_id,
+        },
+      }
+    );
 
-        return response.data;
-    } catch (error) {
-        console.error("Error deleting bundle:", error);
-        return null;
-    }
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting bundle:", error);
+    return null;
+  }
 };
 
 const editBundles = async (data: {
@@ -106,7 +108,7 @@ const editBundles = async (data: {
   try {
     const response = await apiClient.put<PricingPlan>(
       `/pricing/v1/update/${_id}`,
-      payload, 
+      payload,
       {
         params: {
           user_id,
@@ -159,6 +161,56 @@ const fetchBillingData = async (data: {
   return response.data;
 };
 
+const changeSubscription = async (
+  params: { user_id: string; public_key: string },
+  data: ChangePlanRequest,
+  authToken: string
+): Promise<ChangePlanResponse> => {
+  const response = await apiClient.put<ChangePlanResponse>(
+    `/workspaces/workspaces/v1/subscribe`,
+    data,
+    {
+      params: params,
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+
+      }
+    }
+  );
+  return response.data;
+};
+
+const createSubscription = async (data: {
+  user_id: string;
+  public_key: string;
+  payload: {
+    plan_id: string;
+    workspace_id: string;
+  };
+}): Promise<SubscriptionResponse> => {
+
+  const { user_id, public_key, payload } = data;
+
+  try {
+    const response = await apiClient.post<SubscriptionResponse>(
+      `/workspaces/workspaces/v1/subscribe`,
+      payload,
+      {
+        params: {
+          user_id,
+          public_key,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Failed to create subscription:', error);
+    throw error;
+  }
+};
+
 const pricingServices = {
   createBundle,
   fetchBundles,
@@ -168,6 +220,8 @@ const pricingServices = {
   editBundles,
   fetchBillingReport,
   fetchBillingData,
+  changeSubscription,
+  createSubscription,
 };
 
 export default pricingServices;

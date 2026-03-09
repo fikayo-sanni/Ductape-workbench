@@ -1,17 +1,17 @@
 export interface PricingPlan {
-    pricing_mode: string;
-    interval?: string;
-    overage_price?: number;
-    limits?: {
-        per_minute?: number;
-        per_hour?: number;
-        per_day?: number;
-        per_week?: number;
-        per_month?: number;
-    };
-    unit_price: number;
-    name: string;
-    currency: string;
+  pricing_mode: string;
+  interval?: string;
+  overage_price?: number;
+  limits?: {
+    per_minute?: number;
+    per_hour?: number;
+    per_day?: number;
+    per_week?: number;
+    per_month?: number;
+  };
+  unit_price: number;
+  name: string;
+  currency: string;
 }
 
 // Enums for pricing
@@ -90,34 +90,34 @@ export interface TotalIncomeRecord {
 
 
 export interface TotalExpenseRecord {
-    status: boolean;
-    data: {
-        totalSpending: number;
-        paid: number;
-        pending: number;
-        issues: number;
-        currency: string;
-        categoryBreakdown: [
-            {
-                category: string;
-                amount: number;
-                percentage: number;
-            }
-        ],
-        recentExpenses: [
-            {
-                reference: string;
-                vendor: string;
-                category: string;
-                details: string;
-                amount: number;
-                status: string;
-                usage_count?: number;
-                bundle_name?: string;
-                date?: string;
-            }
-        ]
-    }
+  status: boolean;
+  data: {
+    totalSpending: number;
+    paid: number;
+    pending: number;
+    issues: number;
+    currency: string;
+    categoryBreakdown: [
+      {
+        category: string;
+        amount: number;
+        percentage: number;
+      }
+    ],
+    recentExpenses: [
+      {
+        reference: string;
+        vendor: string;
+        category: string;
+        details: string;
+        amount: number;
+        status: string;
+        usage_count?: number;
+        bundle_name?: string;
+        date?: string;
+      }
+    ]
+  }
 }
 
 export interface DeletePricingResponse {
@@ -316,3 +316,50 @@ export interface BillingApiResponse {
   data: BillingPlan[];
 }
 
+// Change Subscription
+
+export interface ChangePlanResponse {
+  status: boolean;
+  message: string;
+  data?: {
+    subscription_id: string;
+    old_plan_id: string;
+    new_plan_id: string;
+    effective_date: string;
+    updated_at: string;
+  };
+}
+
+export interface ChangePlanRequest {
+  subscription_id: string;
+  newPlanId: string;
+  reason: string;
+}
+
+// Subscribe interface
+
+// Main response interface
+export interface SubscriptionResponse {
+  status: boolean;
+  meta: Record<string, any>; // or {} if always empty
+  data: SubscriptionData;
+}
+
+// Data container
+interface SubscriptionData {
+  subscription: {
+    plan_id: string,
+    workspace_id: string,
+    status: string,
+    startDate: string,
+    endDate: null,
+    currentPeriodStart: string,
+    currentPeriodEnd: string,
+    lastBillingDate: string,
+    nextBillingDate: string,
+    _id: string,
+    createdAt: string,
+    updatedAt: string,
+  },
+  message: string
+}

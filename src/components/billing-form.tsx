@@ -33,6 +33,7 @@ import {BillingPlan} from '@/types/pricing';
 
 interface BillingsInfoProps {
   selectedPlan: BillingPlan;
+  subscriptionId?: string;
   // Add any other props here
 }
 
@@ -296,7 +297,11 @@ const emptyBilling = {
   country: '',
 };
 
-export default function BillingsInfo({selectedPlan}: BillingsInfoProps) {
+export default function BillingsInfo({
+  selectedPlan,
+  subscriptionId,
+}: BillingsInfoProps) {
+  console.log('info', {subscriptionId});
   const [countryNames, setCountryNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBilling, setLoadingBilling] = useState(true);
@@ -418,7 +423,6 @@ export default function BillingsInfo({selectedPlan}: BillingsInfoProps) {
   }
 
   const handlePayment = async () => {
-    // Get these from your auth context/state
     const userId = user?._id || '';
     const publicKey = user?.public_key || '';
     const authToken = user?.auth_token || '';
@@ -429,12 +433,25 @@ export default function BillingsInfo({selectedPlan}: BillingsInfoProps) {
     }
 
     setIsProcessing(true);
+    if (selectedPlan?._id) {
+      sessionStorage.setItem('pendingPlanId', selectedPlan._id);
+    }
 
     try {
+      // let finalAmount = 0;
+      // const planName = selectedPlan?.name?.toLowerCase() || '';
+
+      // const isFreePlan =
+      //   planName.includes('pay as you go') ||
+      //   planName.includes('free tier') ||
+      //   planName.includes('free');
+
+      // finalAmount = isFreePlan ? 1 : selectedPlan?.monthlyPrice || 0;
+
       const paymentData = {
         email: user?.email || '',
-        amount: selectedPlan?.monthlyPrice * 100, // Get from selected plan or form
-        callback_url: window.location.origin, // Your success callback URL
+        amount: selectedPlan?.monthlyPrice * 100,
+        callback_url: `${window.location.origin}`, // Use a callback page
       };
 
       const response = await initializeTransaction(paymentData, {
@@ -443,13 +460,25 @@ export default function BillingsInfo({selectedPlan}: BillingsInfoProps) {
         authToken,
       });
 
-      // console.log('Payment initialized:', response);
-
-      // If the response contains an authorization URL, redirect the user
       if (response.status) {
+        // Store plan change data BEFORE redirect
+        sessionStorage.setItem(
+          'validation',
+          response?.status ? 'true' : 'false',
+        );
+        sessionStorage.setItem(
+          'pendingPlanChange',
+          JSON.stringify({
+            subscription_id: subscriptionId || '', // Make sure you have this
+            newPlanId: selectedPlan?._id || '',
+            reason: 'Upgrading to accommodate team growth',
+          }),
+        );
+
         window.location.href = response.data.authorization_url;
       } else {
         console.error('Payment initialization failed:', response.message);
+        toast.error(response.message || 'Payment initialization failed');
       }
     } catch (error) {
       console.error('Payment initialization failed:', error);
