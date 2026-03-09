@@ -85,6 +85,7 @@ import {
 } from '@/types/pricing';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import BillingsInfo from '../billing-form';
+import {useNavigate} from 'react-router-dom';
 
 export type PricingBundle = Pricing;
 
@@ -760,6 +761,7 @@ type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'GHS' | 'ZAR';
 
 export default function PricingTabContent() {
   const {currentWorkspaceId, user} = useAuth();
+  const navigate = useNavigate();
   const [pricingBundles, setPricingBundles] = useState<PricingBundle[]>([]);
   const [expenditures] = useState<Expenditure[]>(DUMMY_EXPENDITURES);
   const [incomeRecords] = useState<IncomeRecord[]>(DUMMY_INCOME);
@@ -788,6 +790,7 @@ export default function PricingTabContent() {
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
+  console.log('if', selectedPlan?._id);
   const [planDetailOpen, setPlanDetailOpen] = useState(false);
 
   const queryClient = useQueryClient();
@@ -805,6 +808,88 @@ export default function PricingTabContent() {
     setEditingBundle(null);
     setBundleFormOpen(true);
   };
+
+  // Subscribe and payment section
+
+  const handleSubscribe = async (planId: string | null) => {
+    try {
+      const response = await pricingServices.createSubscription({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        payload: {
+          plan_id: planId || '',
+          workspace_id: currentWorkspaceId || '',
+        },
+      });
+
+      if (response.status) {
+        toast.success(response.data.message);
+        // Handle successful subscription
+        console.log('Subscription created:', response.data.subscription);
+      }
+    } catch (error) {
+      toast.error('Failed to create subscription');
+    }
+  };
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const reference = searchParams.get('reference');
+      const trxref = searchParams.get('trxref');
+
+      const planId = sessionStorage.getItem('pendingPlanId');
+      const validation = sessionStorage.getItem('validation') === 'true';
+
+      if (!user?.auth_token || !user?._id || !user?.public_key) {
+        console.error('Auth data missing');
+        return;
+      }
+
+      if (reference || trxref) {
+        try {
+          if (validation) {
+            if (!billingData) {
+              // If billingData.status is false - run handleSubscribe
+              await handleSubscribe(planId);
+            } else {
+              const pendingPlanChange =
+                sessionStorage.getItem('pendingPlanChange');
+
+              if (pendingPlanChange) {
+                // 3. Execute the plan change
+                const planData = JSON.parse(pendingPlanChange);
+                await pricingServices.changeSubscription(
+                  {
+                    user_id: user?._id || '',
+                    public_key: user?.public_key || '',
+                  },
+                  planData,
+                  user?.auth_token || '',
+                );
+
+                sessionStorage.removeItem('pendingPlanChange');
+                sessionStorage.removeItem('pendingPlanId');
+                sessionStorage.removeItem('validation');
+
+                toast.success('Payment successful! Subscription updated.');
+              }
+            }
+
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2000);
+          } else {
+            toast.error('Payment verification failed');
+          }
+        } catch (error) {
+          console.error('Error in callback:', error);
+        }
+      }
+    };
+
+    handleCallback();
+  }, []);
 
   const editMutation = useMutation({
     mutationFn: (data: {
@@ -1102,8 +1187,93 @@ export default function PricingTabContent() {
     enabled: !!user?._id && !!currentWorkspaceId,
   });
 
-  console.log('Billing Data', billingData);
-  console.log('Billing Data Load State', billingDataLoading);
+  const currentBillingReport = billingData?.data?.currentBillingReport;
+  const planDetails =
+    billingData?.data?.planChangeHistory?.previousPlanReport?.planDetails;
+  const workspaceInfo = currentBillingReport?.workspace_id;
+  const subscriptionInfo = currentBillingReport?.subscription_id;
+  const planInfo = currentBillingReport?.plan_id;
+  const resourceUsage = currentBillingReport?.resourceUsage || {};
+
+  const calculateUsage = (used, limit) => {
+    if (!limit) return {percentage: 0, used: 0, limit: 0};
+    const percentage = (used / limit) * 100;
+    return {
+      percentage: Math.min(percentage, 100), // Cap at 100% for progress bar
+      used,
+      limit,
+      overage: Math.max(0, used - limit),
+    };
+  };
+
+  const requestsUsage = calculateUsage(
+    (resourceUsage as any)?.requests || 0,
+    planInfo?.monthlyRequests || 1000000,
+  );
+
+  const storageUsage = calculateUsage(
+    (resourceUsage as any).storageUnits || 0,
+    planInfo?.productLimits?.storageUnits || 100,
+  );
+
+  const usersUsage = calculateUsage(
+    (resourceUsage as any).users || 0,
+    planInfo?.users || 20,
+  );
+
+  const calculateUserOverageCost = (overage, planInfo) => {
+    return 'TBD';
+  };
+
+  const calculateTotalCost = (
+    report,
+    planInfo,
+    requestsUsage,
+    storageUsage,
+    usersUsage,
+  ) => {
+    const basePrice = report?.basePrice || planInfo?.monthlyPrice || 199;
+
+    const requestsOverageCost =
+      requestsUsage.overage > 0
+        ? (requestsUsage.overage / 1000) *
+          (planInfo?.usagePricing?.additionalRequestPrice || 0.05)
+        : 0;
+
+    const storageOverageCost =
+      storageUsage.overage > 0
+        ? storageUsage.overage *
+          (planInfo?.usagePricing?.additionalStoragePrice || 0.3)
+        : 0;
+
+    const total = basePrice + requestsOverageCost + storageOverageCost;
+    return total.toFixed(2);
+  };
+
+  const generateHistoricalData = currentReport => {
+    const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'];
+    return months.map((month, index) => ({
+      month,
+      api: Math.round(
+        ((resourceUsage as any).requests || 1150000) * (0.8 + index * 0.04),
+      ),
+      storage: Math.round(
+        ((resourceUsage as any).storageUnits || 108) * (0.8 + index * 0.04),
+      ),
+      users: Math.min((resourceUsage as any).users || 8, 20),
+    }));
+  };
+
+  const formatDate = (dateString, p0?: string) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+  console.log('Billing Data Load State', billingData);
 
   // Get Billing Plans
   const {data: billingPlans, isLoading: billingPlansLoading} = useQuery({
@@ -1480,14 +1650,15 @@ export default function PricingTabContent() {
                           YOUR BILLING SUMMARY
                         </p>
                         <p className="text-sm text-grey-600">
-                          $199.00/month • Renews on January 24, 2025
+                          ${planInfo?.monthlyPrice || 0}.00/month • Renews on{' '}
+                          {formatDate(subscriptionInfo?.nextBillingDate)}
                         </p>
                       </div>
                     </div>
 
                     <div className="pt-4">
                       <p className="text-grey text-[32px] font-bold pb-1">
-                        ${expenseData?.totalSpending.toFixed(2)}
+                        ${currentBillingReport?.totalCost?.toFixed(2) || '0.00'}
                       </p>
                       <p className="text-xs text-primary font-semibold">
                         TOTAL AMOUNT DUE
@@ -1496,7 +1667,7 @@ export default function PricingTabContent() {
                   </div>
 
                   <span className="text-sm font-bold text-primary bg-[#0846A6] bg-opacity-15 px-2 py-1 rounded-[5px] ml-auto uppercase">
-                    Enterprise
+                    {planInfo?.isEnterprise ? 'Enterprise' : planInfo?.name}
                   </span>
                 </div>
 
@@ -1508,7 +1679,7 @@ export default function PricingTabContent() {
                         Current Plan Billing
                       </p>
                       <p className="text-[20px] text-grey font-bold">
-                        $ {(199.0).toFixed(2)}
+                        $ {(planInfo?.monthlyPrice || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -1520,14 +1691,15 @@ export default function PricingTabContent() {
                         Next Billing Date
                       </p>
                       <p className="text-[20px] text-grey font-bold">
-                        March 1, 2025
+                        {formatDate(subscriptionInfo?.nextBillingDate) ||
+                          'March 1, 2025'}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center border-t  mt-10 pt-6 border-t-[#8F92A1] border-opacity-[40%]">
+              <div className="flex justify-between items-center border-t mt-10 pt-6 border-t-[#8F92A1] border-opacity-[40%]">
                 <div className="flex items-center space-x-2">
                   <Signal width={24} height={24} className="text-primary" />
                   <p className="text-grey text-[20px] font-bold">
@@ -1567,25 +1739,54 @@ export default function PricingTabContent() {
                         API Requests
                       </span>
                     </div>
-                    <span className="text-xs text-grey-600">115% used</span>
+                    <span className="text-xs text-grey-600">
+                      {requestsUsage.percentage.toFixed(0)}% used
+                    </span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-primary h-2 rounded-full"
-                        style={{width: '100%'}}
+                        style={{width: `${requestsUsage.percentage}%`}}
                       ></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
-                    1,150,000 / 1,000,000 requests
+                    {requestsUsage.used.toLocaleString()} /{' '}
+                    {requestsUsage.limit.toLocaleString()} requests
                   </p>
-                  <div className="bg-primary/10 border border-primary/20 rounded px-2 py-1">
-                    <p className="text-xs font-semibold text-primary/80">
-                      Overage: +150,000 requests
-                    </p>
-                    <p className="text-xs text-primary/60">$7.50 @ $0.05/1K</p>
-                  </div>
+                  {(requestsUsage as any)?.overage > 0 ? (
+                    <div className="bg-primary/10 border border-primary/20 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-primary/80">
+                        Overage: +
+                        {(requestsUsage as any)?.overage.toLocaleString()}{' '}
+                        requests
+                      </p>
+                      <p className="text-xs text-primary/60">
+                        $
+                        {(
+                          ((requestsUsage.overage as any) / 1000) *
+                          (planInfo?.usagePricing?.additionalRequestPrice ||
+                            0.05)
+                        ).toFixed(2)}{' '}
+                        @ $
+                        {(
+                          planInfo?.usagePricing?.additionalRequestPrice || 0.0
+                        ).toFixed(2)}
+                        /1K
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-green-700">
+                        Within limits
+                      </p>
+                      <p className="text-xs text-green-600">
+                        {requestsUsage.limit - requestsUsage.used} requests
+                        remaining
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Storage */}
@@ -1597,25 +1798,50 @@ export default function PricingTabContent() {
                         Storage
                       </span>
                     </div>
-                    <span className="text-xs text-grey-600">108% used</span>
+                    <span className="text-xs text-grey-600">
+                      {storageUsage.percentage.toFixed(0)}% used
+                    </span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-[#00875A] h-2 rounded-full"
-                        style={{width: '100%'}}
+                        style={{width: `${storageUsage.percentage}%`}}
                       ></div>
                     </div>
                   </div>
-                  <p className="text-xs text-grey-600 mb-1">108 GB / 100 GB</p>
-                  <div className="bg-[#00875A]/  border border-[#00875A]/20 rounded px-2 py-1">
-                    <p className="text-xs font-semibold text-[#00875A]/70">
-                      Overage: +8 GB
-                    </p>
-                    <p className="text-xs text-[#00875A]/60">
-                      $2.40 @ $0.30/GB
-                    </p>
-                  </div>
+                  <p className="text-xs text-grey-600 mb-1">
+                    {storageUsage.used} GB / {storageUsage.limit} GB
+                  </p>
+                  {(storageUsage.overage as any) > 0 ? (
+                    <div className="bg-[#00875A]/10 border border-[#00875A]/20 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-[#00875A]/70">
+                        Overage: +{storageUsage.overage} GB
+                      </p>
+                      <p className="text-xs text-[#00875A]/60">
+                        $
+                        {(
+                          (storageUsage.overage as any) *
+                          (planInfo?.usagePricing?.additionalStoragePrice ||
+                            0.3)
+                        ).toFixed(2)}{' '}
+                        @ $
+                        {(
+                          planInfo?.usagePricing?.additionalStoragePrice || 0.3
+                        ).toFixed(2)}
+                        /GB
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-green-700">
+                        Within limits
+                      </p>
+                      <p className="text-xs text-green-600">
+                        {storageUsage.limit - storageUsage.used} GB remaining
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Active Users */}
@@ -1627,27 +1853,40 @@ export default function PricingTabContent() {
                         Users
                       </span>
                     </div>
-                    <span className="text-xs text-grey-600">8 / 20</span>
+                    <span className="text-xs text-grey-600">
+                      {usersUsage.used} / {usersUsage.limit}
+                    </span>
                   </div>
                   <div className="mb-2">
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '40%'}}
+                        style={{width: `${usersUsage.percentage}%`}}
                       ></div>
                     </div>
                   </div>
                   <p className="text-xs text-grey-600 mb-1">
-                    12 user slots remaining
+                    {usersUsage.limit - usersUsage.used} user slots remaining
                   </p>
-                  <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
-                    <p className="text-xs font-semibold text-orange-700">
-                      No overage
-                    </p>
-                    <p className="text-xs text-orange-600">
-                      Within plan limits
-                    </p>
-                  </div>
+                  {(usersUsage as any).overage > 0 ? (
+                    <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-orange-700">
+                        Overage: +{usersUsage.overage} users
+                      </p>
+                      <p className="text-xs text-orange-600">
+                        Additional users will be billed
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                      <p className="text-xs font-semibold text-orange-700">
+                        No overage
+                      </p>
+                      <p className="text-xs text-orange-600">
+                        Within plan limits
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -3044,21 +3283,27 @@ export default function PricingTabContent() {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="text-lg font-bold text-grey">
-                      Enterprise Plan
+                      {planInfo?.name}
                     </h3>
                     <p className="text-sm text-grey-600">
-                      Billing cycle: November 1 - November 30, 2024
+                      Billing cycle:{' '}
+                      {formatDate(currentBillingReport?.billingPeriodStart)} -{' '}
+                      {formatDate(currentBillingReport?.billingPeriodEnd)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-primary">$199</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {' '}
+                      ${planInfo?.monthlyPrice?.toFixed(2) || '00.00'}
+                    </p>
                     <p className="text-xs text-grey-600">per month</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-green" />
                   <span className="text-grey-700">
-                    Plan renews on December 1, 2024
+                    Plan renews on{' '}
+                    {formatDate(subscriptionInfo?.nextBillingDate)}
                   </span>
                 </div>
               </div>
@@ -3081,30 +3326,74 @@ export default function PricingTabContent() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-baseline">
                       <span className="text-2xl font-bold text-grey">
-                        1.15M
+                        {(
+                          (resourceUsage as any).requests || 0
+                        ).toLocaleString()}
                       </span>
-                      <span className="text-sm text-grey-600">of 1M</span>
+                      <span className="text-sm text-grey-600">
+                        of{' '}
+                        {(
+                          planInfo?.monthlyRequests || 1000000
+                        ).toLocaleString()}
+                      </span>
                     </div>
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '100%'}}
+                        className={`h-2 rounded-full ${
+                          requestsUsage.percentage > 100
+                            ? 'bg-orange-500'
+                            : 'bg-primary'
+                        }`}
+                        style={{
+                          width: `${Math.min(requestsUsage.percentage, 100)}%`,
+                        }}
                       ></div>
                     </div>
-                    <p className="text-xs text-grey-600">115% used</p>
+                    <p className="text-xs text-grey-600">
+                      {requestsUsage.percentage.toFixed(1)}% used
+                    </p>
 
                     <div className="mt-3 pt-3 border-t border-grey-300">
-                      <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
-                        <p className="text-xs font-semibold text-orange-700">
-                          Overage
-                        </p>
-                        <p className="text-sm font-bold text-orange-800">
-                          +150,000 requests
-                        </p>
-                        <p className="text-xs text-orange-600">
-                          $7.50 @ $0.05/1K
-                        </p>
-                      </div>
+                      {(requestsUsage as any).overage > 0 ? (
+                        <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-orange-700">
+                            Overage
+                          </p>
+                          <p className="text-sm font-bold text-orange-800">
+                            +{(requestsUsage as any).overage.toLocaleString()}{' '}
+                            requests
+                          </p>
+                          <p className="text-xs text-orange-600">
+                            $
+                            {(
+                              ((requestsUsage as any) / 1000) *
+                              (planInfo?.usagePricing?.additionalRequestPrice ||
+                                0.05)
+                            ).toFixed(2)}{' '}
+                            @ $
+                            {(
+                              planInfo?.usagePricing?.additionalRequestPrice ||
+                              0.05
+                            ).toFixed(2)}
+                            /1K
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-green-50 border border-green-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-green-700">
+                            Within Limit
+                          </p>
+                          <p className="text-sm font-bold text-green-800">
+                            {(
+                              requestsUsage.limit - requestsUsage.used
+                            ).toLocaleString()}{' '}
+                            available
+                          </p>
+                          <p className="text-xs text-green-600">
+                            $0.00 overage
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3123,30 +3412,66 @@ export default function PricingTabContent() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-baseline">
                       <span className="text-2xl font-bold text-grey">
-                        108 GB
+                        {storageUsage.used} GB
                       </span>
-                      <span className="text-sm text-grey-600">of 100 GB</span>
+                      <span className="text-sm text-grey-600">
+                        of {storageUsage.limit} GB
+                      </span>
                     </div>
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
-                        style={{width: '100%'}}
+                        className={`h-2 rounded-full ${
+                          storageUsage.percentage > 100
+                            ? 'bg-orange-500'
+                            : 'bg-[#00875A]'
+                        }`}
+                        style={{
+                          width: `${Math.min(storageUsage.percentage, 100)}%`,
+                        }}
                       ></div>
                     </div>
-                    <p className="text-xs text-grey-600">108% used</p>
+                    <p className="text-xs text-grey-600">
+                      {storageUsage.percentage.toFixed(1)}% used
+                    </p>
 
                     <div className="mt-3 pt-3 border-t border-grey-300">
-                      <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
-                        <p className="text-xs font-semibold text-orange-700">
-                          Overage
-                        </p>
-                        <p className="text-sm font-bold text-orange-800">
-                          +8 GB
-                        </p>
-                        <p className="text-xs text-orange-600">
-                          $2.40 @ $0.30/GB
-                        </p>
-                      </div>
+                      {(storageUsage as any).overage > 0 ? (
+                        <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-orange-700">
+                            Overage
+                          </p>
+                          <p className="text-sm font-bold text-orange-800">
+                            +{storageUsage.overage} GB
+                          </p>
+                          <p className="text-xs text-orange-600">
+                            $
+                            {(
+                              (storageUsage as any).overage *
+                              (planInfo?.usagePricing?.additionalStoragePrice ||
+                                0.3)
+                            ).toFixed(2)}{' '}
+                            @ $
+                            {(
+                              planInfo?.usagePricing?.additionalStoragePrice ||
+                              0.3
+                            ).toFixed(2)}
+                            /GB
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-green-50 border border-green-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-green-700">
+                            Within Limit
+                          </p>
+                          <p className="text-sm font-bold text-green-800">
+                            {storageUsage.limit - storageUsage.used} GB
+                            available
+                          </p>
+                          <p className="text-xs text-green-600">
+                            $0.00 overage
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3164,27 +3489,49 @@ export default function PricingTabContent() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-baseline">
-                      <span className="text-2xl font-bold text-grey">8</span>
-                      <span className="text-sm text-grey-600">of 20</span>
+                      <span className="text-2xl font-bold text-grey">
+                        {usersUsage.used}
+                      </span>
+                      <span className="text-sm text-grey-600">
+                        of {usersUsage.limit}
+                      </span>
                     </div>
                     <div className="w-full bg-grey-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-green h-2 rounded-full"
-                        style={{width: '40%'}}
+                        style={{width: `${usersUsage.percentage}%`}}
                       ></div>
                     </div>
-                    <p className="text-xs text-grey-600">40% used</p>
+                    <p className="text-xs text-grey-600">
+                      {usersUsage.percentage.toFixed(1)}% used
+                    </p>
 
                     <div className="mt-3 pt-3 border-t border-grey-300">
-                      <div className="bg-green-50 border border-green-200 rounded px-2 py-1.5">
-                        <p className="text-xs font-semibold text-green-700">
-                          Within Limit
-                        </p>
-                        <p className="text-sm font-bold text-green-800">
-                          12 available
-                        </p>
-                        <p className="text-xs text-green-600">$0.00 overage</p>
-                      </div>
+                      {(usersUsage as any).overage > 0 ? (
+                        <div className="bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-orange-700">
+                            Overage
+                          </p>
+                          <p className="text-sm font-bold text-orange-800">
+                            +{usersUsage.overage} users
+                          </p>
+                          <p className="text-xs text-orange-600">
+                            Additional users will be billed
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-green-50 border border-green-200 rounded px-2 py-1.5">
+                          <p className="text-xs font-semibold text-green-700">
+                            Within Limit
+                          </p>
+                          <p className="text-sm font-bold text-green-800">
+                            {usersUsage.limit - usersUsage.used} available
+                          </p>
+                          <p className="text-xs text-green-600">
+                            $0.00 overage
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3197,14 +3544,7 @@ export default function PricingTabContent() {
                 </h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart
-                    data={[
-                      {month: 'Jun', api: 800000, storage: 85, users: 7},
-                      {month: 'Jul', api: 850000, storage: 89, users: 7},
-                      {month: 'Aug', api: 920000, storage: 92, users: 8},
-                      {month: 'Sep', api: 980000, storage: 95, users: 8},
-                      {month: 'Oct', api: 1050000, storage: 102, users: 8},
-                      {month: 'Nov', api: 1150000, storage: 108, users: 8},
-                    ]}
+                    data={generateHistoricalData(currentBillingReport)}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis
@@ -3236,7 +3576,7 @@ export default function PricingTabContent() {
                       type="monotone"
                       dataKey="api"
                       stroke={CHART_COLORS.blue}
-                      name="API Requests (K)"
+                      name="API Requests"
                       strokeWidth={2}
                     />
                     <Line
@@ -3267,45 +3607,94 @@ export default function PricingTabContent() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center pb-2 border-b border-grey-300">
                     <span className="text-sm text-grey-700">
-                      Base Plan (Enterprise)
+                      Base Plan ({planInfo?.name || 'Enterprise'})
                     </span>
                     <span className="text-sm font-semibold text-grey">
-                      $199.00
+                      ${planInfo?.monthlyPrice?.toFixed(2) || '199.00'}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-grey-300">
-                    <span className="text-sm text-grey-700">
-                      API Overage (+150K requests)
-                    </span>
-                    <span className="text-sm font-semibold text-orange-700">
-                      $7.50
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-grey-300">
-                    <span className="text-sm text-grey-700">
-                      Storage Overage (+8 GB)
-                    </span>
-                    <span className="text-sm font-semibold text-orange-700">
-                      $2.40
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-grey-300">
-                    <span className="text-sm text-grey-700">User Overage</span>
-                    <span className="text-sm font-semibold text-green">
-                      $0.00
-                    </span>
-                  </div>
+
+                  {(requestsUsage as any).overage > 0 && (
+                    <div className="flex justify-between items-center pb-2 border-b border-grey-300">
+                      <span className="text-sm text-grey-700">
+                        API Overage (+
+                        {(requestsUsage as any).overage.toLocaleString()}{' '}
+                        requests)
+                      </span>
+                      <span className="text-sm font-semibold text-orange-700">
+                        $
+                        {(
+                          ((requestsUsage as any).overage / 1000) *
+                          (planInfo?.usagePricing?.additionalRequestPrice ||
+                            0.05)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  {(storageUsage as any).overage > 0 && (
+                    <div className="flex justify-between items-center pb-2 border-b border-grey-300">
+                      <span className="text-sm text-grey-700">
+                        Storage Overage (+{storageUsage.overage} GB)
+                      </span>
+                      <span className="text-sm font-semibold text-orange-700">
+                        $
+                        {(
+                          (storageUsage as any).overage *
+                          (planInfo?.usagePricing?.additionalStoragePrice ||
+                            0.3)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  {(usersUsage as any).overage > 0 && (
+                    <div className="flex justify-between items-center pb-2 border-b border-grey-300">
+                      <span className="text-sm text-grey-700">
+                        User Overage (+{usersUsage.overage} users)
+                      </span>
+                      <span className="text-sm font-semibold text-orange-700">
+                        $
+                        {calculateUserOverageCost(usersUsage.overage, planInfo)}
+                      </span>
+                    </div>
+                  )}
+
+                  {!requestsUsage.overage &&
+                    !storageUsage.overage &&
+                    !usersUsage.overage && (
+                      <div className="flex justify-between items-center pb-2 border-b border-grey-300">
+                        <span className="text-sm text-grey-700">
+                          No overages
+                        </span>
+                        <span className="text-sm font-semibold text-green">
+                          $0.00
+                        </span>
+                      </div>
+                    )}
+
                   <div className="flex justify-between items-center pt-2">
                     <span className="text-base font-bold text-grey">
-                      Total (November 2024)
+                      Total (
+                      {formatDate(
+                        currentBillingReport?.billingPeriodStart,
+                        'MMMM yyyy',
+                      )}
+                      )
                     </span>
                     <span className="text-xl font-bold text-primary">
-                      $208.90
+                      $
+                      {calculateTotalCost(
+                        currentBillingReport,
+                        planInfo,
+                        requestsUsage,
+                        storageUsage,
+                        usersUsage,
+                      )}
                     </span>
                   </div>
                 </div>
               </div>
-
               {/* Actions */}
               <div className="flex gap-3">
                 <Button
@@ -3571,7 +3960,13 @@ export default function PricingTabContent() {
 
                 <div className="w-full mt-6 text-grey">
                   <>
-                    <BillingsInfo selectedPlan = {selectedPlan} />
+                    <BillingsInfo
+                      selectedPlan={selectedPlan}
+                      subscriptionId={
+                        billingData?.data?.currentBillingReport?.subscription_id
+                          ?._id
+                      }
+                    />
                   </>
                 </div>
               </section>
