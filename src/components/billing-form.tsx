@@ -301,7 +301,6 @@ export default function BillingsInfo({
   selectedPlan,
   subscriptionId,
 }: BillingsInfoProps) {
-  console.log('info', {subscriptionId});
   const [countryNames, setCountryNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBilling, setLoadingBilling] = useState(true);
@@ -450,7 +449,7 @@ export default function BillingsInfo({
 
       const paymentData = {
         email: user?.email || '',
-        amount: selectedPlan?.monthlyPrice * 100,
+        amount: 12 * 100,
         callback_url: `${window.location.origin}`, // Use a callback page
       };
 

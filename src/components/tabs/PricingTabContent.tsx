@@ -790,7 +790,6 @@ export default function PricingTabContent() {
   // Bundle expansion state
   const [expandedBundleId, setExpandedBundleId] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
-  console.log('if', selectedPlan?._id);
   const [planDetailOpen, setPlanDetailOpen] = useState(false);
 
   const queryClient = useQueryClient();
@@ -1273,7 +1272,6 @@ export default function PricingTabContent() {
   });
 };
 
-  console.log('Billing Data Load State', billingData);
 
   // Get Billing Plans
   const {data: billingPlans, isLoading: billingPlansLoading} = useQuery({
@@ -1303,7 +1301,7 @@ export default function PricingTabContent() {
 
   const pricingPlans = billingPlans?.data || [];
 
-  const currentPlan = 'Enterprise Plan';
+  const currentPlan = currentBillingReport?.plan_id?.name || "";
 
   const tierPlans = pricingPlans.filter(
     plan => plan.name !== 'Enterprise Plan',
@@ -1452,7 +1450,7 @@ export default function PricingTabContent() {
   const UltimatePlanCard = ({plan, onSelect}) => {
     return (
       <div
-        className="bg-white w-full rounded-lg border-4 border-[#391484] p-5 mt-4"
+        className="cursor-pointer relative bg-white md:col-span-2 w-full transition-all hover:shadow-lg rounded-lg border-4 border-[#391484] p-5 mt-4"
         onClick={onSelect}
       >
         <div className="flex items-start justify-between mb-4">
@@ -1464,49 +1462,42 @@ export default function PricingTabContent() {
 
             <div className="flex items-baseline gap-1">
               <span className="text-[40px] font-bold text-grey">
-                ${plan.monthlyPrice !== null ? plan.monthlyPrice : 'Custom'}
+                {plan.monthlyPrice !== null ? plan.monthlyPrice : 'Custom'}
               </span>
               {plan.monthlyPrice !== null && (
                 <span className="text-grey-600 text-sm">/month</span>
               )}
             </div>
           </div>
-
-          <Button className="bg-[#391484] hover:bg-[#391484]/80">
-            Upgrade to {plan.name}
-          </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-sm text-grey-600 mb-1 font-bold">API Requests</p>
-            <p className="text-[24px] font-bold text-grey">
-              {formatNumber(plan.monthlyRequests)}/month
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-grey-600 mb-1 font-bold">Storage</p>
-            <p className="text-[24px] font-bold text-grey">
-              {formatStorage(plan.fileTransfer)}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-grey-600 mb-1 font-bold">Users</p>
-            <p className="text-[24px] font-bold text-grey">
-              {plan.users !== null ? plan.users : 'Unlimited'}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-grey-600 mb-1 font-bold">
-              Logs Retention
-            </p>
-            <p className="text-[24px] font-bold text-grey">
-              {plan.logsRetentionDays} days
-            </p>
-          </div>
-        </div>
+        
 
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {formatNumber(plan.monthlyRequests)} api requests/month
+            </span>
+          </li>
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {formatStorage(plan.fileTransfer)} storage
+              </span>
+          </li>
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {plan.users !== null ? plan.users : 'Unlimited'} users
+            </span>
+          </li>
+          <li className="flex items-start gap-2 text-sm py-1">
+            <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
+            <span className="font-medium text-base text-[#78797A]">
+              {plan.logsRetentionDays} days logs retention
+            </span>
+          </li>
           <li className="flex items-start gap-2 text-sm py-1">
             <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
             <span className="font-medium text-base text-[#78797A]">
@@ -1543,6 +1534,12 @@ export default function PricingTabContent() {
             </ul>
           </div>
         )}
+
+        <Button
+          className="mt-auto bg-white hover:bg-white w-full text-[12px] font-semibold text-grey"
+        >
+          Contact Sales
+        </Button>
       </div>
     );
   };
@@ -3227,7 +3224,7 @@ export default function PricingTabContent() {
                     }}
                   />
                 ))}
-              </div>
+              
 
               {highlightedPlan && (
                 <UltimatePlanCard
@@ -3238,6 +3235,7 @@ export default function PricingTabContent() {
                   }}
                 />
               )}
+              </div>
 
               {/* Footer Info */}
               <div className="bg-primary/15 rounded-lg border border-primary/50 p-4 mt-2">
@@ -3734,7 +3732,7 @@ export default function PricingTabContent() {
                 </button>
                 <DialogHeader>
                   <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
-                    Upgrade Workspace from Starter to {selectedPlan.name}
+                    Upgrade Workspace {currentPlan ? `from ${currentPlan}` : ""} to {selectedPlan.name}
                   </DialogTitle>
                   <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
                     {selectedPlan.name} plan details
