@@ -844,11 +844,14 @@ export default function PricingTabContent() {
         console.error('Auth data missing');
         return;
       }
+      const billData = JSON.parse(
+        sessionStorage.getItem('billingData') || 'null',
+      );
 
       if (reference || trxref) {
         try {
           if (validation) {
-            if (!billingData) {
+            if (!billData) {
               // If billingData.status is false - run handleSubscribe
               await handleSubscribe(planId);
             } else {
@@ -870,6 +873,7 @@ export default function PricingTabContent() {
                 sessionStorage.removeItem('pendingPlanChange');
                 sessionStorage.removeItem('pendingPlanId');
                 sessionStorage.removeItem('validation');
+                sessionStorage.removeItem('billingData');
 
                 toast.success('Payment successful! Subscription updated.');
               }
@@ -1186,6 +1190,8 @@ export default function PricingTabContent() {
     enabled: !!user?._id && !!currentWorkspaceId,
   });
 
+  sessionStorage.setItem('billingData', JSON.stringify(billingData));
+
   const currentBillingReport = billingData?.data?.currentBillingReport;
   const planDetails =
     billingData?.data?.planChangeHistory?.previousPlanReport?.planDetails;
@@ -1264,14 +1270,13 @@ export default function PricingTabContent() {
   };
 
   const formatDate = (dateString, p0?: string) => {
-  if (!dateString) return 'N/A';
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
-
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
 
   // Get Billing Plans
   const {data: billingPlans, isLoading: billingPlansLoading} = useQuery({
@@ -1301,7 +1306,7 @@ export default function PricingTabContent() {
 
   const pricingPlans = billingPlans?.data || [];
 
-  const currentPlan = currentBillingReport?.plan_id?.name || "";
+  const currentPlan = currentBillingReport?.plan_id?.name || '';
 
   const tierPlans = pricingPlans.filter(
     plan => plan.name !== 'Enterprise Plan',
@@ -1471,8 +1476,6 @@ export default function PricingTabContent() {
           </div>
         </div>
 
-        
-
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 py-2">
           <li className="flex items-start gap-2 text-sm py-1">
             <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
@@ -1484,7 +1487,7 @@ export default function PricingTabContent() {
             <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
             <span className="font-medium text-base text-[#78797A]">
               {formatStorage(plan.fileTransfer)} storage
-              </span>
+            </span>
           </li>
           <li className="flex items-start gap-2 text-sm py-1">
             <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
@@ -1535,9 +1538,7 @@ export default function PricingTabContent() {
           </div>
         )}
 
-        <Button
-          className="mt-auto bg-white hover:bg-white w-full text-[12px] font-semibold text-grey"
-        >
+        <Button className="mt-auto bg-white hover:bg-white w-full text-[12px] font-semibold text-grey">
           Contact Sales
         </Button>
       </div>
@@ -3224,17 +3225,16 @@ export default function PricingTabContent() {
                     }}
                   />
                 ))}
-              
 
-              {highlightedPlan && (
-                <UltimatePlanCard
-                  plan={highlightedPlan}
-                  onSelect={() => {
-                    setSelectedPlan(highlightedPlan);
-                    setPlanDetailOpen(true);
-                  }}
-                />
-              )}
+                {highlightedPlan && (
+                  <UltimatePlanCard
+                    plan={highlightedPlan}
+                    onSelect={() => {
+                      setSelectedPlan(highlightedPlan);
+                      setPlanDetailOpen(true);
+                    }}
+                  />
+                )}
               </div>
 
               {/* Footer Info */}
@@ -3732,7 +3732,8 @@ export default function PricingTabContent() {
                 </button>
                 <DialogHeader>
                   <DialogTitle className="!text-2xl !text-grey !font-bold !pt-5">
-                    Upgrade Workspace {currentPlan ? `from ${currentPlan}` : ""} to {selectedPlan.name}
+                    Upgrade Workspace {currentPlan ? `from ${currentPlan}` : ''}{' '}
+                    to {selectedPlan.name}
                   </DialogTitle>
                   <DialogDescription className="!text-xl !font-bold !text-grey pt-4">
                     {selectedPlan.name} plan details

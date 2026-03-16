@@ -437,19 +437,9 @@ export default function BillingsInfo({
     }
 
     try {
-      // let finalAmount = 0;
-      // const planName = selectedPlan?.name?.toLowerCase() || '';
-
-      // const isFreePlan =
-      //   planName.includes('pay as you go') ||
-      //   planName.includes('free tier') ||
-      //   planName.includes('free');
-
-      // finalAmount = isFreePlan ? 1 : selectedPlan?.monthlyPrice || 0;
-
       const paymentData = {
         email: user?.email || '',
-        amount: 12 * 100,
+        amount: 50 * 100,
         callback_url: `${window.location.origin}`, // Use a callback page
       };
 
