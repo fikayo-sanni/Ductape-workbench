@@ -831,68 +831,88 @@ export default function PricingTabContent() {
     }
   };
 
+  // Get Billing Report
+  const {data: billingData, isLoading: billingDataLoading} = useQuery({
+    queryKey: ['billingReport', user?._id, currentWorkspaceId],
+    queryFn: () =>
+      pricingServices.fetchBillingReport({
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        workspace_id: currentWorkspaceId || '',
+      }),
+    enabled: !!user?._id && !!currentWorkspaceId,
+  });
+
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('Callback triggered');
+
+      if (billingDataLoading) {
+        console.log('Waiting for billingData...');
+        return;
+      }
+
+      console.log('billingData ready:', billingData);
+
       const searchParams = new URLSearchParams(window.location.search);
       const reference = searchParams.get('reference');
       const trxref = searchParams.get('trxref');
-
       const planId = sessionStorage.getItem('pendingPlanId');
-      const validation = sessionStorage.getItem('validation') === 'true';
 
-      if (!user?.auth_token || !user?._id || !user?.public_key) {
-        console.error('Auth data missing');
+      if (!reference && !trxref) {
+        console.warn('No payment reference');
         return;
       }
-      const billData = JSON.parse(
-        sessionStorage.getItem('billingData') || 'null',
-      );
 
-      if (reference || trxref) {
-        try {
-          if (validation) {
-            if (!billData) {
-              // If billingData.status is false - run handleSubscribe
-              await handleSubscribe(planId);
-            } else {
-              const pendingPlanChange =
-                sessionStorage.getItem('pendingPlanChange');
+      if (!user?.auth_token || !user?._id || !user?.public_key) {
+        console.error('Missing auth');
+        return;
+      }
 
-              if (pendingPlanChange) {
-                // 3. Execute the plan change
-                const planData = JSON.parse(pendingPlanChange);
-                await pricingServices.changeSubscription(
-                  {
-                    user_id: user?._id || '',
-                    public_key: user?.public_key || '',
-                  },
-                  planData,
-                  user?.auth_token || '',
-                );
+      try {
+        console.log('Payment detected');
 
-                sessionStorage.removeItem('pendingPlanChange');
-                sessionStorage.removeItem('pendingPlanId');
-                sessionStorage.removeItem('validation');
-                sessionStorage.removeItem('billingData');
+        if (!billingData) {
+          console.log('No billingData → running handleSubscribe');
 
-                toast.success('Payment successful! Subscription updated.');
-              }
-            }
+          await handleSubscribe(planId);
+        } else {
+          console.log('billingData exists → checking plan change');
 
-            setTimeout(() => {
-              window.location.href = '/';
-            }, 2000);
+          const pendingPlanChange = sessionStorage.getItem('pendingPlanChange');
+
+          if (pendingPlanChange) {
+            console.log('Running changeSubscription');
+
+            const planData = JSON.parse(pendingPlanChange);
+
+            await pricingServices.changeSubscription(
+              {
+                user_id: user._id,
+                public_key: user.public_key,
+              },
+              planData,
+              user.auth_token,
+            );
+
+            sessionStorage.removeItem('pendingPlanChange');
+
+            toast.success('Payment successful! Subscription updated.');
           } else {
-            toast.error('Payment verification failed');
+            console.log('No pending plan change');
           }
-        } catch (error) {
-          console.error('Error in callback:', error);
         }
+
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } catch (error) {
+        console.error('Callback error:', error);
       }
     };
 
     handleCallback();
-  }, []);
+  }, [billingDataLoading, billingData]);
 
   const editMutation = useMutation({
     mutationFn: (data: {
@@ -1178,20 +1198,8 @@ export default function PricingTabContent() {
     });
   });
 
-  // Get Billing Report
-  const {data: billingData, isLoading: billingDataLoading} = useQuery({
-    queryKey: ['billingReport', user?._id, currentWorkspaceId],
-    queryFn: () =>
-      pricingServices.fetchBillingReport({
-        user_id: user?._id || '',
-        public_key: user?.public_key || '',
-        workspace_id: currentWorkspaceId || '',
-      }),
-    enabled: !!user?._id && !!currentWorkspaceId,
-  });
-
   sessionStorage.setItem('billingData', JSON.stringify(billingData));
-
+  console.log('Before redirect:', sessionStorage.getItem('billingData'));
   const currentBillingReport = billingData?.data?.currentBillingReport;
   const planDetails =
     billingData?.data?.planChangeHistory?.previousPlanReport?.planDetails;
