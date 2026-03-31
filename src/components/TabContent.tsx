@@ -1,5 +1,5 @@
-import { useWorkbenchStore } from '@/stores/workbench-store';
-import { Tab } from '@/types/tab';
+import {useWorkbenchStore} from '@/stores/workbench-store';
+import {Tab} from '@/types/tab';
 import RequestPanel from './RequestPanel';
 import ResponsePanel from './ResponsePanel';
 import ProductTabContent from './tabs/ProductTabContent';
@@ -74,39 +74,43 @@ import JobExplorerTab from './tabs/JobExplorerTab';
 import GenericComponentContent from './tabs/GenericComponentContent';
 import PricingTabContent from './tabs/PricingTabContent';
 
-function FeatureTabContent({ tab }: { tab: Tab }) {
-    // Check if this is a component from product (not app)
-    if (tab.data?.componentType) {
-      const componentType = tab.data.componentType;
+function FeatureTabContent({tab}: {tab: Tab}) {
+  // Check if this is a component from product (not app)
+  if (tab.data?.componentType) {
+    const componentType = tab.data.componentType;
 
-      // App-level components (from app versions)
-      if (['auth', 'environment', 'webhook', 'healthcheck', 'new-webhook'].includes(componentType)) {
-        switch (componentType) {
-          case 'auth':
-            // Check if this is a new auth creation tab
-            if (tab.data?.isNew) {
-              return <NewAuthTabContent tabId={tab.id} data={tab.data} />;
-            }
-            return <AuthTabContent auth={tab.data} />;
-          case 'environment':
-            return <EnvironmentTabContent environment={tab.data} />;
-          case 'new-webhook':
-            // Direct new webhook creation tab
+    // App-level components (from app versions)
+    if (
+      ['auth', 'environment', 'webhook', 'healthcheck', 'new-webhook'].includes(
+        componentType,
+      )
+    ) {
+      switch (componentType) {
+        case 'auth':
+          // Check if this is a new auth creation tab
+          if (tab.data?.isNew) {
+            return <NewAuthTabContent tabId={tab.id} data={tab.data} />;
+          }
+          return <AuthTabContent auth={tab.data} />;
+        case 'environment':
+          return <EnvironmentTabContent environment={tab.data} />;
+        case 'new-webhook':
+          // Direct new webhook creation tab
+          return <NewWebhookTabContent tabId={tab.id} data={tab.data} />;
+        case 'webhook':
+          // Check if this is a new webhook creation tab
+          if (tab.isDirty && tab.data?.isNew) {
             return <NewWebhookTabContent tabId={tab.id} data={tab.data} />;
-          case 'webhook':
-            // Check if this is a new webhook creation tab
-            if (tab.isDirty && tab.data?.isNew) {
-              return <NewWebhookTabContent tabId={tab.id} data={tab.data} />;
-            }
-            return <WebhookTabContent webhook={tab.data} />;
-          case 'healthcheck':
-            // Check if this is a new healthcheck creation tab
-            if (tab.isDirty && tab.data?.isNew) {
-              return <NewHealthcheckTabContent data={tab.data} />;
-            }
-            return <HealthcheckTabContent data={tab.data} />;
-        }
+          }
+          return <WebhookTabContent webhook={tab.data} />;
+        case 'healthcheck':
+          // Check if this is a new healthcheck creation tab
+          if (tab.isDirty && tab.data?.isNew) {
+            return <NewHealthcheckTabContent data={tab.data} />;
+          }
+          return <HealthcheckTabContent data={tab.data} />;
       }
+    }
 
     // Product-level components with dedicated displays
     switch (componentType) {
@@ -122,7 +126,9 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
         return <MessageBrokerTabContent messageBroker={tab.data} />;
       case 'fallback':
       case 'quota':
-        return <GenericComponentContent component={tab.data} type={componentType} />;
+        return (
+          <GenericComponentContent component={tab.data} type={componentType} />
+        );
       case 'job':
         return <JobTabContent job={tab.data} />;
       case 'healthcheck':
@@ -152,24 +158,29 @@ function FeatureTabContent({ tab }: { tab: Tab }) {
 
   // Fallback for unimplemented types
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-semibold text-grey mb-2">{tab.title}</h2>
-      <p className="text-grey-600">
-        {tab.type.charAt(0).toUpperCase() + tab.type.slice(1)} configuration will appear here.
+    <div className="p-4 sm:p-6">
+      <h2 className="text-lg sm:text-xl font-semibold text-grey mb-2">
+        {tab.title}
+      </h2>
+      <p className="text-sm sm:text-base text-grey-600">
+        {tab.type.charAt(0).toUpperCase() + tab.type.slice(1)} configuration
+        will appear here.
       </p>
     </div>
   );
 }
 
 export default function TabContent() {
-  const { tabs, activeTabId } = useWorkbenchStore();
+  const {tabs, activeTabId} = useWorkbenchStore();
 
   if (tabs.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-grey-100 p-6">
-        <div className="text-center text-grey-600 max-w-md">
-          <p className="text-lg mb-2">No tab selected</p>
-          <p className="text-sm">Open an item from the sidebar or create a new one</p>
+      <div className="flex-1 flex items-center justify-center bg-grey-100 p-4 sm:p-6 md:p-8">
+        <div className="text-center text-grey-600 max-w-xs sm:max-w-md px-4">
+          <p className="text-base sm:text-lg mb-2">No tab selected</p>
+          <p className="text-xs sm:text-sm">
+            Open an item from the sidebar or create a new one
+          </p>
         </div>
       </div>
     );
@@ -197,16 +208,19 @@ export default function TabContent() {
           );
         }
 
-        // Regular request (manual API testing)
+        // Regular request (manual API testing) - Responsive layout
         return (
-          <div key={tab.id} className="flex-1 flex flex-col lg:flex-row min-h-0">
-            {/* Request Panel */}
-            <div className="flex-1 border-r border-grey-400 bg-white overflow-auto">
+          <div
+            key={tab.id}
+            className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden"
+          >
+            {/* Request Panel - Full width on mobile, half on desktop */}
+            <div className="flex-1 lg:border-r border-grey-400 bg-white overflow-auto min-h-[300px] lg:min-h-0">
               <RequestPanel />
             </div>
 
-            {/* Response Panel */}
-            <div className="flex-1 bg-white-700 overflow-auto">
+            {/* Response Panel - Full width on mobile, half on desktop */}
+            <div className="flex-1 bg-white-700 overflow-auto min-h-[300px] lg:min-h-0">
               <ResponsePanel />
             </div>
           </div>
@@ -215,7 +229,9 @@ export default function TabContent() {
       case 'app':
         // Check if this is a new app creation tab
         if (tab.isDirty && !tab.itemId && !tab.data?._id) {
-          return <NewAppTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewAppTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         // Use key to force remount when switching between different apps
         return <AppTabContent key={tab.id} app={tab.data} appId={tab.itemId} />;
@@ -223,17 +239,30 @@ export default function TabContent() {
       case 'product':
         // Check if this is a new product creation tab
         if (tab.isDirty && !tab.itemId && !tab.data?._id) {
-          return <NewProductTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewProductTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
-        return <ProductTabContent key={tab.id} tabId={tab.id} product={tab.data} productId={tab.itemId} />;
+        return (
+          <ProductTabContent
+            key={tab.id}
+            tabId={tab.id}
+            product={tab.data}
+            productId={tab.itemId}
+          />
+        );
 
       case 'auth':
         // Check if this is a new auth creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewAuthTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewAuthTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         // This would handle viewing an auth, but for now just show the new auth content
-        return <NewAuthTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+        return (
+          <NewAuthTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+        );
 
       case 'logs':
         return <Logs key={tab.id} />;
@@ -256,23 +285,38 @@ export default function TabContent() {
 
       case 'brief':
         // Product brief view/edit/create
-        return <BriefTabContent key={tab.id} tab={tab as typeof tab & { data: NonNullable<typeof tab.data> }} />;
+        return (
+          <BriefTabContent
+            key={tab.id}
+            tab={tab as typeof tab & {data: NonNullable<typeof tab.data>}}
+          />
+        );
 
       case 'storage':
         // Check if this is a storage explorer tab
         if (tab.data?.isExplorer) {
-          return <StorageExplorerTab key={tab.id} tabId={tab.id} storage={tab.data.storage} />;
+          return (
+            <StorageExplorerTab
+              key={tab.id}
+              tabId={tab.id}
+              storage={tab.data.storage}
+            />
+          );
         }
         // Check if this is a new storage creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewStorageTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewStorageTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <StorageTabContent key={tab.id} storage={tab.data} />;
 
       case 'cache':
         // Check if this is a new cache creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewCacheTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewCacheTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <CacheTabContent key={tab.id} cache={tab.data} />;
 
@@ -285,11 +329,19 @@ export default function TabContent() {
       case 'database':
         // Check if this is a database explorer tab
         if (tab.data?.isExplorer) {
-          return <DatabaseExplorerTab key={tab.id} database={tab.data.database} />;
+          return (
+            <DatabaseExplorerTab key={tab.id} database={tab.data.database} />
+          );
         }
         // Check if this is a new database creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewDatabaseTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewDatabaseTabContent
+              key={tab.id}
+              tabId={tab.id}
+              data={tab.data}
+            />
+          );
         }
         return <DatabaseTabContent key={tab.id} database={tab.data} />;
 
@@ -300,7 +352,9 @@ export default function TabContent() {
         }
         // Check if this is a new graph creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewGraphTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewGraphTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <GraphTabContent key={tab.id} graph={tab.data} />;
 
@@ -324,16 +378,30 @@ export default function TabContent() {
           );
         }
         // Default workflow view (can be extended later for workflow creation/editing)
-        return <WorkflowExplorerTab key={tab.id} tabId={tab.id} workflow={tab.data} />;
+        return (
+          <WorkflowExplorerTab
+            key={tab.id}
+            tabId={tab.id}
+            workflow={tab.data}
+          />
+        );
 
       case 'workflow-run':
         // Check if we have the run data (may be missing after page reload)
         if (!tab.data?.run) {
           return (
-            <div key={tab.id} className="flex-1 flex flex-col items-center justify-center bg-background-tertiary p-6">
-              <div className="text-center text-grey-200 max-w-md">
-                <p className="text-lg mb-2">Run data not available</p>
-                <p className="text-sm">The workflow run data has expired. Please open the run again from the workflow explorer.</p>
+            <div
+              key={tab.id}
+              className="flex-1 flex flex-col items-center justify-center bg-background-tertiary p-4 sm:p-6"
+            >
+              <div className="text-center text-grey-200 max-w-xs sm:max-w-md">
+                <p className="text-base sm:text-lg mb-2">
+                  Run data not available
+                </p>
+                <p className="text-xs sm:text-sm">
+                  The workflow run data has expired. Please open the run again
+                  from the workflow explorer.
+                </p>
               </div>
             </div>
           );
@@ -361,32 +429,57 @@ export default function TabContent() {
         // Check if we have the run data (may be missing after page reload)
         if (!tab.data?.run) {
           return (
-            <div key={tab.id} className="flex-1 flex flex-col items-center justify-center bg-background-tertiary p-6">
-              <div className="text-center text-grey-200 max-w-md">
-                <p className="text-lg mb-2">Run data not available</p>
-                <p className="text-sm">The agent run data has expired. Please open the run again from the agent explorer.</p>
+            <div
+              key={tab.id}
+              className="flex-1 flex flex-col items-center justify-center bg-background-tertiary p-4 sm:p-6"
+            >
+              <div className="text-center text-grey-200 max-w-xs sm:max-w-md">
+                <p className="text-base sm:text-lg mb-2">
+                  Run data not available
+                </p>
+                <p className="text-xs sm:text-sm">
+                  The agent run data has expired. Please open the run again from
+                  the agent explorer.
+                </p>
               </div>
             </div>
           );
         }
-        return <AgentRunTab key={tab.id} run={tab.data.run} agentName={tab.data.agentName} agentTag={tab.data.agentTag} />;
+        return (
+          <AgentRunTab
+            key={tab.id}
+            run={tab.data.run}
+            agentName={tab.data.agentName}
+            agentTag={tab.data.agentTag}
+          />
+        );
 
       case 'message-broker':
         // Check if this is a new message broker creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewMessageBrokerTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewMessageBrokerTabContent
+              key={tab.id}
+              tabId={tab.id}
+              data={tab.data}
+            />
+          );
         }
         return <FeatureTabContent key={tab.id} tab={tab} />;
 
       case 'webhook':
         // Check if this is a new webhook creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewWebhookTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewWebhookTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <WebhookTabContent key={tab.id} webhook={tab.data} />;
 
       case 'webhook-explorer':
-        return <WebhookExplorerTab key={tab.id} tabId={tab.id} webhook={tab.data} />;
+        return (
+          <WebhookExplorerTab key={tab.id} tabId={tab.id} webhook={tab.data} />
+        );
 
       case 'healthcheck':
         // Check if this is a new healthcheck creation tab
@@ -399,17 +492,35 @@ export default function TabContent() {
       case 'notifier':
         // Check if this is a new notification creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewNotificationTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewNotificationTabContent
+              key={tab.id}
+              tabId={tab.id}
+              data={tab.data}
+            />
+          );
         }
         return <NotificationTabContent key={tab.id} data={tab.data} />;
 
       case 'new-notification':
         // Create new notification/notifier
-        return <NewNotificationTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+        return (
+          <NewNotificationTabContent
+            key={tab.id}
+            tabId={tab.id}
+            data={tab.data}
+          />
+        );
 
       case 'notification-template':
         // Create/edit notification template (IProductNotificationTemplate via SDK notifications.messages)
-        return <NotificationTemplateTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+        return (
+          <NotificationTemplateTabContent
+            key={tab.id}
+            tabId={tab.id}
+            data={tab.data}
+          />
+        );
 
       case 'notification-explorer':
         // Notification explorer: product-only = Product Mode (notifier cards); product+notification+env+isExplorer = Notifier+Env Mode (sidebar + overview/templates)
@@ -417,15 +528,30 @@ export default function TabContent() {
 
       case 'fallback-explorer':
         // Fallback explorer tab with product envs
-        return <FallbackExplorerTab key={tab.id} product={tab.data?.product || { tag: '', name: '', envs: [] }} />;
+        return (
+          <FallbackExplorerTab
+            key={tab.id}
+            product={tab.data?.product || {tag: '', name: '', envs: []}}
+          />
+        );
 
       case 'quota-explorer':
         // Quota explorer tab with product envs
-        return <QuotaExplorerTab key={tab.id} product={tab.data?.product || { tag: '', name: '', envs: [] }} />;
+        return (
+          <QuotaExplorerTab
+            key={tab.id}
+            product={tab.data?.product || {tag: '', name: '', envs: []}}
+          />
+        );
 
       case 'healthcheck-explorer':
         // Healthcheck explorer tab with product envs
-        return <HealthcheckExplorerTab key={tab.id} product={tab.data?.product || { tag: '', name: '', envs: [] }} />;
+        return (
+          <HealthcheckExplorerTab
+            key={tab.id}
+            product={tab.data?.product || {tag: '', name: '', envs: []}}
+          />
+        );
 
       case 'job-explorer':
         // Single-job explorer: past/future invocations, timeline, metrics
@@ -434,7 +560,7 @@ export default function TabContent() {
             key={tab.id}
             tabId={tab.id}
             job={tab.data?.job || {}}
-            product={tab.data?.product || { tag: '', name: '', envs: [] }}
+            product={tab.data?.product || {tag: '', name: '', envs: []}}
             env={tab.data?.env}
             initialActiveSection={tab.data?.activeSection}
           />
@@ -446,37 +572,62 @@ export default function TabContent() {
 
       case 'new-message':
         // Create new message
-        return <NewMessageTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+        return (
+          <NewMessageTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+        );
 
       case 'new-topic':
         // Create new topic/queue for message broker
-        return <NewMessageBrokerTopicContent key={tab.id} tabId={tab.id} data={tab.data} />;
+        return (
+          <NewMessageBrokerTopicContent
+            key={tab.id}
+            tabId={tab.id}
+            data={tab.data}
+          />
+        );
 
       case 'feature':
         // Check if this is a new feature creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewFeatureTabContent key={tab.id} tabId={tab.id} type={tab.type} data={tab.data} />;
+          return (
+            <NewFeatureTabContent
+              key={tab.id}
+              tabId={tab.id}
+              type={tab.type}
+              data={tab.data}
+            />
+          );
         }
         return <FeatureTabContent key={tab.id} tab={tab} />;
 
       case 'quota':
         // Check if this is a new quota creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewQuotaTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewQuotaTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <FeatureTabContent key={tab.id} tab={tab} />;
 
       case 'fallback':
         // Check if this is a new fallback creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewFallbackTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewFallbackTabContent
+              key={tab.id}
+              tabId={tab.id}
+              data={tab.data}
+            />
+          );
         }
         return <FeatureTabContent key={tab.id} tab={tab} />;
 
       case 'job':
         // Check if this is a new job creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewJobTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewJobTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <JobTabContent key={tab.id} job={tab.data} />;
 
@@ -494,7 +645,9 @@ export default function TabContent() {
       case 'session':
         // Check if this is a new session creation tab
         if (tab.isDirty && tab.data?.isNew) {
-          return <NewSessionTabContent key={tab.id} tabId={tab.id} data={tab.data} />;
+          return (
+            <NewSessionTabContent key={tab.id} tabId={tab.id} data={tab.data} />
+          );
         }
         return <SessionTabContent key={tab.id} session={tab.data} />;
 
@@ -518,8 +671,10 @@ export default function TabContent() {
 
       default:
         return (
-          <div key={tab.id} className="p-6">
-            <p className="text-grey-600">Unknown tab type: {tab.type}</p>
+          <div key={tab.id} className="p-4 sm:p-6">
+            <p className="text-sm sm:text-base text-grey-600">
+              Unknown tab type: {tab.type}
+            </p>
           </div>
         );
     }
@@ -528,11 +683,11 @@ export default function TabContent() {
   // Keep all tab panels mounted; hide inactive ones so workflow (and other) tabs don't remount/refetch on switch
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {tabs.map((tab) => (
+      {tabs.map(tab => (
         <div
           key={tab.id}
           className="flex-1 flex flex-col min-h-0 overflow-hidden"
-          style={{ display: tab.id === activeTabId ? 'flex' : 'none' }}
+          style={{display: tab.id === activeTabId ? 'flex' : 'none'}}
           aria-hidden={tab.id !== activeTabId}
         >
           {renderTabContent(tab)}
