@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button } from './ui/button';
+import {useState} from 'react';
+import {Button} from './ui/button';
 import {
   Plus,
   FileText,
@@ -15,9 +15,9 @@ import {
   Heart,
   ListTree,
   Key,
-  Layers
+  Layers,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {cn} from '@/lib/utils';
 
 interface NewItemOption {
   id: string;
@@ -130,7 +130,7 @@ interface NewItemDropdownProps {
   onSelect: (itemId: string) => void;
 }
 
-export default function NewItemDropdown({ onSelect }: NewItemDropdownProps) {
+export default function NewItemDropdown({onSelect}: NewItemDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSelect = (itemId: string) => {
@@ -139,17 +139,17 @@ export default function NewItemDropdown({ onSelect }: NewItemDropdownProps) {
   };
 
   const categories = [
-    { id: 'common', label: 'Common' },
-    { id: 'app', label: 'Application' },
-    { id: 'product', label: 'Product Features' },
+    {id: 'common', label: 'Common'},
+    {id: 'app', label: 'Application'},
+    {id: 'product', label: 'Product Features'},
   ];
 
   return (
-    <div className="relative">
+    <div className="relative inline-block">
       <Button
         onClick={() => setIsOpen(!isOpen)}
         size="sm"
-        className="h-auto px-2 md:px-4 py-1.5 md:py-2 bg-primary text-white hover:bg-primary/90 shadow-sm hover:shadow"
+        className="h-auto px-2 md:px-4 py-1.5 md:py-2 bg-primary text-white hover:bg-primary/90 shadow-sm hover:shadow whitespace-nowrap"
         data-intro="new-button"
       >
         <Plus className="h-4 w-4 md:mr-2" />
@@ -158,37 +158,40 @@ export default function NewItemDropdown({ onSelect }: NewItemDropdownProps) {
 
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - only for mobile */}
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-40 md:hidden"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Dropdown */}
-          <div className="absolute top-full left-0 md:left-auto right-0 md:right-auto mt-2 w-[calc(100vw-24px)] md:w-80 bg-white rounded-lg shadow-xl border border-grey-400 z-50 max-h-[calc(100vh-120px)] md:max-h-[600px] overflow-auto">
-            {categories.map((category) => {
+          <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-grey-400 z-50 max-h-[600px] overflow-auto">
+            {categories.map(category => {
               const categoryItems = newItemOptions.filter(
-                (item) => item.category === category.id
+                item => item.category === category.id,
               );
 
               if (categoryItems.length === 0) return null;
 
               return (
-                <div key={category.id} className="border-b border-grey-400 last:border-b-0 shadow-sm">
+                <div
+                  key={category.id}
+                  className="border-b border-grey-400 last:border-b-0 shadow-sm"
+                >
                   <div className="px-4 py-2 bg-grey-100">
                     <h3 className="text-xs font-semibold text-grey-600 uppercase">
                       {category.label}
                     </h3>
                   </div>
                   <div className="p-2">
-                    {categoryItems.map((item) => {
+                    {categoryItems.map(item => {
                       const Icon = item.icon;
                       return (
                         <button
                           key={item.id}
                           onClick={() => handleSelect(item.id)}
                           className={cn(
-                            'w-full flex items-start gap-3 px-3 py-2.5 rounded-md hover:bg-grey-100 transition-colors text-left'
+                            'w-full flex items-start gap-3 px-3 py-2.5 rounded-md hover:bg-grey-100 transition-colors text-left',
                           )}
                         >
                           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">

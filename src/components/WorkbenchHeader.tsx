@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useAuth } from '@/store/useAuth';
-import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useFetchWorkspaces } from '@/hooks/useWorkspaceQueries';
+import {useState, useCallback, useEffect} from 'react';
+import {useAuth} from '@/store/useAuth';
+import {useWorkbenchStore} from '@/stores/workbench-store';
+import {useMutation, useQueryClient} from '@tanstack/react-query';
+import {useFetchWorkspaces} from '@/hooks/useWorkspaceQueries';
 import workspaceServices from '@/services/workspaceServices';
 import productServices from '@/services/productServices';
 import toast from 'react-hot-toast';
-import { Button } from './ui/button';
+import {Button} from './ui/button';
 import {
   Select,
   SelectContent,
@@ -19,8 +19,11 @@ import {
   LogOut,
   Settings,
   Plus,
+  Menu,
+  X,
+  ChevronRight,
 } from 'lucide-react';
-import { Skeleton } from './ui/skeleton';
+import {Skeleton} from './ui/skeleton';
 import NewItemDropdown from './NewItemDropdown';
 import ImportDialog from './ImportDialog';
 import ProductSelectionModal from './modals/ProductSelectionModal';
@@ -34,20 +37,26 @@ interface ApiError {
 }
 
 export default function WorkbenchHeader() {
-  const { user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId } = useAuth();
-  const { openTab, activeView, setActiveView, clearAllTabs } = useWorkbenchStore();
+  const {user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId} =
+    useAuth();
+  const {openTab, activeView, setActiveView, clearAllTabs} =
+    useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showAppModal, setShowAppModal] = useState(false);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
-  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
+    useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    null,
+  );
   const [pendingItemType, setPendingItemType] = useState<string | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Fetch real workspaces
-  const { data: workspacesData, status: workspacesStatus } = useFetchWorkspaces({
+  const {data: workspacesData, status: workspacesStatus} = useFetchWorkspaces({
     user_id: user?._id ?? '',
     public_key: user?.public_key ?? '',
   });
@@ -57,9 +66,9 @@ export default function WorkbenchHeader() {
     workspace => workspace.default === true,
   );
 
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedWorkspace, setSelectedWorkspace] = useState<
+    string | undefined
+  >(undefined);
 
   const selectedWorkspaceName =
     workspacesData?.data?.find(
@@ -67,7 +76,7 @@ export default function WorkbenchHeader() {
     )?.workspace_name || 'Select workspace';
 
   // Mutation for changing workspace
-  const { mutate: changeDefaultWorkspace } = useMutation({
+  const {mutate: changeDefaultWorkspace} = useMutation({
     mutationFn: (workspace_id: string) =>
       workspaceServices.changeDefaultWorkspace({
         user_id: user?._id ?? '',
@@ -77,7 +86,7 @@ export default function WorkbenchHeader() {
 
     onSuccess: async (data, variables) => {
       if (user && user._id && data?.data) {
-        const updatedUser = { ...user, workspaces: data.data };
+        const updatedUser = {...user, workspaces: data.data};
         setUser(updatedUser as any);
         // Set the current workspace ID in auth store
         setCurrentWorkspaceId(variables);
@@ -107,6 +116,7 @@ export default function WorkbenchHeader() {
       }
       setSelectedWorkspace(workspace_id);
       changeDefaultWorkspace(workspace_id);
+      setShowMobileMenu(false); // Close mobile menu after selection
     },
     [changeDefaultWorkspace],
   );
@@ -136,6 +146,9 @@ export default function WorkbenchHeader() {
   };
 
   const handleNewItem = async (itemId: string) => {
+    // Close mobile menu if open
+    setShowMobileMenu(false);
+
     // If on dashboard, switch to products view first
     if (activeView === 'dashboard') {
       setActiveView('products');
@@ -224,7 +237,7 @@ export default function WorkbenchHeader() {
       id: appTabId,
       type: 'app',
       title: 'New App',
-      data: { productId: selectedProductId },
+      data: {productId: selectedProductId},
       isDirty: true,
     });
     setPendingItemType(null);
@@ -239,13 +252,17 @@ export default function WorkbenchHeader() {
       id: productTabId,
       type: 'product',
       title: 'New Product',
-      data: { isNew: true },
+      data: {isNew: true},
       isDirty: true,
     });
     // Don't clear pendingItemType - we'll reopen the modal after product is created
   };
 
-  const createTab = async (itemType: string, productId: string | null, appId: string | null) => {
+  const createTab = async (
+    itemType: string,
+    productId: string | null,
+    appId: string | null,
+  ) => {
     const tabId = `${itemType}-${Date.now()}`;
     const titleMap: Record<string, string> = {
       request: 'New Request',
@@ -275,7 +292,7 @@ export default function WorkbenchHeader() {
           public_key: user.public_key,
           workspace_id: currentWorkspaceId || '',
         });
-        
+
         if (productResponse?.data) {
           productData = productResponse.data;
         }
@@ -312,7 +329,7 @@ export default function WorkbenchHeader() {
         appId,
         isNew: true,
         componentType: itemType,
-        
+
         // Complete product context (if available)
         ...(productData && {
           productName: productData.name,
@@ -336,7 +353,11 @@ export default function WorkbenchHeader() {
     });
   };
 
-  const handleImport = (data: { type: 'postman' | 'openapi'; source: 'file' | 'url'; content: string }) => {
+  const handleImport = (data: {
+    type: 'postman' | 'openapi';
+    source: 'file' | 'url';
+    content: string;
+  }) => {
     console.log('Importing:', data);
     // TODO: Implement import logic
     // For now, create a new app tab
@@ -345,7 +366,7 @@ export default function WorkbenchHeader() {
       id: tabId,
       type: 'app',
       title: `Imported ${data.type === 'postman' ? 'Postman' : 'OpenAPI'}`,
-      data: { importData: data },
+      data: {importData: data},
       isDirty: true,
     });
   };
@@ -354,173 +375,460 @@ export default function WorkbenchHeader() {
     // Switch to the newly created workspace
     setCurrentWorkspaceId(workspace.workspace_id);
     toast.success(`Switched to ${workspace.workspace_name}`);
+    setShowCreateWorkspaceModal(false);
   };
 
-  return (
-    <header className="h-14 md:h-16 border-b border-grey-400 bg-white flex items-center px-3 md:px-6 flex-shrink-0 shadow-sm" data-intro="header">
-      {/* Logo/Brand */}
-      <div className="flex items-center gap-2 md:gap-3 pr-3 md:pr-8 md:border-r border-grey-400">
-        <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-          <path d="M14 10C10 10 8 14 8 18V22C8 24 6 26 6 26C6 26 8 28 8 30V34C8 38 10 42 14 42"
-            stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" className="text-primary" />
-          <path d="M34 10C38 10 40 14 40 18V22C40 24 42 26 42 26C42 26 40 28 40 30V34C40 38 38 42 34 42"
-            stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" className="text-primary" />
-          <path d="M16 20H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-          <path d="M16 26H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-          <path d="M16 32H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-          <circle cx="16" cy="20" r="2" fill="currentColor" className="text-primary" />
-          <circle cx="32" cy="26" r="2" fill="currentColor" className="text-primary" />
-          <circle cx="16" cy="32" r="2" fill="currentColor" className="text-primary" />
-        </svg>
-        <div className="text-lg md:text-xl font-bold text-primary">Ductape</div>
-        <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary ml-1">Beta</span>
-        <span className="hidden sm:inline text-sm text-grey-600 font-medium">Workbench</span>
+  // Mobile workspace selector component
+  const MobileWorkspaceSelector = () => (
+    <div className="border-b border-grey-200 pb-3 mb-3">
+      <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+        WORKSPACE
       </div>
-
-      {/* Workspace Selector - Hidden on small mobile */}
-      <div className="hidden sm:flex items-center gap-2 md:gap-3 px-3 md:px-8">
-        {workspacesStatus === 'pending' ? (
-          <Skeleton className="w-[180px] md:w-[280px] h-9 md:h-10 bg-slate-200" />
-        ) : (
-          <Select
-            value={selectedWorkspace}
-            onValueChange={handleChangeWorkspace}
-          >
-            <SelectTrigger className="w-[180px] md:w-[280px] h-9 md:h-10 shadow-sm">
-              <SelectValue>{selectedWorkspaceName}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {workspacesData?.data?.map(workspace => (
-                <SelectItem
-                  key={workspace.workspace_id}
-                  value={workspace.workspace_id}
-                  className="pl-4 font-semibold"
-                >
-                  {workspace.workspace_name}
-                </SelectItem>
-              ))}
-              <Button
-                className="pt-4.5 pl-4 h-fit gap-2 w-full items-center justify-start"
-                variant="ghost"
-                onClick={() => setShowCreateWorkspaceModal(true)}
-              >
-                <Plus className="h-5 w-5" />
-                <span className="text-grey text-xs font-semibold">
-                  Add a workspace
-                </span>
-              </Button>
-            </SelectContent>
-          </Select>
-        )}
-      </div>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Action Buttons - Compact on mobile */}
-      <div className="flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
-        <ThemeToggle />
-        <NewItemDropdown onSelect={handleNewItem} />
-        {/*<Button
-          onClick={() => setShowImportDialog(true)}
-          variant="outline"
-          size="sm"
-          className="h-auto px-2 md:px-4 py-1.5 md:py-2 shadow-sm hover:shadow"
-        >
-          <Upload className="h-4 w-4 md:mr-2" />
-          <span className="hidden md:inline">Import</span>
-        </Button>*/}
-      </div>
-
-      {/* User Section */}
-      {user && (
-        <div className="flex items-center pl-3 md:pl-6">
-          {/* User Info */}
-          <div className="relative">
+      {workspacesStatus === 'pending' ? (
+        <Skeleton className="w-full h-10 bg-slate-200" />
+      ) : (
+        <div className="space-y-1">
+          {workspacesData?.data?.map(workspace => (
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 rounded-lg hover:bg-grey-100 transition-colors shadow-sm hover:shadow"
+              key={workspace.workspace_id}
+              onClick={() => handleChangeWorkspace(workspace.workspace_id)}
+              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                selectedWorkspace === workspace.workspace_id
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'hover:bg-grey-100'
+              }`}
             >
-              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold shadow-sm">
-                {user.firstname?.[0]}{user.lastname?.[0]}
+              <div className="flex items-center justify-between">
+                <span>{workspace.workspace_name}</span>
+                {selectedWorkspace === workspace.workspace_id && (
+                  <ChevronRight className="h-4 w-4 text-primary" />
+                )}
               </div>
-              <div className="text-left hidden lg:block">
-                <div className="text-sm font-medium text-grey">
-                  {user.firstname} {user.lastname}
-                </div>
-                <div className="text-xs text-grey-600">{user.email}</div>
-              </div>
-              <ChevronDown className="h-4 w-4 text-grey-600 ml-1 hidden md:block" />
             </button>
+          ))}
+          <button
+            onClick={() => {
+              setShowCreateWorkspaceModal(true);
+              setShowMobileMenu(false);
+            }}
+            className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 text-primary flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add a workspace</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
-            {/* User Dropdown Menu */}
-            {showUserMenu && (
-              <>
-                {/* Backdrop to close menu */}
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowUserMenu(false)}
-                />
+  // Mobile menu content
+  const MobileMenu = () => (
+    <>
+      <div
+        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+        onClick={() => setShowMobileMenu(false)}
+      />
+      <div className="fixed top-0 right-0 h-full w-[280px] bg-white shadow-xl z-50 flex flex-col animate-slide-in-right">
+        <div className="p-4 border-b border-grey-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 48 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M14 10C10 10 8 14 8 18V22C8 24 6 26 6 26C6 26 8 28 8 30V34C8 38 10 42 14 42"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                fill="none"
+                className="text-primary"
+              />
+              <path
+                d="M34 10C38 10 40 14 40 18V22C40 24 42 26 42 26C42 26 40 28 40 30V34C40 38 38 42 34 42"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                fill="none"
+                className="text-primary"
+              />
+              <path
+                d="M16 20H32"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                className="text-primary"
+              />
+              <path
+                d="M16 26H32"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                className="text-primary"
+              />
+              <path
+                d="M16 32H32"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                className="text-primary"
+              />
+              <circle
+                cx="16"
+                cy="20"
+                r="2"
+                fill="currentColor"
+                className="text-primary"
+              />
+              <circle
+                cx="32"
+                cy="26"
+                r="2"
+                fill="currentColor"
+                className="text-primary"
+              />
+              <circle
+                cx="16"
+                cy="32"
+                r="2"
+                fill="currentColor"
+                className="text-primary"
+              />
+            </svg>
+            <span className="font-bold text-primary">Ductape</span>
+          </div>
+          <button
+            onClick={() => setShowMobileMenu(false)}
+            className="p-2 hover:bg-grey-100 rounded-lg"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-                {/* Menu */}
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-grey-400 rounded-lg shadow-lg z-20">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        openTab({
-                          id: `settings-${Date.now()}`,
-                          type: 'settings',
-                          title: 'Settings',
-                        });
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2"
-                    >
-                      <Settings className="h-4 w-4" />
-                      Settings
-                    </button>
+        <div className="flex-1 overflow-y-auto p-4">
+          <MobileWorkspaceSelector />
+
+          <div className="border-b border-grey-200 pb-3 mb-3">
+            <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+              ACTIONS
+            </div>
+            <div className="space-y-1">
+              <NewItemDropdown onSelect={handleNewItem} />
+              <button
+                onClick={() => {
+                  setShowImportDialog(true);
+                  setShowMobileMenu(false);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                <span>Import</span>
+              </button>
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-sm">Theme</span>
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+
+          {user && (
+            <div>
+              <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+                ACCOUNT
+              </div>
+              <div className="space-y-1">
+                <div className="px-3 py-2 bg-grey-50 rounded-lg mb-2">
+                  <div className="font-medium text-sm">
+                    {user.firstname} {user.lastname}
                   </div>
-
-                  <div className="py-1 border-t border-grey-400">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-3 py-2 text-left text-sm text-red hover:bg-grey-100 flex items-center gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
+                  <div className="text-xs text-grey-600 truncate">
+                    {user.email}
                   </div>
                 </div>
-              </>
-            )}
-          </div>
+                <button
+                  onClick={() => {
+                    openTab({
+                      id: `settings-${Date.now()}`,
+                      type: 'settings',
+                      title: 'Settings',
+                    });
+                    setShowMobileMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 text-red flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+    </>
+  );
 
-      {/* Guest State */}
-      {!user && (
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowCreateAccountModal(true)}
+  return (
+    <>
+      <header
+        className="h-16 sticky top-0 z-30 border-b border-grey-400 bg-white flex items-center px-4 flex-shrink-0 shadow-sm"
+        data-intro="header"
+      >
+        {/* Logo/Brand */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="flex-shrink-0"
           >
-            Create Account
-          </Button>
-          <Button size="sm" onClick={() => window.location.reload()}>
-            Login
-          </Button>
+            <path
+              d="M14 10C10 10 8 14 8 18V22C8 24 6 26 6 26C6 26 8 28 8 30V34C8 38 10 42 14 42"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              className="text-primary"
+            />
+            <path
+              d="M34 10C38 10 40 14 40 18V22C40 24 42 26 42 26C42 26 40 28 40 30V34C40 38 38 42 34 42"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              className="text-primary"
+            />
+            <path
+              d="M16 20H32"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="text-primary"
+            />
+            <path
+              d="M16 26H32"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="text-primary"
+            />
+            <path
+              d="M16 32H32"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="text-primary"
+            />
+            <circle
+              cx="16"
+              cy="20"
+              r="2"
+              fill="currentColor"
+              className="text-primary"
+            />
+            <circle
+              cx="32"
+              cy="26"
+              r="2"
+              fill="currentColor"
+              className="text-primary"
+            />
+            <circle
+              cx="16"
+              cy="32"
+              r="2"
+              fill="currentColor"
+              className="text-primary"
+            />
+          </svg>
+          <div className="text-lg sm:text-xl font-bold text-primary">
+            Ductape
+          </div>
+          <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+            Beta
+          </span>
+          <span className="hidden sm:inline text-sm text-grey-600 font-medium whitespace-nowrap">
+            Workbench
+          </span>
         </div>
-      )}
 
-      {/* Import Dialog */}
+        {/* Workspace Selector - Desktop */}
+        <div className="hidden md:flex items-center gap-2 md:gap-3 px-3 md:px-8 flex-shrink-0">
+          {workspacesStatus === 'pending' ? (
+            <Skeleton className="w-[180px] md:w-[280px] h-9 md:h-10 bg-slate-200" />
+          ) : (
+            <Select
+              value={selectedWorkspace}
+              onValueChange={handleChangeWorkspace}
+            >
+              <SelectTrigger className="w-[200px] md:w-[280px] h-9 md:h-10 shadow-sm">
+                <SelectValue>{selectedWorkspaceName}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {workspacesData?.data?.map(workspace => (
+                  <SelectItem
+                    key={workspace.workspace_id}
+                    value={workspace.workspace_id}
+                    className="pl-4 font-semibold"
+                  >
+                    {workspace.workspace_name}
+                  </SelectItem>
+                ))}
+                <Button
+                  className="pt-4.5 pl-4 h-fit gap-2 w-full items-center justify-start"
+                  variant="ghost"
+                  onClick={() => setShowCreateWorkspaceModal(true)}
+                >
+                  <Plus className="h-5 w-5" />
+                  <span className="text-grey text-xs font-semibold">
+                    Add a workspace
+                  </span>
+                </Button>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Action Buttons - Desktop */}
+        <div className="hidden md:flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
+          <ThemeToggle />
+          <NewItemDropdown onSelect={handleNewItem} />
+        </div>
+
+        {/* User Section - Desktop */}
+        {user && (
+          <div className="hidden md:flex items-center pl-3 md:pl-6">
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 rounded-lg hover:bg-grey-100 transition-colors shadow-sm hover:shadow"
+              >
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                  {user.firstname?.[0]}
+                  {user.lastname?.[0]}
+                </div>
+                <div className="text-left hidden lg:block">
+                  <div className="text-sm font-medium text-grey">
+                    {user.firstname} {user.lastname}
+                  </div>
+                  <div className="text-xs text-grey-600">{user.email}</div>
+                </div>
+                <ChevronDown className="h-4 w-4 text-grey-600 ml-1 hidden md:block" />
+              </button>
+
+              {/* User Dropdown Menu */}
+              {showUserMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowUserMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-grey-400 rounded-lg shadow-lg z-20">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          openTab({
+                            id: `settings-${Date.now()}`,
+                            type: 'settings',
+                            title: 'Settings',
+                          });
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2"
+                      >
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </button>
+                    </div>
+
+                    <div className="py-1 border-t border-grey-400">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-3 py-2 text-left text-sm text-red hover:bg-grey-100 flex items-center gap-2"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Guest State - Desktop */}
+        {!user && (
+          <div className="hidden md:flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCreateAccountModal(true)}
+            >
+              Create Account
+            </Button>
+            <Button size="sm" onClick={() => window.location.reload()}>
+              Login
+            </Button>
+          </div>
+        )}
+
+        {/* Mobile Menu Button */}
+        <div className="flex md:hidden items-center gap-2">
+          {user && (
+            <button
+              onClick={() => setShowMobileMenu(true)}
+              className="p-2 hover:bg-grey-100 rounded-lg"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          {!user && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateAccountModal(true)}
+                className="text-xs px-3 py-1.5"
+              >
+                Sign Up
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="text-xs px-3 py-1.5"
+              >
+                Login
+              </Button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Mobile Menu */}
+      {showMobileMenu && <MobileMenu />}
+
+      {/* Modals */}
       <ImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
         onImport={handleImport}
       />
 
-      {/* Product Selection Modal */}
+      {/* Product Selection Modal - Responsive */}
       <ProductSelectionModal
         open={showProductModal}
         onClose={() => {
@@ -533,7 +841,7 @@ export default function WorkbenchHeader() {
         description={`Choose which product to add this ${pendingItemType} to`}
       />
 
-      {/* App Selection Modal */}
+      {/* App Selection Modal - Responsive */}
       <AppSelectionModal
         open={showAppModal}
         onClose={() => {
@@ -543,32 +851,42 @@ export default function WorkbenchHeader() {
         }}
         onSelect={handleAppSelect}
         onCreateNew={handleCreateNewApp}
-        productId={pendingItemType === 'request' || pendingItemType === 'auth' ? undefined : selectedProductId || ''}
-        title={pendingItemType === 'request' ? 'Select App for Request' : pendingItemType === 'auth' ? 'Select App for Auth' : 'Select or Create App'}
-        description={pendingItemType === 'request' 
-          ? 'Choose an app from your workspace to create a new request'
-          : pendingItemType === 'auth'
-          ? 'Choose an app from your workspace to create authentication'
-          : 'Choose an existing app or create a new one for this request'
+        productId={
+          pendingItemType === 'request' || pendingItemType === 'auth'
+            ? undefined
+            : selectedProductId || ''
+        }
+        title={
+          pendingItemType === 'request'
+            ? 'Select App for Request'
+            : pendingItemType === 'auth'
+              ? 'Select App for Auth'
+              : 'Select or Create App'
+        }
+        description={
+          pendingItemType === 'request'
+            ? 'Choose an app from your workspace to create a new request'
+            : pendingItemType === 'auth'
+              ? 'Choose an app from your workspace to create authentication'
+              : 'Choose an existing app or create a new one for this request'
         }
       />
 
-      {/* Create Account Modal */}
+      {/* Create Account Modal - Responsive */}
       <CreateAccountModal
         open={showCreateAccountModal}
         onClose={() => setShowCreateAccountModal(false)}
         onSuccess={() => {
-          // Optionally handle success (e.g., redirect to login)
-          toast.success("Account created! Please log in to continue.");
+          toast.success('Account created! Please log in to continue.');
         }}
       />
 
-      {/* Create Workspace Modal */}
+      {/* Create Workspace Modal - Responsive */}
       <CreateWorkspaceModal
         open={showCreateWorkspaceModal}
         onOpenChange={setShowCreateWorkspaceModal}
         onSuccess={handleWorkspaceCreated}
       />
-    </header>
+    </>
   );
 }

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { IProduct } from '@/types/product';
+import {useState, useEffect, useRef} from 'react';
+import {IProduct} from '@/types/product';
 import {
   Database,
   HardDrive,
@@ -34,22 +34,28 @@ import {
   Home,
   FileText,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useWorkbenchStore } from '@/stores/workbench-store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {cn} from '@/lib/utils';
+import {useWorkbenchStore} from '@/stores/workbench-store';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useAuth } from '@/store/useAuth';
+import {useQuery, useMutation} from '@tanstack/react-query';
+import {useAuth} from '@/store/useAuth';
 import productServices from '@/services/productServices';
-import { MarkdownViewer } from '@/components/ui/markdown-editor';
+import {MarkdownViewer} from '@/components/ui/markdown-editor';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
@@ -62,7 +68,7 @@ import InlineCacheForm from '@/components/forms/InlineCacheForm';
 import InlineMessageBrokerForm from '@/components/forms/InlineMessageBrokerForm';
 import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
 import CodeSidebar from '@/components/CodeSidebar';
-import { saveTabState, getTabState } from '@/lib/tab-state-manager';
+import {saveTabState, getTabState} from '@/lib/tab-state-manager';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -99,22 +105,116 @@ interface ResourceCategoryConfig {
 
 const resourceCategories: ResourceCategoryConfig[] = [
   // Enabled categories first
-  { id: 'apps', label: 'Connected Apps', icon: Grid3x3, color: 'text-green', bgColor: 'bg-green/10', dataKey: 'apps', componentType: 'app' },
-  { id: 'databases', label: 'Databases', icon: Database, color: 'text-primary', bgColor: 'bg-primary/10', dataKey: 'databases', componentType: 'database' },
-  { id: 'storage', label: 'Storage', icon: HardDrive, color: 'text-purple-500', bgColor: 'bg-purple-500/10', dataKey: 'storage', componentType: 'storage' },
-  { id: 'sessions', label: 'Sessions', icon: KeyRound, color: 'text-blue-600', bgColor: 'bg-blue-600/10', dataKey: 'sessions', componentType: 'session' },
-  { id: 'messageBrokers', label: 'Messaging', icon: MessageSquare, color: 'text-cyan-600', bgColor: 'bg-cyan-600/10', dataKey: 'messageBrokers', componentType: 'message-broker' },
-  { id: 'caches', label: 'Caches', icon: Layers, color: 'text-orange-500', bgColor: 'bg-orange-500/10', dataKey: 'caches', componentType: 'cache' },
-  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10', dataKey: 'notifications', componentType: 'notification' },
-  { id: 'jobs', label: 'Jobs', icon: Box, color: 'text-indigo-600', bgColor: 'bg-indigo-600/10', dataKey: 'jobs', componentType: 'job' },
-  { id: 'workflows', label: 'Workflows', icon: GitBranch, color: 'text-violet-600', bgColor: 'bg-violet-600/10', dataKey: 'workflows', componentType: 'workflow' },
-  { id: 'intelligence', label: 'Intelligence', icon: Brain, color: 'text-amber-600', bgColor: 'bg-amber-600/10', dataKey: 'intelligence', componentType: 'intelligence', disabled: true },
-  { id: 'resilience', label: 'Resilience', icon: Shield, color: 'text-red-500', bgColor: 'bg-red-500/10', dataKey: 'resilience', componentType: 'resilience', disabled: true },
+  {
+    id: 'apps',
+    label: 'Connected Apps',
+    icon: Grid3x3,
+    color: 'text-green',
+    bgColor: 'bg-green/10',
+    dataKey: 'apps',
+    componentType: 'app',
+  },
+  {
+    id: 'databases',
+    label: 'Databases',
+    icon: Database,
+    color: 'text-primary',
+    bgColor: 'bg-primary/10',
+    dataKey: 'databases',
+    componentType: 'database',
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    icon: HardDrive,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-500/10',
+    dataKey: 'storage',
+    componentType: 'storage',
+  },
+  {
+    id: 'sessions',
+    label: 'Sessions',
+    icon: KeyRound,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-600/10',
+    dataKey: 'sessions',
+    componentType: 'session',
+  },
+  {
+    id: 'messageBrokers',
+    label: 'Messaging',
+    icon: MessageSquare,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-600/10',
+    dataKey: 'messageBrokers',
+    componentType: 'message-broker',
+  },
+  {
+    id: 'caches',
+    label: 'Caches',
+    icon: Layers,
+    color: 'text-orange-500',
+    bgColor: 'bg-orange-500/10',
+    dataKey: 'caches',
+    componentType: 'cache',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
+    dataKey: 'notifications',
+    componentType: 'notification',
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    icon: Box,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-600/10',
+    dataKey: 'jobs',
+    componentType: 'job',
+  },
+  {
+    id: 'workflows',
+    label: 'Workflows',
+    icon: GitBranch,
+    color: 'text-violet-600',
+    bgColor: 'bg-violet-600/10',
+    dataKey: 'workflows',
+    componentType: 'workflow',
+  },
+  {
+    id: 'intelligence',
+    label: 'Intelligence',
+    icon: Brain,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-600/10',
+    dataKey: 'intelligence',
+    componentType: 'intelligence',
+    disabled: true,
+  },
+  {
+    id: 'resilience',
+    label: 'Resilience',
+    icon: Shield,
+    color: 'text-red-500',
+    bgColor: 'bg-red-500/10',
+    dataKey: 'resilience',
+    componentType: 'resilience',
+    disabled: true,
+  },
 ];
 
-export default function ProductTabContent({ tabId, product: initialProduct, productId }: ProductTabContentProps) {
-  const { openTab, updateTab, activeTabId } = useWorkbenchStore();
-  const { user, currentWorkspaceId } = useAuth();
+export default function ProductTabContent({
+  tabId,
+  product: initialProduct,
+  productId,
+}: ProductTabContentProps) {
+  const {openTab, updateTab, activeTabId} = useWorkbenchStore();
+  const {user, currentWorkspaceId} = useAuth();
   const hasRestoredStateRef = useRef(false);
 
   // Load persisted state from tab state manager
@@ -141,23 +241,34 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
   // Type selection dialogs for combined categories
   const [showDatabaseTypeDialog, setShowDatabaseTypeDialog] = useState(false);
-  const [showIntelligenceTypeDialog, setShowIntelligenceTypeDialog] = useState(false);
-  const [showResilienceTypeDialog, setShowResilienceTypeDialog] = useState(false);
+  const [showIntelligenceTypeDialog, setShowIntelligenceTypeDialog] =
+    useState(false);
+  const [showResilienceTypeDialog, setShowResilienceTypeDialog] =
+    useState(false);
   const [showJobsCodeDialog, setShowJobsCodeDialog] = useState(false);
   const [showWorkflowsCodeDialog, setShowWorkflowsCodeDialog] = useState(false);
-  const [selectedWorkflowFn, setSelectedWorkflowFn] = useState<string>('define');
+  const [selectedWorkflowFn, setSelectedWorkflowFn] =
+    useState<string>('define');
   const [selectedJobType, setSelectedJobType] = useState<string>('app-action');
 
   // Inline component creation state (null = not creating, string = type being created)
   const [inlineCreateMode, setInlineCreateMode] = useState<string | null>(null);
 
   // Sidebar state - initialized from persisted state
-  const [activeCategory, setActiveCategory] = useState<ResourceCategory>(persistedState?.activeCategory || 'overview');
-  const [searchQuery, setSearchQuery] = useState(persistedState?.searchQuery || '');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(persistedState?.isSidebarCollapsed || false);
+  const [activeCategory, setActiveCategory] = useState<ResourceCategory>(
+    persistedState?.activeCategory || 'overview',
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    persistedState?.searchQuery || '',
+  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    persistedState?.isSidebarCollapsed || false,
+  );
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
   // Which notification card is expanded to show templates inline (tag or null)
-  const [expandedNotificationTag, setExpandedNotificationTag] = useState<string | null>(null);
+  const [expandedNotificationTag, setExpandedNotificationTag] = useState<
+    string | null
+  >(null);
 
   // Mark state as restored after initial load
   useEffect(() => {
@@ -187,17 +298,32 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       tabId,
       'product',
       productName,
-      initialProduct || { _id: productId }, // Pass actual product data
+      initialProduct || {_id: productId}, // Pass actual product data
       uiState, // Pass UI state as formState
-      initialProduct?.tag || productId || initialProduct?._id
+      initialProduct?.tag || productId || initialProduct?._id,
     );
-  }, [tabId, activeCategory, searchQuery, isSidebarCollapsed, initialProduct?.name, initialProduct?.tag, initialProduct?._id, productId, initialProduct]);
+  }, [
+    tabId,
+    activeCategory,
+    searchQuery,
+    isSidebarCollapsed,
+    initialProduct?.name,
+    initialProduct?.tag,
+    initialProduct?._id,
+    productId,
+    initialProduct,
+  ]);
 
   // Fetch product data if not provided or incomplete
-  const { data: fetchedProductData, isLoading: isFetchingProduct, refetch } = useQuery({
+  const {
+    data: fetchedProductData,
+    isLoading: isFetchingProduct,
+    refetch,
+  } = useQuery({
     queryKey: ['product', productId],
     queryFn: async () => {
-      if (!productId || !user?._id || !user?.public_key || !currentWorkspaceId) return null;
+      if (!productId || !user?._id || !user?.public_key || !currentWorkspaceId)
+        return null;
 
       const response = await productServices.fetchProduct({
         product_id: productId,
@@ -207,7 +333,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       });
       return response.data;
     },
-    enabled: !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
+    enabled:
+      !!productId && !!user?._id && !!user?.public_key && !!currentWorkspaceId,
     staleTime: 30 * 1000, // 30 seconds - data is considered fresh
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
     refetchOnMount: 'always', // Always refetch when component mounts to get latest data
@@ -216,10 +343,19 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   const product = fetchedProductData || initialProduct;
 
   // Check if product data is incomplete
-  const isProductDataIncomplete = !product || !product.tag || !product.name || !product.envs || product.envs.length === 0;
+  const isProductDataIncomplete =
+    !product ||
+    !product.tag ||
+    !product.name ||
+    !product.envs ||
+    product.envs.length === 0;
 
   // Fetch connected apps
-  const { data: productAppsRes, status: productAppsStatus, refetch: refetchApps } = useQuery({
+  const {
+    data: productAppsRes,
+    status: productAppsStatus,
+    refetch: refetchApps,
+  } = useQuery({
     queryKey: ['product-apps', product?._id],
     queryFn: () =>
       productServices.fetchProductApps({
@@ -228,7 +364,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         workspace_id: currentWorkspaceId || '',
         product_id: product!._id,
       }),
-    enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
+    enabled:
+      !!user?._id &&
+      !!user?.public_key &&
+      !!currentWorkspaceId &&
+      !!product?._id,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: 'always', // Always refetch when component mounts to get latest data
@@ -239,15 +379,15 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Update tab with fetched data
   useEffect(() => {
     if (fetchedProductData && activeTabId && !initialProduct) {
-      updateTab(activeTabId, { data: fetchedProductData });
+      updateTab(activeTabId, {data: fetchedProductData});
     }
   }, [fetchedProductData, activeTabId, initialProduct, updateTab]);
 
   // Mutation to fetch full app data by tag
-  const { mutate: fetchFullApp } = useMutation({
-    mutationFn: (params: { tag: string; user_id: string; public_key: string }) =>
+  const {mutate: fetchFullApp} = useMutation({
+    mutationFn: (params: {tag: string; user_id: string; public_key: string}) =>
       appServicesReal.fetchAppByTag(params),
-    onSuccess: (response) => {
+    onSuccess: response => {
       const fullApp = response.data;
       openTab({
         id: `app-${fullApp._id}`,
@@ -272,7 +412,6 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     },
   });
 
-
   // Get resources for a category
   const getResources = (category: ResourceCategoryConfig): any[] => {
     if (category.id === 'apps') return connectedApps;
@@ -282,9 +421,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       const graphs = (product as any)?.graphs || [];
       const vectors = (product as any)?.vectors || [];
       return [
-        ...databases.map((d: any) => ({ ...d, _resourceType: 'database' })),
-        ...graphs.map((g: any) => ({ ...g, _resourceType: 'graph' })),
-        ...vectors.map((v: any) => ({ ...v, _resourceType: 'vector' })),
+        ...databases.map((d: any) => ({...d, _resourceType: 'database'})),
+        ...graphs.map((g: any) => ({...g, _resourceType: 'graph'})),
+        ...vectors.map((v: any) => ({...v, _resourceType: 'vector'})),
       ];
     }
     // Combined AI category (agents + models)
@@ -292,8 +431,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       const agents = (product as any)?.agents || [];
       const models = (product as any)?.models || [];
       return [
-        ...agents.map((a: any) => ({ ...a, _resourceType: 'agent' })),
-        ...models.map((m: any) => ({ ...m, _resourceType: 'model' })),
+        ...agents.map((a: any) => ({...a, _resourceType: 'agent'})),
+        ...models.map((m: any) => ({...m, _resourceType: 'model'})),
       ];
     }
     // Combined Resilience category (fallbacks + quotas + healthchecks)
@@ -302,9 +441,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       const quotas = (product as any)?.quota || [];
       const healthchecks = (product as any)?.healthchecks || [];
       return [
-        ...fallbacks.map((f: any) => ({ ...f, _resourceType: 'fallback' })),
-        ...quotas.map((q: any) => ({ ...q, _resourceType: 'quota' })),
-        ...healthchecks.map((h: any) => ({ ...h, _resourceType: 'healthcheck' })),
+        ...fallbacks.map((f: any) => ({...f, _resourceType: 'fallback'})),
+        ...quotas.map((q: any) => ({...q, _resourceType: 'quota'})),
+        ...healthchecks.map((h: any) => ({...h, _resourceType: 'healthcheck'})),
       ];
     }
     // Storage
@@ -354,34 +493,89 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Show skeleton loading state
   if ((isFetchingProduct && !product) || (product && !product.name)) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
-        {/* Sidebar skeleton */}
-        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
-          <div className="p-4 border-b border-grey-400">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-9 h-9 bg-grey-200 rounded-lg animate-pulse" />
+      <div className="h-[calc(100vh-8rem)] flex flex-col md:flex-row bg-grey-100">
+        {/* Sidebar skeleton - responsive */}
+        <div className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-grey-400 flex flex-col flex-shrink-0">
+          <div className="p-3 sm:p-4 border-b border-grey-400">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-grey-200 rounded-lg animate-pulse" />
               <div className="flex-1">
-                <div className="h-4 w-24 bg-grey-200 rounded animate-pulse mb-1.5" />
-                <div className="h-3 w-16 bg-grey-200 rounded animate-pulse" />
+                <div className="h-3 sm:h-4 w-20 sm:w-24 bg-grey-200 rounded animate-pulse mb-1 sm:mb-1.5" />
+                <div className="h-2 sm:h-3 w-12 sm:w-16 bg-grey-200 rounded animate-pulse" />
               </div>
             </div>
-            <div className="h-9 bg-grey-200 rounded animate-pulse" />
+            <div className="h-8 sm:h-9 bg-grey-200 rounded animate-pulse" />
           </div>
+
+          {/* Navigation items */}
           <div className="flex-1 p-2 space-y-1">
-            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <div key={i} className="h-10 bg-grey-100 rounded animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+              <div
+                key={i}
+                className="h-9 sm:h-10 bg-grey-100 rounded animate-pulse"
+                style={{animationDelay: `${i * 100}ms`}}
+              />
             ))}
           </div>
-          <div className="p-3 border-t border-grey-400">
-            <div className="h-8 bg-grey-200 rounded animate-pulse" />
+
+          <div className="p-2 sm:p-3 border-t border-grey-400">
+            <div className="h-7 sm:h-8 bg-grey-200 rounded animate-pulse" />
           </div>
         </div>
-        {/* Main content skeleton with loading indicator */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-grey-50">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-sm font-medium text-grey-700">Loading product...</p>
-            <p className="text-xs text-grey-500 mt-1">Fetching product details and components</p>
+
+        {/* Main content skeleton with grid layout */}
+        <div className="flex-1 overflow-auto bg-grey-50">
+          {/* Header skeleton */}
+          <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
+            <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-grey-200 rounded-xl animate-pulse" />
+                  <div>
+                    <div className="h-4 sm:h-5 md:h-6 w-24 sm:w-32 bg-grey-200 rounded animate-pulse mb-1" />
+                    <div className="h-3 sm:h-4 w-32 sm:w-40 bg-grey-200 rounded animate-pulse" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="h-8 sm:h-9 w-28 sm:w-32 bg-grey-200 rounded animate-pulse" />
+                  <div className="h-8 sm:h-9 w-16 sm:w-20 bg-grey-200 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content skeleton - cards grid */}
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+            {/* Loading indicator */}
+            <div className="flex flex-col items-center justify-center py-8 sm:py-12 md:py-16">
+              <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-primary mx-auto mb-3 sm:mb-4" />
+              <p className="text-sm sm:text-base font-medium text-grey-700">
+                Loading product configuration...
+              </p>
+              <p className="text-xs sm:text-sm text-grey-500 mt-1 sm:mt-2">
+                Fetching product details and components
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 mt-4 sm:mt-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div
+                  key={i}
+                  className="bg-white border border-grey-300 rounded-lg p-3 sm:p-4 animate-pulse"
+                  style={{animationDelay: `${i * 100}ms`}}
+                >
+                  <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-grey-200" />
+                    <div className="flex-1">
+                      <div className="h-3 sm:h-4 w-20 sm:w-24 bg-grey-200 rounded mb-1 sm:mb-2" />
+                      <div className="h-2 sm:h-3 w-12 sm:w-16 bg-grey-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-2 sm:h-3 w-full bg-grey-100 rounded mb-1.5 sm:mb-2" />
+                  <div className="h-2 sm:h-3 w-2/3 bg-grey-100 rounded" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -391,11 +585,19 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Show error state
   if (!product && !isFetchingProduct) {
     return (
-      <div className="flex items-center justify-center h-full bg-grey-100">
-        <div className="text-center">
-          <p className="text-red text-lg mb-2">Failed to load product</p>
-          <p className="text-grey-600">The product data could not be retrieved.</p>
-          {productId && <p className="text-grey-500 text-sm mt-2">Product ID: {productId}</p>}
+      <div className="flex items-center justify-center h-full bg-grey-100 p-4 sm:p-6 md:p-8">
+        <div className="text-center max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+          <p className="text-red text-base sm:text-lg md:text-xl font-semibold mb-2 sm:mb-3">
+            Failed to load product
+          </p>
+          <p className="text-grey-600 text-sm sm:text-base">
+            The product data could not be retrieved.
+          </p>
+          {productId && (
+            <p className="text-grey-500 text-xs sm:text-sm mt-2 sm:mt-3 break-all">
+              Product ID: {productId}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -404,7 +606,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   const getInitials = (name: string) => {
     return name
       ?.split(' ')
-      .map((word) => word[0])
+      .map(word => word[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -414,8 +616,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Jobs: open single-job + env explorer (past/future invocations, timeline, metrics)
     if (type === 'job') {
       const env = product?.envs?.[0]
-        ? { slug: product.envs[0].slug, name: product.envs[0].env_name ?? product.envs[0].slug }
-        : { slug: 'prd', name: 'Production' };
+        ? {
+            slug: product.envs[0].slug,
+            name: product.envs[0].env_name ?? product.envs[0].slug,
+          }
+        : {slug: 'prd', name: 'Production'};
       openTab({
         id: `job-explorer-${component.tag}-${env.slug}-${Date.now()}`,
         type: 'job-explorer',
@@ -428,7 +633,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
             logo: product?.logo,
             envs: product?.envs || [],
           },
-          job: { ...component, productTag: product?.tag, productName: product?.name },
+          job: {
+            ...component,
+            productTag: product?.tag,
+            productName: product?.name,
+          },
           env,
           isExplorer: true,
         },
@@ -552,7 +761,10 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   };
 
   // Open template: MessageTabContent (view) when clicking a template, NotificationTemplateTabContent when creating new
-  const handleOpenNotificationTemplate = (notification: any, template?: { tag: string; name?: string; _id?: string }) => {
+  const handleOpenNotificationTemplate = (
+    notification: any,
+    template?: {tag: string; name?: string; _id?: string},
+  ) => {
     if (template) {
       // View existing template in MessageTabContent (message tag for SDK fetch must be full "notifier:template")
       const fullTag = template.tag?.includes(':')
@@ -560,7 +772,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         : notification?.tag
           ? `${notification.tag}:${template.tag}`
           : template.tag;
-      const messageForTab = { ...template, tag: fullTag };
+      const messageForTab = {...template, tag: fullTag};
       openTab({
         id: `message-${notification?.tag}-${fullTag}`.replace(/:/g, '-'),
         type: 'message',
@@ -587,7 +799,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           productEnvs: product?.envs || [],
           workspaceId: currentWorkspaceId || '',
           notificationTag: notification?.tag,
-          notification: notification ? { name: notification.name, tag: notification.tag } : undefined,
+          notification: notification
+            ? {name: notification.name, tag: notification.tag}
+            : undefined,
           isNew: true,
         },
         isDirty: true,
@@ -596,7 +810,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   };
 
   // Open database explorer for a specific environment
-  const handleOpenDatabaseExplorer = (database: any, env: any, e: React.MouseEvent) => {
+  const handleOpenDatabaseExplorer = (
+    database: any,
+    env: any,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation(); // Prevent card click
     openTab({
       id: `db-explorer-${database.tag}-${env.slug}`,
@@ -618,26 +836,31 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   };
 
   // Open resource explorer for a specific environment (generic handler for all resource types)
-  const handleOpenResourceExplorer = (resource: any, resourceType: string, env: any, e: React.MouseEvent) => {
+  const handleOpenResourceExplorer = (
+    resource: any,
+    resourceType: string,
+    env: any,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation(); // Prevent card click
 
     // Map resource types to tab types
     // Some resource types open directly to their "values/events/files" views
     const typeMap: Record<string, string> = {
-      'database': 'database',
-      'graph': 'graph',
-      'vector': 'vector',
-      'storage': 'storage',  // Opens StorageExplorerTab (files view)
-      'cache': 'cache-values',  // Opens directly to cache values
-      'message-broker': 'message-broker-events',  // Opens directly to broker events
-      'session': 'session-activity',  // Opens SessionActivityTab
-      'job': 'job-explorer',  // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
-      'workflow': 'workflow',  // Opens WorkflowExplorerTab
-      'agent': 'agent',  // Opens AgentExplorerTab
-      'fallback': 'fallback-explorer',  // Opens FallbackExplorerTab
-      'quota': 'quota-explorer',  // Opens QuotaExplorerTab
-      'healthcheck': 'healthcheck-explorer',  // Opens HealthcheckExplorerTab
-      'notification': 'notification-explorer',
+      database: 'database',
+      graph: 'graph',
+      vector: 'vector',
+      storage: 'storage', // Opens StorageExplorerTab (files view)
+      cache: 'cache-values', // Opens directly to cache values
+      'message-broker': 'message-broker-events', // Opens directly to broker events
+      session: 'session-activity', // Opens SessionActivityTab
+      job: 'job-explorer', // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
+      workflow: 'workflow', // Opens WorkflowExplorerTab
+      agent: 'agent', // Opens AgentExplorerTab
+      fallback: 'fallback-explorer', // Opens FallbackExplorerTab
+      quota: 'quota-explorer', // Opens QuotaExplorerTab
+      healthcheck: 'healthcheck-explorer', // Opens HealthcheckExplorerTab
+      notification: 'notification-explorer',
     };
 
     const tabType = typeMap[resourceType] || resourceType;
@@ -662,14 +885,18 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       productLogo: product?.logo,
     };
 
-    if (resourceType === 'database' || resourceType === 'graph' || resourceType === 'vector') {
+    if (
+      resourceType === 'database' ||
+      resourceType === 'graph' ||
+      resourceType === 'vector'
+    ) {
       // These use nested object structure (database/graph/vector key)
       data.database = resourceData;
       data.graph = resourceData;
       // VectorExplorerTab expects 'vector' field (not 'tag') to identify the vector config
       data.vector = {
         ...resourceData,
-        vector: resource.tag,  // VectorExplorerTab expects vector.vector not vector.tag
+        vector: resource.tag, // VectorExplorerTab expects vector.vector not vector.tag
       };
     } else if (resourceType === 'storage') {
       // StorageExplorerTab expects product object with tag, name, and envs
@@ -727,7 +954,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           name: resource.name,
           tag: resource.tag,
           productTag: product?.tag,
-          env: { slug: env.slug },
+          env: {slug: env.slug},
         },
         isExplorer: true,
       };
@@ -745,7 +972,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           name: resource.name,
           tag: resource.tag,
           productTag: product?.tag,
-          env: { slug: env.slug },
+          env: {slug: env.slug},
         },
         isExplorer: true,
       };
@@ -770,7 +997,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           envs: product?.envs || [],
         },
         notification: resource,
-        env: env ? { slug: env.slug, name: env.name } : undefined,
+        env: env ? {slug: env.slug, name: env.name} : undefined,
         isExplorer: true,
       };
     } else if (resourceType === 'fallback') {
@@ -818,8 +1045,12 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           logo: product?.logo,
           envs: product?.envs || [],
         },
-        job: { ...resource, productTag: product?.tag, productName: product?.name },
-        env: env ? { slug: env.slug, name: env.name } : undefined,
+        job: {
+          ...resource,
+          productTag: product?.tag,
+          productName: product?.name,
+        },
+        env: env ? {slug: env.slug, name: env.name} : undefined,
         isExplorer: true,
       };
     } else {
@@ -844,7 +1075,8 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Render resource card (using old design style)
   const renderResourceCard = (item: any, category: ResourceCategoryConfig) => {
     const itemName = item.name || item.app_name || item.tag || item.env_name;
-    const isLoadingApp = category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
+    const isLoadingApp =
+      category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
     const isActive = item.status === 'active' || item.active;
 
     // For combined categories, determine the actual resource type
@@ -852,16 +1084,23 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
     // Check if this resource has environments configured
     // Caches, sessions, jobs, and workflows (product-level) use product environments for env chips
-    const useProductEnvs = (category.id === 'caches' || category.id === 'sessions' || category.id === 'jobs' || category.id === 'workflows') && product?.envs?.length;
-    const itemEnvs = Array.isArray(item.envs) && item.envs.length > 0
-      ? item.envs
-      : useProductEnvs
-        ? product.envs.map((env: any) => ({ slug: env.slug, name: env.name }))
-        : [];
+    const useProductEnvs =
+      (category.id === 'caches' ||
+        category.id === 'sessions' ||
+        category.id === 'jobs' ||
+        category.id === 'workflows') &&
+      product?.envs?.length;
+    const itemEnvs =
+      Array.isArray(item.envs) && item.envs.length > 0
+        ? item.envs
+        : useProductEnvs
+          ? product.envs.map((env: any) => ({slug: env.slug, name: env.name}))
+          : [];
     const hasEnvs = itemEnvs.length > 0;
 
     // Resource types that should NOT show env explorer buttons (apps and environments don't make sense to have explorer)
-    const excludeEnvButtons = category.id === 'apps' || category.id === 'environments';
+    const excludeEnvButtons =
+      category.id === 'apps' || category.id === 'environments';
 
     // Get the appropriate icon for combined categories
     const getItemIcon = () => {
@@ -887,91 +1126,194 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         if (item.type) {
           const type = item.type.toLowerCase();
           if (type.includes('neo4j')) {
-            return { label: 'Neo4j', bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+            return {
+              label: 'Neo4j',
+              bgColor: 'bg-purple-100',
+              textColor: 'text-purple-700',
+            };
           }
           if (type.includes('neptune')) {
-            return { label: 'Neptune', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+            return {
+              label: 'Neptune',
+              bgColor: 'bg-blue-100',
+              textColor: 'text-blue-700',
+            };
           }
           if (type.includes('arango')) {
-            return { label: 'ArangoDB', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+            return {
+              label: 'ArangoDB',
+              bgColor: 'bg-green-100',
+              textColor: 'text-green-700',
+            };
           }
           if (type.includes('memgraph')) {
-            return { label: 'Memgraph', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+            return {
+              label: 'Memgraph',
+              bgColor: 'bg-orange-100',
+              textColor: 'text-orange-700',
+            };
           }
           // Default for other graph types
-          return { label: item.type, bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+          return {
+            label: item.type,
+            bgColor: 'bg-purple-100',
+            textColor: 'text-purple-700',
+          };
         }
-        return { label: 'Graph', bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+        return {
+          label: 'Graph',
+          bgColor: 'bg-purple-100',
+          textColor: 'text-purple-700',
+        };
       }
       if (item._resourceType === 'vector') {
         if (item.type) {
           const type = item.type.toLowerCase();
           if (type.includes('pinecone')) {
-            return { label: 'Pinecone', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+            return {
+              label: 'Pinecone',
+              bgColor: 'bg-emerald-100',
+              textColor: 'text-emerald-700',
+            };
           }
           if (type.includes('weaviate')) {
-            return { label: 'Weaviate', bgColor: 'bg-pink-100', textColor: 'text-pink-700' };
+            return {
+              label: 'Weaviate',
+              bgColor: 'bg-pink-100',
+              textColor: 'text-pink-700',
+            };
           }
           if (type.includes('qdrant')) {
-            return { label: 'Qdrant', bgColor: 'bg-red-100', textColor: 'text-red-700' };
+            return {
+              label: 'Qdrant',
+              bgColor: 'bg-red-100',
+              textColor: 'text-red-700',
+            };
           }
           if (type.includes('milvus')) {
-            return { label: 'Milvus', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+            return {
+              label: 'Milvus',
+              bgColor: 'bg-blue-100',
+              textColor: 'text-blue-700',
+            };
           }
           if (type.includes('chroma')) {
-            return { label: 'Chroma', bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' };
+            return {
+              label: 'Chroma',
+              bgColor: 'bg-yellow-100',
+              textColor: 'text-yellow-700',
+            };
           }
           if (type.includes('memory')) {
-            return { label: 'Memory', bgColor: 'bg-gray-100', textColor: 'text-gray-700' };
+            return {
+              label: 'Memory',
+              bgColor: 'bg-gray-100',
+              textColor: 'text-gray-700',
+            };
           }
           // Default for other vector types - show the actual type
-          return { label: item.type, bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+          return {
+            label: item.type,
+            bgColor: 'bg-emerald-100',
+            textColor: 'text-emerald-700',
+          };
         }
-        return { label: 'Vector', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700' };
+        return {
+          label: 'Vector',
+          bgColor: 'bg-emerald-100',
+          textColor: 'text-emerald-700',
+        };
       }
       if (item._resourceType === 'database' && item.type) {
         const type = item.type.toLowerCase();
         // SQL databases
         if (type.includes('postgres') || type === 'postgresql') {
-          return { label: 'PostgreSQL', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+          return {
+            label: 'PostgreSQL',
+            bgColor: 'bg-blue-100',
+            textColor: 'text-blue-700',
+          };
         }
         if (type.includes('mysql')) {
-          return { label: 'MySQL', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+          return {
+            label: 'MySQL',
+            bgColor: 'bg-orange-100',
+            textColor: 'text-orange-700',
+          };
         }
         if (type.includes('sqlite')) {
-          return { label: 'SQLite', bgColor: 'bg-sky-100', textColor: 'text-sky-700' };
+          return {
+            label: 'SQLite',
+            bgColor: 'bg-sky-100',
+            textColor: 'text-sky-700',
+          };
         }
         if (type.includes('mssql') || type.includes('sqlserver')) {
-          return { label: 'SQL Server', bgColor: 'bg-red-100', textColor: 'text-red-700' };
+          return {
+            label: 'SQL Server',
+            bgColor: 'bg-red-100',
+            textColor: 'text-red-700',
+          };
         }
         // NoSQL databases
         if (type.includes('mongo')) {
-          return { label: 'MongoDB', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+          return {
+            label: 'MongoDB',
+            bgColor: 'bg-green-100',
+            textColor: 'text-green-700',
+          };
         }
         if (type.includes('redis')) {
-          return { label: 'Redis', bgColor: 'bg-rose-100', textColor: 'text-rose-700' };
+          return {
+            label: 'Redis',
+            bgColor: 'bg-rose-100',
+            textColor: 'text-rose-700',
+          };
         }
         if (type.includes('dynamo')) {
-          return { label: 'DynamoDB', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+          return {
+            label: 'DynamoDB',
+            bgColor: 'bg-amber-100',
+            textColor: 'text-amber-700',
+          };
         }
         if (type.includes('cassandra')) {
-          return { label: 'Cassandra', bgColor: 'bg-teal-100', textColor: 'text-teal-700' };
+          return {
+            label: 'Cassandra',
+            bgColor: 'bg-teal-100',
+            textColor: 'text-teal-700',
+          };
         }
         if (type.includes('couch')) {
-          return { label: 'CouchDB', bgColor: 'bg-pink-100', textColor: 'text-pink-700' };
+          return {
+            label: 'CouchDB',
+            bgColor: 'bg-pink-100',
+            textColor: 'text-pink-700',
+          };
         }
         if (type.includes('firebase') || type.includes('firestore')) {
-          return { label: 'Firestore', bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' };
+          return {
+            label: 'Firestore',
+            bgColor: 'bg-yellow-100',
+            textColor: 'text-yellow-700',
+          };
         }
         // Default for other types
-        return { label: item.type, bgColor: 'bg-grey-100', textColor: 'text-grey-700' };
+        return {
+          label: item.type,
+          bgColor: 'bg-grey-100',
+          textColor: 'text-grey-700',
+        };
       }
       return null;
     };
 
-    const databaseTypeBadge = (item._resourceType === 'database' || item._resourceType === 'graph' || item._resourceType === 'vector')
-      ? getDatabaseTypeBadge()
-      : null;
+    const databaseTypeBadge =
+      item._resourceType === 'database' ||
+      item._resourceType === 'graph' ||
+      item._resourceType === 'vector'
+        ? getDatabaseTypeBadge()
+        : null;
 
     // Get message broker type badge
     const getMessageBrokerTypeBadge = () => {
@@ -985,25 +1327,53 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
       const type = brokerType.toLowerCase();
       if (type.includes('rabbitmq') || type === 'rabbitmq') {
-        return { label: 'RabbitMQ', bgColor: 'bg-orange-100', textColor: 'text-orange-700' };
+        return {
+          label: 'RabbitMQ',
+          bgColor: 'bg-orange-100',
+          textColor: 'text-orange-700',
+        };
       }
       if (type.includes('kafka')) {
-        return { label: 'Kafka', bgColor: 'bg-slate-100', textColor: 'text-slate-700' };
+        return {
+          label: 'Kafka',
+          bgColor: 'bg-slate-100',
+          textColor: 'text-slate-700',
+        };
       }
       if (type.includes('redis')) {
-        return { label: 'Redis', bgColor: 'bg-rose-100', textColor: 'text-rose-700' };
+        return {
+          label: 'Redis',
+          bgColor: 'bg-rose-100',
+          textColor: 'text-rose-700',
+        };
       }
       if (type.includes('sqs') || type.includes('aws_sqs')) {
-        return { label: 'AWS SQS', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+        return {
+          label: 'AWS SQS',
+          bgColor: 'bg-amber-100',
+          textColor: 'text-amber-700',
+        };
       }
       if (type.includes('pubsub') || type.includes('google_pubsub')) {
-        return { label: 'Google Pub/Sub', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+        return {
+          label: 'Google Pub/Sub',
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-700',
+        };
       }
       if (type.includes('nats')) {
-        return { label: 'NATS', bgColor: 'bg-green-100', textColor: 'text-green-700' };
+        return {
+          label: 'NATS',
+          bgColor: 'bg-green-100',
+          textColor: 'text-green-700',
+        };
       }
       // Default for other types
-      return { label: brokerType, bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' };
+      return {
+        label: brokerType,
+        bgColor: 'bg-cyan-100',
+        textColor: 'text-cyan-700',
+      };
     };
 
     // Get storage type badge
@@ -1018,16 +1388,36 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
       const type = storageType.toLowerCase();
       if (type.includes('s3') || type.includes('aws') || type === 'aws') {
-        return { label: 'AWS S3', bgColor: 'bg-amber-100', textColor: 'text-amber-700' };
+        return {
+          label: 'AWS S3',
+          bgColor: 'bg-amber-100',
+          textColor: 'text-amber-700',
+        };
       }
-      if (type.includes('gcp') || type.includes('google') || type.includes('gcs')) {
-        return { label: 'Google Cloud', bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+      if (
+        type.includes('gcp') ||
+        type.includes('google') ||
+        type.includes('gcs')
+      ) {
+        return {
+          label: 'Google Cloud',
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-700',
+        };
       }
       if (type.includes('azure') || type.includes('blob')) {
-        return { label: 'Azure Blob', bgColor: 'bg-sky-100', textColor: 'text-sky-700' };
+        return {
+          label: 'Azure Blob',
+          bgColor: 'bg-sky-100',
+          textColor: 'text-sky-700',
+        };
       }
       // Default for other types
-      return { label: storageType, bgColor: 'bg-purple-100', textColor: 'text-purple-700' };
+      return {
+        label: storageType,
+        bgColor: 'bg-purple-100',
+        textColor: 'text-purple-700',
+      };
     };
 
     const messageBrokerTypeBadge = getMessageBrokerTypeBadge();
@@ -1047,7 +1437,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         return `TTL: ${item.expiry} ${item.period || ''}`.trim();
       }
       // Skip database types - handled by badge now
-      if (item._resourceType === 'database' || item._resourceType === 'graph' || item._resourceType === 'vector') {
+      if (
+        item._resourceType === 'database' ||
+        item._resourceType === 'graph' ||
+        item._resourceType === 'vector'
+      ) {
         return null;
       }
       // AI category - models
@@ -1074,7 +1468,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     const detailText = getDetailText();
     const isNotifications = category.id === 'notifications';
     const isExpanded = isNotifications && expandedNotificationTag === item.tag;
-    const templates = (isNotifications && item.messages) ? item.messages : [];
+    const templates = isNotifications && item.messages ? item.messages : [];
 
     const cardContent = (
       <div
@@ -1092,117 +1486,159 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           }
         }}
         className={cn(
-          'bg-white rounded-lg border border-grey-400 p-4 transition-all',
-          category.id === 'workflows' ? 'cursor-default' : 'hover:border-primary hover:shadow-md cursor-pointer',
-          isLoadingApp && 'opacity-70 cursor-wait'
+          'bg-white rounded-lg border border-grey-400 transition-all',
+          // Responsive padding
+          'p-3 sm:p-4',
+          category.id === 'workflows'
+            ? 'cursor-default'
+            : 'hover:border-primary hover:shadow-md cursor-pointer',
+          isLoadingApp && 'opacity-70 cursor-wait',
         )}
       >
-        <div className="flex items-start gap-3">
-          {/* Icon/Logo */}
-          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', category.bgColor)}>
+        <div className="flex items-start gap-2 sm:gap-3">
+          {/* Icon/Logo - Responsive sizing */}
+          <div
+            className={cn(
+              'rounded-lg flex items-center justify-center flex-shrink-0',
+              'w-8 h-8 sm:w-10 sm:h-10',
+              category.bgColor,
+            )}
+          >
             {isLoadingApp ? (
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary" />
             ) : item.logo ? (
-              <img src={item.logo} alt={itemName} className="w-8 h-8 rounded object-cover" />
+              <img
+                src={item.logo}
+                alt={itemName}
+                className="w-6 h-6 sm:w-8 sm:h-8 rounded object-cover"
+              />
             ) : (
-              <ItemIcon className={cn('h-5 w-5', category.color)} />
+              <ItemIcon
+                className={cn('h-4 w-4 sm:h-5 sm:w-5', category.color)}
+              />
             )}
           </div>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-medium text-grey truncate">{itemName}</h3>
-              {/* Status badge */}
+            <div className="flex items-start justify-between gap-1 sm:gap-2 flex-wrap">
+              <h3 className="text-xs sm:text-sm font-medium text-grey truncate max-w-[150px] sm:max-w-none">
+                {itemName}
+              </h3>
+              {/* Status badge - Responsive */}
               {(item.status || item.active !== undefined) && (
                 <span
                   className={cn(
-                    'px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0',
+                    'px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border flex-shrink-0',
                     isActive
                       ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
                   )}
                 >
                   {item.status || (isActive ? 'Active' : 'Inactive')}
                 </span>
               )}
             </div>
-            <p className="text-xs text-grey-500 truncate">{item.tag || item.slug}</p>
+            <p className="text-[10px] sm:text-xs text-grey-500 truncate">
+              {item.tag || item.slug}
+            </p>
 
-            {/* Database Type Badge */}
+            {/* Database Type Badge - Responsive */}
             {databaseTypeBadge && (
-              <span className={cn(
-                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
-                databaseTypeBadge.bgColor,
-                databaseTypeBadge.textColor
-              )}>
+              <span
+                className={cn(
+                  'inline-block mt-1 sm:mt-1.5 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium',
+                  databaseTypeBadge.bgColor,
+                  databaseTypeBadge.textColor,
+                )}
+              >
                 {databaseTypeBadge.label}
               </span>
             )}
 
             {/* Message Broker Type Badge */}
             {messageBrokerTypeBadge && (
-              <span className={cn(
-                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
-                messageBrokerTypeBadge.bgColor,
-                messageBrokerTypeBadge.textColor
-              )}>
+              <span
+                className={cn(
+                  'inline-block mt-1 sm:mt-1.5 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium',
+                  messageBrokerTypeBadge.bgColor,
+                  messageBrokerTypeBadge.textColor,
+                )}
+              >
                 {messageBrokerTypeBadge.label}
               </span>
             )}
 
             {/* Storage Type Badge */}
             {storageTypeBadge && (
-              <span className={cn(
-                'inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium',
-                storageTypeBadge.bgColor,
-                storageTypeBadge.textColor
-              )}>
+              <span
+                className={cn(
+                  'inline-block mt-1 sm:mt-1.5 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium',
+                  storageTypeBadge.bgColor,
+                  storageTypeBadge.textColor,
+                )}
+              >
                 {storageTypeBadge.label}
               </span>
             )}
 
-            {/* Description */}
+            {/* Description - Responsive */}
             {item.description && (
-              <p className="text-xs text-grey-600 mt-1.5 line-clamp-2">{item.description}</p>
+              <p className="text-[10px] sm:text-xs text-grey-600 mt-1 sm:mt-1.5 line-clamp-2">
+                {item.description}
+              </p>
             )}
 
             {/* Category-specific detail */}
             {detailText && (
-              <p className="text-xs text-grey-500 mt-1.5">{detailText}</p>
+              <p className="text-[10px] sm:text-xs text-grey-500 mt-1 sm:mt-1.5">
+                {detailText}
+              </p>
             )}
 
-            {/* Environment Buttons - Click to open explorer */}
+            {/* Environment Buttons - Responsive with wrapping */}
             {hasEnvs && !excludeEnvButtons && (
-              <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                <ItemIcon className="h-3.5 w-3.5 text-grey-400 flex-shrink-0" />
-                {itemEnvs.map((env: any) => (
+              <div className="mt-1.5 sm:mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <ItemIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-grey-400 flex-shrink-0" />
+                {itemEnvs.slice(0, 3).map((env: any) => (
                   <button
                     key={env.slug}
-                    onClick={(e) => handleOpenResourceExplorer(item, resourceType, env, e)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                    onClick={e =>
+                      handleOpenResourceExplorer(item, resourceType, env, e)
+                    }
+                    className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                     title={`Open ${env.slug} in explorer`}
                   >
                     {env.slug}
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </button>
                 ))}
+                {itemEnvs.length > 3 && (
+                  <span className="text-[9px] sm:text-[10px] text-grey-500">
+                    +{itemEnvs.length - 3}
+                  </span>
+                )}
               </div>
             )}
 
-            {/* Notifications: Templates toggle - expand to show templates inline */}
+            {/* Notifications: Templates toggle - Responsive */}
             {isNotifications && (
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   setExpandedNotificationTag(isExpanded ? null : item.tag);
                 }}
-                className="mt-2.5 flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1.5 transition-colors"
+                className="mt-1.5 sm:mt-2 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md px-1.5 sm:px-2 py-1 sm:py-1.5 transition-colors"
               >
-                <FileText className="h-3.5 w-3.5" />
-                Templates ({templates.length})
-                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden xs:inline">Templates</span>
+                <span className="xs:hidden">Templates</span>({templates.length})
+                {isExpanded ? (
+                  <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                )}
               </button>
             )}
           </div>
@@ -1217,44 +1653,99 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           {cardContent}
           {isExpanded && (
             <div
-              className="ml-4 pl-4 border-l-2 border-blue-200 bg-blue-50/50 rounded-r-lg py-3 pr-4 mt-1"
-              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                'border-l-2 border-blue-200 bg-blue-50/50 rounded-r-lg mt-1',
+                'ml-2 sm:ml-4 pl-2 sm:pl-4 py-2 sm:py-3 pr-2 sm:pr-4',
+              )}
+              onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-grey-600 uppercase tracking-wide">Templates</span>
+              {/* Header Section - Responsive with better mobile handling */}
+              <div className="flex items-center justify-between mb-1.5 sm:mb-2 flex-wrap gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] sm:text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                    Templates
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] text-grey-500 bg-grey-100 px-1.5 sm:px-2 py-0.5 rounded-full">
+                    {templates.length}
+                  </span>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs"
-                  onClick={(e) => {
+                  className={cn(
+                    'h-5 sm:h-6 md:h-7',
+                    'text-[10px] sm:text-xs',
+                    'px-1.5 sm:px-2 md:px-3',
+                    'hover:bg-blue-100 transition-colors',
+                  )}
+                  onClick={e => {
                     e.stopPropagation();
                     handleOpenNotificationTemplate(item);
                   }}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Create template
+                  <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 mr-0.5 sm:mr-1" />
+                  <span className="hidden xs:inline">Create template</span>
+                  <span className="xs:hidden">Create</span>
                 </Button>
               </div>
+
+              {/* Empty State - Responsive with better visual */}
               {templates.length === 0 ? (
-                <p className="text-xs text-grey-500 py-2">No templates yet. Create one to get started.</p>
+                <div className="flex flex-col items-center justify-center py-2 sm:py-3 text-center">
+                  <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-grey-400 mb-1 sm:mb-2 opacity-50" />
+                  <p className="text-[10px] sm:text-xs text-grey-500">
+                    No templates yet
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-grey-400 mt-0.5">
+                    Create one to get started
+                  </p>
+                </div>
               ) : (
-                <ul className="space-y-1.5">
-                  {templates.map((msg: any) => (
+                /* Templates List - Responsive with better touch targets */
+                <ul className="space-y-1 sm:space-y-1.5">
+                  {templates.slice(0, 5).map((msg: any) => (
                     <li key={msg.tag}>
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation();
                           handleOpenNotificationTemplate(item, msg);
                         }}
-                        className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-md text-sm text-grey-700 hover:bg-white hover:shadow-sm transition-colors border border-transparent hover:border-grey-200"
+                        className={cn(
+                          'w-full flex items-center gap-1.5 sm:gap-2 text-left',
+                          'px-2 sm:px-3 py-2 sm:py-2.5', // Larger touch target for mobile
+                          'rounded-md text-xs sm:text-sm',
+                          'text-grey-700 hover:bg-white hover:shadow-sm',
+                          'transition-all duration-200',
+                          'border border-transparent hover:border-grey-200',
+                          'active:bg-grey-50', // Active state for mobile
+                        )}
                       >
-                        <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <span className="font-medium truncate">{msg.name || msg.tag}</span>
-                        <span className="text-xs text-grey-500 truncate flex-shrink-0">{msg.tag}</span>
+                        <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-blue-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate text-[10px] sm:text-xs md:text-sm">
+                            {msg.name || msg.tag}
+                          </div>
+                          {msg.tag && (
+                            <div className="text-[8px] sm:text-[9px] text-grey-400 truncate sm:hidden">
+                              {msg.tag}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[8px] sm:text-[10px] text-grey-500 truncate flex-shrink-0 hidden sm:inline">
+                          {msg.tag}
+                        </span>
+                        <ChevronRight className="h-3 w-3 text-grey-400 flex-shrink-0 hidden sm:block" />
                       </button>
                     </li>
                   ))}
+                  {templates.length > 5 && (
+                    <li className="text-center pt-1">
+                      <span className="text-[9px] sm:text-[10px] text-grey-500">
+                        +{templates.length - 5} more templates
+                      </span>
+                    </li>
+                  )}
                 </ul>
               )}
             </div>
@@ -1269,16 +1760,22 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Get category description for empty states
   const getCategoryDescription = (categoryId: string) => {
     const descriptions: Record<string, string> = {
-      apps: 'Connect external applications and services to extend your product\'s capabilities.',
-      environments: 'Configure deployment environments for development, staging, and production.',
-      databases: 'Set up databases, graph stores, and vector stores to manage your application data.',
-      storage: 'Configure file storage solutions for documents, images, and media.',
+      apps: "Connect external applications and services to extend your product's capabilities.",
+      environments:
+        'Configure deployment environments for development, staging, and production.',
+      databases:
+        'Set up databases, graph stores, and vector stores to manage your application data.',
+      storage:
+        'Configure file storage solutions for documents, images, and media.',
       caches: 'Add caching layers to improve performance and reduce latency.',
-      messageBrokers: 'Set up message queues for asynchronous communication between services.',
+      messageBrokers:
+        'Set up message queues for asynchronous communication between services.',
       jobs: 'Schedule background tasks and automated workflows.',
       workflows: 'Design multi-step processes and business logic flows.',
-      intelligence: 'Configure AI agents and models for intelligent automation and predictions.',
-      resilience: 'Set up fallbacks, quotas, and health checks for reliable operations.',
+      intelligence:
+        'Configure AI agents and models for intelligent automation and predictions.',
+      resilience:
+        'Set up fallbacks, quotas, and health checks for reliable operations.',
       notifications: 'Set up notification channels and alert rules.',
       sessions: 'Manage user session configurations.',
     };
@@ -1294,43 +1791,57 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Check if the category is loading
     // Apps use a separate query, other resources come from the product data
     // For non-apps categories, check if we're still fetching or if we only have initial (incomplete) product data
-    const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
-    const isCategoryLoading = category.id === 'apps'
-      ? productAppsStatus === 'pending'
-      : isProductResourcesLoading;
+    const isProductResourcesLoading =
+      isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
+    const isCategoryLoading =
+      category.id === 'apps'
+        ? productAppsStatus === 'pending'
+        : isProductResourcesLoading;
 
     // Filter by search if present
     const filteredResources = searchQuery
       ? resources.filter(
-        (item) =>
-          item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.app_name?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+          item =>
+            item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.tag?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.app_name?.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
       : resources;
 
     const singularLabel = category.label.replace(/s$/, '').replace(/ies$/, 'y');
 
     return (
       <div className="h-full overflow-auto">
-        {/* Header Section */}
+        {/* Header Section - Responsive */}
         <div className="bg-white dark:bg-background border-b border-grey-300 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center shadow-sm',
-                  category.bgColor
-                )}>
-                  <Icon className={cn('h-6 w-6', category.color)} />
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                <div
+                  className={cn(
+                    'rounded-xl flex items-center justify-center shadow-sm',
+                    'w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12',
+                    category.bgColor,
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      'h-5 w-5 sm:h-5.5 sm:w-5.5 md:h-6 md:w-6',
+                      category.color,
+                    )}
+                  />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-grey">{category.label}</h1>
-                  <p className="text-sm text-grey-500">
+                  <h1 className="text-base sm:text-lg md:text-xl font-bold text-grey">
+                    {category.label}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-grey-500">
                     {isCategoryLoading ? (
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading...
+                      <span className="flex items-center gap-1 sm:gap-1.5">
+                        <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin" />
+                        <span className="text-[10px] sm:text-xs">
+                          Loading...
+                        </span>
                       </span>
                     ) : (
                       `${count} ${count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()} configured`
@@ -1338,113 +1849,140 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {/* Search bar - always visible when there are items */}
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Search bar - responsive width */}
                 {count > 0 && (
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-400" />
+                  <div className="relative flex-1 sm:flex-initial">
+                    <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-grey-400" />
                     <Input
                       type="text"
                       placeholder={`Search...`}
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 w-64 bg-white-700"
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className={cn(
+                        'pl-8 sm:pl-10',
+                        'w-full sm:w-48 md:w-64',
+                        'bg-white text-xs sm:text-sm',
+                        'h-8 sm:h-9 md:h-10',
+                      )}
                     />
                   </div>
                 )}
                 <Button
                   onClick={() => handleAddComponent(category.componentType)}
-                  className="gap-2 shadow-sm"
+                  className="gap-1 sm:gap-2 shadow-sm text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                  size="sm"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Add</span>
                 </Button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Content Section */}
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        {/* Content Section - Responsive */}
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
           {isCategoryLoading ? (
-            /* Loading State */
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+            /* Loading State - Responsive grid */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+              {[1, 2, 3, 4, 5, 6].map(i => (
                 <div
                   key={i}
-                  className="bg-white border border-grey-300 rounded-lg p-4 animate-pulse"
-                  style={{ animationDelay: `${i * 100}ms` }}
+                  className="bg-white border border-grey-300 rounded-lg p-3 sm:p-4 animate-pulse"
+                  style={{animationDelay: `${i * 100}ms`}}
                 >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-grey-200" />
+                  <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-grey-200" />
                     <div className="flex-1">
-                      <div className="h-4 w-24 bg-grey-200 rounded mb-2" />
-                      <div className="h-3 w-16 bg-grey-100 rounded" />
+                      <div className="h-3 sm:h-4 w-20 sm:w-24 bg-grey-200 rounded mb-1 sm:mb-2" />
+                      <div className="h-2 sm:h-3 w-12 sm:w-16 bg-grey-100 rounded" />
                     </div>
                   </div>
-                  <div className="h-3 w-full bg-grey-100 rounded mb-2" />
-                  <div className="h-3 w-2/3 bg-grey-100 rounded" />
+                  <div className="h-2 sm:h-3 w-full bg-grey-100 rounded mb-1.5 sm:mb-2" />
+                  <div className="h-2 sm:h-3 w-2/3 bg-grey-100 rounded" />
                 </div>
               ))}
             </div>
           ) : filteredResources.length > 0 ? (
             <>
-              {/* Results count when searching */}
+              {/* Results count when searching - Responsive */}
               {searchQuery && (
-                <p className="text-sm text-grey-500 mb-4">
-                  Showing {filteredResources.length} of {count} {count === 1 ? singularLabel.toLowerCase() : category.label.toLowerCase()}
+                <p className="text-xs sm:text-sm text-grey-500 mb-3 sm:mb-4">
+                  Showing {filteredResources.length} of {count}{' '}
+                  {count === 1
+                    ? singularLabel.toLowerCase()
+                    : category.label.toLowerCase()}
                 </p>
               )}
 
-              {/* Resources Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {filteredResources.map((item) => renderResourceCard(item, category))}
+              {/* Resources Grid - Responsive */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+                {filteredResources.map(item =>
+                  renderResourceCard(item, category),
+                )}
               </div>
             </>
           ) : (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-20">
-              {/* Decorative background */}
-              <div className="relative mb-8">
-                <div className={cn(
-                  'w-24 h-24 rounded-2xl flex items-center justify-center',
-                  category.bgColor
-                )}>
-                  <Icon className={cn('h-12 w-12', category.color)} />
+            /* Empty State - Responsive */
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 md:py-20">
+              {/* Decorative background - Responsive sizing */}
+              <div className="relative mb-4 sm:mb-6 md:mb-8">
+                <div
+                  className={cn(
+                    'rounded-2xl flex items-center justify-center',
+                    'w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24',
+                    category.bgColor,
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      'h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12',
+                      category.color,
+                    )}
+                  />
                 </div>
-                {/* Decorative dots */}
-                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
-                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
-                <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
+                {/* Decorative dots - Responsive positioning */}
+                <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-grey-200" />
+                <div className="absolute -bottom-0.5 -left-2 w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-grey-300" />
+                <div className="absolute top-1/2 -right-4 sm:-right-5 md:-right-6 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-grey-200" />
               </div>
 
               {searchQuery ? (
                 <>
-                  <h3 className="text-xl font-semibold text-grey mb-2">No results found</h3>
-                  <p className="text-grey-500 text-center max-w-md mb-6">
-                    We couldn't find any {category.label.toLowerCase()} matching "<span className="font-medium text-grey">{searchQuery}</span>"
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-grey mb-1 sm:mb-2 text-center px-4">
+                    No results found
+                  </h3>
+                  <p className="text-xs sm:text-sm text-grey-500 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4">
+                    We couldn't find any {category.label.toLowerCase()} matching
+                    "
+                    <span className="font-medium text-grey">{searchQuery}</span>
+                    "
                   </p>
                   <Button
                     variant="outline"
                     onClick={() => setSearchQuery('')}
-                    className="gap-2"
+                    className="gap-2 text-xs sm:text-sm"
+                    size="sm"
                   >
                     Clear search
                   </Button>
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-semibold text-grey mb-2">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-grey mb-1 sm:mb-2 text-center px-4">
                     No {category.label.toLowerCase()} yet
                   </h3>
-                  <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-grey-500 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4 leading-relaxed">
                     {getCategoryDescription(category.id)}
                   </p>
                   <Button
                     onClick={() => handleAddComponent(category.componentType)}
-                    className="gap-2 shadow-sm"
+                    className="gap-1 sm:gap-2 shadow-sm text-xs sm:text-sm px-3 sm:px-4"
+                    size="sm"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                     Add
                   </Button>
                 </>
@@ -1459,41 +1997,55 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   // Render overview dashboard (activity-focused)
   const renderOverview = () => {
     // Calculate some mock activity metrics (in real app, these would come from API)
-    const totalResources = resourceCategories.reduce((sum, cat) => sum + getResourceCount(cat), 0);
-    const activeEnvCount = product?.envs?.filter((e: any) => e.active)?.length || 0;
+    const totalResources = resourceCategories.reduce(
+      (sum, cat) => sum + getResourceCount(cat),
+      0,
+    );
+    const activeEnvCount =
+      product?.envs?.filter((e: any) => e.active)?.length || 0;
 
     return (
-      <div className="h-full overflow-auto p-6">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* Product Header */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
+      <div className="h-full overflow-auto p-3 sm:p-4 md:p-6">
+        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+          {/* Product Header - Responsive */}
+          <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+              {/* Logo - Responsive sizing */}
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg bg-primary flex items-center justify-center text-white text-lg sm:text-xl font-semibold flex-shrink-0">
                 {product?.logo ? (
-                  <img src={product.logo} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                  <img
+                    src={product.logo}
+                    alt={product.name}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
                 ) : (
                   getInitials(String(product?.name))
                 )}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-grey">{product?.name}</h1>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-grey break-words">
+                    {product?.name}
+                  </h1>
                   {product?.status && (
                     <span
                       className={cn(
-                        'px-3 py-1 rounded-full text-xs font-semibold border',
+                        'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border flex-shrink-0',
                         product.status === 'active'
                           ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                          : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                          : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
                       )}
                     >
                       {product.status}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-grey-600 mb-3">{product?.tag}</p>
+                <p className="text-xs sm:text-sm text-grey-600 mb-2 sm:mb-3 break-all">
+                  {product?.tag}
+                </p>
                 {product?.description && (
-                  <div className="text-grey-600">
+                  <div className="text-xs sm:text-sm text-grey-600">
                     <MarkdownViewer content={product.description} />
                   </div>
                 )}
@@ -1501,77 +2053,121 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
             </div>
           </div>
 
-          {/* Activity Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Activity Dashboard Grid - Responsive */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Left Column - Activity Stats */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Key Metrics */}
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-grey mb-4">Overview</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-3 rounded-lg bg-grey-50">
-                    <p className="text-3xl font-bold text-primary">{totalResources}</p>
-                    <p className="text-sm text-grey-600">Total Resources</p>
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+              {/* Key Metrics - Responsive */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
+                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
+                  Overview
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
+                      {totalResources}
+                    </p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
+                      Total Resources
+                    </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-grey-50">
-                    <p className="text-3xl font-bold text-green">{connectedApps.length}</p>
-                    <p className="text-sm text-grey-600">Connected Apps</p>
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green">
+                      {connectedApps.length}
+                    </p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
+                      Connected Apps
+                    </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-grey-50">
-                    <p className="text-3xl font-bold text-blue-500">{product?.envs?.length || 0}</p>
-                    <p className="text-sm text-grey-600">Environments</p>
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-500">
+                      {product?.envs?.length || 0}
+                    </p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
+                      Environments
+                    </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-grey-50">
-                    <p className="text-3xl font-bold text-purple-500">{activeEnvCount}</p>
-                    <p className="text-sm text-grey-600">Active Envs</p>
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-purple-500">
+                      {activeEnvCount}
+                    </p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
+                      Active Envs
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Recent Activity Placeholder */}
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-grey mb-4">Recent Activity</h2>
-                <div className="space-y-3">
-                  {/* Activity items would be populated from an API in a real implementation */}
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
-                    <div className="w-8 h-8 rounded-full bg-green/10 flex items-center justify-center">
-                      <Activity className="h-4 w-4 text-green" />
+              {/* Recent Activity - Responsive */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
+                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
+                  Recent Activity
+                </h2>
+                <div className="space-y-2 sm:space-y-3">
+                  {/* Activity items */}
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green/10 flex items-center justify-center flex-shrink-0">
+                      <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-green" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-grey">Product initialized</p>
-                      <p className="text-xs text-grey-500">Ready for configuration</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-grey">
+                        Product initialized
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-grey-500">
+                        Ready for configuration
+                      </p>
                     </div>
                   </div>
+
                   {connectedApps.length > 0 && (
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                        <Grid3x3 className="h-4 w-4 text-blue-500" />
+                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <Grid3x3 className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-grey">{connectedApps.length} app{connectedApps.length !== 1 ? 's' : ''} connected</p>
-                        <p className="text-xs text-grey-500">External integrations active</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-grey">
+                          {connectedApps.length} app
+                          {connectedApps.length !== 1 ? 's' : ''} connected
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-grey-500">
+                          External integrations active
+                        </p>
                       </div>
                     </div>
                   )}
+
                   {(product?.databases?.length || 0) > 0 && (
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Database className="h-4 w-4 text-primary" />
+                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Database className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-grey">{product?.databases?.length} database{(product?.databases?.length || 0) !== 1 ? 's' : ''} configured</p>
-                        <p className="text-xs text-grey-500">Data layer ready</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-grey">
+                          {product?.databases?.length} database
+                          {(product?.databases?.length || 0) !== 1 ? 's' : ''}{' '}
+                          configured
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-grey-500">
+                          Data layer ready
+                        </p>
                       </div>
                     </div>
                   )}
+
                   {(product?.features?.length || 0) > 0 && (
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-grey-50">
-                      <div className="w-8 h-8 rounded-full bg-pink-500/10 flex items-center justify-center">
-                        <Workflow className="h-4 w-4 text-pink-500" />
+                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-pink-500/10 flex items-center justify-center flex-shrink-0">
+                        <Workflow className="h-3 w-3 sm:h-4 sm:w-4 text-pink-500" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-grey">{product?.features?.length} feature{(product?.features?.length || 0) !== 1 ? 's' : ''} defined</p>
-                        <p className="text-xs text-grey-500">Business logic configured</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-grey">
+                          {product?.features?.length} feature
+                          {(product?.features?.length || 0) !== 1 ? 's' : ''}{' '}
+                          defined
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-grey-500">
+                          Business logic configured
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1579,118 +2175,139 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
               </div>
             </div>
 
-            {/* Right Column - Quick Actions & Health */}
-            <div className="space-y-6">
-              {/* Quick Actions */}
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-grey mb-4">Quick Actions</h2>
-                <div className="space-y-2">
+            {/* Right Column - Quick Actions & Environments */}
+            <div className="space-y-4 sm:space-y-6">
+              {/* Quick Actions - Responsive */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
+                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
+                  Quick Actions
+                </h2>
+                <div className="space-y-1.5 sm:space-y-2">
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-2"
+                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                    size="sm"
                     onClick={() => setShowAddAppModal(true)}
                   >
-                    <Grid3x3 className="h-4 w-4" />
-                    Connect App
+                    <Grid3x3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Connect App</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-2"
+                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                    size="sm"
                     onClick={() => setShowCreateEnvModal(true)}
                   >
-                    <Settings2 className="h-4 w-4" />
-                    Add Environment
+                    <Settings2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Add Environment</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-2"
+                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                    size="sm"
                     onClick={() => handleAddComponent('database')}
                   >
-                    <Database className="h-4 w-4" />
-                    Add Database
+                    <Database className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Add Database</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-2"
+                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                    size="sm"
                     onClick={() => handleAddComponent('feature')}
                   >
-                    <Workflow className="h-4 w-4" />
-                    Create Workflow
+                    <Workflow className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Create Workflow</span>
                   </Button>
                 </div>
               </div>
 
-              {/* Environments */}
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-grey">Environments</h2>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-grey-100 text-grey-600">
+              {/* Environments - Responsive */}
+              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <h2 className="text-base sm:text-lg font-semibold text-grey">
+                      Environments
+                    </h2>
+                    <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-grey-100 text-grey-600">
                       {product?.envs?.length || 0}
                     </span>
                   </div>
                 </div>
+
                 {(product?.envs?.length || 0) > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {product?.envs?.slice(0, 4).map((env: any) => {
                       const envSlug = env.slug?.toLowerCase() || '';
-                      const isProduction = envSlug.includes('prod') || envSlug === 'live';
-                      const isStaging = envSlug.includes('stag') || envSlug.includes('uat');
+                      const isProduction =
+                        envSlug.includes('prod') || envSlug === 'live';
+                      const isStaging =
+                        envSlug.includes('stag') || envSlug.includes('uat');
 
                       return (
                         <Button
                           key={env._id}
                           onClick={() => handleEditEnvironment(env)}
                           variant="outline"
-                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-grey-50 transition-all group"
+                          className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg hover:bg-grey-50 transition-all group text-left"
                         >
                           {/* Status dot */}
-                          <div className={cn(
-                            "w-2.5 h-2.5 rounded-full flex-shrink-0",
-                            env.active ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"
-                          )} />
+                          <div
+                            className={cn(
+                              'w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0',
+                              env.active
+                                ? 'bg-emerald-500'
+                                : 'bg-gray-300 dark:bg-gray-600',
+                            )}
+                          />
 
                           {/* Name and slug */}
-                          <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-grey group-hover:text-primary transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                              <span className="text-xs sm:text-sm font-medium text-grey group-hover:text-primary transition-colors truncate">
                                 {env.name}
                               </span>
                               {isProduction && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red/10 text-red">
+                                <span className="px-1 py-0.5 rounded text-[8px] sm:text-[10px] font-medium bg-red/10 text-red flex-shrink-0">
                                   PROD
                                 </span>
                               )}
                               {isStaging && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-500/10 text-orange-600">
+                                <span className="px-1 py-0.5 rounded text-[8px] sm:text-[10px] font-medium bg-orange-500/10 text-orange-600 flex-shrink-0">
                                   STAGING
                                 </span>
                               )}
                             </div>
                             {/* Slug badge */}
-                            <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-grey-100 text-grey-600">
+                            <span className="inline-block mt-0.5 px-1 sm:px-1.5 py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium bg-grey-100 text-grey-600">
                               {env.slug}
                             </span>
                           </div>
 
                           {/* Status badge */}
-                          <span className={cn(
-                            "px-2 py-1 rounded-full text-xs font-semibold border flex-shrink-0",
-                            env.active
-                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
-                              : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
-                          )}>
-                            {env.active ? "Active" : "Inactive"}
+                          <span
+                            className={cn(
+                              'px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-semibold border flex-shrink-0',
+                              env.active
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                                : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+                            )}
+                          >
+                            {env.active ? 'Active' : 'Inactive'}
                           </span>
                         </Button>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8 border-2 border-dashed border-grey-200 rounded-lg">
-                    <Settings2 className="h-8 w-8 text-grey-400 mx-auto mb-2" />
-                    <p className="text-sm text-grey-600 mb-1">No environments yet</p>
-                    <p className="text-xs text-grey-500">Configure dev, staging, and production</p>
+                  <div className="text-center py-6 sm:py-8 border-2 border-dashed border-grey-200 rounded-lg">
+                    <Settings2 className="h-6 w-6 sm:h-8 sm:w-8 text-grey-400 mx-auto mb-1 sm:mb-2" />
+                    <p className="text-xs sm:text-sm text-grey-600 mb-0.5 sm:mb-1">
+                      No environments yet
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-grey-500">
+                      Configure dev, staging, and production
+                    </p>
                   </div>
                 )}
               </div>
@@ -1717,11 +2334,15 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
     // Show loader if product is loading or data is incomplete
     if ((isFetchingProduct && isProductDataIncomplete) || !product) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 text-center space-y-3 sm:space-y-4">
+          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-primary opacity-50" />
           <div>
-            <h3 className="text-lg font-medium text-grey">Loading product configuration...</h3>
-            <p className="text-sm text-grey-600">This will only take a moment</p>
+            <h3 className="text-sm sm:text-base md:text-lg font-medium text-grey">
+              Loading product configuration...
+            </h3>
+            <p className="text-xs sm:text-sm text-grey-600 mt-0.5 sm:mt-1">
+              This will only take a moment
+            </p>
           </div>
         </div>
       );
@@ -1747,7 +2368,11 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       };
 
       // Database types (database, graph, vector)
-      if (inlineCreateMode === 'database' || inlineCreateMode === 'graph' || inlineCreateMode === 'vector') {
+      if (
+        inlineCreateMode === 'database' ||
+        inlineCreateMode === 'graph' ||
+        inlineCreateMode === 'vector'
+      ) {
         return (
           <InlineDatabaseForm
             product={productProps}
@@ -1774,7 +2399,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
 
       // Message Broker
       if (inlineCreateMode === 'message-broker') {
-        return <InlineMessageBrokerForm product={productProps} {...formCallbacks} />;
+        return (
+          <InlineMessageBrokerForm product={productProps} {...formCallbacks} />
+        );
       }
 
       // Notifier
@@ -1792,7 +2419,7 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
       return renderCategoryContent(environmentsConfig);
     }
 
-    const category = resourceCategories.find((c) => c.id === activeCategory);
+    const category = resourceCategories.find(c => c.id === activeCategory);
     if (category) {
       return renderCategoryContent(category);
     }
@@ -1801,18 +2428,30 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
-      {/* Sidebar */}
+    <div className="h-[calc(100vh-8rem)] flex bg-grey-100 relative">
+      {/* Sidebar - Responsive widths */}
       <div
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300',
-          isSidebarCollapsed ? 'w-14' : 'w-64'
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300 absolute z-25',
+          isSidebarCollapsed
+            ? 'w-12 sm:w-14' // Smaller on mobile, standard on tablet/desktop
+            : 'w-56 sm:w-64', // Slightly narrower on mobile
         )}
       >
-        {/* Header */}
-        <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-3')}>
-          <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-2')}>
-            {/* Product Logo */}
+        {/* Header - Responsive padding */}
+        <div
+          className={cn(
+            'flex-shrink-0 border-b border-grey-400',
+            isSidebarCollapsed ? 'p-1.5 sm:p-2' : 'p-2 sm:p-3',
+          )}
+        >
+          <div
+            className={cn(
+              'flex items-center',
+              isSidebarCollapsed ? 'justify-center' : 'gap-1.5 sm:gap-2',
+            )}
+          >
+            {/* Product Logo - Responsive sizing */}
             <button
               onClick={() => {
                 if (isSidebarCollapsed) {
@@ -1823,16 +2462,25 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
               }}
               className={cn(
                 'rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0 transition-all hover:ring-2 hover:ring-primary/50',
-                isSidebarCollapsed ? 'w-8 h-8 text-sm' : 'w-9 h-9 text-sm'
+                isSidebarCollapsed
+                  ? 'w-7 h-7 sm:w-8 sm:h-8 text-[11px] sm:text-xs'
+                  : 'w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm',
               )}
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Return to overview'}
+              title={
+                isSidebarCollapsed ? 'Expand sidebar' : 'Return to overview'
+              }
             >
               {product?.logo ? (
-                <img src={product.logo} alt={product.name} className="w-full h-full rounded-lg object-cover" />
+                <img
+                  src={product.logo}
+                  alt={product.name}
+                  className="w-full h-full rounded-lg object-cover"
+                />
               ) : (
                 getInitials(String(product?.name))
               )}
             </button>
+
             {!isSidebarCollapsed && (
               <>
                 <button
@@ -1840,57 +2488,70 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                   className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
                   title="Return to overview"
                 >
-                  <h2 className="font-semibold text-grey text-sm truncate">{product?.name}</h2>
-                  <p className="text-xs text-grey-600 truncate">{product?.tag}</p>
+                  <h2 className="font-semibold text-grey text-xs sm:text-sm truncate">
+                    {product?.name}
+                  </h2>
+                  <p className="text-[10px] sm:text-xs text-grey-600 truncate">
+                    {product?.tag}
+                  </p>
                 </button>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
                   title="Collapse sidebar"
                 >
-                  <PanelLeftClose className="h-4 w-4" />
+                  <PanelLeftClose className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - Responsive */}
         {!isSidebarCollapsed ? (
           <div className="flex-1 overflow-y-auto py-2 min-h-0">
             {/* Overview */}
-            <div className="px-2 mb-1">
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
               <button
                 onClick={() => handleCategoryChange('overview')}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
                   activeCategory === 'overview'
                     ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-grey hover:bg-grey-100'
+                    : 'text-grey hover:bg-grey-100',
                 )}
               >
-                <Home className="h-4 w-4 flex-shrink-0" />
+                <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span>Overview</span>
               </button>
             </div>
 
-            {/* Environments - below Overview */}
-            <div className="px-2 mb-1">
+            {/* Environments */}
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
               <button
                 onClick={() => handleCategoryChange('environments')}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
                   activeCategory === 'environments'
                     ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-grey hover:bg-grey-100'
+                    : 'text-grey hover:bg-grey-100',
                 )}
               >
-                <Settings2 className={cn('h-4 w-4 flex-shrink-0', activeCategory === 'environments' ? 'text-primary' : 'text-grey-600')} />
+                <Settings2
+                  className={cn(
+                    'h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0',
+                    activeCategory === 'environments'
+                      ? 'text-primary'
+                      : 'text-grey-600',
+                  )}
+                />
                 <span className="flex-1 text-left">Environments</span>
                 <span
                   className={cn(
-                    'text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center',
-                    activeCategory === 'environments' ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600'
+                    'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
+                    activeCategory === 'environments'
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-grey-100 text-grey-600',
                   )}
                 >
                   {product?.envs?.length || 0}
@@ -1899,58 +2560,84 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
             </div>
 
             {/* Divider */}
-            <div className="px-4 py-2">
+            <div className="px-3 sm:px-4 py-1.5 sm:py-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-grey-500 uppercase tracking-wider">Resources</span>
+                <span className="text-[10px] sm:text-xs font-semibold text-grey-500 uppercase tracking-wider">
+                  Resources
+                </span>
                 <button
                   onClick={handleRefresh}
                   disabled={isSidebarRefreshing}
                   className="text-grey-500 hover:text-primary transition-colors"
                   title="Refresh"
                 >
-                  <RefreshCw className={cn('h-3.5 w-3.5', isSidebarRefreshing && 'animate-spin')} />
+                  <RefreshCw
+                    className={cn(
+                      'h-3 w-3 sm:h-3.5 sm:w-3.5',
+                      isSidebarRefreshing && 'animate-spin',
+                    )}
+                  />
                 </button>
               </div>
             </div>
 
             {/* Categories */}
-            <div className="px-2 space-y-0.5">
-              {resourceCategories.map((category) => {
+            <div className="px-1.5 sm:px-2 space-y-0.5">
+              {resourceCategories.map(category => {
                 const count = getResourceCount(category);
                 const Icon = category.icon;
                 const isActive = activeCategory === category.id;
                 const isDisabled = category.disabled;
-                // Apps use separate query, other resources use product loading state
-                // Also show loading during sidebar refresh
-                const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
-                const isCatLoading = isSidebarRefreshing || (category.id === 'apps'
-                  ? productAppsStatus === 'pending'
-                  : isProductResourcesLoading);
+                const isProductResourcesLoading =
+                  isFetchingProduct &&
+                  (!fetchedProductData || isProductDataIncomplete);
+                const isCatLoading =
+                  isSidebarRefreshing ||
+                  (category.id === 'apps'
+                    ? productAppsStatus === 'pending'
+                    : isProductResourcesLoading);
 
                 return (
                   <button
                     key={category.id}
-                    onClick={() => !isDisabled && handleCategoryChange(category.id)}
+                    onClick={() =>
+                      !isDisabled && handleCategoryChange(category.id)
+                    }
                     disabled={isDisabled}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+                      'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
                       isDisabled
                         ? 'text-grey-400 cursor-not-allowed opacity-50'
                         : isActive
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-grey hover:bg-grey-100'
+                          : 'text-grey hover:bg-grey-100',
                     )}
                   >
-                    <Icon className={cn('h-4 w-4 flex-shrink-0', isDisabled ? 'text-grey-400' : isActive ? 'text-primary' : 'text-grey-600')} />
-                    <span className="flex-1 text-left truncate">{category.label}</span>
+                    <Icon
+                      className={cn(
+                        'h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0',
+                        isDisabled
+                          ? 'text-grey-400'
+                          : isActive
+                            ? 'text-primary'
+                            : 'text-grey-600',
+                      )}
+                    />
+                    <span className="flex-1 text-left truncate">
+                      {category.label}
+                    </span>
                     <span
                       className={cn(
-                        'text-xs px-1.5 py-0.5 rounded min-w-[20px] text-center',
-                        isDisabled ? 'bg-grey-100 text-grey-400' : isActive ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600'
+                        'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
+                        isDisabled
+                          ? 'bg-grey-100 text-grey-400'
+                          : isActive
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-grey-100 text-grey-600',
                       )}
                     >
                       {isCatLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin mx-auto" />
+                        <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin mx-auto" />
                       ) : (
                         count
                       )}
@@ -1963,57 +2650,72 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
         ) : (
           <div className="flex-1 overflow-y-auto py-2 min-h-0">
             {/* Collapsed: Overview */}
-            <div className="px-2 mb-1">
+            <div className="px-1 mb-0.5 sm:mb-1">
               <button
                 onClick={() => {
                   handleCategoryChange('overview');
                   setIsSidebarCollapsed(false);
                 }}
                 className={cn(
-                  'w-full flex items-center justify-center p-2 rounded-lg transition-colors',
-                  activeCategory === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100'
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors',
+                  activeCategory === 'overview'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-grey hover:bg-grey-100',
                 )}
                 title="Overview"
               >
-                <Home className="h-5 w-5" />
+                <Home className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
 
             {/* Collapsed: Environments */}
-            <div className="px-2 mb-1">
+            <div className="px-1 mb-0.5 sm:mb-1">
               <button
                 onClick={() => {
                   handleCategoryChange('environments');
                   setIsSidebarCollapsed(false);
                 }}
                 className={cn(
-                  'w-full flex items-center justify-center p-2 rounded-lg transition-colors relative',
-                  activeCategory === 'environments' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100'
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
+                  activeCategory === 'environments'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-grey hover:bg-grey-100',
                 )}
                 title={`Environments (${product?.envs?.length || 0})`}
               >
-                <Settings2 className={cn('h-5 w-5', activeCategory === 'environments' ? 'text-primary' : 'text-grey-600')} />
+                <Settings2
+                  className={cn(
+                    'h-4 w-4 sm:h-5 sm:w-5',
+                    activeCategory === 'environments'
+                      ? 'text-primary'
+                      : 'text-grey-600',
+                  )}
+                />
                 {(product?.envs?.length || 0) > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
-                    {(product?.envs?.length || 0) > 9 ? '9+' : product?.envs?.length}
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-primary text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium">
+                    {(product?.envs?.length || 0) > 9
+                      ? '9+'
+                      : product?.envs?.length}
                   </span>
                 )}
               </button>
             </div>
 
             {/* Collapsed: Categories */}
-            <div className="px-2 space-y-0.5">
-              {resourceCategories.map((category) => {
+            <div className="px-1 space-y-0.5">
+              {resourceCategories.map(category => {
                 const count = getResourceCount(category);
                 const Icon = category.icon;
                 const isActive = activeCategory === category.id;
                 const isDisabled = category.disabled;
-                // Apps use separate query, other resources use product loading state
-                // Also show loading during sidebar refresh
-                const isProductResourcesLoading = isFetchingProduct && (!fetchedProductData || isProductDataIncomplete);
-                const isCatLoading = isSidebarRefreshing || (category.id === 'apps'
-                  ? productAppsStatus === 'pending'
-                  : isProductResourcesLoading);
+                const isProductResourcesLoading =
+                  isFetchingProduct &&
+                  (!fetchedProductData || isProductDataIncomplete);
+                const isCatLoading =
+                  isSidebarRefreshing ||
+                  (category.id === 'apps'
+                    ? productAppsStatus === 'pending'
+                    : isProductResourcesLoading);
 
                 return (
                   <button
@@ -2026,22 +2728,35 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                     }}
                     disabled={isDisabled}
                     className={cn(
-                      'w-full flex items-center justify-center p-2 rounded-lg transition-colors relative',
+                      'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
                       isDisabled
                         ? 'text-grey-400 cursor-not-allowed opacity-50'
                         : isActive
                           ? 'bg-primary/10 text-primary'
-                          : 'text-grey hover:bg-grey-100'
+                          : 'text-grey hover:bg-grey-100',
                     )}
-                    title={isCatLoading ? `${category.label} (Loading...)` : `${category.label} (${count})`}
+                    title={
+                      isCatLoading
+                        ? `${category.label} (Loading...)`
+                        : `${category.label} (${count})`
+                    }
                   >
-                    <Icon className={cn('h-5 w-5', isDisabled ? 'text-grey-400' : isActive ? 'text-primary' : 'text-grey-600')} />
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 sm:h-5 sm:w-5',
+                        isDisabled
+                          ? 'text-grey-400'
+                          : isActive
+                            ? 'text-primary'
+                            : 'text-grey-600',
+                      )}
+                    />
                     {isCatLoading ? (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-grey-200 rounded-full flex items-center justify-center">
-                        <Loader2 className="h-2.5 w-2.5 animate-spin text-grey-500" />
+                      <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-grey-200 rounded-full flex items-center justify-center">
+                        <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-500" />
                       </span>
                     ) : count > 0 && !isDisabled ? (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
+                      <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-primary text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium">
                         {count > 9 ? '9+' : count}
                       </span>
                     ) : null}
@@ -2051,32 +2766,39 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
             </div>
 
             {/* Expand button */}
-            <div className="px-2 mt-4">
+            <div className="px-1 mt-3 sm:mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                className="w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
                 title="Expand sidebar"
               >
-                <PanelLeft className="h-5 w-5" />
+                <PanelLeft className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
           </div>
         )}
       </div>
-
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-grey-50">{renderMainContent()}</div>
-
+      <div 
+    className={cn(
+      "flex-1 flex flex-col overflow-hidden bg-grey-50 transition-all duration-300",
+       isSidebarCollapsed ? "ml-12 sm:ml-14" : "ml-0 sm:ml-64"
+    )}
+  >
+        {renderMainContent()}
+      </div>
       {/* Modals */}
-      <AddAppModal open={showAddAppModal} onOpenChange={setShowAddAppModal} product={product} />
-
+      <AddAppModal
+        open={showAddAppModal}
+        onOpenChange={setShowAddAppModal}
+        product={product}
+      />
       <CreateEnvironmentModal
         open={showCreateEnvModal}
         onOpenChange={setShowCreateEnvModal}
         productTag={product?.tag || ''}
         productId={String(product?._id)}
       />
-
       <UpdateProductEnvironmentModal
         open={showUpdateEnvModal}
         onOpenChange={setShowUpdateEnvModal}
@@ -2087,160 +2809,209 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           setSelectedEnvironment(null);
         }}
       />
-
       {/* Database Type Selection Dialog */}
-      <Dialog open={showDatabaseTypeDialog} onOpenChange={setShowDatabaseTypeDialog}>
-        <DialogContent className="sm:max-w-md">
+      {/* Database Type Selection Dialog - Responsive */}
+      <Dialog
+        open={showDatabaseTypeDialog}
+        onOpenChange={setShowDatabaseTypeDialog}
+      >
+        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-grey">What type of database would you like to add?</DialogTitle>
+            <DialogTitle className="text-sm sm:text-base md:text-lg text-grey">
+              What type of database would you like to add?
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-4">
+          <div className="grid gap-2 sm:gap-3 py-2 sm:py-4">
             <button
               onClick={() => {
                 setShowDatabaseTypeDialog(false);
                 setInlineCreateMode('database');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Database className="h-6 w-6 text-primary" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Database className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Database</h3>
-                <p className="text-sm text-grey-500">SQL, NoSQL, or other traditional databases</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Database
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  SQL, NoSQL, or other traditional databases
+                </p>
               </div>
             </button>
+
             <button
               onClick={() => {
                 setShowDatabaseTypeDialog(false);
                 setInlineCreateMode('graph');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-purple-600/10 flex items-center justify-center">
-                <Share2 className="h-6 w-6 text-purple-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-purple-600/10 flex items-center justify-center flex-shrink-0">
+                <Share2 className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Graph Database</h3>
-                <p className="text-sm text-grey-500">Neo4j, Neptune, or graph-based stores</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Graph Database
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  Neo4j, Neptune, or graph-based stores
+                </p>
               </div>
             </button>
+
             <button
               onClick={() => {
                 setShowDatabaseTypeDialog(false);
                 setInlineCreateMode('vector');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-emerald-600/10 flex items-center justify-center">
-                <Boxes className="h-6 w-6 text-emerald-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-600/10 flex items-center justify-center flex-shrink-0">
+                <Boxes className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Vector Store</h3>
-                <p className="text-sm text-grey-500">Pinecone, Weaviate, or embedding stores</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Vector Store
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  Pinecone, Weaviate, or embedding stores
+                </p>
               </div>
             </button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Intelligence Type Selection Dialog */}
-      <Dialog open={showIntelligenceTypeDialog} onOpenChange={setShowIntelligenceTypeDialog}>
-        <DialogContent className="sm:max-w-md">
+      {/* Intelligence Type Selection Dialog - Responsive */}
+      <Dialog
+        open={showIntelligenceTypeDialog}
+        onOpenChange={setShowIntelligenceTypeDialog}
+      >
+        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>What would you like to add?</DialogTitle>
+            <DialogTitle className="text-sm sm:text-base md:text-lg">
+              What would you like to add?
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-4">
+          <div className="grid gap-2 sm:gap-3 py-2 sm:py-4">
             <button
               onClick={() => {
                 setShowIntelligenceTypeDialog(false);
                 openNewComponentTab('agent');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-amber-600/10 flex items-center justify-center">
-                <Bot className="h-6 w-6 text-amber-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-600/10 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Agent</h3>
-                <p className="text-sm text-grey-500">AI agents for automated tasks and workflows</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Agent
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  AI agents for automated tasks and workflows
+                </p>
               </div>
             </button>
+
             <button
               onClick={() => {
                 setShowIntelligenceTypeDialog(false);
                 openNewComponentTab('model');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center">
-                <Brain className="h-6 w-6 text-rose-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-rose-600/10 flex items-center justify-center flex-shrink-0">
+                <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-rose-600" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Model</h3>
-                <p className="text-sm text-grey-500">ML models for inference and predictions</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Model
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  ML models for inference and predictions
+                </p>
               </div>
             </button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Resilience Type Selection Dialog */}
-      <Dialog open={showResilienceTypeDialog} onOpenChange={setShowResilienceTypeDialog}>
-        <DialogContent className="sm:max-w-md">
+      {/* Resilience Type Selection Dialog - Responsive */}
+      <Dialog
+        open={showResilienceTypeDialog}
+        onOpenChange={setShowResilienceTypeDialog}
+      >
+        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>What would you like to configure?</DialogTitle>
+            <DialogTitle className="text-sm sm:text-base md:text-lg">
+              What would you like to configure?
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-4">
+          <div className="grid gap-2 sm:gap-3 py-2 sm:py-4">
             <button
               onClick={() => {
                 setShowResilienceTypeDialog(false);
                 openNewComponentTab('fallback');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <Shield className="h-6 w-6 text-red-500" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Fallback</h3>
-                <p className="text-sm text-grey-500">Backup strategies for error handling</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Fallback
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  Backup strategies for error handling
+                </p>
               </div>
             </button>
+
             <button
               onClick={() => {
                 setShowResilienceTypeDialog(false);
                 openNewComponentTab('quota');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-orange-600/10 flex items-center justify-center">
-                <Timer className="h-6 w-6 text-orange-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-600/10 flex items-center justify-center flex-shrink-0">
+                <Timer className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Quota</h3>
-                <p className="text-sm text-grey-500">Rate limits and usage quotas</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Quota
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  Rate limits and usage quotas
+                </p>
               </div>
             </button>
+
             <button
               onClick={() => {
                 setShowResilienceTypeDialog(false);
                 openNewComponentTab('healthcheck');
               }}
-              className="flex items-center gap-4 p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border border-grey-300 hover:border-primary hover:bg-primary/5 transition-colors text-left active:bg-primary/10"
             >
-              <div className="w-12 h-12 rounded-xl bg-red-400/10 flex items-center justify-center">
-                <Heart className="h-6 w-6 text-red-400" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-red-400/10 flex items-center justify-center flex-shrink-0">
+                <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
               </div>
-              <div>
-                <h3 className="font-medium text-grey">Health Check</h3>
-                <p className="text-sm text-grey-500">Service health monitoring</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-medium text-grey">
+                  Health Check
+                </h3>
+                <p className="text-xs sm:text-sm text-grey-500">
+                  Service health monitoring
+                </p>
               </div>
             </button>
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Jobs Code Sidebar */}
       {showJobsCodeDialog && (
         <CodeSidebar
@@ -2250,13 +3021,16 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
           onClose={() => setShowJobsCodeDialog(false)}
           environments={product?.envs || []}
           additionalControls={
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+                <Label className="text-xs sm:text-sm font-semibold text-grey-700 mb-1.5 sm:mb-2 block">
                   Job Type
                 </Label>
-                <Select value={selectedJobType} onValueChange={setSelectedJobType}>
-                  <SelectTrigger className="w-full">
+                <Select
+                  value={selectedJobType}
+                  onValueChange={setSelectedJobType}
+                >
+                  <SelectTrigger className="w-full text-xs sm:text-sm h-8 sm:h-9 md:h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2272,9 +3046,9 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
                 href="https://docs.ductape.app/jobs/scheduling-jobs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-primary hover:underline"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
                 View full documentation
               </a>
             </div>
@@ -2284,8 +3058,10 @@ export default function ProductTabContent({ tabId, product: initialProduct, prod
             const envSlug = env || 'prd';
 
             // Generate code sections based on selected job type
-            // API based on https://docs.ductape.app/jobs/scheduling-jobs
-            const jobTypeSections: Record<string, Array<{ title: string; code: string }>> = {
+            const jobTypeSections: Record<
+              string,
+              Array<{title: string; code: string}>
+            > = {
               'app-action': [
                 {
                   title: 'Dispatch App Action Job',
@@ -2336,7 +3112,7 @@ const job = await ductape.actions.dispatch({
 });`,
                 },
               ],
-              'database': [
+              database: [
                 {
                   title: 'Dispatch Database Job',
                   code: `import ductape from '@ductape/sdk';
@@ -2390,7 +3166,7 @@ const job = await ductape.database.dispatch({
 });`,
                 },
               ],
-              'storage': [
+              storage: [
                 {
                   title: 'Dispatch Storage Job',
                   code: `import ductape from '@ductape/sdk';
@@ -2447,7 +3223,7 @@ const job = await ductape.storage.dispatch({
 });`,
                 },
               ],
-              'messaging': [
+              messaging: [
                 {
                   title: 'Dispatch Message Broker Job',
                   code: `import ductape from '@ductape/sdk';
@@ -2501,7 +3277,7 @@ const job = await ductape.events.dispatch({
 });`,
                 },
               ],
-              'notification': [
+              notification: [
                 {
                   title: 'Dispatch Notification Job',
                   code: `import ductape from '@ductape/sdk';
@@ -2562,11 +3338,12 @@ const job = await ductape.notifications.dispatch({
               ],
             };
 
-            return jobTypeSections[selectedJobType] || jobTypeSections['app-action'];
+            return (
+              jobTypeSections[selectedJobType] || jobTypeSections['app-action']
+            );
           }}
         />
       )}
-
       {/* Workflows Code Sidebar */}
       {showWorkflowsCodeDialog && (
         <CodeSidebar
@@ -2576,13 +3353,16 @@ const job = await ductape.notifications.dispatch({
           onClose={() => setShowWorkflowsCodeDialog(false)}
           environments={product?.envs || []}
           additionalControls={
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <Label className="text-sm font-semibold text-grey-700 mb-2 block">
+                <Label className="text-xs sm:text-sm font-semibold text-grey-700 mb-1.5 sm:mb-2 block">
                   Workflow function
                 </Label>
-                <Select value={selectedWorkflowFn} onValueChange={setSelectedWorkflowFn}>
-                  <SelectTrigger className="w-full">
+                <Select
+                  value={selectedWorkflowFn}
+                  onValueChange={setSelectedWorkflowFn}
+                >
+                  <SelectTrigger className="w-full text-xs sm:text-sm h-8 sm:h-9 md:h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2601,10 +3381,14 @@ const job = await ductape.notifications.dispatch({
                     <SelectItem value="replay">replay</SelectItem>
                     <SelectItem value="restart">restart</SelectItem>
                     <SelectItem value="resume">resume</SelectItem>
-                    <SelectItem value="replayFromStep">replayFromStep</SelectItem>
+                    <SelectItem value="replayFromStep">
+                      replayFromStep
+                    </SelectItem>
                     <SelectItem value="history">history</SelectItem>
                     <SelectItem value="stepDetail">stepDetail</SelectItem>
-                    <SelectItem value="relatedExecutions">relatedExecutions</SelectItem>
+                    <SelectItem value="relatedExecutions">
+                      relatedExecutions
+                    </SelectItem>
                     <SelectItem value="compare">compare</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2613,9 +3397,9 @@ const job = await ductape.notifications.dispatch({
                 href="https://docs.ductape.app/workflows/overview"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline"
+                className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-primary hover:underline"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
                 View workflow documentation
               </a>
             </div>
@@ -2623,7 +3407,10 @@ const job = await ductape.notifications.dispatch({
           generateCodeSections={(language, env) => {
             const productTag = product?.tag || 'your-product';
             const envSlug = env || 'prd';
-            const workflowFnSections: Record<string, Array<{ title: string; code: string }>> = {
+            const workflowFnSections: Record<
+              string,
+              Array<{title: string; code: string}>
+            > = {
               define: [
                 {
                   title: 'Define a workflow (code-first)',
@@ -2907,10 +3694,13 @@ const comparison = await ductape.workflow.compare({
                 },
               ],
             };
-            return workflowFnSections[selectedWorkflowFn] || workflowFnSections['define'];
+            return (
+              workflowFnSections[selectedWorkflowFn] ||
+              workflowFnSections['define']
+            );
           }}
         />
-      )}
+      )}{' '}
     </div>
   );
 }
