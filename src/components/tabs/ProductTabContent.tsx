@@ -2428,11 +2428,11 @@ export default function ProductTabContent({
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className="h-[calc(100vh-8rem)] flex bg-grey-100 relative">
       {/* Sidebar - Responsive widths */}
       <div
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300',
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300 absolute z-25',
           isSidebarCollapsed
             ? 'w-12 sm:w-14' // Smaller on mobile, standard on tablet/desktop
             : 'w-56 sm:w-64', // Slightly narrower on mobile
@@ -2779,7 +2779,12 @@ export default function ProductTabContent({
         )}
       </div>
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-grey-50">
+      <div 
+    className={cn(
+      "flex-1 flex flex-col overflow-hidden bg-grey-50 transition-all duration-300",
+       isSidebarCollapsed ? "ml-12 sm:ml-14" : "ml-0 sm:ml-64"
+    )}
+  >
         {renderMainContent()}
       </div>
       {/* Modals */}

@@ -115,7 +115,7 @@ function WorkbenchContent() {
             <div
               className={`${sidebarCollapsed ? 'w-0' : 'w-full md:w-[280px]'
                 } transition-all duration-300 ease-in-out border-r border-grey-400 bg-white flex-shrink-0 overflow-hidden shadow-sm
-              ${!sidebarCollapsed ? 'fixed md:relative inset-0 md:inset-auto z-30 md:z-0' : ''}`}
+              ${!sidebarCollapsed ? 'fixed md:relative inset-0 md:inset-auto z-50 md:z-0' : ''}`}
             >
               {/* Mobile Header - Show view selector on mobile */}
               <div className="md:hidden p-4 border-b border-grey-400 bg-white shadow-sm">
