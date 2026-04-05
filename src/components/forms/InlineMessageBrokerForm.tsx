@@ -105,11 +105,11 @@ export default function InlineMessageBrokerForm({
   // Proxy configuration
   const proxyConfig = product?.workspace_id && user?._id
     ? {
-        workspace_id: product.workspace_id || currentWorkspaceId || "",
-        user_id: user._id || "",
-        token: user.auth_token || "",
-        public_key: user.public_key || "",
-      }
+      workspace_id: product.workspace_id || currentWorkspaceId || "",
+      user_id: user._id || "",
+      token: user.auth_token || "",
+      public_key: user.public_key || "",
+    }
     : null;
 
   // Initialize SDK Proxy
@@ -121,7 +121,7 @@ export default function InlineMessageBrokerForm({
       const configs: EnvConfig[] = product.envs.map((env: any) => ({
         slug: env.slug,
         env_name: env.name || env.env_name || env.slug,
-        type: "",
+        type: "RABBITMQ",
         // RabbitMQ - URL-based
         rabbitmqUrl: "",
         // Redis
@@ -138,7 +138,7 @@ export default function InlineMessageBrokerForm({
         kafkaClientId: "",
         kafkaGroupId: "",
         kafkaSsl: false,
-        kafkaSaslMechanism: "",
+        kafkaSaslMechanism: "none",
         kafkaSaslUsername: "",
         kafkaSaslPassword: "",
         // Google Pub/Sub
@@ -256,12 +256,12 @@ export default function InlineMessageBrokerForm({
           clientId: env.kafkaClientId,
           groupId: env.kafkaGroupId || undefined,
           ssl: env.kafkaSsl,
-          sasl: env.kafkaSaslMechanism
+          sasl: env.kafkaSaslMechanism && env.kafkaSaslMechanism !== "none"
             ? {
-                mechanism: env.kafkaSaslMechanism,
-                username: env.kafkaSaslUsername,
-                password: env.kafkaSaslPassword,
-              }
+              mechanism: env.kafkaSaslMechanism,
+              username: env.kafkaSaslUsername,
+              password: env.kafkaSaslPassword,
+            }
             : undefined,
         };
       case "GOOGLE_PUBSUB":
@@ -309,7 +309,6 @@ export default function InlineMessageBrokerForm({
           config: buildConfigForType(env),
         })),
       };
-
       const messageBroker = await sdkProxy.messageBrokers.create(product.tag, payload);
       return messageBroker;
     },
@@ -332,6 +331,8 @@ export default function InlineMessageBrokerForm({
       toast.error("Please configure at least one environment");
       return;
     }
+
+    // alert(product.tag);
 
     await createMessageBroker({
       name: formData.name,
@@ -649,7 +650,7 @@ export default function InlineMessageBrokerForm({
                               <SelectValue placeholder="Select SASL mechanism (optional)" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
                               <SelectItem value="plain">PLAIN</SelectItem>
                               <SelectItem value="scram-sha-256">SCRAM-SHA-256</SelectItem>
                               <SelectItem value="scram-sha-512">SCRAM-SHA-512</SelectItem>

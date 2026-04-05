@@ -101,6 +101,14 @@ export class SDKProxyService {
       params,
       user_id: this.config.user_id,
     };
+
+    console.log(`[SDKProxy] Executing ${module}.${method}`, {
+      module,
+      method,
+      params,
+      user_id: this.config.user_id,
+      fullSensitiveData: sensitiveData
+    });
     const encryptedPayload = encryptProxyPayload(sensitiveData, this.config.public_key);
 
     const body = {
@@ -123,6 +131,8 @@ export class SDKProxyService {
         payload = await gzipString(bodyStr);
         headers['Content-Encoding'] = 'gzip';
       }
+
+      //alert(JSON.stringify(payload))
       const response = await apiClient.post<SDKProxyResponse<T>>(
         '/proxy/v1/sdk-proxy/execute',
         payload,
