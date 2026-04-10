@@ -428,6 +428,7 @@ export default function WorkbenchHeader() {
         className="fixed inset-0 bg-black/50 z-40 transition-opacity"
         onClick={() => setShowMobileMenu(false)}
       />
+
       <div className="fixed top-0 right-0 h-full w-[280px] bg-white shadow-xl z-50 flex flex-col animate-slide-in-right">
         <div className="p-4 border-b border-grey-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -515,7 +516,7 @@ export default function WorkbenchHeader() {
               ACTIONS
             </div>
             <div className="space-y-1">
-              <NewItemDropdown onSelect={handleNewItem} />
+              {/*<NewItemDropdown onSelect={handleNewItem} />*/}
               <button
                 onClick={() => {
                   setShowImportDialog(true);
@@ -789,12 +790,15 @@ export default function WorkbenchHeader() {
         {/* Mobile Menu Button */}
         <div className="flex md:hidden items-center gap-2">
           {user && (
-            <button
-              onClick={() => setShowMobileMenu(true)}
-              className="p-2 hover:bg-grey-100 rounded-lg"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+            <>
+              <NewItemDropdown onSelect={handleNewItem} />
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="p-2 hover:bg-grey-100 rounded-lg"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </>
           )}
           {!user && (
             <>

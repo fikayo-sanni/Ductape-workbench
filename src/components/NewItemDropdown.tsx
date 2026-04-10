@@ -153,7 +153,7 @@ export default function NewItemDropdown({onSelect}: NewItemDropdownProps) {
         data-intro="new-button"
       >
         <Plus className="h-4 w-4 md:mr-2" />
-        <span className="hidden md:inline">New</span>
+        <span className="inline">New</span>
       </Button>
 
       {isOpen && (
