@@ -724,6 +724,7 @@ export default function AppTabContent({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
+                    title="folder options"
                     className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-grey-200 transition-all mr-1"
                     onClick={e => e.stopPropagation()}
                   >
@@ -1564,6 +1565,7 @@ export default function AppTabContent({
                     size="sm"
                     variant="outline"
                     className="w-36"
+                    disabled={selectedVersion?.status == 'draft'}
                   >
                     <Plug className="h-4 w-4 mr-1" />
                     Integrate
@@ -2191,7 +2193,10 @@ export default function AppTabContent({
                   {isInternalApp && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100">
+                        <button
+                          title="Create..."
+                          className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100"
+                        >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </DropdownMenuTrigger>
