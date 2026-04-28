@@ -15,7 +15,6 @@ interface NewCacheTabContentProps {
   tabId: string;
   data?: any;
 }
-
 export default function NewCacheTabContent({ tabId, data }: NewCacheTabContentProps) {
   const { closeTab, openTab, tabs, updateTab, setActiveTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
