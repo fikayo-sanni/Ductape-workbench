@@ -5,7 +5,7 @@ interface AuthState {
   user: User | null;
   currentWorkspaceId: string | null;
   setUser: (user: User | null) => void;
-  setCurrentWorkspaceId: (workspaceId: string) => void;
+  setCurrentWorkspaceId: (workspaceId: string | null) => void;
   logout: () => void;
 }
 
@@ -24,9 +24,14 @@ export const useAuth = create<AuthState>((set) => ({
     }
     set({ user });
   },
-  setCurrentWorkspaceId: (workspaceId: string) => {
-    localStorage.setItem("currentWorkspaceId", workspaceId);
-    set({ currentWorkspaceId: workspaceId });
+  setCurrentWorkspaceId: (workspaceId: string | null) => {
+    if (workspaceId === null) {
+      localStorage.removeItem("currentWorkspaceId");
+      set({ currentWorkspaceId: null });
+    } else {
+      localStorage.setItem("currentWorkspaceId", workspaceId);
+      set({ currentWorkspaceId: workspaceId });
+    }
   },
   logout: () => {
     localStorage.removeItem("token");

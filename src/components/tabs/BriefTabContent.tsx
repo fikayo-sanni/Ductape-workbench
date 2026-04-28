@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWorkspaceProductBriefAppOptions, getLabelForAppId } from '@/hooks/useWorkspaceProductBriefAppOptions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { MarkdownEditor, MarkdownViewer } from '@/components/ui/markdown-editor';
 import { Plus, X, Save, FileText, Edit } from 'lucide-react';
 import { IProductBrief, BriefStatus, IOnboardingStep } from '@/types/partnership';
-import { dummyProducts } from '@/data/partnerships.dummy';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/store/useAuth';
+import partnershipServices, { getPartnershipsApiError } from '@/services/partnershipServices';
 import {
   Select,
   SelectContent,
@@ -21,11 +24,17 @@ import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 interface BriefTabContentProps {
   tab: {
     id: string;
+    itemId?: string;
     data: (IProductBrief & { isNew?: boolean; isEdit?: boolean }) | { isNew: true };
   };
 }
 
 export default function BriefTabContent({ tab }: BriefTabContentProps) {
+  const queryClient = useQueryClient();
+  const { user, currentWorkspaceId } = useAuth();
+  const { options: appOptions, isLoading: appsLoading, isEmpty: noApps } =
+    useWorkspaceProductBriefAppOptions();
+
   const brief = 'isNew' in tab.data && tab.data.isNew ? null : (tab.data as IProductBrief);
   const isEdit = 'isEdit' in tab.data && tab.data.isEdit;
   const isNew = !brief;
@@ -103,16 +112,66 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
       }
     }
 
+    if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Select a workspace and sign in to save.');
+      return;
+    }
+
+    const briefId = brief?._id ?? tab.itemId;
     setIsSaving(true);
+    try {
+      const base = {
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        title: formData.title,
+        description: formData.description,
+        product_details: formData.product_details,
+        usage_instructions: formData.usage_instructions,
+        onboarding_steps: onboardingSteps,
+      };
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (briefId) {
+        await partnershipServices.updateProductBrief({
+          brief_id: briefId,
+          ...base,
+          product_id: formData.product_id,
+        });
+        if (!asDraft) {
+          await partnershipServices.publishProductBrief({
+            brief_id: briefId,
+            workspace_id: currentWorkspaceId,
+            user_id: user._id,
+            public_key: user.public_key,
+          });
+        }
+      } else {
+        const { data: created } = await partnershipServices.createProductBrief({
+          ...base,
+          product_id: formData.product_id,
+          status: asDraft ? BriefStatus.DRAFT : BriefStatus.PUBLISHED,
+        });
+        if (!asDraft && created.status !== BriefStatus.PUBLISHED) {
+          await partnershipServices.publishProductBrief({
+            brief_id: created._id,
+            workspace_id: currentWorkspaceId,
+            user_id: user._id,
+            public_key: user.public_key,
+          });
+        }
+      }
 
-    const action = brief ? 'updated' : 'created';
-    const status = asDraft ? 'draft' : 'published';
+      await queryClient.invalidateQueries({ queryKey: ['workspace-briefs'] });
+      await queryClient.invalidateQueries({ queryKey: ['published-briefs'] });
 
-    toast.success(`Brief ${action} successfully as ${status}!`);
-    setIsSaving(false);
+      const action = briefId ? 'updated' : 'created';
+      const status = asDraft ? 'draft' : 'published';
+      toast.success(`Brief ${action} successfully as ${status}!`);
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const getBriefStatusColor = (status: BriefStatus) => {
@@ -140,9 +199,22 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-grey">{brief?.title}</h1>
-                  <p className="text-sm text-grey-600">{brief?.description}</p>
+                <div className="min-w-0">
+                  <MarkdownViewer
+                    content={brief?.title || ''}
+                    className={cn(
+                      '!my-0 leading-tight',
+                      '[&_h1]:!text-2xl [&_h1]:!font-bold [&_h1]:!my-1 [&_h1]:!leading-tight',
+                      '[&_h2]:!text-xl [&_h2]:!font-semibold [&_h2]:!my-1',
+                      '[&_h3]:!text-lg [&_h3]:!font-semibold [&_h3]:!my-1',
+                      '[&_p]:!text-2xl [&_p]:!font-bold [&_p]:!my-0 [&_p]:!leading-tight',
+                      '[&_ul]:!my-1 [&_ol]:!my-1'
+                    )}
+                  />
+                  <MarkdownViewer
+                    content={brief?.description || ''}
+                    className="text-sm text-grey-600 mt-2 !my-0 [&_p]:!text-sm [&_li]:!text-sm"
+                  />
                 </div>
               </div>
               <Badge
@@ -159,7 +231,9 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
             <h3 className="font-semibold text-grey mb-3">Product</h3>
             <div className="p-4 bg-grey-50 rounded-lg">
               <p className="text-sm text-grey-600">
-                {dummyProducts.find(p => p._id === brief?.product_id)?.app_name || 'Unknown Product'}
+                {appsLoading
+                  ? 'Loading app…'
+                  : getLabelForAppId(brief?.product_id, appOptions)}
               </p>
             </div>
           </div>
@@ -222,22 +296,36 @@ export default function BriefTabContent({ tab }: BriefTabContentProps) {
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
           {/* Product Selection */}
           <div className="space-y-2">
-            <Label htmlFor="product">Product/App *</Label>
+            <Label htmlFor="product">Public app (linked to public products) *</Label>
             <Select
               value={formData.product_id}
               onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+              disabled={appsLoading || noApps}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product" />
+                <SelectValue
+                  placeholder={
+                    appsLoading
+                      ? 'Loading apps…'
+                      : noApps
+                        ? 'No apps in this workspace'
+                        : 'Select an app'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {dummyProducts.map((product) => (
-                  <SelectItem key={product._id} value={product._id}>
-                    {product.app_name}
+                {appOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {noApps && !appsLoading && (
+              <p className="text-xs text-grey-600">
+                Publish an app (and product) first — briefs only list public apps.
+              </p>
+            )}
           </div>
 
           {/* Title */}

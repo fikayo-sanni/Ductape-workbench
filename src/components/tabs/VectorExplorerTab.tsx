@@ -4623,7 +4623,7 @@ await ductape.init();`,
   // Show loading state while initializing the vector service
   if (!vectorService) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
           {/* Background decoration */}
           <div className="absolute inset-0 -z-10">
@@ -4669,7 +4669,7 @@ await ductape.init();`,
   // Show connecting state while establishing vector database connection
   if (isConnecting) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
           {/* Background decoration */}
           <div className="absolute inset-0 -z-10">
@@ -4727,7 +4727,7 @@ await ductape.init();`,
   // Show connection error state
   if (connectionError) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
           {/* Background decoration */}
           <div className="absolute inset-0 -z-10">
@@ -4786,10 +4786,10 @@ await ductape.init();`,
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-grey-100">
       {/* Sidebar */}
       <div className={cn(
-        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
+        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-200',
         isSidebarCollapsed ? 'w-14' : 'w-64'
       )}>
         {/* Sidebar Header */}
@@ -5048,7 +5048,7 @@ await ductape.init();`,
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {mainView === 'overview' && renderOverview()}
         {mainView === 'namespace' && renderNamespaceView()}
         {mainView === 'vector' && renderVectorView()}

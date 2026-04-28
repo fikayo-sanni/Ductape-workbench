@@ -1,16 +1,63 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// import apiClient from "@/config/axiosinstance";
-import { IPartnership, IProductBrief, BriefStatus, IPartnershipMessage } from "@/types/partnership";
+import axios, { AxiosResponse } from 'axios';
+import apiClient from '@/config/axiosinstance';
+import { IPartnership, IProductBrief, BriefStatus, IPartnershipMessage, IOnboardingStep } from '@/types/partnership';
 import {
   dummyPartnerships,
   dummyProductBriefs,
   getDummyPublishedBriefs,
   getDummyWorkspaceBriefs,
   getPartnershipById as getDummyPartnershipById,
-} from "@/data/partnerships.dummy";
+} from '@/data/partnerships.dummy';
 
-// Toggle this to switch between dummy data and real API
-const USE_DUMMY_DATA = true;
+/** Set `VITE_PARTNERSHIPS_USE_DUMMY=true` in `.env` to use local dummy data instead of the API. */
+const USE_DUMMY_DATA = import.meta.env.VITE_PARTNERSHIPS_USE_DUMMY === 'true';
+
+type ApiEnvelope<T> = {
+  status?: boolean;
+  message?: string;
+  data: T;
+};
+
+function unwrapData<T>(response: AxiosResponse<ApiEnvelope<T>>): T {
+  const body = response.data;
+  if (typeof body.status === 'boolean' && !body.status) {
+    throw new Error(body.message || 'Request failed');
+  }
+  return body.data;
+}
+
+function idToString(id: unknown): string {
+  if (id == null) return '';
+  if (typeof id === 'string') return id;
+  if (typeof id === 'object' && id !== null && '$oid' in (id as Record<string, unknown>)) {
+    return String((id as { $oid: string }).$oid);
+  }
+  return String(id);
+}
+
+/** Detail endpoint returns an aggregation array with one document; UI expects `relationship_type` when scoped to a workspace. */
+function normalizePartnershipDetail(
+  raw: IPartnership | IPartnership[] | null | undefined,
+  workspaceId?: string
+): IPartnership {
+  const single = Array.isArray(raw) ? raw[0] : raw;
+  if (!single) {
+    throw new Error('Partnership not found');
+  }
+  let p: IPartnership = { ...single };
+  if (workspaceId && !p.relationship_type) {
+    const wid = workspaceId;
+    const cid = idToString(p.client_id);
+    const spid = idToString(p.service_provider_id);
+    if (cid && cid === wid) {
+      p = { ...p, relationship_type: 'client' };
+    } else if (spid && spid === wid) {
+      p = { ...p, relationship_type: 'service_provider' };
+    }
+  }
+  return p;
+}
 
 export interface PartnershipsResponse {
   data: {
@@ -45,13 +92,36 @@ export interface MessagesResponse {
   data: IPartnershipMessage[];
 }
 
+export interface ProductBriefResponse {
+  data: IProductBrief;
+}
+
+function normalizeOnboardingSteps(steps: IOnboardingStep[]): IOnboardingStep[] {
+  return steps
+    .filter((s) => s.name?.trim() && s.description?.trim())
+    .map((s) => ({
+      name: s.name.trim(),
+      description: s.description.trim(),
+      message_template: (s.message_template ?? '').trim(),
+    }));
+}
+
+export function getPartnershipsApiError(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const d = err.response?.data as { message?: string; errors?: unknown };
+    if (d?.message && typeof d.message === 'string') return d.message;
+    if (typeof d?.errors === 'string') return d.errors;
+    return err.message || 'Request failed';
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 const fetchWorkspacePartnerships = async (data: {
   workspace_id: string;
   user_id: string;
   public_key: string;
 }): Promise<PartnershipsResponse> => {
   if (USE_DUMMY_DATA) {
-    // For dummy data, return all partnerships with relationship type
     const myClients = dummyPartnerships.filter(
       p => p.service_provider_id === data.workspace_id || p.relationship_type === 'client'
     );
@@ -61,14 +131,12 @@ const fetchWorkspacePartnerships = async (data: {
     return { data: { myClients, myServiceProviders } };
   }
 
-  // Real API call (commented out for now)
-  // const { workspace_id, user_id, public_key } = data;
-  // const response = await apiClient.get<PartnershipsResponse>(
-  //   `/partnerships/v1/partnerships/workspace`,
-  //   { params: { workspace_id, user_id, public_key } }
-  // );
-  // return response.data;
-  return { data: { myClients: [], myServiceProviders: [] } };
+  const { workspace_id, user_id, public_key } = data;
+  const response = await apiClient.get<ApiEnvelope<PartnershipsResponse['data']>>(
+    '/partnerships/v1/partnerships/workspace',
+    { params: { workspace_id, user_id, public_key } }
+  );
+  return { data: unwrapData(response) };
 };
 
 const fetchPartnershipById = async (data: {
@@ -85,17 +153,16 @@ const fetchPartnershipById = async (data: {
     throw new Error('Partnership not found');
   }
 
-  // Real API call (commented out for now)
-  // const { partnership_id, user_id, public_key } = data;
-  // const response = await apiClient.get<PartnershipResponse>(
-  //   `/partnerships/v1/${partnership_id}`,
-  //   { params: { user_id, public_key } }
-  // );
-  // return response.data;
-  throw new Error('Partnership not found');
+  const { partnership_id, user_id, public_key, workspace_id } = data;
+  const response = await apiClient.get<ApiEnvelope<IPartnership | IPartnership[]>>(
+    `/partnerships/v1/${partnership_id}`,
+    { params: { user_id, public_key } }
+  );
+  return { data: normalizePartnershipDetail(unwrapData(response) as IPartnership | IPartnership[], workspace_id) };
 };
 
 const fetchPublishedBriefs = async (data: {
+  workspace_id: string;
   user_id: string;
   public_key: string;
   search?: string;
@@ -108,14 +175,12 @@ const fetchPublishedBriefs = async (data: {
     return { data: response.data };
   }
 
-  // Real API call (commented out for now)
-  // const { user_id, public_key, search = '', page = 1, limit = 20 } = data;
-  // const response = await apiClient.get<PublishedBriefsResponse>(
-  //   `/partnerships/v1/product-briefs/published`,
-  //   { params: { user_id, public_key, search, page, limit } }
-  // );
-  // return response.data;
-  return { data: { briefs: [], pagination: { total: 0, page: 1, limit: 20, totalPages: 0, hasNextPage: false, hasPrevPage: false } } };
+  const { workspace_id, user_id, public_key, search = '', page = 1, limit = 20 } = data;
+  const response = await apiClient.get<ApiEnvelope<PublishedBriefsResponse['data']>>(
+    '/partnerships/v1/product-briefs/published',
+    { params: { workspace_id, user_id, public_key, search, page, limit } }
+  );
+  return { data: unwrapData(response) };
 };
 
 const fetchWorkspaceBriefs = async (data: {
@@ -126,18 +191,15 @@ const fetchWorkspaceBriefs = async (data: {
 }): Promise<WorkspaceBriefsResponse> => {
   if (USE_DUMMY_DATA) {
     const briefs = getDummyWorkspaceBriefs(data.workspace_id, data.status);
-    // Return all briefs for demo purposes
     return { data: briefs.length > 0 ? briefs : dummyProductBriefs };
   }
 
-  // Real API call (commented out for now)
-  // const { workspace_id, user_id, public_key, status = BriefStatus.ALL } = data;
-  // const response = await apiClient.get<WorkspaceBriefsResponse>(
-  //   `/partnerships/v1/product-briefs/workspace`,
-  //   { params: { workspace_id, user_id, public_key, status } }
-  // );
-  // return response.data;
-  return { data: [] };
+  const { workspace_id, user_id, public_key, status = BriefStatus.ALL } = data;
+  const response = await apiClient.get<ApiEnvelope<IProductBrief[]>>(
+    '/partnerships/v1/product-briefs/workspace',
+    { params: { workspace_id, user_id, public_key, status } }
+  );
+  return { data: unwrapData(response) };
 };
 
 const createPartnership = async (data: {
@@ -153,7 +215,6 @@ const createPartnership = async (data: {
   };
 }): Promise<PartnershipResponse> => {
   if (USE_DUMMY_DATA) {
-    // Create a mock partnership
     const newPartnership: IPartnership = {
       _id: `partnership_${Date.now()}`,
       service_provider_id: data.payload.service_provider_id,
@@ -172,14 +233,12 @@ const createPartnership = async (data: {
     return { data: newPartnership };
   }
 
-  // Real API call (commented out for now)
-  // const { workspace_id, user_id, public_key, payload } = data;
-  // const response = await apiClient.post<PartnershipResponse>(
-  //   `/partnerships/v1/create`,
-  //   { ...payload, workspace_id, user_id, public_key }
-  // );
-  // return response.data;
-  throw new Error('API not available');
+  const { workspace_id, user_id, public_key, payload } = data;
+  const response = await apiClient.post<ApiEnvelope<IPartnership>>(
+    '/partnerships/v1/create',
+    { ...payload, workspace_id, user_id, public_key }
+  );
+  return { data: unwrapData(response) };
 };
 
 const addMessage = async (data: {
@@ -210,15 +269,18 @@ const addMessage = async (data: {
     throw new Error('Partnership not found');
   }
 
-  // Real API call (commented out for now)
-  // const { partnership_id, workspace_id, user_id, public_key, content, attachments } = data;
-  // const response = await apiClient.put<PartnershipResponse>(
-  //   `/partnerships/v1/${partnership_id}/messages`,
-  //   { content, attachments },
-  //   { params: { workspace_id, user_id, public_key } }
-  // );
-  // return response.data;
-  throw new Error('API not available');
+  const { partnership_id, workspace_id, user_id, public_key, content, attachments } = data;
+  await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/${partnership_id}/messages`,
+    { content, attachments },
+    { params: { workspace_id, user_id, public_key } }
+  );
+  return fetchPartnershipById({
+    partnership_id,
+    workspace_id,
+    user_id,
+    public_key,
+  });
 };
 
 const fetchMessages = async (data: {
@@ -232,14 +294,12 @@ const fetchMessages = async (data: {
     return { data: partnership?.messages || [] };
   }
 
-  // Real API call (commented out for now)
-  // const { partnership_id, workspace_id, user_id, public_key } = data;
-  // const response = await apiClient.get<MessagesResponse>(
-  //   `/partnerships/v1/${partnership_id}/messages`,
-  //   { params: { workspace_id, user_id, public_key } }
-  // );
-  // return response.data;
-  return { data: [] };
+  const { partnership_id, workspace_id, user_id, public_key } = data;
+  const response = await apiClient.get<ApiEnvelope<IPartnershipMessage[]>>(
+    `/partnerships/v1/${partnership_id}/messages`,
+    { params: { workspace_id, user_id, public_key } }
+  );
+  return { data: unwrapData(response) };
 };
 
 const markMessageAsRead = async (data: {
@@ -261,15 +321,134 @@ const markMessageAsRead = async (data: {
     throw new Error('Partnership not found');
   }
 
-  // Real API call (commented out for now)
-  // const { partnership_id, message_id, workspace_id, user_id, public_key } = data;
-  // const response = await apiClient.put<PartnershipResponse>(
-  //   `/partnerships/v1/${partnership_id}/messages/${message_id}/read`,
-  //   {},
-  //   { params: { workspace_id, user_id, public_key } }
-  // );
-  // return response.data;
-  throw new Error('API not available');
+  const { partnership_id, message_id, workspace_id, user_id, public_key } = data;
+  await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/${partnership_id}/messages/${message_id}/read`,
+    {},
+    { params: { workspace_id, user_id, public_key } }
+  );
+  return fetchPartnershipById({
+    partnership_id,
+    workspace_id,
+    user_id,
+    public_key,
+  });
+};
+
+const createProductBrief = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  product_id: string;
+  title: string;
+  description: string;
+  product_details: string;
+  usage_instructions?: string;
+  onboarding_steps: IOnboardingStep[];
+  status: BriefStatus.DRAFT | BriefStatus.PUBLISHED;
+}): Promise<ProductBriefResponse> => {
+  const payload = {
+    workspace_id: data.workspace_id,
+    user_id: data.user_id,
+    public_key: data.public_key,
+    product_id: data.product_id,
+    title: data.title,
+    description: data.description,
+    product_details: data.product_details,
+    usage_instructions: data.usage_instructions ?? '',
+    onboarding_steps: normalizeOnboardingSteps(data.onboarding_steps),
+    status: data.status,
+  };
+
+  if (USE_DUMMY_DATA) {
+    const created: IProductBrief = {
+      _id: `brief_${Date.now()}`,
+      workspace_id: data.workspace_id,
+      product_id: data.product_id,
+      title: data.title,
+      description: data.description,
+      product_details: data.product_details,
+      usage_instructions: data.usage_instructions ?? '',
+      onboarding_steps: payload.onboarding_steps,
+      status: data.status,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    dummyProductBriefs.push(created);
+    return { data: created };
+  }
+
+  const response = await apiClient.post<ApiEnvelope<IProductBrief>>(
+    '/partnerships/v1/product-briefs',
+    payload
+  );
+  return { data: unwrapData(response) };
+};
+
+const updateProductBrief = async (data: {
+  brief_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  product_id?: string;
+  title: string;
+  description: string;
+  product_details: string;
+  usage_instructions?: string;
+  onboarding_steps: IOnboardingStep[];
+}): Promise<{ data: boolean }> => {
+  const body: Record<string, unknown> = {
+    workspace_id: data.workspace_id,
+    user_id: data.user_id,
+    public_key: data.public_key,
+    title: data.title,
+    description: data.description,
+    product_details: data.product_details,
+    usage_instructions: data.usage_instructions ?? '',
+    onboarding_steps: normalizeOnboardingSteps(data.onboarding_steps),
+  };
+  if (data.product_id) body.product_id = data.product_id;
+
+  if (USE_DUMMY_DATA) {
+    const b = dummyProductBriefs.find((x) => x._id === data.brief_id);
+    if (b) {
+      Object.assign(b, {
+        ...body,
+        onboarding_steps: body.onboarding_steps,
+        updated_at: new Date(),
+      });
+    }
+    return { data: true };
+  }
+
+  const response = await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/product-briefs/${data.brief_id}`,
+    body
+  );
+  return { data: unwrapData(response) };
+};
+
+const publishProductBrief = async (data: {
+  brief_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<{ data: boolean }> => {
+  if (USE_DUMMY_DATA) {
+    const b = dummyProductBriefs.find((x) => x._id === data.brief_id);
+    if (b) {
+      b.status = BriefStatus.PUBLISHED;
+      b.updated_at = new Date();
+    }
+    return { data: true };
+  }
+
+  const response = await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/product-briefs/${data.brief_id}/publish`,
+    { workspace_id: data.workspace_id },
+    { params: { user_id: data.user_id, public_key: data.public_key } }
+  );
+  return { data: unwrapData(response) };
 };
 
 const confirmPartnership = async (data: {
@@ -292,15 +471,50 @@ const confirmPartnership = async (data: {
     throw new Error('Partnership not found');
   }
 
-  // Real API call (commented out for now)
-  // const { partnership_id, workspace_id, user_id, public_key, is_service_provider } = data;
-  // const response = await apiClient.put<PartnershipResponse>(
-  //   `/partnerships/v1/${partnership_id}/confirm`,
-  //   { workspace_id, is_service_provider },
-  //   { params: { user_id, public_key } }
-  // );
-  // return response.data;
-  throw new Error('API not available');
+  const { partnership_id, workspace_id, user_id, public_key, is_service_provider } = data;
+  await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/${partnership_id}/confirm`,
+    { workspace_id, is_service_provider },
+    { params: { user_id, public_key } }
+  );
+  return fetchPartnershipById({
+    partnership_id,
+    workspace_id,
+    user_id,
+    public_key,
+  });
+};
+
+const movePartnershipFunnelStep = async (data: {
+  partnership_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  service_provider_id: string;
+  step: number;
+}): Promise<PartnershipResponse> => {
+  if (USE_DUMMY_DATA) {
+    const p = dummyPartnerships.find((x) => x._id === data.partnership_id);
+    if (p) {
+      p.current_funnel_step = data.step;
+      p.updated_at = new Date();
+      return { data: p };
+    }
+    throw new Error('Partnership not found');
+  }
+
+  const { partnership_id, workspace_id, user_id, public_key, service_provider_id, step } = data;
+  await apiClient.put<ApiEnvelope<boolean>>(
+    `/partnerships/v1/${partnership_id}/funnel/${step}`,
+    { service_provider_id },
+    { params: { workspace_id, user_id, public_key } }
+  );
+  return fetchPartnershipById({
+    partnership_id,
+    workspace_id,
+    user_id,
+    public_key,
+  });
 };
 
 const partnershipServices = {
@@ -309,9 +523,13 @@ const partnershipServices = {
   fetchPublishedBriefs,
   fetchWorkspaceBriefs,
   createPartnership,
+  createProductBrief,
+  updateProductBrief,
+  publishProductBrief,
   addMessage,
   fetchMessages,
   markMessageAsRead,
+  movePartnershipFunnelStep,
   confirmPartnership,
 };
 

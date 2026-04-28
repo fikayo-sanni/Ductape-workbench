@@ -165,7 +165,7 @@ export default function TeamsTabContent() {
 
   if (membersStatus === 'pending') {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex flex-1 min-h-0 w-full items-center justify-center bg-grey-100">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -173,7 +173,7 @@ export default function TeamsTabContent() {
 
   if (membersStatus === 'error' || !currentWorkspaceId) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex flex-1 min-h-0 w-full items-center justify-center bg-grey-100">
         <div className="text-center">
           <p className="text-sm text-grey-600">Failed to load team members</p>
           <Button
@@ -192,8 +192,9 @@ export default function TeamsTabContent() {
   }
 
   return (
-    <div className="bg-grey-100">
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-grey-100">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-6 p-6 pb-10">
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start justify-between">
@@ -421,6 +422,7 @@ export default function TeamsTabContent() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 

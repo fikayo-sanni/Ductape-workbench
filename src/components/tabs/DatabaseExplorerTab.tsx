@@ -3590,7 +3590,7 @@ const result = await ductape.database.transaction(
   // Show connecting state while establishing database connection
   if (isConnecting) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
           {/* Background decoration */}
           <div className="absolute inset-0 -z-10">
@@ -3648,7 +3648,7 @@ const result = await ductape.database.transaction(
   // Show connection error state
   if (connectionError) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
           {/* Background decoration */}
           <div className="absolute inset-0 -z-10">
@@ -3707,11 +3707,11 @@ const result = await ductape.database.transaction(
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-grey-100">
       {/* Sidebar */}
       <div
         className={cn(
-          "bg-white border-r border-grey-300 flex flex-col transition-all duration-300 relative z-10",
+          "bg-white border-r border-grey-300 flex flex-col min-h-0 overflow-hidden transition-all duration-300 relative z-10",
           isSidebarCollapsed ? "w-14" : ""
         )}
         style={{ width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px` }}
@@ -4085,7 +4085,7 @@ const result = await ductape.database.transaction(
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Database Overview - when no table selected */}
         {sidebarView === 'tables' && !selectedTable && (
           <div className="flex-1 overflow-auto p-6 space-y-6">

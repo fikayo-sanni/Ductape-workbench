@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
   TrendingUp,
   MessageSquare,
   ChevronRight,
+  ChevronLeft,
   X,
   Copy,
   Check,
@@ -26,11 +27,25 @@ import {
   Shield,
   Save,
   Loader2,
+  Ticket,
 } from 'lucide-react';
 import { IPartnership, PartnershipStatus } from '@/types/partnership';
 import { cn } from '@/lib/utils';
+import { getPartnershipFunnelSteps } from '@/lib/partnershipFunnel';
 import toast from 'react-hot-toast';
-import partnershipServices from '@/services/partnershipServices';
+import partnershipServices, {
+  getPartnershipsApiError,
+  type PartnershipResponse,
+} from '@/services/partnershipServices';
+
+function partnershipIdStr(id: unknown): string {
+  if (id == null) return '';
+  if (typeof id === 'string') return id;
+  if (typeof id === 'object' && id !== null && '$oid' in (id as Record<string, unknown>)) {
+    return String((id as { $oid: string }).$oid);
+  }
+  return String(id);
+}
 import { useAuth } from '@/store/useAuth';
 import {
   Select,
@@ -70,67 +85,14 @@ interface Issue {
   category?: string;
 }
 
-// Dummy issues for testing
-const getDummyIssues = (): Issue[] => [
-  {
-    _id: 'issue_001',
-    title: 'API rate limiting not working as expected',
-    description: 'We\'re experiencing issues with the API rate limiting. Requests are being throttled even when we\'re well below our quota. This is affecting our production environment.',
-    priority: 'high',
-    status: 'in_progress',
-    created_at: new Date('2024-03-10T09:30:00'),
-    updated_at: new Date('2024-03-11T14:20:00'),
-    created_by: 'client',
-    assigned_to: 'service_provider',
-    category: 'Performance',
-  },
-  {
-    _id: 'issue_002',
-    title: 'Documentation missing for webhook configuration',
-    description: 'The webhook documentation doesn\'t include examples for handling retry logic. Could you add some code samples?',
-    priority: 'low',
-    status: 'resolved',
-    created_at: new Date('2024-03-08T11:15:00'),
-    updated_at: new Date('2024-03-09T16:45:00'),
-    created_by: 'client',
-    assigned_to: 'service_provider',
-    category: 'Documentation',
-  },
-  {
-    _id: 'issue_003',
-    title: 'CDN cache invalidation delay',
-    description: 'Cache invalidation is taking longer than the documented 60 seconds. We\'re seeing delays of up to 5 minutes in some regions.',
-    priority: 'critical',
-    status: 'open',
-    created_at: new Date('2024-03-12T08:00:00'),
-    updated_at: new Date('2024-03-12T08:00:00'),
-    created_by: 'client',
-    category: 'Bug',
-  },
-  {
-    _id: 'issue_004',
-    title: 'Feature request: Batch upload support',
-    description: 'Would love to see support for batch uploads via the API. Currently having to upload files one at a time which is inefficient for our use case.',
-    priority: 'medium',
-    status: 'open',
-    created_at: new Date('2024-03-11T15:30:00'),
-    updated_at: new Date('2024-03-11T15:30:00'),
-    created_by: 'client',
-    category: 'Feature Request',
-  },
-  {
-    _id: 'issue_005',
-    title: 'Billing discrepancy for February',
-    description: 'We noticed our February invoice includes charges for bandwidth we didn\'t use. Can you review the billing for account #12345?',
-    priority: 'medium',
-    status: 'resolved',
-    created_at: new Date('2024-03-05T10:00:00'),
-    updated_at: new Date('2024-03-07T09:30:00'),
-    created_by: 'client',
-    assigned_to: 'service_provider',
-    category: 'Billing',
-  },
-];
+/** Former UI seed data; strip if still present in persisted tab state. */
+const LEGACY_DUMMY_ISSUE_IDS = new Set([
+  'issue_001',
+  'issue_002',
+  'issue_003',
+  'issue_004',
+  'issue_005',
+]);
 
 interface PartnershipDetailTabContentProps {
   tab: {
@@ -141,7 +103,8 @@ interface PartnershipDetailTabContentProps {
 }
 
 export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTabContentProps) {
-  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { user, currentWorkspaceId } = useAuth();
   const tabId = tab.id;
 
   // Restore saved state
@@ -149,13 +112,15 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
   // Fetch partnership data from API
   const { data: partnershipResponse, isLoading } = useQuery({
-    queryKey: ['partnership', tab.itemId],
-    queryFn: () => partnershipServices.fetchPartnershipById({
-      partnership_id: tab.itemId || '',
-      user_id: user?._id || '',
-      public_key: user?.public_key || '',
-    }),
-    enabled: !!tab.itemId && !!user,
+    queryKey: ['partnership', tab.itemId, currentWorkspaceId],
+    queryFn: () =>
+      partnershipServices.fetchPartnershipById({
+        partnership_id: tab.itemId || '',
+        workspace_id: currentWorkspaceId || undefined,
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      }),
+    enabled: !!tab.itemId && !!user && !!currentWorkspaceId,
     initialData: tab.data ? { data: tab.data } : undefined,
   });
 
@@ -168,13 +133,18 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
   const [deliverableKey, setDeliverableKey] = useState(savedTabState?.deliverableKey || '');
   const [deliverableValue, setDeliverableValue] = useState(savedTabState?.deliverableValue || '');
   const [isSending, setIsSending] = useState(false);
+  const [isMovingFunnel, setIsMovingFunnel] = useState(false);
+  const [isConfirmingPartnership, setIsConfirmingPartnership] = useState(false);
   const [attachments, setAttachments] = useState<string[]>(savedTabState?.attachments || []);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Issues state
-  const [issues, setIssues] = useState<Issue[]>(savedTabState?.issues || getDummyIssues());
+  const [issues, setIssues] = useState<Issue[]>(() => {
+    const raw = savedTabState?.issues ?? [];
+    return raw.filter((i) => !LEGACY_DUMMY_ISSUE_IDS.has(i._id));
+  });
   const [issueTitle, setIssueTitle] = useState(savedTabState?.issueTitle || '');
   const [issueDescription, setIssueDescription] = useState(savedTabState?.issueDescription || '');
   const [issuePriority, setIssuePriority] = useState<IssuePriority>(savedTabState?.issuePriority || 'medium');
@@ -232,7 +202,6 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
   );
 
   // Initialize Ductape SDK for saving tokens
-  const { currentWorkspaceId } = useAuth();
   const ductape = useMemo<SDKProxyService | null>(() => {
     if (!currentWorkspaceId || !user?._id || !user?.public_key || !user?.auth_token) {
       return null;
@@ -280,25 +249,72 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
     );
   }
 
+  /** Misnamed legacy flag: true when the current workspace is the *client* in the partnership. */
   const isServiceProvider = partnership.relationship_type === 'client';
+  /** Service-provider workspace can advance or rewind the partnership funnel; clients cannot. */
+  const viewerCanManageFunnel = partnership.relationship_type === 'service_provider';
   const messages = partnership.messages || [];
   const deliverables = partnership.deliverables || [];
+  const funnelSteps = getPartnershipFunnelSteps(partnership);
+  const funnelStepCount = funnelSteps.length;
+  // Backend tracks funnel step as an index of the current step.
+  // At step 0, no steps are completed yet (0% progress).
+  const completedFunnelSteps = Math.max(
+    0,
+    Math.min(partnership.current_funnel_step ?? 0, Math.max(0, funnelStepCount - 1))
+  );
+  const isOnboardingFlowCompleted =
+    funnelStepCount > 0 && completedFunnelSteps >= funnelStepCount - 1;
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    setIsSending(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    if (attachments.length > 0) {
-      toast.success(`Message sent with ${attachments.length} attachment(s)`);
-    } else {
-      toast.success('Message sent successfully');
+    if (!tab.itemId || !currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Missing partnership, workspace, or sign-in; cannot send message.');
+      return;
     }
 
-    setNewMessage('');
-    setAttachments([]);
-    setIsSending(false);
+    // API validates attachments as URIs; local file names from the picker cannot be sent yet.
+    const uriAttachments = attachments.filter((a) => {
+      try {
+        // eslint-disable-next-line no-new
+        new URL(a);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    const skippedLocalFiles = attachments.length > uriAttachments.length;
+
+    setIsSending(true);
+    try {
+      await partnershipServices.addMessage({
+        partnership_id: tab.itemId,
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        content: newMessage.trim(),
+        attachments: uriAttachments.length > 0 ? uriAttachments : undefined,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['partnership', tab.itemId, currentWorkspaceId],
+      });
+
+      if (skippedLocalFiles) {
+        toast.success('Message sent. Only URL attachments are supported; local files were not included.');
+      } else if (uriAttachments.length > 0) {
+        toast.success(`Message sent with ${uriAttachments.length} attachment(s)`);
+      } else {
+        toast.success('Message sent successfully');
+      }
+      setNewMessage('');
+      setAttachments([]);
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -522,12 +538,80 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
     closed: issues.filter(i => i.status === 'closed').length,
   };
 
-  const handleMoveToStep = async (stepIndex: number) => {
-    toast.success(`Moved client to step ${stepIndex + 1}`);
+  const handleMoveToStep = async (targetStepIndex: number) => {
+    if (!viewerCanManageFunnel) {
+      toast.error('Only the service provider can update the funnel.');
+      return;
+    }
+    if (!tab.itemId || !currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Missing partnership, workspace, or sign-in.');
+      return;
+    }
+    const serviceProviderId = partnershipIdStr(partnership.service_provider_id);
+    if (!serviceProviderId) {
+      toast.error('Missing service provider on this partnership.');
+      return;
+    }
+
+    setIsMovingFunnel(true);
+    try {
+      const res = await partnershipServices.movePartnershipFunnelStep({
+        partnership_id: tab.itemId,
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        service_provider_id: serviceProviderId,
+        step: targetStepIndex,
+      });
+      const detailKey: [string, string | undefined, string | undefined | null] = [
+        'partnership',
+        tab.itemId,
+        currentWorkspaceId,
+      ];
+      queryClient.setQueryData<PartnershipResponse>(detailKey, res);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: detailKey }),
+        queryClient.invalidateQueries({ queryKey: ['workspace-partnerships', currentWorkspaceId] }),
+      ]);
+      toast.success('Funnel step updated');
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsMovingFunnel(false);
+    }
   };
 
   const handleConfirmPartnership = async () => {
-    toast.success('Partnership confirmed!');
+    if (!tab.itemId || !currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Missing partnership, workspace, or sign-in.');
+      return;
+    }
+
+    setIsConfirmingPartnership(true);
+    try {
+      const res = await partnershipServices.confirmPartnership({
+        partnership_id: tab.itemId,
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        is_service_provider: partnership.relationship_type === 'service_provider',
+      });
+      const detailKey: [string, string | undefined, string | undefined | null] = [
+        'partnership',
+        tab.itemId,
+        currentWorkspaceId,
+      ];
+      queryClient.setQueryData<PartnershipResponse>(detailKey, res);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: detailKey }),
+        queryClient.invalidateQueries({ queryKey: ['workspace-partnerships', currentWorkspaceId] }),
+      ]);
+      toast.success('Partnership confirmed!');
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsConfirmingPartnership(false);
+    }
   };
 
   const getPriorityColor = (priority: IssuePriority) => {
@@ -563,7 +647,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
   const partnerInfo = isServiceProvider ? partnership.client : partnership.serviceProvider;
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden">
+    <div className="flex flex-1 flex-col min-h-0 w-full h-full bg-white overflow-hidden">
       {/* Header - Fixed */}
       <div className="flex-shrink-0 border-b border-grey-400 p-6 bg-white">
         <div className="flex items-start justify-between">
@@ -608,9 +692,19 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
           </div>
 
           {isServiceProvider && partnership.status === PartnershipStatus.PROSPECTIVE && (
-            <Button size="sm" onClick={handleConfirmPartnership} className="gap-2">
+            <Button
+              size="sm"
+              onClick={handleConfirmPartnership}
+              disabled={!isOnboardingFlowCompleted || isConfirmingPartnership}
+              title={
+                isOnboardingFlowCompleted
+                  ? undefined
+                  : 'Complete all onboarding steps before confirming partnership'
+              }
+              className="gap-2"
+            >
               <CheckCircle2 className="h-4 w-4" />
-              Confirm Partnership
+              {isConfirmingPartnership ? 'Confirming…' : 'Confirm Partnership'}
             </Button>
           )}
         </div>
@@ -627,9 +721,12 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
             </TabsTrigger>
             {/* Show Sales Funnel for prospective partnerships, Issues for active partnerships */}
             {partnership.status === PartnershipStatus.PROSPECTIVE ? (
-              <TabsTrigger value="funnel" className="gap-2" disabled={!partnership.salesFunnel}>
+              <TabsTrigger value="funnel" className="gap-2" disabled={funnelStepCount === 0}>
                 <TrendingUp className="h-4 w-4" />
-                Sales Funnel {partnership.salesFunnel && `(${partnership.current_funnel_step + 1}/${partnership.salesFunnel.steps.length})`}
+                Sales Funnel{' '}
+                {funnelStepCount > 0
+                  ? `(${completedFunnelSteps}/${funnelStepCount})`
+                  : ''}
               </TabsTrigger>
             ) : (
               <TabsTrigger value="issues" className="gap-2">
@@ -688,9 +785,9 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                       >
                         {message.content}
                       </div>
-                      {message.attachments.length > 0 && (
+                      {(message.attachments?.length ?? 0) > 0 && (
                         <div className="mt-2 space-y-1">
-                          {message.attachments.map((attachment, idx) => (
+                          {(message.attachments ?? []).map((attachment, idx) => (
                             <div
                               key={idx}
                               className="text-xs text-primary flex items-center gap-1 cursor-pointer hover:underline"
@@ -784,7 +881,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
         {/* Sales Funnel Tab */}
         <TabsContent value="funnel" className="flex-1 overflow-y-auto px-6 py-4">
-          {partnership.salesFunnel && (
+          {funnelStepCount > 0 ? (
             <div className="space-y-4">
               {/* Progress Overview */}
               <div className="bg-white rounded-lg p-6 border border-grey-400 shadow-sm">
@@ -792,12 +889,15 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                   <div>
                     <h3 className="text-lg font-semibold text-grey">Sales Funnel Progress</h3>
                     <p className="text-sm text-grey-600 mt-1">
-                      Step {partnership.current_funnel_step + 1} of {partnership.salesFunnel.steps.length}
+                      Completed {completedFunnelSteps} of {funnelStepCount} steps
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-primary">
-                      {Math.round(((partnership.current_funnel_step + 1) / partnership.salesFunnel.steps.length) * 100)}%
+                      {Math.round(
+                        (completedFunnelSteps / funnelStepCount) * 100
+                      )}
+                      %
                     </div>
                     <p className="text-xs text-grey-600 mt-1">Complete</p>
                   </div>
@@ -807,7 +907,10 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                   <div
                     className="bg-primary h-2 rounded-full transition-all"
                     style={{
-                      width: `${((partnership.current_funnel_step + 1) / partnership.salesFunnel.steps.length) * 100}%`
+                      width: `${Math.min(
+                        100,
+                        (completedFunnelSteps / funnelStepCount) * 100
+                      )}%`,
                     }}
                   />
                 </div>
@@ -815,10 +918,12 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
               {/* Steps List */}
               <div className="space-y-3">
-                {partnership.salesFunnel.steps.map((step, index) => {
-                  const isCurrent = index === partnership.current_funnel_step;
-                  const isCompleted = index < partnership.current_funnel_step;
-                  const isPending = index > partnership.current_funnel_step;
+                {funnelSteps.map((step, index) => {
+                  const currentStep = completedFunnelSteps;
+                  const isCompleted = index < completedFunnelSteps;
+                  const isCurrent = index === currentStep;
+                  const isPending = !isCompleted && !isCurrent;
+                  const isLastStep = index === funnelStepCount - 1;
 
                   return (
                     <div key={index} className="bg-white rounded-lg border border-grey-400 p-5 shadow-sm">
@@ -847,16 +952,38 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                           <h4 className="font-semibold text-grey text-base mb-1">{step.name}</h4>
                           <p className="text-sm text-grey-600">{step.description}</p>
                         </div>
-                        {isServiceProvider && isCurrent && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleMoveToStep(index + 1)}
-                            disabled={index >= partnership.salesFunnel!.steps.length - 1}
-                            className="gap-2 ml-4"
-                          >
-                            Move Forward
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
+                        {viewerCanManageFunnel && isCurrent && (
+                          <div className="flex flex-col gap-2 ml-4 sm:flex-row sm:items-center">
+                            {currentStep > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMoveToStep(currentStep - 1)}
+                                disabled={isMovingFunnel}
+                                className="gap-2"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                Move back
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                isLastStep
+                                  ? handleConfirmPartnership()
+                                  : handleMoveToStep(index + 1)
+                              }
+                              disabled={isMovingFunnel || isConfirmingPartnership}
+                              className="gap-2"
+                            >
+                              {(isMovingFunnel || isConfirmingPartnership)
+                                ? 'Updating…'
+                                : isLastStep
+                                  ? 'Complete onboarding'
+                                  : 'Move forward'}
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -864,6 +991,10 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                 })}
               </div>
             </div>
+          ) : (
+            <p className="text-sm text-grey-600 py-4">
+              No sales funnel steps are available for this partnership yet.
+            </p>
           )}
         </TabsContent>
 
@@ -1361,275 +1492,308 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
           )}
         </TabsContent>
 
-        {/* Issues Tab */}
-        <TabsContent value="issues" className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
-            {/* Header with Create Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-grey">Support Tickets</h3>
-                <p className="text-sm text-grey-600 mt-1">Track and manage partnership issues</p>
-              </div>
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    New Ticket
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[550px]">
-                  <DialogHeader>
-                    <DialogTitle className='text-grey'>Create Support Ticket</DialogTitle>
-                    <DialogDescription>
-                      Report an issue or request assistance. We'll get back to you as soon as possible.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-grey">Title *</label>
-                      <Input
-                        value={issueTitle}
-                        onChange={(e) => setIssueTitle(e.target.value)}
-                        placeholder="Brief description of the issue"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-grey">Description *</label>
-                      <Textarea
-                        value={issueDescription}
-                        onChange={(e) => setIssueDescription(e.target.value)}
-                        placeholder="Provide detailed information about the issue..."
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+        {/* Issues Tab — layout aligned with AppTabContent (grey-50 body, white sticky header, border-grey-400 cards) */}
+        <TabsContent
+          value="issues"
+          className="data-[state=inactive]:hidden !mt-0 flex flex-1 min-h-0 flex-col p-0"
+        >
+          <div className="h-full min-h-0 overflow-auto bg-grey-50">
+            <div className="sticky top-0 z-10 border-b border-grey-300 bg-white">
+              <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 shadow-sm">
+                    <Ticket className="h-6 w-6 text-primary" aria-hidden />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-grey">Issues &amp; support</h1>
+                    <p className="text-sm text-grey-500">
+                      {issueStats.all}{' '}
+                      {issueStats.all === 1 ? 'ticket' : 'tickets'} · filter by status below
+                    </p>
+                  </div>
+                </div>
+                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full shrink-0 gap-2 shadow-sm sm:w-auto">
+                      <Plus className="h-4 w-4" />
+                      New ticket
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[560px]">
+                    <DialogHeader>
+                      <DialogTitle className="text-grey">Create support ticket</DialogTitle>
+                      <DialogDescription className="text-grey-600">
+                        Describe what you need. Include steps to reproduce for bugs where possible.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-grey">Priority *</label>
-                        <Select value={issuePriority} onValueChange={(value) => setIssuePriority(value as IssuePriority)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="critical">Critical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-grey">Category</label>
+                        <Label htmlFor="issue-title">Title</Label>
                         <Input
-                          value={issueCategory}
-                          onChange={(e) => setIssueCategory(e.target.value)}
-                          placeholder="e.g., Bug, Feature"
+                          id="issue-title"
+                          value={issueTitle}
+                          onChange={(e) => setIssueTitle(e.target.value)}
+                          placeholder="Brief summary"
                         />
                       </div>
-                    </div>
 
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCreateDialogOpen(false)}
-                        disabled={isSending}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleCreateIssue}
-                        disabled={isSending || !issueTitle.trim() || !issueDescription.trim()}
-                        className="gap-2"
-                      >
-                        {isSending ? 'Creating...' : 'Create Ticket'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="issue-desc">Description</Label>
+                        <Textarea
+                          id="issue-desc"
+                          value={issueDescription}
+                          onChange={(e) => setIssueDescription(e.target.value)}
+                          placeholder="Details, expected vs actual, IDs or timestamps…"
+                          rows={5}
+                          className="min-h-[120px] resize-y"
+                        />
+                      </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-5 gap-3">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={cn(
-                  'bg-white rounded-lg border p-4 text-left transition-all hover:shadow-md',
-                  statusFilter === 'all' ? 'border-primary ring-2 ring-primary/20' : 'border-grey-400'
-                )}
-              >
-                <div className="text-2xl font-bold text-grey">{issueStats.all}</div>
-                <div className="text-xs text-grey-600 mt-1">All Tickets</div>
-              </button>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Priority</Label>
+                          <Select value={issuePriority} onValueChange={(value) => setIssuePriority(value as IssuePriority)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="critical">Critical</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-              <button
-                onClick={() => setStatusFilter('open')}
-                className={cn(
-                  'bg-white rounded-lg border p-4 text-left transition-all hover:shadow-md',
-                  statusFilter === 'open' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-grey-400'
-                )}
-              >
-                <div className="text-2xl font-bold text-blue-600">{issueStats.open}</div>
-                <div className="text-xs text-grey-600 mt-1">Open</div>
-              </button>
-
-              <button
-                onClick={() => setStatusFilter('in_progress')}
-                className={cn(
-                  'bg-white rounded-lg border p-4 text-left transition-all hover:shadow-md',
-                  statusFilter === 'in_progress' ? 'border-yellow ring-2 ring-yellow/20' : 'border-grey-400'
-                )}
-              >
-                <div className="text-2xl font-bold text-yellow">{issueStats.in_progress}</div>
-                <div className="text-xs text-grey-600 mt-1">In Progress</div>
-              </button>
-
-              <button
-                onClick={() => setStatusFilter('resolved')}
-                className={cn(
-                  'bg-white rounded-lg border p-4 text-left transition-all hover:shadow-md',
-                  statusFilter === 'resolved' ? 'border-green ring-2 ring-green/20' : 'border-grey-400'
-                )}
-              >
-                <div className="text-2xl font-bold text-green">{issueStats.resolved}</div>
-                <div className="text-xs text-grey-600 mt-1">Resolved</div>
-              </button>
-
-              <button
-                onClick={() => setStatusFilter('closed')}
-                className={cn(
-                  'bg-white rounded-lg border p-4 text-left transition-all hover:shadow-md',
-                  statusFilter === 'closed' ? 'border-grey-500 ring-2 ring-grey-500/20' : 'border-grey-400'
-                )}
-              >
-                <div className="text-2xl font-bold text-grey-600">{issueStats.closed}</div>
-                <div className="text-xs text-grey-600 mt-1">Closed</div>
-              </button>
-            </div>
-
-            {/* Issues List */}
-            {filteredIssues.length > 0 ? (
-              <div className="space-y-3">
-                {filteredIssues.map((issue) => {
-                  const isExpanded = expandedIssueId === issue._id;
-                  const timeSinceUpdate = Math.floor((Date.now() - new Date(issue.updated_at).getTime()) / (1000 * 60 * 60 * 24));
-
-                  return (
-                    <div
-                      key={issue._id}
-                      className="bg-white rounded-lg border border-grey-400 overflow-hidden transition-all hover:shadow-md"
-                    >
-                      {/* Issue Header - Always Visible */}
-                      <div
-                        className="p-4 cursor-pointer"
-                        onClick={() => setExpandedIssueId(isExpanded ? null : issue._id)}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-semibold text-grey truncate">{issue.title}</h4>
-                              <Badge
-                                variant="secondary"
-                                className={cn('text-xs flex-shrink-0', getPriorityColor(issue.priority))}
-                              >
-                                {issue.priority}
-                              </Badge>
-                              <Badge
-                                variant="secondary"
-                                className={cn('text-xs flex-shrink-0', getStatusColor(issue.status))}
-                              >
-                                {issue.status.replace('_', ' ')}
-                              </Badge>
-                              {issue.category && (
-                                <Badge variant="outline" className="text-xs flex-shrink-0">
-                                  {issue.category}
-                                </Badge>
-                              )}
-                            </div>
-
-                            <p className={cn(
-                              'text-sm text-grey-600',
-                              !isExpanded && 'line-clamp-1'
-                            )}>
-                              {issue.description}
-                            </p>
-
-                            <div className="flex items-center gap-3 mt-2 text-xs text-grey-500">
-                              <span>Created {new Date(issue.created_at).toLocaleDateString()}</span>
-                              <span>•</span>
-                              <span>by {issue.created_by === 'service_provider' ? 'Provider' : 'Client'}</span>
-                              {timeSinceUpdate > 0 && (
-                                <>
-                                  <span>•</span>
-                                  <span>Updated {timeSinceUpdate}d ago</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <ChevronRight
-                            className={cn(
-                              'h-5 w-5 text-grey-400 transition-transform flex-shrink-0',
-                              isExpanded && 'rotate-90'
-                            )}
+                        <div className="space-y-2">
+                          <Label htmlFor="issue-cat">Category</Label>
+                          <Input
+                            id="issue-cat"
+                            value={issueCategory}
+                            onChange={(e) => setIssueCategory(e.target.value)}
+                            placeholder="Bug, billing, docs…"
                           />
                         </div>
                       </div>
 
-                      {/* Expanded Content */}
-                      {isExpanded && (
-                        <div className="border-t border-grey-200 bg-grey-50 p-4">
-                          <div className="space-y-4">
-                            {/* Full Description */}
-                            <div>
-                              <h5 className="text-sm font-semibold text-grey mb-2">Description</h5>
-                              <p className="text-sm text-grey-600 whitespace-pre-wrap">{issue.description}</p>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-4 pt-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-grey">Status:</span>
-                                <Select
-                                  value={issue.status}
-                                  onValueChange={(value) => handleUpdateIssueStatus(issue._id, value as IssueStatus)}
-                                >
-                                  <SelectTrigger className="w-[150px] h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="open">Open</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="resolved">Resolved</SelectItem>
-                                    <SelectItem value="closed">Closed</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={isSending}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleCreateIssue}
+                          disabled={isSending || !issueTitle.trim() || !issueDescription.trim()}
+                          className="gap-2 shadow-sm"
+                        >
+                          {isSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Creating…
+                            </>
+                          ) : (
+                            'Create ticket'
+                          )}
+                        </Button>
+                      </DialogFooter>
                     </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            <div className="mx-auto max-w-6xl space-y-5 px-6 py-6">
+              <div
+                role="toolbar"
+                aria-label="Filter tickets by status"
+                className="flex flex-wrap gap-1 rounded-lg border border-grey-400 bg-white p-2 shadow-sm"
+              >
+                {(
+                  [
+                    { key: 'all' as const, label: 'All', count: issueStats.all },
+                    { key: 'open' as IssueStatus, label: 'Open', count: issueStats.open },
+                    { key: 'in_progress' as IssueStatus, label: 'In progress', count: issueStats.in_progress },
+                    { key: 'resolved' as IssueStatus, label: 'Resolved', count: issueStats.resolved },
+                    { key: 'closed' as IssueStatus, label: 'Closed', count: issueStats.closed },
+                  ] as const
+                ).map((f) => {
+                  const active = statusFilter === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setStatusFilter(f.key)}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                        active
+                          ? 'bg-primary/10 font-medium text-primary'
+                          : 'text-grey hover:bg-grey-100',
+                      )}
+                    >
+                      <span>{f.label}</span>
+                      <span
+                        className={cn(
+                          'min-w-[20px] rounded px-1.5 py-0.5 text-center text-xs',
+                          active ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600',
+                        )}
+                      >
+                        {f.count}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
-            ) : (
-              <div className="bg-white rounded-lg border border-grey-400 shadow-sm p-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mb-4 mx-auto">
-                  <AlertCircle className="h-8 w-8 text-grey-400" />
+
+              {filteredIssues.length > 0 ? (
+                <>
+                  <p className="text-sm text-grey-500">
+                    Showing{' '}
+                    <span className="font-medium text-grey">{filteredIssues.length}</span>{' '}
+                    {filteredIssues.length === 1 ? 'ticket' : 'tickets'}
+                    {statusFilter !== 'all' && (
+                      <>
+                        {' '}
+                        · status:{' '}
+                        <span className="font-medium text-grey">{statusFilter.replace('_', ' ')}</span>
+                      </>
+                    )}
+                  </p>
+
+                  <ul className="space-y-3">
+                    {filteredIssues.map((issue) => {
+                      const isExpanded = expandedIssueId === issue._id;
+                      const created = new Date(issue.created_at);
+                      const updated = new Date(issue.updated_at);
+                      const diffMs = Date.now() - updated.getTime();
+                      const diffMins = Math.floor(diffMs / (1000 * 60));
+                      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                      let updatedLabel = '';
+                      if (diffMins < 1) updatedLabel = 'Just now';
+                      else if (diffMins < 60) updatedLabel = `${diffMins}m ago`;
+                      else if (diffHrs < 24) updatedLabel = `${diffHrs}h ago`;
+                      else updatedLabel = `${diffDays}d ago`;
+
+                      return (
+                        <li key={issue._id}>
+                          <div className="overflow-hidden rounded-lg border border-grey-400 bg-white transition-all hover:border-primary hover:shadow-md">
+                            <button
+                              type="button"
+                              className="flex w-full items-start gap-3 p-4 text-left"
+                              onClick={() => setExpandedIssueId(isExpanded ? null : issue._id)}
+                              aria-expanded={isExpanded}
+                            >
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Ticket className="h-5 w-5 text-primary" aria-hidden />
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <span className="text-sm font-medium text-grey">{issue.title}</span>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className={cn('text-[10px] font-medium', getPriorityColor(issue.priority))}
+                                  >
+                                    {issue.priority}
+                                  </Badge>
+                                  <Badge
+                                    variant="secondary"
+                                    className={cn('text-[10px] capitalize', getStatusColor(issue.status))}
+                                  >
+                                    {issue.status.replace('_', ' ')}
+                                  </Badge>
+                                  {issue.category ? (
+                                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-grey-100 text-grey-600">
+                                      {issue.category}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                <p
+                                  className={cn(
+                                    'text-xs text-grey-600',
+                                    !isExpanded && 'line-clamp-2',
+                                  )}
+                                >
+                                  {issue.description}
+                                </p>
+
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grey-500">
+                                  <span>{created.toLocaleDateString(undefined, { dateStyle: 'medium' })}</span>
+                                  <span>·</span>
+                                  <span>
+                                    {issue.created_by === 'service_provider' ? 'Provider' : 'Client'}
+                                  </span>
+                                  <span>·</span>
+                                  <span>Updated {updatedLabel}</span>
+                                </div>
+                              </div>
+
+                              <ChevronRight
+                                className={cn(
+                                  'mt-1 h-5 w-5 shrink-0 text-grey-400 transition-transform',
+                                  isExpanded && 'rotate-90',
+                                )}
+                                aria-hidden
+                              />
+                            </button>
+
+                            {isExpanded ? (
+                              <div className="border-t border-grey-300 bg-grey-50 px-4 py-4">
+                                <p className="mb-4 whitespace-pre-wrap text-sm text-grey-700">{issue.description}</p>
+
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className="text-sm font-medium text-grey">Status</span>
+                                  <Select
+                                    value={issue.status}
+                                    onValueChange={(value) =>
+                                      handleUpdateIssueStatus(issue._id, value as IssueStatus)
+                                    }
+                                  >
+                                    <SelectTrigger className="h-9 w-full border-grey-400 bg-white sm:w-[200px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="open">Open</SelectItem>
+                                      <SelectItem value="in_progress">In progress</SelectItem>
+                                      <SelectItem value="resolved">Resolved</SelectItem>
+                                      <SelectItem value="closed">Closed</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <div className="rounded-lg border border-grey-400 bg-white p-12 text-center shadow-sm">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-grey-100">
+                    <AlertCircle className="h-7 w-7 text-grey-400" aria-hidden />
+                  </div>
+                  <h3 className="text-xl font-semibold text-grey">
+                    {statusFilter === 'all' ? 'No tickets yet' : `No ${statusFilter.replace('_', ' ')} tickets`}
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-grey-500">
+                    {statusFilter === 'all'
+                      ? 'Create a ticket to track bugs, requests, or questions for this partnership.'
+                      : 'Nothing matches this filter. Try another status or view all tickets.'}
+                  </p>
+                  {statusFilter === 'all' ? (
+                    <Button className="mt-6 gap-2 shadow-sm" onClick={() => setCreateDialogOpen(true)}>
+                      <Plus className="h-4 w-4" />
+                      Create ticket
+                    </Button>
+                  ) : (
+                    <Button variant="outline" className="mt-6 border-grey-400" onClick={() => setStatusFilter('all')}>
+                      Show all tickets
+                    </Button>
+                  )}
                 </div>
-                <h3 className="text-base font-semibold text-grey mb-2">
-                  {statusFilter === 'all' ? 'No Support Tickets Yet' : `No ${statusFilter.replace('_', ' ')} tickets`}
-                </h3>
-                <p className="text-sm text-grey-600 max-w-md mx-auto">
-                  {statusFilter === 'all'
-                    ? 'Create a support ticket to report issues or request assistance with this partnership.'
-                    : `There are no tickets with status "${statusFilter.replace('_', ' ')}".`}
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </TabsContent>
       </Tabs>

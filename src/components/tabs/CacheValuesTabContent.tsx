@@ -454,10 +454,10 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-background-tertiary">
+    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-background-tertiary">
       {/* Sidebar */}
       <div className={cn(
-        "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300",
+        "bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300",
         isSidebarCollapsed ? "w-14" : "w-64"
       )}>
         {/* Header */}
@@ -653,7 +653,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
         </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border bg-white">
           <div className="px-6 py-5">

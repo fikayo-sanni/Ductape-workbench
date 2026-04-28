@@ -682,11 +682,11 @@ export default function TabContent() {
 
   // Keep all tab panels mounted; hide inactive ones so workflow (and other) tabs don't remount/refetch on switch
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
       {tabs.map(tab => (
         <div
           key={tab.id}
-          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          className="flex-1 flex flex-col min-h-0 overflow-hidden w-full [&>*]:min-h-0"
           style={{display: tab.id === activeTabId ? 'flex' : 'none'}}
           aria-hidden={tab.id !== activeTabId}
         >

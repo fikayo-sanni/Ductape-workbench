@@ -493,9 +493,9 @@ export default function ProductTabContent({
   // Show skeleton loading state
   if ((isFetchingProduct && !product) || (product && !product.name)) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex flex-col md:flex-row bg-grey-100">
+      <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-grey-100 md:flex-row">
         {/* Sidebar skeleton - responsive */}
-        <div className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-grey-400 flex flex-col flex-shrink-0">
+        <div className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden md:self-stretch">
           <div className="p-3 sm:p-4 border-b border-grey-400">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
               <div className="w-8 h-8 sm:w-9 sm:h-9 bg-grey-200 rounded-lg animate-pulse" />
@@ -2428,11 +2428,11 @@ export default function ProductTabContent({
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100 relative">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100">
       {/* Sidebar - Responsive widths */}
       <div
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300 absolute z-25',
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0 z-25',
           isSidebarCollapsed
             ? 'w-12 sm:w-14' // Smaller on mobile, standard on tablet/desktop
             : 'w-56 sm:w-64', // Slightly narrower on mobile
@@ -2781,7 +2781,7 @@ export default function ProductTabContent({
       {/* Main Content */}
       <div 
     className={cn(
-      "flex-1 flex flex-col overflow-hidden bg-grey-50 transition-all duration-300",
+      "flex-1 flex flex-col min-h-0 overflow-hidden bg-grey-50 transition-all duration-300",
        isSidebarCollapsed ? "ml-12 sm:ml-14" : "ml-0 sm:ml-64"
     )}
   >

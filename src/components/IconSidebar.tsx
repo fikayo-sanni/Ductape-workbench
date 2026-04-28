@@ -47,7 +47,6 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
       id: 'partnership',
       icon: Handshake,
       label: 'Partnerships',
-      disabled: true,
     },
   ];
 
@@ -101,13 +100,6 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
             aria-label={item.label}
           >
             <Icon className="h-5 w-5" />
-
-            {/* Badge for Partnerships */}
-            {item.id === 'partnership' && (
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
-                0
-              </div>
-            )}
 
             {/* Tooltip on hover */}
             <div className="absolute left-full ml-2 px-3 py-1.5 bg-grey text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">

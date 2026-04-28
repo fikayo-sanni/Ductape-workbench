@@ -301,9 +301,9 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
   };
 
   return (
-    <div className="flex h-full bg-grey-100">
+    <div className="flex flex-1 min-h-0 w-full overflow-hidden h-full bg-grey-100">
       {/* Sidebar */}
-      <div className="w-72 border-r border-grey-400 bg-white flex flex-col">
+      <div className="w-72 border-r border-grey-400 bg-white flex flex-col flex-shrink-0 min-h-0 overflow-hidden">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-grey-400">
           <div className="flex items-center gap-2 mb-3">
@@ -486,7 +486,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Header */}
         <div className="h-14 border-b border-grey-400 bg-white flex items-center justify-between px-4">
           <div className="flex items-center gap-3">

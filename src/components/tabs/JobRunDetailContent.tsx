@@ -118,7 +118,7 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
   const outputData = execution.output ?? execution.result_metadata ?? undefined;
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col bg-background-tertiary">
+    <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden bg-background-tertiary">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-border bg-white px-6 py-5">
         <div className="flex items-center gap-4">
@@ -156,7 +156,7 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
         {/* Job type & operation */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-lg border border-border bg-white p-4">

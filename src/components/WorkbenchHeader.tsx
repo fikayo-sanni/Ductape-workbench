@@ -1,9 +1,11 @@
-import {useState, useCallback, useEffect} from 'react';
+import {useState, useCallback, useEffect, useMemo} from 'react';
 import {useAuth} from '@/store/useAuth';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {useFetchWorkspaces} from '@/hooks/useWorkspaceQueries';
-import workspaceServices from '@/services/workspaceServices';
+import workspaceServices, {
+  filterAcceptedWorkspaceRows,
+} from '@/services/workspaceServices';
 import productServices from '@/services/productServices';
 import toast from 'react-hot-toast';
 import {Button} from './ui/button';
@@ -61,8 +63,13 @@ export default function WorkbenchHeader() {
     public_key: user?.public_key ?? '',
   });
 
-  // Get the default workspace
-  const defaultWorkspace = workspacesData?.data?.find(
+  const acceptedWorkspaces = useMemo(
+    () => filterAcceptedWorkspaceRows(workspacesData?.data),
+    [workspacesData?.data],
+  );
+
+  // Get the default workspace (only memberships the user has accepted)
+  const defaultWorkspace = acceptedWorkspaces.find(
     workspace => workspace.default === true,
   );
 
@@ -71,7 +78,7 @@ export default function WorkbenchHeader() {
   >(undefined);
 
   const selectedWorkspaceName =
-    workspacesData?.data?.find(
+    acceptedWorkspaces.find(
       workspace => workspace.workspace_id === selectedWorkspace,
     )?.workspace_name || 'Select workspace';
 
@@ -122,19 +129,44 @@ export default function WorkbenchHeader() {
   );
 
   useEffect(() => {
+    const raw = workspacesData?.data;
+    if (!raw?.length || workspacesStatus === 'pending') {
+      return;
+    }
+    const acceptedIds = new Set(acceptedWorkspaces.map(w => w.workspace_id));
+    if (currentWorkspaceId && !acceptedIds.has(currentWorkspaceId)) {
+      const fallback =
+        acceptedWorkspaces.find(w => w.default) ?? acceptedWorkspaces[0];
+      if (fallback) {
+        setSelectedWorkspace(fallback.workspace_id);
+        setCurrentWorkspaceId(fallback.workspace_id);
+      } else {
+        setSelectedWorkspace(undefined);
+        setCurrentWorkspaceId(null);
+      }
+    }
+  }, [
+    workspacesData?.data,
+    workspacesStatus,
+    acceptedWorkspaces,
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
+  ]);
+
+  useEffect(() => {
     if (defaultWorkspace) {
       setSelectedWorkspace(defaultWorkspace.workspace_id);
       // Also update the auth store
       setCurrentWorkspaceId(defaultWorkspace.workspace_id);
-    } else if (workspacesData?.data?.length === 1) {
-      const singleWorkspace = workspacesData.data[0];
+    } else if (acceptedWorkspaces.length === 1) {
+      const singleWorkspace = acceptedWorkspaces[0];
       if (selectedWorkspace !== singleWorkspace.workspace_id) {
         handleChangeWorkspace(singleWorkspace.workspace_id);
       }
     }
   }, [
     defaultWorkspace,
-    workspacesData?.data,
+    acceptedWorkspaces,
     handleChangeWorkspace,
     selectedWorkspace,
     setCurrentWorkspaceId,
@@ -388,7 +420,7 @@ export default function WorkbenchHeader() {
         <Skeleton className="w-full h-10 bg-slate-200" />
       ) : (
         <div className="space-y-1">
-          {workspacesData?.data?.map(workspace => (
+          {acceptedWorkspaces.map(workspace => (
             <button
               key={workspace.workspace_id}
               onClick={() => handleChangeWorkspace(workspace.workspace_id)}
@@ -676,7 +708,7 @@ export default function WorkbenchHeader() {
                 <SelectValue>{selectedWorkspaceName}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {workspacesData?.data?.map(workspace => (
+                {acceptedWorkspaces.map(workspace => (
                   <SelectItem
                     key={workspace.workspace_id}
                     value={workspace.workspace_id}

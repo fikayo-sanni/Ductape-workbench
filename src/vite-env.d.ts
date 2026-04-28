@@ -2,7 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
-  // add more env variables as needed
+  /** When `"true"`, partnership UI uses local dummy data instead of `/partnerships/v1` on the API. */
+  readonly VITE_PARTNERSHIPS_USE_DUMMY?: string
 }
 
 interface ImportMeta {

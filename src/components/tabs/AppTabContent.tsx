@@ -565,9 +565,9 @@ export default function AppTabContent({
   // Show skeleton loading state while fetching or when data is incomplete
   if ((isLoading && !currentApp) || (currentApp && !currentApp.app_name)) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+      <div className="relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100">
         {/* Sidebar Skeleton */}
-        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0">
+        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden">
           <div className="p-4 border-b border-grey-400">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 bg-grey-300 rounded-lg animate-pulse" />
@@ -1928,8 +1928,7 @@ export default function AppTabContent({
   return (
     <div
       className={cn(
-        'flex bg-grey-100 relative',
-        isMarketplace ? 'h-full' : 'h-[calc(100vh-8rem)]',
+        'relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100',
       )}
     >
       {/* Sidebar */}
@@ -1937,7 +1936,7 @@ export default function AppTabContent({
         ref={sidebarRef}
         style={{width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px`}}
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-300 absolute z-49',
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0 z-49',
           isResizing && 'transition-none',
         )}
       >
@@ -2239,8 +2238,8 @@ export default function AppTabContent({
                 />
               </div>
 
-              {/* Actions List */}
-              <div className="max-h-[calc(100vh-26rem)] overflow-y-auto">
+              {/* Actions List — scroll via parent navigation panel */}
+              <div className="min-h-0">
                 {renderActionsListContent()}
               </div>
             </div>
@@ -2284,7 +2283,7 @@ export default function AppTabContent({
                 : 'overview'
         }
         className={cn(
-          'flex-1 flex flex-col overflow-hidden bg-grey-50 transition-all duration-300',
+          'flex-1 flex flex-col min-h-0 overflow-hidden bg-grey-50 transition-all duration-300',
           isSidebarCollapsed ? 'ml-12 sm:ml-14' : 'ml-0 sm:ml-64',
         )}
       >

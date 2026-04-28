@@ -35,6 +35,14 @@ interface WorkspacesResponse {
   meta?: any;
 }
 
+/** Membership rows where the user has accepted (owner/joined). Pending invites (`accepted: false`) are excluded. Rows without `accepted` are treated as accepted for backwards compatibility. */
+export function filterAcceptedWorkspaceRows<T extends {accepted?: boolean}>(
+  workspaces: T[] | undefined | null,
+): T[] {
+  if (!workspaces?.length) return [];
+  return workspaces.filter(w => w.accepted !== false);
+}
+
 interface CreateWorkspaceResponse {
   data: Workspace;
   message: string;

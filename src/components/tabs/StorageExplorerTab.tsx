@@ -1362,10 +1362,10 @@ console.log('Files by type:', stats.byType);`,
   });
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex bg-grey-100">
+    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-grey-100">
       {/* Sidebar */}
       <div className={cn(
-        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 transition-all duration-200',
+        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-200',
         isSidebarCollapsed ? 'w-14' : 'w-64'
       )}>
         {/* Header - Fixed */}
@@ -1569,7 +1569,7 @@ console.log('Files by type:', stats.byType);`,
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border bg-white">
           <div className="px-6 py-5">

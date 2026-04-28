@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -19,21 +20,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, X } from 'lucide-react';
-import { IProductBrief, IOnboardingStep } from '@/types/partnership';
-import { dummyProducts } from '@/data/partnerships.dummy';
+import { IProductBrief, IOnboardingStep, BriefStatus } from '@/types/partnership';
+import { useWorkspaceProductBriefAppOptions } from '@/hooks/useWorkspaceProductBriefAppOptions';
+import { useAuth } from '@/store/useAuth';
+import partnershipServices, { getPartnershipsApiError } from '@/services/partnershipServices';
 import toast from 'react-hot-toast';
 
 interface CreateEditBriefDialogProps {
   brief: IProductBrief | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
 export default function CreateEditBriefDialog({
   brief,
   open,
   onOpenChange,
+  onSaved,
 }: CreateEditBriefDialogProps) {
+  const queryClient = useQueryClient();
+  const { user, currentWorkspaceId } = useAuth();
+  const { options: appOptions, isLoading: appsLoading, isEmpty: noApps } =
+    useWorkspaceProductBriefAppOptions();
+
   const [formData, setFormData] = useState({
     product_id: '',
     title: '',
@@ -111,23 +121,67 @@ export default function CreateEditBriefDialog({
       }
     }
 
+    if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Select a workspace and sign in to save.');
+      return;
+    }
+
     setIsSaving(true);
+    try {
+      const base = {
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        title: formData.title,
+        description: formData.description,
+        product_details: formData.product_details,
+        usage_instructions: formData.usage_instructions,
+        onboarding_steps: onboardingSteps,
+      };
 
-    // TODO: Send brief data to API
-    // const briefData = {
-    //   ...formData,
-    //   onboarding_steps: onboardingSteps,
-    // };
+      if (brief?._id) {
+        await partnershipServices.updateProductBrief({
+          brief_id: brief._id,
+          ...base,
+          product_id: formData.product_id,
+        });
+        if (!asDraft) {
+          await partnershipServices.publishProductBrief({
+            brief_id: brief._id,
+            workspace_id: currentWorkspaceId,
+            user_id: user._id,
+            public_key: user.public_key,
+          });
+        }
+      } else {
+        const { data: created } = await partnershipServices.createProductBrief({
+          ...base,
+          product_id: formData.product_id,
+          status: asDraft ? BriefStatus.DRAFT : BriefStatus.PUBLISHED,
+        });
+        if (!asDraft && created.status !== BriefStatus.PUBLISHED) {
+          await partnershipServices.publishProductBrief({
+            brief_id: created._id,
+            workspace_id: currentWorkspaceId,
+            user_id: user._id,
+            public_key: user.public_key,
+          });
+        }
+      }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      await queryClient.invalidateQueries({ queryKey: ['workspace-briefs'] });
+      await queryClient.invalidateQueries({ queryKey: ['published-briefs'] });
 
-    const action = brief ? 'updated' : 'created';
-    const status = asDraft ? 'draft' : 'published';
-
-    toast.success(`Brief ${action} successfully as ${status}!`);
-    setIsSaving(false);
-    onOpenChange(false);
+      const action = brief ? 'updated' : 'created';
+      const status = asDraft ? 'draft' : 'published';
+      toast.success(`Brief ${action} successfully as ${status}!`);
+      onSaved?.();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -145,22 +199,36 @@ export default function CreateEditBriefDialog({
         <div className="space-y-4 py-4">
           {/* Product Selection */}
           <div className="space-y-2">
-            <Label htmlFor="product">Product/App *</Label>
+            <Label htmlFor="product">Public app (linked to public products) *</Label>
             <Select
               value={formData.product_id}
               onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+              disabled={appsLoading || noApps}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product" />
+                <SelectValue
+                  placeholder={
+                    appsLoading
+                      ? 'Loading apps…'
+                      : noApps
+                        ? 'No apps in this workspace'
+                        : 'Select an app'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {dummyProducts.map((product) => (
-                  <SelectItem key={product._id} value={product._id}>
-                    {product.app_name}
+                {appOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {noApps && !appsLoading && (
+              <p className="text-xs text-grey-600">
+                Publish an app (and product) first — briefs only list public apps.
+              </p>
+            )}
           </div>
 
           {/* Title */}

@@ -7,6 +7,7 @@ import { useAuth } from '@/store/useAuth';
 import partnershipServices from '@/services/partnershipServices';
 import { IProductBrief } from '@/types/partnership';
 import ProductBriefDetailDialog from './ProductBriefDetailDialog';
+import { markdownToPlainText } from '@/lib/markdownPlainText';
 
 interface SearchPartnersViewProps {
   searchQuery: string;
@@ -14,21 +15,23 @@ interface SearchPartnersViewProps {
 }
 
 export default function SearchPartnersView({ searchQuery, setSearchQuery }: SearchPartnersViewProps) {
-  const { user } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
   const [selectedBrief, setSelectedBrief] = useState<IProductBrief | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
   // Fetch published briefs with search
   const { data: briefsResponse } = useQuery({
-    queryKey: ['published-briefs', searchQuery],
-    queryFn: () => partnershipServices.fetchPublishedBriefs({
-      user_id: user?._id || '',
-      public_key: user?.public_key || '',
-      search: searchQuery,
-      page: 1,
-      limit: 20,
-    }),
-    enabled: !!user,
+    queryKey: ['published-briefs', currentWorkspaceId, searchQuery],
+    queryFn: () =>
+      partnershipServices.fetchPublishedBriefs({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        search: searchQuery,
+        page: 1,
+        limit: 20,
+      }),
+    enabled: !!user && !!currentWorkspaceId,
   });
 
   const briefs = briefsResponse?.data?.briefs || [];
@@ -95,9 +98,11 @@ export default function SearchPartnersView({ searchQuery, setSearchQuery }: Sear
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-grey mb-1">{brief.title}</h3>
+                    <h3 className="font-medium text-grey mb-1">
+                      {markdownToPlainText(brief.title) || brief.title}
+                    </h3>
                     <p className="text-sm text-grey-600 mb-2 line-clamp-2">
-                      {brief.description}
+                      {markdownToPlainText(brief.description) || brief.description}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-grey-600">
                       <span>{brief.workspace?.name}</span>

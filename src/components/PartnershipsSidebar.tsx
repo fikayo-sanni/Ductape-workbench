@@ -6,6 +6,8 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Search, TrendingUp, MessageSquare, Plus, FileText, Eye, Edit, Trash2, UserPlus, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { markdownToPlainText } from '@/lib/markdownPlainText';
+import { getPartnershipFunnelStepCount } from '@/lib/partnershipFunnel';
 import partnershipServices from '@/services/partnershipServices';
 import { IPartnership, IProductBrief, PartnershipStatus, BriefStatus } from '@/types/partnership';
 import { Badge } from './ui/badge';
@@ -114,17 +116,18 @@ export default function PartnershipsSidebar() {
     openTab({
       id: `brief-${brief._id}`,
       type: 'brief',
-      title: brief.title,
+      title: markdownToPlainText(brief.title) || 'Product Brief',
       itemId: brief._id,
       data: brief,
     });
   };
 
   const handleEditBrief = (brief: IProductBrief) => {
+    const plainTitle = markdownToPlainText(brief.title) || 'Brief';
     openTab({
       id: `brief-edit-${brief._id}`,
       type: 'brief',
-      title: `Edit: ${brief.title}`,
+      title: `Edit: ${plainTitle}`,
       itemId: brief._id,
       data: { ...brief, isEdit: true },
       isDirty: true,
@@ -132,7 +135,7 @@ export default function PartnershipsSidebar() {
   };
 
   const handleDeleteBrief = (brief: IProductBrief) => {
-    toast.success(`Brief "${brief.title}" deleted successfully`);
+    toast.success(`Brief "${markdownToPlainText(brief.title) || brief.title}" deleted successfully`);
   };
 
   // Filter partnerships based on view mode and search
@@ -157,12 +160,17 @@ export default function PartnershipsSidebar() {
     );
   });
 
-  // Filter briefs based on search
+  // Filter briefs based on search (match raw or plain-text-stripped markdown)
   const filteredBriefs = briefs.filter(brief => {
     if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const titlePlain = markdownToPlainText(brief.title).toLowerCase();
+    const descPlain = markdownToPlainText(brief.description).toLowerCase();
     return (
-      brief.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      brief.description.toLowerCase().includes(searchQuery.toLowerCase())
+      brief.title.toLowerCase().includes(q) ||
+      brief.description.toLowerCase().includes(q) ||
+      titlePlain.includes(q) ||
+      descPlain.includes(q)
     );
   });
 
@@ -287,6 +295,8 @@ export default function PartnershipsSidebar() {
 
                 const unreadCount = getUnreadCount(partnership);
 
+                const funnelStepTotal = getPartnershipFunnelStepCount(partnership);
+
                 return (
                   <div
                     key={partnership._id}
@@ -356,11 +366,11 @@ export default function PartnershipsSidebar() {
                             <MessageSquare className="h-3 w-3" />
                             <span>{partnership.messages?.length || 0}</span>
                           </div>
-                          {partnership.status === PartnershipStatus.PROSPECTIVE && partnership.salesFunnel && (
+                          {partnership.status === PartnershipStatus.PROSPECTIVE && funnelStepTotal > 0 && (
                             <div className="flex items-center gap-1">
                               <TrendingUp className="h-3 w-3" />
                               <span>
-                                {partnership.current_funnel_step + 1}/{partnership.salesFunnel.steps.length}
+                                {(partnership.current_funnel_step ?? 0) + 1}/{funnelStepTotal}
                               </span>
                             </div>
                           )}
@@ -399,7 +409,7 @@ export default function PartnershipsSidebar() {
                       <div className="flex items-center gap-2 mb-1">
                         <FileText className="h-4 w-4 text-primary flex-shrink-0" />
                         <h3 className="text-sm font-medium text-grey truncate flex-1">
-                          {brief.title}
+                          {markdownToPlainText(brief.title) || brief.title}
                         </h3>
                         <Badge
                           variant="secondary"
@@ -409,7 +419,7 @@ export default function PartnershipsSidebar() {
                         </Badge>
                       </div>
                       <p className="text-xs text-grey-600 line-clamp-2 ml-6">
-                        {brief.description}
+                        {markdownToPlainText(brief.description) || brief.description}
                       </p>
                     </div>
 

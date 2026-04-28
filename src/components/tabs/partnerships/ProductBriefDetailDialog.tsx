@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -20,8 +21,28 @@ import {
   Handshake,
   CheckCircle2,
 } from 'lucide-react';
-import { IProductBrief } from '@/types/partnership';
+import { IProductBrief, SenderType } from '@/types/partnership';
 import toast from 'react-hot-toast';
+import { MarkdownViewer } from '@/components/ui/markdown-editor';
+import { markdownToPlainText } from '@/lib/markdownPlainText';
+import { useAuth } from '@/store/useAuth';
+import partnershipServices, { getPartnershipsApiError } from '@/services/partnershipServices';
+
+/** Normalize Mongo / API id values to a 24-char hex string when possible. */
+function idToHexString(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') {
+    const t = value.trim();
+    if (!t || t === 'undefined' || t === 'null') return '';
+    return t;
+  }
+  if (typeof value === 'object' && value !== null && '$oid' in (value as Record<string, unknown>)) {
+    return String((value as { $oid: string }).$oid);
+  }
+  const s = String(value);
+  if (s === 'undefined' || s === '[object Object]') return '';
+  return s;
+}
 
 interface ProductBriefDetailDialogProps {
   brief: IProductBrief;
@@ -34,9 +55,24 @@ export default function ProductBriefDetailDialog({
   open,
   onOpenChange,
 }: ProductBriefDetailDialogProps) {
+  const queryClient = useQueryClient();
+  const { user, currentWorkspaceId } = useAuth();
   const [step, setStep] = useState<'details' | 'initiate'>('details');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Published-briefs API historically omitted workspace_id; nested workspace._id is always present after lookup.
+  const providerWorkspaceId =
+    idToHexString(brief.workspace_id) || idToHexString(brief.workspace?._id);
+  const briefId = idToHexString(brief._id);
+
+  useEffect(() => {
+    if (!open) {
+      setStep('details');
+      setMessage('');
+      setIsSubmitting(false);
+    }
+  }, [open]);
 
   const handlePartnerUp = () => {
     // Pre-populate message
@@ -52,16 +88,51 @@ export default function ProductBriefDetailDialog({
       return;
     }
 
+    if (!currentWorkspaceId || !user?._id || !user?.public_key) {
+      toast.error('Select a workspace and sign in to send a request.');
+      return;
+    }
+
+    if (!providerWorkspaceId || !briefId) {
+      toast.error('This brief is missing workspace or id; cannot start a partnership.');
+      return;
+    }
+
+    if (providerWorkspaceId === currentWorkspaceId) {
+      toast.error('You cannot send a partnership request to your own workspace.');
+      return;
+    }
+
     setIsSubmitting(true);
+    try {
+      await partnershipServices.createPartnership({
+        workspace_id: currentWorkspaceId,
+        user_id: user._id,
+        public_key: user.public_key,
+        payload: {
+          service_provider_id: providerWorkspaceId,
+          client_id: currentWorkspaceId,
+          product_brief_id: briefId,
+          messages: [
+            {
+              sender_type: SenderType.CLIENT,
+              content: message.trim(),
+            },
+          ],
+        },
+      });
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+      await queryClient.invalidateQueries({ queryKey: ['workspace-partnerships', currentWorkspaceId] });
 
-    toast.success('Partnership request sent successfully!');
-    setIsSubmitting(false);
-    setMessage('');
-    setStep('details');
-    onOpenChange(false);
+      toast.success('Partnership request sent successfully!');
+      setMessage('');
+      setStep('details');
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(getPartnershipsApiError(e));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBack = () => {
@@ -75,6 +146,12 @@ export default function ProductBriefDetailDialog({
         {step === 'details' ? (
           <>
             <DialogHeader>
+              <DialogTitle className="sr-only">
+                {markdownToPlainText(brief.title) || 'Product brief'}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                {markdownToPlainText(brief.description) || 'Product brief details'}
+              </DialogDescription>
               <div className="flex items-start gap-4">
                 <Avatar className="h-16 w-16 rounded-lg">
                   <AvatarImage src={brief.product?.logo} alt={brief.product?.app_name} />
@@ -82,11 +159,15 @@ export default function ProductBriefDetailDialog({
                     {brief.product?.app_name?.substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <DialogTitle className="text-2xl text-grey mb-2">{brief.title}</DialogTitle>
-                  <DialogDescription className="text-base">
-                    {brief.description}
-                  </DialogDescription>
+                <div className="flex-1 min-w-0 text-left">
+                  <MarkdownViewer
+                    content={brief.title}
+                    className="!my-0 text-grey [&_h1]:!text-2xl [&_h1]:!font-bold [&_h1]:!my-1 [&_h2]:!text-xl [&_h2]:!font-semibold [&_p]:!text-2xl [&_p]:!font-bold [&_p]:!my-0"
+                  />
+                  <MarkdownViewer
+                    content={brief.description}
+                    className="text-base text-grey-600 mt-2 !my-0 [&_p]:!text-base [&_li]:!text-base"
+                  />
                 </div>
               </div>
             </DialogHeader>
@@ -133,14 +214,14 @@ export default function ProductBriefDetailDialog({
               {/* Product Details */}
               <div>
                 <h3 className="font-semibold text-grey mb-3">What the Product Does</h3>
-                <p className="text-grey-600 whitespace-pre-wrap">{brief.product_details}</p>
+                <MarkdownViewer content={brief.product_details} className="text-grey-600" />
               </div>
 
               {/* Usage Instructions */}
               {brief.usage_instructions && (
                 <div>
                   <h3 className="font-semibold text-grey mb-3">How to Use the Product</h3>
-                  <p className="text-grey-600 whitespace-pre-wrap">{brief.usage_instructions}</p>
+                  <MarkdownViewer content={brief.usage_instructions} className="text-grey-600" />
                 </div>
               )}
 
@@ -154,9 +235,7 @@ export default function ProductBriefDetailDialog({
                         <h4 className="font-semibold text-grey mb-2">
                           Step {index + 1}: {step.name}
                         </h4>
-                        <p className="text-sm text-grey-600 whitespace-pre-wrap">
-                          {step.description}
-                        </p>
+                        <MarkdownViewer content={step.description} className="text-sm text-grey-600" />
                       </div>
                     ))}
                   </div>
@@ -175,7 +254,16 @@ export default function ProductBriefDetailDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button onClick={handlePartnerUp} className="gap-2">
+              <Button
+                onClick={handlePartnerUp}
+                className="gap-2"
+                disabled={
+                  !currentWorkspaceId ||
+                  !user?._id ||
+                  !user?.public_key ||
+                  (providerWorkspaceId !== '' && providerWorkspaceId === currentWorkspaceId)
+                }
+              >
                 <Handshake className="h-4 w-4" />
                 Partner Up
               </Button>

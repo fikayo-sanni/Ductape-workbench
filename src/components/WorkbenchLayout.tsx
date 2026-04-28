@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 // import { useIntro } from '@/hooks/useIntro.js'; // Disabled to avoid conflicts with OnboardingModal
 import { useFetchWorkspaces } from '@/hooks/useWorkspaceQueries';
+import { filterAcceptedWorkspaceRows } from '@/services/workspaceServices';
 import IconSidebar from './IconSidebar';
 import WorkbenchHeader from './WorkbenchHeader';
 import ProductsSidebar from './ProductsSidebar';
@@ -43,6 +44,11 @@ function WorkbenchContent() {
     public_key: user?.public_key ?? '',
   });
 
+  const acceptedWorkspaceCount = useMemo(
+    () => filterAcceptedWorkspaceRows(workspacesData?.data).length,
+    [workspacesData?.data],
+  );
+
   // Note: Using OnboardingModal instead of intro.js to avoid conflicts
 
   // Check authentication on mount
@@ -69,7 +75,7 @@ function WorkbenchContent() {
       return;
     }
 
-    const hasNoWorkspace = !currentWorkspaceId && workspacesData?.data?.length === 0;
+    const hasNoWorkspace = !currentWorkspaceId && acceptedWorkspaceCount === 0;
 
     if (user && hasNoWorkspace && !hasTriggeredOnboarding && !showLoginModal && !showCreateAccountModal) {
       // Small delay to ensure DOM is ready
@@ -78,7 +84,7 @@ function WorkbenchContent() {
         setHasTriggeredOnboarding(true);
       }, 500);
     }
-  }, [user, currentWorkspaceId, workspacesData, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding, isLoading, isFetched]);
+  }, [user, currentWorkspaceId, acceptedWorkspaceCount, hasTriggeredOnboarding, showLoginModal, showCreateAccountModal, startOnboarding, isLoading, isFetched]);
 
 
   return (
@@ -217,10 +223,15 @@ function WorkbenchContent() {
             {/* Tab Bar - Hidden when dashboard is active */}
             {activeView !== 'dashboard' && <div data-intro="tabs" className="flex-shrink-0"><TabBar /></div>}
 
-            {/* Content - Show Dashboard or Tab Content */}
-            <div data-intro="content" className="flex-1 min-h-0 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            {/* Content - Show Dashboard or Tab Content (flex column so TabContent / inner sidebars can fill height) */}
+            <div
+              data-intro="content"
+              className="flex-1 min-h-0 flex flex-col overflow-hidden"
+            >
               {activeView === 'dashboard' ? (
-                <Dashboard />
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <Dashboard />
+                </div>
               ) : (
                 <TabContent />
               )}
