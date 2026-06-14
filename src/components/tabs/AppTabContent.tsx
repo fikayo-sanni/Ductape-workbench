@@ -393,44 +393,42 @@ export default function AppTabContent({
     const tab = tabs.find(t => t.id === tabId);
     if (!tab || tab.type !== 'app') return;
 
-    const existing = (tab.data || app || {}) as Record<string, unknown>;
-    const fetched = appDetails.data as Record<string, unknown>;
+    const existingRecord = (tab.data || app || {}) as unknown as Record<string, unknown>;
+    const fetchedRecord = appDetails.data as unknown as Record<string, unknown>;
 
     const resolvedAccess = resolveProductAppAccessTag(
-      String(fetched.tag || existing.tag || ''),
-      (existing as { productApps?: unknown[] }).productApps as
-        | Array<{ access_tag?: string; app_tag?: string }>
-        | undefined,
-      (existing.accessTag as string | undefined) ||
-        (existing.access_tag as string | undefined)
+      String(fetchedRecord.tag || existingRecord.tag || ''),
+      (existingRecord.productApps as Array<{ access_tag?: string; app_tag?: string }> | undefined),
+      (existingRecord.accessTag as string | undefined) ||
+        (existingRecord.access_tag as string | undefined)
     );
 
-    const merged = {
-      ...fetched,
-      ...(existing.productTag ? {productTag: existing.productTag} : {}),
-      ...(existing.productName ? {productName: existing.productName} : {}),
-      ...(existing.productId ? {productId: existing.productId} : {}),
-      ...(existing.productEnvs ? {productEnvs: existing.productEnvs} : {}),
-      ...(existing.appViewMode ? {appViewMode: existing.appViewMode} : {}),
-      ...(existing.isMarketplaceApp ? {isMarketplaceApp: existing.isMarketplaceApp} : {}),
+    const merged: Record<string, unknown> = {
+      ...fetchedRecord,
+      ...(existingRecord.productTag ? { productTag: existingRecord.productTag } : {}),
+      ...(existingRecord.productName ? { productName: existingRecord.productName } : {}),
+      ...(existingRecord.productId ? { productId: existingRecord.productId } : {}),
+      ...(existingRecord.productEnvs ? { productEnvs: existingRecord.productEnvs } : {}),
+      ...(existingRecord.appViewMode ? { appViewMode: existingRecord.appViewMode } : {}),
+      ...(existingRecord.isMarketplaceApp ? { isMarketplaceApp: existingRecord.isMarketplaceApp } : {}),
       ...(resolvedAccess
         ? { accessTag: resolvedAccess, access_tag: resolvedAccess }
-        : existing.accessTag || existing.access_tag
+        : existingRecord.accessTag || existingRecord.access_tag
           ? {
-              accessTag: existing.accessTag || existing.access_tag,
-              access_tag: existing.accessTag || existing.access_tag,
+              accessTag: existingRecord.accessTag || existingRecord.access_tag,
+              access_tag: existingRecord.accessTag || existingRecord.access_tag,
             }
           : {}),
     };
 
     // Avoid re-writing tab data when nothing changed (prevents render loops)
     if (
-      existing._id === merged._id &&
-      existing.updated_at === merged.updated_at &&
-      existing.productTag === merged.productTag &&
-      existing.appViewMode === merged.appViewMode &&
-      existing.isMarketplaceApp === merged.isMarketplaceApp &&
-      existing.accessTag === merged.accessTag
+      existingRecord._id === merged._id &&
+      existingRecord.updated_at === merged.updated_at &&
+      existingRecord.productTag === merged.productTag &&
+      existingRecord.appViewMode === merged.appViewMode &&
+      existingRecord.isMarketplaceApp === merged.isMarketplaceApp &&
+      existingRecord.accessTag === merged.accessTag
     ) {
       return;
     }

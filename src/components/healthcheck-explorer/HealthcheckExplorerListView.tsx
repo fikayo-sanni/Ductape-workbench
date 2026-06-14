@@ -5,8 +5,8 @@ import {
   getSortedRowModel,
   getPaginationRowModel,
   flexRender,
-  ColumnDef,
   createColumnHelper,
+  type ColumnDef,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -59,31 +59,33 @@ export function HealthcheckExplorerListView({
   onCode,
   onDelete,
 }: HealthcheckExplorerListViewProps) {
-  const columns = useMemo<ColumnDef<IHealthCheck, unknown>[]>(
-    () => [
-      columnHelper.accessor('name', {
-        header: 'Healthcheck',
-        cell: ({ row }) => {
-          const envStatus = getEnvStatusForSlug(row.original, selectedEnv);
-          const healthy = envStatus?.status === 'healthy';
-          return (
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center',
-                  healthy ? 'bg-green/10' : 'bg-red/10'
-                )}
-              >
-                <Heart className={cn('h-4 w-4', healthy ? 'text-green' : 'text-red')} />
+  const columns = useMemo(
+    () =>
+      [
+        columnHelper.display({
+          id: 'name',
+          header: 'Healthcheck',
+          cell: ({ row }) => {
+            const envStatus = getEnvStatusForSlug(row.original, selectedEnv);
+            const healthy = envStatus?.status === 'healthy';
+            return (
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-lg flex items-center justify-center',
+                    healthy ? 'bg-green/10' : 'bg-red/10'
+                  )}
+                >
+                  <Heart className={cn('h-4 w-4', healthy ? 'text-green' : 'text-red')} />
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-grey">{row.original.name}</span>
+                  <p className="text-xs text-grey-500 font-mono">{row.original.tag}</p>
+                </div>
               </div>
-              <div>
-                <span className="text-sm font-medium text-grey">{row.original.name}</span>
-                <p className="text-xs text-grey-500 font-mono">{row.original.tag}</p>
-              </div>
-            </div>
-          );
-        },
-      }),
+            );
+          },
+        }),
       columnHelper.display({
         id: 'status',
         header: 'Status',
@@ -169,7 +171,7 @@ export function HealthcheckExplorerListView({
           </DropdownMenu>
         ),
       }),
-    ],
+      ] as ColumnDef<IHealthCheck>[],
     [selectedEnv, onView, onCode, onDelete]
   );
 

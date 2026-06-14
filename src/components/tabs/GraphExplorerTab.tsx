@@ -40,20 +40,14 @@ import {
   Eye,
   List,
 } from 'lucide-react';
-// Import SDK types for graph operations
+// Graph explorer types (local — avoids @ductape/sdk export drift on CI/Vercel)
 import type {
   IGraphAction,
-  IGraphActionParameter,
-  GraphActionParameterType,
   IGraphLabel,
-} from '@ductape/sdk';
-import type {
-  IGraphLabelProperty,
-  GraphPropertyType,
   IGraphRelationshipType,
   IGraphIndex,
   IGraphConstraint,
-} from '@ductape/sdk/dist/graph/types/schema.interface';
+} from '@/types/graphSdk';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -169,7 +163,7 @@ const GRAPH_OPERATIONS: Record<GraphOperation, {
   executeRaw: { label: 'Raw Query', description: 'Execute a raw Cypher/Gremlin/AQL query', color: 'bg-grey/10 text-grey', category: 'raw' },
 };
 
-// IGraphAction is now imported from SDK
+// Graph types from @/types/graphSdk (local, not @ductape/sdk)
 
 // Helper function to generate tag from name
 const generateActionTag = (name: string): string => {
