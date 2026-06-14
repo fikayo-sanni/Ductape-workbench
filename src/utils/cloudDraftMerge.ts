@@ -35,11 +35,12 @@ export function extractCloudDraftEnv(
   const root = result as Record<string, unknown> | undefined;
   if (!root) return undefined;
 
-  const componentDraft =
+  const componentDraft = (
     (root.componentDraft as Record<string, unknown> | undefined) ??
     (root.data as Record<string, unknown> | undefined)?.componentDraft ??
     ((root.data as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)
-      ?.componentDraft;
+      ?.componentDraft
+  ) as Record<string, unknown> | undefined;
 
   const draft =
     (componentDraft?.draft as Record<string, unknown> | undefined) ??
@@ -255,9 +256,9 @@ export function mergeGraphEnvFromDraft(
 
 export function mergeBrokerEnvFromDraft(
   env: Record<string, unknown>,
-  draftEnv: { config?: Record<string, unknown> },
+  draftEnv: Record<string, unknown>,
 ): Record<string, unknown> {
-  const cfg = draftEnv.config || (draftEnv as Record<string, unknown>);
+  const cfg = (draftEnv.config as Record<string, unknown> | undefined) || draftEnv;
   const cloud = String(cfg.cloud || draftEnv.cloud || env.cloud || '');
   if (cloud) {
     return {

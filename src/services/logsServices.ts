@@ -857,7 +857,7 @@ export const fetchAppDashboard = async (
   public_key: string,
   query: AppDashboardQuery
 ): Promise<AppDashboardMetrics> => {
-  const { app_id, app_tag, version, app_env, groupBy = 'day', start_date, end_date } = query;
+  const { app_id, app_tag, product_tag, version, app_env, groupBy = 'day', start_date, end_date } = query;
 
   // Calculate date range (default 7 days)
   const today = new Date();

@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { FlowNodeKind, FlowStepNodeData } from '@/components/flow-diagram/flowModels';
-import type { WorkflowStepDraft } from './types';
+import type { MappingSource, WorkflowStepDraft } from './types';
 
 const NON_STEP_KINDS = new Set<FlowNodeKind>(['start', 'end', 'condition', 'router']);
 
@@ -103,7 +103,7 @@ export function buildParentMappingSources(
   parentSteps: WorkflowStepDraft[],
   workflowInputs: Record<string, unknown> = {},
 ) {
-  const sources = [];
+  const sources: MappingSource[] = [];
 
   if (parentInfo.isLayer1) {
     const inputKeys = Object.keys(workflowInputs);

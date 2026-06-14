@@ -117,8 +117,16 @@ export function buildReviewFeedbackResources(version?: {
   return resources;
 }
 
-function getLatestVersion(app: { versions?: Array<{ latest?: boolean } & Record<string, unknown>> }) {
-  if (!app.versions?.length) return undefined;
+function getLatestVersion(app?: {
+  versions?: Array<{
+    latest?: boolean;
+    actions?: Array<{ _id?: string; tag?: string; name?: string }>;
+    envs?: Array<{ slug?: string; env_name?: string }>;
+    auths?: Array<{ tag?: string; name?: string }>;
+    webhooks?: Array<{ tag?: string; name?: string }>;
+  }>;
+}) {
+  if (!app?.versions?.length) return undefined;
   return app.versions.find((version) => version.latest) ?? app.versions[0];
 }
 

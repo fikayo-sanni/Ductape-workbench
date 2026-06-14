@@ -147,7 +147,7 @@ export default function WorkflowBuilderTab({
       envs: productEnvs,
       apps: productAppsRes?.data || [],
       databases: details?.databases || [],
-      storages: details?.storage || details?.storages || [],
+      storages: details?.storage || [],
       notifications: details?.notifications || [],
       graphs: details?.graphs || [],
       vectors: details?.vectors || [],
