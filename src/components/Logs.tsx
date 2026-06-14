@@ -91,6 +91,7 @@ const componentTypes = [
   { id: 'feature', name: 'Feature', icon: Server },
   { id: 'functions', name: 'Functions', icon: Code },
   { id: 'webhook', name: 'Webhook', icon: Webhook },
+  { id: 'frontend', name: 'Frontend', icon: Activity },
 ];
 
 const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();

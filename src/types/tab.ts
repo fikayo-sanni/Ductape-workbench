@@ -16,7 +16,9 @@ export type TabType =
   | 'graph'
   | 'vector'
   | 'workflow'
+  | 'workflow-builder'
   | 'workflow-run'
+  | 'resilience-flow'
   | 'agent'
   | 'agent-run'
   | 'message-broker'
@@ -50,7 +52,8 @@ export type TabType =
   | 'marketplace'
   | 'notifier'
   | 'pricing'
-  | 'settings';
+  | 'settings'
+  | 'cloud';
 
 export interface Tab {
   id: string;

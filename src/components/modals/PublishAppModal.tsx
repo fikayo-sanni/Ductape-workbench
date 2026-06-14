@@ -165,7 +165,7 @@ export default function PublishAppModal({
 
       // Build update payload
       const updatePayload: any = {
-        status: formData.isPublic ? 'public' : 'private',
+        status: formData.isPublic ? 'pending_review' : 'private',
         workspace_id: currentWorkspaceId,
       };
 
@@ -197,7 +197,11 @@ export default function PublishAppModal({
       });
     },
     onSuccess: () => {
-      toast.success(`App version ${formData.isPublic ? 'published' : 'made private'} successfully`);
+      toast.success(
+        formData.isPublic
+          ? 'App submitted for marketplace review'
+          : 'App made private successfully',
+      );
       queryClient.invalidateQueries({ queryKey: ['app', app?._id] });
       queryClient.invalidateQueries({ queryKey: ['apps'] });
       onSuccess?.();
@@ -504,7 +508,7 @@ export default function PublishAppModal({
               ) : (
                 <>
                   <Rocket className="h-4 w-4" />
-                  {formData.isPublic ? 'Publish' : 'Make Private'}
+                  {formData.isPublic ? 'Submit for review' : 'Make Private'}
                 </>
               )}
             </Button>

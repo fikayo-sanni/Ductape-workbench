@@ -193,7 +193,10 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative bg-white border border-grey-400 rounded-10px px-4 sm:px-7 py-8 w-full max-w-[456px] shadow-xl">
+      <div
+        data-testid="login-modal"
+        className="relative bg-white border border-grey-400 rounded-10px px-4 sm:px-7 py-8 w-full max-w-[456px] shadow-xl"
+      >
 
         {/* Ductape Logo */}
         <div className="flex justify-center mb-6">
@@ -214,7 +217,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
                 <FormItem>
                   <FormLabel>Email address</FormLabel>
                   <FormControl>
-                    <Input {...field} type="email" placeholder="your@email.com" />
+                    <Input {...field} type="email" placeholder="your@email.com" data-testid="login-email" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -228,7 +231,11 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
                   <FormLabel>Password</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input {...field} type={showPassword ? "text" : "password"} />
+                      <Input
+                        {...field}
+                        type={showPassword ? "text" : "password"}
+                        data-testid="login-password"
+                      />
                       <Button
                         variant="ghost"
                         type="button"
@@ -261,6 +268,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               type="submit"
               className="w-full font-bold h-12"
               disabled={status === "pending"}
+              data-testid="login-submit"
             >
               {status === "pending" && <Loader className="animate-spin mr-2 size-5" />}
               Login

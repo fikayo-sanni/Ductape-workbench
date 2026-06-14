@@ -41,6 +41,11 @@ const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
 });
 
+function canManageTeamMembers(role?: string) {
+  const normalized = role?.toLowerCase();
+  return normalized === 'owner' || normalized === 'admin';
+}
+
 export default function TeamsTabContent() {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
@@ -59,6 +64,10 @@ export default function TeamsTabContent() {
   });
 
   const allMembers = membersRes?.data || [];
+  const currentMember = allMembers.find(
+    (member) => String(member.user_id) === String(user?._id),
+  );
+  const canManageMembers = canManageTeamMembers(currentMember?.access_level);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -104,6 +113,11 @@ export default function TeamsTabContent() {
   });
 
   const onInviteMemberSubmit = (values: z.infer<typeof formSchema>) => {
+    if (!canManageMembers) {
+      toast.error('Only workspace owners and admins can invite members');
+      return;
+    }
+
     inviteMember({
       ...values,
       workspace_id: currentWorkspaceId as string,
@@ -116,6 +130,10 @@ export default function TeamsTabContent() {
 
   const handleRemoveMember = (memberId: string) => {
     if (!currentWorkspaceId) return;
+    if (!canManageMembers) {
+      toast.error('Only workspace owners and admins can remove members');
+      return;
+    }
     removeMember({
       workspace_id: currentWorkspaceId,
       access_id: memberId,
@@ -204,17 +222,21 @@ export default function TeamsTabContent() {
                 <h1 className="text-2xl font-bold text-grey">Team Members</h1>
               </div>
               <p className="text-grey-600">
-                Manage team members and their access to your workspace
+                {canManageMembers
+                  ? 'Manage team members and their access to your workspace'
+                  : 'View team members in your workspace'}
               </p>
             </div>
-            <Button
-              onClick={() => setShowInviteDialog(true)}
-              className="gap-2"
-              disabled={!currentWorkspaceId}
-            >
-              <UserPlus className="h-4 w-4" />
-              Invite Member
-            </Button>
+            {canManageMembers ? (
+              <Button
+                onClick={() => setShowInviteDialog(true)}
+                className="gap-2"
+                disabled={!currentWorkspaceId}
+              >
+                <UserPlus className="h-4 w-4" />
+                Invite Member
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -286,14 +308,16 @@ export default function TeamsTabContent() {
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-grey-400 mx-auto mb-3" />
               <p className="text-sm text-grey-600">No team members yet</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => setShowInviteDialog(true)}
-              >
-                Invite Your First Member
-              </Button>
+              {canManageMembers ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setShowInviteDialog(true)}
+                >
+                  Invite Your First Member
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-3">
@@ -363,7 +387,7 @@ export default function TeamsTabContent() {
                         {member.access_level}
                       </Badge>
 
-                      {member.access_level.toLowerCase() !== 'owner' && (
+                      {canManageMembers && member.access_level.toLowerCase() !== 'owner' && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="ghost" className="h-8 w-8 p-0">

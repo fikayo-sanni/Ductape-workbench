@@ -139,7 +139,7 @@ const fetchBillingReport = async (data: {
 }): Promise<BillingResponse> => {
   const { user_id, public_key, workspace_id } = data;
   const response = await apiClient.get<BillingResponse>(
-    `/workspaces/workspaces/v1/billing/report/${workspace_id}`,
+    `/workspaces/v1/billing/report/${workspace_id}`,
     {
       params: { user_id, public_key },
     }
@@ -167,7 +167,7 @@ const changeSubscription = async (
   authToken: string
 ): Promise<ChangePlanResponse> => {
   const response = await apiClient.put<ChangePlanResponse>(
-    `/workspaces/workspaces/v1/subscribe`,
+    `/workspaces/v1/subscribe`,
     data,
     {
       params: params,
@@ -194,7 +194,7 @@ const createSubscription = async (data: {
 
   try {
     const response = await apiClient.post<SubscriptionResponse>(
-      `/workspaces/workspaces/v1/subscribe`,
+      `/workspaces/v1/subscribe`,
       payload,
       {
         params: {

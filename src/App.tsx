@@ -3,19 +3,21 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import WorkbenchLayout from './components/WorkbenchLayout';
-import LoginModal from './components/LoginModal';
+import AuthLayout from './layouts/AuthLayout';
+import LoginPage from './pages/auth/LoginPage';
+import SignupPage from './pages/auth/SignupPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import OnboardingPage from './pages/auth/OnboardingPage';
+import PendingInvitesPage from './pages/auth/PendingInvitesPage';
 import MarketplacePublicLayout from './pages/MarketplacePublicLayout';
 import MarketplacePublicIndex from './pages/MarketplacePublicIndex';
 import MarketplacePublicAppPage from './pages/MarketplacePublicAppPage';
 import MarketplacePublicWorkspacePage from './pages/MarketplacePublicWorkspacePage';
 import { useThemeStore } from './stores/theme-store';
-import { useLoginModalStore } from './stores/login-modal-store';
 import { useAuth } from './store/useAuth';
 import { authServices } from './services/authServices';
-import { triggerOnboardingForNewUser } from '@/utils/onboarding';
 import toast from 'react-hot-toast';
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -27,16 +29,13 @@ const queryClient = new QueryClient({
 
 function App() {
   const theme = useThemeStore((state) => state.theme);
-  const { isOpen: isLoginModalOpen, closeLoginModal } = useLoginModalStore();
   const setUser = useAuth((state) => state.setUser);
 
-  // Initialize theme on mount
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
   }, [theme]);
 
-  // Handle OAuth callback (Google/GitHub redirect with ?loggedIn=true&token=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const loggedIn = params.get('loggedIn');
@@ -57,43 +56,43 @@ function App() {
             workspaces: user.workspaces,
           });
           window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-          closeLoginModal();
-          triggerOnboardingForNewUser();
           toast.success('Login successful');
-          window.location.reload();
+          window.location.href = '/';
         })
         .catch(() => {
           window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
           toast.error('Login failed. Please try again.');
+          window.location.href = '/login';
         });
     }
-  }, [setUser, closeLoginModal]);
+  }, [setUser]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
         <Toaster position="top-right" />
         <Routes>
-          <Route path="/" element={<WorkbenchLayout />} />
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/pending-invites" element={<PendingInvitesPage />} />
+          </Route>
+
+          <Route
+            path="/"
+            element={<WorkbenchLayout />}
+          />
+
           <Route path="/marketplace" element={<MarketplacePublicLayout />}>
             <Route index element={<MarketplacePublicIndex />} />
             <Route path="app/:appTag" element={<MarketplacePublicAppPage />} />
             <Route path="workspace/:workspaceTag" element={<MarketplacePublicWorkspacePage />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-
-        {/* Login Modal - shown on 401 unauthorized */}
-        {isLoginModalOpen && (
-          <LoginModal
-            onSuccess={() => {
-              closeLoginModal();
-              // Reload to refresh data with new auth
-              window.location.reload();
-            }}
-            onClose={closeLoginModal}
-          />
-        )}
       </Router>
     </QueryClientProvider>
   );

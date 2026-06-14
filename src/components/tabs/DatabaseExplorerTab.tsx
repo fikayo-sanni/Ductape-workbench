@@ -66,7 +66,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -74,6 +75,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeDatabase } from '@/hooks/useDuctapeDatabase';
 import { useAuth } from '@/store/useAuth';
 import logsServices, { DatabaseDashboardMetrics } from '@/services/logsServices';
+import payloadGenerationService from '@/services/payloadGenerationService';
 
 // Column type definitions
 type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
@@ -224,6 +226,7 @@ interface DatabaseExplorerTabProps {
     type?: string;
     productTag?: string;
     productName?: string;
+    productEnvironments?: Array<{ slug: string }>;
     env: {
       slug: string;
       connection_url?: string; // Optional - not used directly, SDK resolves connection via product/database/env
@@ -496,6 +499,9 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
   const [showViewIndexesDialog, setShowViewIndexesDialog] = useState(false);
   const [showExportDataDialog, setShowExportDataDialog] = useState(false);
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [generatedPayloadsByEnvOperation, setGeneratedPayloadsByEnvOperation] = useState<
+    Record<string, Record<string, Record<string, unknown>>>
+  >({});
 
   // Confirmation dialogs
   const [showAddColumnsConfirm, setShowAddColumnsConfirm] = useState(false);
@@ -1528,34 +1534,6 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     },
     enabled: false, // Disabled until SDK bug is fixed
     staleTime: 30000,
-  });
-
-  // Query for fetching database activity metrics from logs service
-  const { data: databaseActivityData, isLoading: isLoadingActivity } = useQuery<DatabaseDashboardMetrics | null>({
-    queryKey: ['database-activity', database.productTag, database.tag, database.env.slug],
-    queryFn: async () => {
-      if (!database.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
-        return null;
-      }
-      try {
-        const result = await logsServices.fetchDatabaseDashboard(
-          currentWorkspaceId,
-          user._id,
-          user.public_key,
-          {
-            product_tag: database.productTag,
-            database_tag: database.tag,
-            env: database.env.slug,
-          }
-        );
-        return result;
-      } catch (error) {
-        console.error('Error fetching database activity data:', error);
-        return null;
-      }
-    },
-    enabled: !!database.productTag && !!currentWorkspaceId && !!user?._id,
-    staleTime: 60000, // Cache for 1 minute
   });
 
   // SDK Mutation for creating an action
@@ -3110,14 +3088,131 @@ const complexQuery = await ductape.database.raw({
 });`;
   };
 
+  useEffect(() => {
+    const loadGeneratedPayloads = async () => {
+      if (!showCodeSidebar || !selectedTable?.name || !database?.tag || !database?.productTag) return;
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) return;
+
+      const envs = (database.productEnvironments || []).map((e: any) => e.slug);
+      if (!envs.length) return;
+
+      const operationToMethod: Record<string, string> = {
+        query: 'find',
+        insert: 'insert',
+        update: 'update',
+        delete: 'delete',
+        upsert: 'upsert',
+        count: 'count',
+        aggregate: 'aggregate',
+        'aggregate-conditional': 'aggregate',
+        groupBy: 'aggregate',
+        sum: 'sum',
+        avg: 'avg',
+        min: 'min',
+        max: 'max',
+        raw: 'query',
+      };
+
+      const operations = Object.keys(operationToMethod);
+      const nextState: Record<string, Record<string, Record<string, unknown>>> = {};
+
+      await Promise.all(
+        envs.map(async (envSlug: string) => {
+          nextState[envSlug] = {};
+          await Promise.all(
+            operations.map(async (operation) => {
+              try {
+                const result = await payloadGenerationService.generateExecutablePayload({
+                  workspace_id: currentWorkspaceId,
+                  user_id: user._id,
+                  public_key: user.public_key,
+                  product_tag: database.productTag!,
+                  env_slug: envSlug,
+                  operation_family: 'database',
+                  method: operationToMethod[operation],
+                  targets: {
+                    database_tag: database.tag,
+                    table: selectedTable.name,
+                  },
+                  schema_mode: 'best_effort',
+                });
+                nextState[envSlug][operation] = result.payload || {};
+              } catch {
+                nextState[envSlug][operation] = {};
+              }
+            }),
+          );
+        }),
+      );
+
+      setGeneratedPayloadsByEnvOperation(nextState);
+    };
+
+    loadGeneratedPayloads();
+  }, [
+    showCodeSidebar,
+    selectedTable?.name,
+    database?.tag,
+    database?.productTag,
+    database?.productEnvironments,
+    currentWorkspaceId,
+    user?._id,
+    user?.public_key,
+  ]);
+
+  const buildDynamicDatabaseCode = (
+    language: string,
+    operation: string,
+    payloadTemplate: Record<string, unknown> | undefined,
+  ): string | null => {
+    if (!payloadTemplate || !Object.keys(payloadTemplate).length) return null;
+    const methodMap: Record<string, string> = {
+      query: 'query',
+      insert: 'insert',
+      update: 'update',
+      delete: 'delete',
+      upsert: 'upsert',
+      count: 'count',
+      aggregate: 'aggregate',
+      'aggregate-conditional': 'aggregate',
+      groupBy: 'aggregate',
+      sum: 'sum',
+      avg: 'avg',
+      min: 'min',
+      max: 'max',
+      raw: 'query',
+    };
+    const method = methodMap[operation] || 'query';
+    const inputPayload = (payloadTemplate.input as Record<string, unknown>) || {};
+    const json = JSON.stringify(inputPayload, null, 2);
+    if (language === 'typescript' || language === 'javascript') {
+      return `const result = await ductape.databases.${method}(${json});
+
+console.log('Result:', result);`;
+    }
+    if (language === 'python') {
+      return `result = ductape.databases.${method}(${json.replace(/"([^"]+)":/g, "'$1':")})
+print('Result:', result)`;
+    }
+    return null;
+  };
+
   // Generate code examples for database operations
   const generateCodeSections = (language: string, env?: string, runtime?: string) => {
     const tableName = selectedTable?.name || 'your_table';
     const envSlug = env || 'prd';
+    const dynamicTemplate = generatedPayloadsByEnvOperation[envSlug]?.[selectedOperation];
+    const dynamicCode = buildDynamicDatabaseCode(language, selectedOperation, dynamicTemplate);
 
     // Build operation-specific code sections (shared by runtime and non-runtime paths)
     const buildOperationSections = (): Array<{ title: string; code: string }> => {
       const opSections: Array<{ title: string; code: string }> = [];
+      if (dynamicCode) {
+        opSections.push({
+          title: `Generated ${selectedOperation} payload`,
+          code: dynamicCode,
+        });
+      }
       switch (selectedOperation) {
         case 'query':
           opSections.push(
@@ -4139,53 +4234,15 @@ const result = await ductape.database.transaction(
               </div>
             </div>
 
-            {/* Activity Timeline (Last 7 Days) */}
-            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-              </div>
-              {isLoadingActivity ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {(() => {
-                    const timeline = getLast7CalendarDays(
-                      databaseActivityData?.activityTimeline ?? [],
-                      (d) => d.sessions ?? 0
-                    );
-                    const maxOperations = Math.max(...timeline.map((d) => d.value), 1);
-                    return timeline.map((day) => {
-                      const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
-
-                      return (
-                        <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                              style={{ width: `${percentage}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center px-3">
-                              <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                {day.value.toLocaleString()} operations
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
+            <ActivityTimelinePanel
+              title="Activity timeline"
+              kind="database"
+              productTag={database.productTag}
+              componentTag={database.tag}
+              env={database.env.slug}
+              countLabel="operations"
+              enabled={!!database.productTag}
+            />
 
             {/* Quick Actions */}
             <div>

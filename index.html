@@ -5,9 +5,45 @@
     <link rel="icon" type="image/svg+xml" href="/ductape-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ductape</title>
+    <link rel="stylesheet" href="/boot-loader.css" />
+    <script>
+      (function () {
+        var theme = 'light';
+        try {
+          var raw = localStorage.getItem('ductape-theme-storage');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && parsed.state && parsed.state.theme) {
+              theme = parsed.state.theme;
+            }
+          }
+        } catch (e) {
+          /* ignore */
+        }
+        document.documentElement.classList.add(theme);
+      })();
+    </script>
   </head>
-  <body>
+  <body class="boot-loading">
+    <div
+      id="boot-loader"
+      class="boot-loader"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div class="boot-loader-brand">
+        <img src="/ductape-icon.svg" alt="" width="32" height="32" />
+        <span class="boot-loader-wordmark">Ductape</span>
+        <span class="boot-loader-beta">Beta</span>
+      </div>
+      <div class="boot-loader-status">
+        <span class="boot-spinner" aria-hidden="true"></span>
+        <span id="boot-loader-text">Loading workbench…</span>
+      </div>
+    </div>
     <div id="root"></div>
+    <script src="/boot-loader.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

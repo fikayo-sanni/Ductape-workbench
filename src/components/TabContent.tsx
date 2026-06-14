@@ -26,7 +26,9 @@ import NewGraphTabContent from './tabs/NewGraphTabContent';
 import VectorTabContent from './tabs/VectorTabContent';
 import VectorExplorerTab from './tabs/VectorExplorerTab';
 import WorkflowExplorerTab from './tabs/WorkflowExplorerTab';
+import WorkflowBuilderTab from './tabs/WorkflowBuilderTab';
 import WorkflowRunTab from './tabs/WorkflowRunTab';
+import ResilienceFlowTab from './tabs/ResilienceFlowTab';
 import AgentExplorerTab from './tabs/AgentExplorerTab';
 import AgentRunTab from './tabs/AgentRunTab';
 import CacheTabContent from './tabs/CacheTabContent';
@@ -73,6 +75,7 @@ import NewJobTabContent from './tabs/NewJobTabContent';
 import JobExplorerTab from './tabs/JobExplorerTab';
 import GenericComponentContent from './tabs/GenericComponentContent';
 import PricingTabContent from './tabs/PricingTabContent';
+import CloudTabContent from './tabs/CloudTabContent';
 
 function FeatureTabContent({tab}: {tab: Tab}) {
   // Check if this is a component from product (not app)
@@ -171,7 +174,7 @@ function FeatureTabContent({tab}: {tab: Tab}) {
 }
 
 export default function TabContent() {
-  const {tabs, activeTabId} = useWorkbenchStore();
+  const {tabs, activeTabId, activeView} = useWorkbenchStore();
 
   if (tabs.length === 0) {
     return (
@@ -179,7 +182,9 @@ export default function TabContent() {
         <div className="text-center text-grey-600 max-w-xs sm:max-w-md px-4">
           <p className="text-base sm:text-lg mb-2">No tab selected</p>
           <p className="text-xs sm:text-sm">
-            Open an item from the sidebar or create a new one
+            {activeView === 'cloud'
+              ? 'Add or select a cloud connection from the sidebar'
+              : 'Open an item from the sidebar or create a new one'}
           </p>
         </div>
       </div>
@@ -234,7 +239,14 @@ export default function TabContent() {
           );
         }
         // Use key to force remount when switching between different apps
-        return <AppTabContent key={tab.id} app={tab.data} appId={tab.itemId} />;
+        return (
+          <AppTabContent
+            key={tab.id}
+            tabId={tab.id}
+            app={tab.data}
+            appId={tab.itemId}
+          />
+        );
 
       case 'product':
         // Check if this is a new product creation tab
@@ -364,6 +376,31 @@ export default function TabContent() {
           return <VectorExplorerTab key={tab.id} vector={tab.data.vector} />;
         }
         return <VectorTabContent key={tab.id} vector={tab.data} />;
+
+      case 'workflow-builder':
+        return (
+          <WorkflowBuilderTab
+            key={tab.id}
+            tabId={tab.id}
+            workflow={tab.data?.workflow || tab.data || {}}
+            productTag={tab.data?.productTag}
+            productName={tab.data?.productName}
+            productId={tab.data?.productId}
+            productEnvs={tab.data?.productEnvs || []}
+          />
+        );
+
+      case 'resilience-flow':
+        return (
+          <ResilienceFlowTab
+            key={tab.id}
+            kind={tab.data?.kind || 'healthcheck'}
+            component={tab.data?.component || {}}
+            productTag={tab.data?.productTag}
+            productName={tab.data?.productName}
+            productEnvs={tab.data?.productEnvs || []}
+          />
+        );
 
       case 'workflow':
         // Check if this is a workflow explorer tab (from ProductTabContent: product + workflow)
@@ -527,29 +564,56 @@ export default function TabContent() {
         return <NotificationExplorerTab key={tab.id} data={tab.data} />;
 
       case 'fallback-explorer':
-        // Fallback explorer tab with product envs
         return (
           <FallbackExplorerTab
             key={tab.id}
-            product={tab.data?.product || {tag: '', name: '', envs: []}}
+            product={
+              tab.data?.product || {
+                tag: tab.data?.productTag || '',
+                name: tab.data?.productName || '',
+                logo: tab.data?.productLogo,
+                envs: [],
+              }
+            }
+            initialFallbackTag={tab.data?.fallback?.tag}
+            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
+            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.fallback?.tag)}
           />
         );
 
       case 'quota-explorer':
-        // Quota explorer tab with product envs
         return (
           <QuotaExplorerTab
             key={tab.id}
-            product={tab.data?.product || {tag: '', name: '', envs: []}}
+            product={
+              tab.data?.product || {
+                tag: tab.data?.productTag || '',
+                name: tab.data?.productName || '',
+                logo: tab.data?.productLogo,
+                envs: [],
+              }
+            }
+            initialQuotaTag={tab.data?.quota?.tag}
+            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
+            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.quota?.tag)}
           />
         );
 
       case 'healthcheck-explorer':
-        // Healthcheck explorer tab with product envs
         return (
           <HealthcheckExplorerTab
             key={tab.id}
-            product={tab.data?.product || {tag: '', name: '', envs: []}}
+            product={
+              tab.data?.product || {
+                tag: tab.data?.productTag || '',
+                name: tab.data?.productName || '',
+                logo: tab.data?.productLogo,
+                envs: [],
+              }
+            }
+            initialHealthcheckTag={tab.data?.healthcheck?.tag}
+            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
+            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.healthcheck?.tag)}
           />
         );
 
@@ -669,6 +733,9 @@ export default function TabContent() {
       case 'settings':
         return <SettingsTabContent key={tab.id} />;
 
+      case 'cloud':
+        return <CloudTabContent key={tab.id} tab={tab} />;
+
       default:
         return (
           <div key={tab.id} className="p-4 sm:p-6">
@@ -680,19 +747,26 @@ export default function TabContent() {
     }
   };
 
-  // Keep all tab panels mounted; hide inactive ones so workflow (and other) tabs don't remount/refetch on switch
+  // Keep all tab panels mounted; stack with absolute positioning so Safari gets a stable
+  // flex height (display:none + flex-1 siblings collapses to 0px in WebKit).
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
-      {tabs.map(tab => (
-        <div
-          key={tab.id}
-          className="flex-1 flex flex-col min-h-0 overflow-hidden w-full [&>*]:min-h-0"
-          style={{display: tab.id === activeTabId ? 'flex' : 'none'}}
-          aria-hidden={tab.id !== activeTabId}
-        >
-          {renderTabContent(tab)}
-        </div>
-      ))}
+    <div className="flex-1 min-h-0 overflow-hidden w-full relative">
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTabId;
+        return (
+          <div
+            key={tab.id}
+            className={
+              isActive
+                ? 'absolute inset-0 flex flex-col min-h-0 overflow-hidden w-full [&>*]:min-h-0'
+                : 'absolute inset-0 flex flex-col min-h-0 overflow-hidden w-full invisible pointer-events-none [&>*]:min-h-0'
+            }
+            aria-hidden={!isActive}
+          >
+            {renderTabContent(tab)}
+          </div>
+        );
+      })}
     </div>
   );
 }

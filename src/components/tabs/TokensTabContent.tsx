@@ -14,6 +14,7 @@ import {
   Shield,
   MoreVertical,
   Clock,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -754,147 +755,121 @@ export default function TokensTabContent() {
     }
   };
 
+  const activeCount = tokens.filter((t) => t.is_active).length;
+  const revokedCount = tokens.filter((t) => !t.is_active).length;
+
+  const tabBtnClass = (active: boolean) =>
+    cn(
+      'relative flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
+      active
+        ? 'border-primary text-primary'
+        : 'border-transparent text-grey-600 hover:border-grey-300 hover:text-grey',
+    );
+
   return (
-    <div className="h-full overflow-auto bg-grey-100">
-      <div className="max-w-4xl mx-auto p-6 space-y-4">
-        {/* Page Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-grey">Tokens & Credentials</h1>
-          <p className="text-sm text-grey-500 mt-1">
-            Manage API tokens and SDK access keys for your workspace
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-green/10 flex items-center justify-center">
-                <Key className="h-4 w-4 text-green" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-grey">
-                  {tokens.filter((t) => t.is_active).length}
-                </p>
-                <p className="text-xs text-grey-500">Active</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Key className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-grey">{tokens.length}</p>
-                <p className="text-xs text-grey-500">Total</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-grey">
-                  {tokens.filter((t) => !t.is_active).length}
-                </p>
-                <p className="text-xs text-grey-500">Revoked</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Header with tabs-style navigation */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 bg-white rounded-lg border border-grey-300 p-1">
-            <button
-              onClick={() => setShowAccessKeyPanel(false)}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                showAccessKeyPanel === false
-                  ? "bg-primary text-white"
-                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
-              )}
-            >
-              <span className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                Tokens
-                <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                  {tokens.length}
-                </span>
-              </span>
-            </button>
-            <button
-              onClick={() => setShowAccessKeyPanel(true)}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                showAccessKeyPanel === true
-                  ? "bg-primary text-white"
-                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
-              )}
-            >
-              <span className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                SDK Access Key
-              </span>
-            </button>
-            <button
-              onClick={() => setShowAccessKeyPanel('publishable')}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                showAccessKeyPanel === 'publishable'
-                  ? "bg-primary text-white"
-                  : "text-grey-600 hover:text-grey hover:bg-grey-50"
-              )}
-            >
-              <span className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
-                Publishable Key
-              </span>
-            </button>
-          </div>
-
-          {showAccessKeyPanel === false && (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={fetchTokens}
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                disabled={loading}
-              >
-                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-              </Button>
-              <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Token
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Content based on selected tab */}
-        {showAccessKeyPanel === 'publishable' ? (
-          /* Publishable Key Panel */
-          <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-grey-400">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                    <Key className="h-6 w-6 text-primary" />
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-grey-100">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-6 p-6 pb-10">
+          {/* Page header */}
+          <div className="rounded-lg border border-grey-400 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Lock className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-grey">Publishable Key</h2>
-                    <p className="text-sm text-grey-600">
-                      Frontend-safe key for the SDK proxy. Cannot create/update/fetch primitives; use for query and read operations.
-                    </p>
-                  </div>
+                  <h1 className="text-2xl font-bold text-grey">Secrets &amp; credentials</h1>
                 </div>
+                <p className="max-w-2xl text-sm text-grey-600">
+                  Store workspace secrets, manage SDK access keys, and configure browser-safe publishable keys for your apps.
+                </p>
+              </div>
+              {showAccessKeyPanel === false && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    onClick={fetchTokens}
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={loading}
+                    aria-label="Refresh secrets"
+                  >
+                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                    Refresh
+                  </Button>
+                  <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    New secret
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-grey-400 pt-5">
+              <div className="rounded-md border border-grey-400 bg-grey-100/80 px-4 py-3">
+                <p className="text-2xl font-bold text-grey">{activeCount}</p>
+                <p className="text-xs font-medium text-grey-600">Active secrets</p>
+              </div>
+              <div className="rounded-md border border-grey-400 bg-grey-100/80 px-4 py-3">
+                <p className="text-2xl font-bold text-grey">{tokens.length}</p>
+                <p className="text-xs font-medium text-grey-600">Total secrets</p>
+              </div>
+              <div className="rounded-md border border-grey-400 bg-grey-100/80 px-4 py-3">
+                <p className="text-2xl font-bold text-grey">{revokedCount}</p>
+                <p className="text-xs font-medium text-grey-600">Revoked</p>
               </div>
             </div>
-            <div className="p-6 bg-grey-50/50">
+          </div>
+
+          {/* Main panel */}
+          <div className="overflow-hidden rounded-lg border border-grey-400 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-grey-400 px-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-1 overflow-x-auto" role="tablist" aria-label="Credentials sections">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showAccessKeyPanel === false}
+                  onClick={() => setShowAccessKeyPanel(false)}
+                  className={tabBtnClass(showAccessKeyPanel === false)}
+                >
+                  <Lock className="h-4 w-4 shrink-0" />
+                  Secrets
+                  <span className="rounded-full bg-grey-200 px-1.5 py-0.5 text-[10px] font-semibold text-grey-600">
+                    {tokens.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showAccessKeyPanel === true}
+                  onClick={() => setShowAccessKeyPanel(true)}
+                  className={tabBtnClass(showAccessKeyPanel === true)}
+                >
+                  <Shield className="h-4 w-4 shrink-0" />
+                  SDK access key
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showAccessKeyPanel === 'publishable'}
+                  onClick={() => setShowAccessKeyPanel('publishable')}
+                  className={tabBtnClass(showAccessKeyPanel === 'publishable')}
+                >
+                  <Key className="h-4 w-4 shrink-0" />
+                  Publishable key
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-[12rem]">
+        {showAccessKeyPanel === 'publishable' ? (
+          <div>
+            <div className="border-b border-grey-400 px-6 py-5">
+              <h2 className="text-base font-semibold text-grey">Publishable key</h2>
+              <p className="mt-1 text-sm text-grey-600">
+                Frontend-safe key for the SDK proxy. Use for query and read operations; scope limits what the key can call.
+              </p>
+            </div>
+            <div className="px-6 py-5">
               <label className="text-xs font-medium text-grey-600 uppercase tracking-wide mb-2 block">
                 Publishable Key
               </label>
@@ -1233,41 +1208,33 @@ console.log('Uploaded:', uploadResult);`}
             </div>
           </div>
         ) : showAccessKeyPanel === true ? (
-          /* SDK Access Key Panel */
-          <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
-            {/* Header Section */}
-            <div className="p-6 border-b border-grey-400">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                    <Shield className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-grey">SDK Access Key</h2>
-                    <p className="text-sm text-grey-600">
-                      Initialize the Ductape SDK in your application
-                    </p>
-                  </div>
-                </div>
-                <span className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-medium border",
-                  otpVerified
-                    ? "bg-green/10 text-green border-green/20"
-                    : "bg-primary/5 text-primary border-primary/20"
-                )}>
-                  {otpVerified ? "Verified" : "2FA Protected"}
-                </span>
+          <div>
+            <div className="flex flex-col gap-3 border-b border-grey-400 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-grey">SDK access key</h2>
+                <p className="mt-1 text-sm text-grey-600">
+                  Server-side key for initializing the Ductape SDK. Protected by email verification before reveal.
+                </p>
               </div>
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-xs font-medium',
+                  otpVerified
+                    ? 'border-green/20 bg-green/10 text-green'
+                    : 'border-primary/20 bg-primary/5 text-primary',
+                )}
+              >
+                {otpVerified ? 'Verified' : '2FA protected'}
+              </span>
             </div>
 
-            {/* Access Key Section */}
-            <div className="p-6 bg-grey-50/50">
+            <div className="px-6 py-5">
               <label className="text-xs font-medium text-grey-600 uppercase tracking-wide mb-2 block">
                 Access Key
               </label>
-              <div className="bg-white rounded-lg border border-grey-300 p-4 flex items-center justify-between gap-4">
-                <code className="text-sm font-mono text-grey break-all flex-1 select-all">
-                  {accessKeyVisible ? accessKey : "•".repeat(40)}
+              <div className="flex items-center justify-between gap-4 rounded-md border border-grey-400 bg-grey-100 p-4">
+                <code className="flex-1 break-all font-mono text-sm text-grey select-all">
+                  {accessKeyVisible ? accessKey : '•'.repeat(40)}
                 </code>
                 <div className="flex items-center gap-1 shrink-0 border-l border-grey-200 pl-3">
                   <Button
@@ -1370,7 +1337,7 @@ const ductape = new Ductape({
               </div>
               <div className="mt-4 flex items-center gap-6 text-sm">
                 <a
-                  href="https://docs.ductape.dev"
+                  href="https://docs.ductape.app"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary hover:text-primary/80 font-medium transition-colors"
@@ -1388,205 +1355,167 @@ const ductape = new Ductape({
               </div>
             </div>
 
-            {/* Security Notice */}
-            <div className="px-6 py-4 bg-amber-50 border-t border-amber-100">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                <p className="text-sm text-amber-700">
-                  Keep your access key secure. Never expose it in client-side code or public repositories.
-                </p>
-              </div>
+            <div className="flex items-start gap-3 border-t border-amber-200/80 bg-amber-50 px-6 py-4 dark:border-amber-900/50 dark:bg-amber-950/30">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-sm text-amber-800 dark:text-amber-200/90">
+                Never expose your SDK access key in client-side code or public repositories.
+              </p>
             </div>
           </div>
         ) : (
-          /* Tokens List */
-          <div>
+          <div className="p-6">
             {loading ? (
-              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-16 text-grey-600">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                <span className="text-sm">Loading tokens...</span>
+              <div className="flex flex-col items-center justify-center py-16 text-grey-600">
+                <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm">Loading secrets…</p>
               </div>
             ) : tokens.length === 0 ? (
-              <div className="bg-white rounded-lg border border-grey-400 shadow-sm text-center py-12 px-4">
-                <Key className="h-12 w-12 text-grey-400 mx-auto mb-3" />
-                <p className="text-sm text-grey-600">No tokens yet</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  Create Your First Token
+              <div className="flex flex-col items-center rounded-lg border border-dashed border-grey-400 bg-grey-100/50 px-6 py-14 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <Lock className="h-6 w-6 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-grey">No secrets yet</p>
+                <p className="mt-1 max-w-sm text-xs text-grey-600">
+                  Create a secret to reference in workflows and the SDK as{' '}
+                  <code className="rounded bg-white px-1 font-mono text-[11px]">$Secret{'{name}'}</code>.
+                </p>
+                <Button size="sm" className="mt-5 gap-2" onClick={() => setShowCreateDialog(true)}>
+                  <Plus className="h-4 w-4" />
+                  Create secret
                 </Button>
               </div>
             ) : (
-              <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-grey mb-4">Secrets</h2>
-                <div className="space-y-3">
+              <div className="overflow-hidden rounded-lg border border-grey-400">
+                <div className="hidden grid-cols-[1fr_auto_auto] gap-4 border-b border-grey-400 bg-grey-100/80 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-grey-600 sm:grid">
+                  <span>Secret</span>
+                  <span className="text-right">Reference</span>
+                  <span className="w-24 text-right">Actions</span>
+                </div>
+                <ul className="divide-y divide-grey-400">
                   {tokens.map((token) => (
-                    <div
-                      key={token.name}
-                      className="p-4 rounded-lg border border-grey-400 hover:border-primary hover:shadow-sm transition-all"
-                    >
-                      {/* Header Row - Icon, Name, Status, Actions */}
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {/* Icon */}
-                          <div className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
-                            token.is_active ? "bg-primary/10" : "bg-grey-100"
-                          )}>
-                            <Key className={cn(
-                              "h-5 w-5",
-                              token.is_active ? "text-primary" : "text-grey-400"
-                            )} />
-                          </div>
-
-                          {/* Name and Status */}
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-semibold text-grey" title={token.name}>
+                    <li key={token.name} className="px-4 py-4 transition-colors hover:bg-grey-100/40">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate font-mono text-sm font-semibold text-grey" title={token.name}>
                               {token.name}
                             </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge
+                            <Badge className={cn('text-[10px] font-semibold uppercase', getStatusColor(token.is_active))}>
+                              {getStatusText(token.is_active)}
+                            </Badge>
+                            {token.expires_in && (
+                              <span
                                 className={cn(
-                                  'uppercase font-semibold text-[10px] px-1.5 py-0',
-                                  getStatusColor(token.is_active)
+                                  'inline-flex items-center gap-1 text-[10px] text-grey-600',
+                                  token.expires_in * 1000 < Date.now() && 'text-red-600',
                                 )}
                               >
-                                {getStatusText(token.is_active)}
-                              </Badge>
-                              {token.expires_in && (
-                                <span className={cn(
-                                  "flex items-center gap-1 text-[10px]",
-                                  token.expires_in * 1000 < Date.now() ? "text-red-500" : "text-grey-500"
-                                )}>
-                                  <Clock className="h-3 w-3" />
-                                  {(() => {
-                                    const expiryMs = token.expires_in * 1000;
-                                    const now = Date.now();
-                                    if (expiryMs < now) return 'Expired';
-                                    const diffMs = expiryMs - now;
-                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                                    if (diffDays > 0) return `${diffDays}d left`;
-                                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                                    if (diffHours > 0) return `${diffHours}h left`;
-                                    return `${Math.floor(diffMs / (1000 * 60))}m left`;
-                                  })()}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-grey-400">
-                                • Created {new Date(token.created_at).toLocaleDateString()}
+                                <Clock className="h-3 w-3" />
+                                {(() => {
+                                  const expiryMs = token.expires_in * 1000;
+                                  const now = Date.now();
+                                  if (expiryMs < now) return 'Expired';
+                                  const diffMs = expiryMs - now;
+                                  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                  if (diffDays > 0) return `${diffDays}d left`;
+                                  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                  if (diffHours > 0) return `${diffHours}h left`;
+                                  return `${Math.floor(diffMs / (1000 * 60))}m left`;
+                                })()}
                               </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Copy and Actions */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCopyTokenKey(token.name)}
-                            className="h-8 gap-1.5 text-xs"
-                          >
-                            {copiedTokenName === token.name ? (
-                              <Check className="h-3.5 w-3.5 text-green" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
                             )}
-                            {copiedTokenName === token.name ? "Copied" : "Copy"}
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleCopyTokenKey(token.name)}
-                                className="cursor-pointer text-xs"
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy $Secret Reference
-                              </DropdownMenuItem>
-                              {token.is_active && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => openConfirmDialog(token.name, 'revoke')}
-                                    className="text-orange-500 cursor-pointer focus:text-orange-600 focus:bg-orange-50 text-xs"
-                                  >
-                                    <AlertCircle className="h-4 w-4 mr-2" />
-                                    Revoke Token
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => openConfirmDialog(token.name, 'delete')}
-                                className="text-red-500 cursor-pointer focus:text-red-500 focus:bg-red-50 text-xs font-semibold"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Token
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {token.description && (
-                        <p className="text-xs text-grey-600 mb-3 ml-[52px]">{token.description}</p>
-                      )}
-
-                      {/* Scopes and Envs - inline */}
-                      {(token.scope.length > 0 || token.envs.length > 0) && (
-                        <div className="flex items-center gap-4 ml-[52px] flex-wrap">
-                          {/* Scope badges */}
-                          {token.scope.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-grey-500 uppercase font-medium">Scope:</span>
-                              {token.scope.slice(0, 3).map((scope) => (
-                                <Badge
-                                  key={scope}
-                                  variant="secondary"
-                                  className="bg-grey-100 text-grey-600 text-[10px] font-normal px-1.5 py-0"
-                                >
-                                  {scope}
-                                </Badge>
-                              ))}
-                              {token.scope.length > 3 && (
-                                <span className="text-[10px] text-grey-400">+{token.scope.length - 3}</span>
-                              )}
-                            </div>
+                          </div>
+                          {token.description && (
+                            <p className="mt-1 text-xs text-grey-600">{token.description}</p>
                           )}
-
-                          {/* Env badges */}
-                          {token.envs.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-grey-500 uppercase font-medium">Envs:</span>
+                          <p className="mt-1 text-[10px] text-grey-500">
+                            Created {new Date(token.created_at).toLocaleDateString()}
+                          </p>
+                          {(token.scope.length > 0 || token.envs.length > 0) && (
+                            <div className="mt-2 flex flex-wrap gap-2">
                               {token.envs.map((env) => (
-                                <Badge
-                                  key={env}
-                                  className="bg-primary/10 text-primary text-[10px] font-normal px-1.5 py-0"
-                                >
+                                <Badge key={env} className="bg-primary/10 text-[10px] font-normal text-primary">
                                   {env}
                                 </Badge>
                               ))}
+                              {token.scope.slice(0, 4).map((scope) => (
+                                <Badge key={scope} variant="secondary" className="text-[10px] font-normal">
+                                  {scope}
+                                </Badge>
+                              ))}
+                              {token.scope.length > 4 && (
+                                <span className="text-[10px] text-grey-500">+{token.scope.length - 4} scope</span>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                        <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                          <code className="rounded border border-grey-400 bg-grey-100 px-2 py-1 font-mono text-xs text-grey">
+                            $Secret{'{' + token.name + '}'}
+                          </code>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCopyTokenKey(token.name)}
+                              className="h-8 gap-1.5 text-xs"
+                            >
+                              {copiedTokenName === token.name ? (
+                                <Check className="h-3.5 w-3.5 text-green" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
+                              {copiedTokenName === token.name ? 'Copied' : 'Copy ref'}
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label="Secret actions">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleCopyTokenKey(token.name)}
+                                  className="cursor-pointer text-xs"
+                                >
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Copy $Secret reference
+                                </DropdownMenuItem>
+                                {token.is_active && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => openConfirmDialog(token.name, 'revoke')}
+                                      className="cursor-pointer text-xs text-orange-600 focus:bg-orange-50 focus:text-orange-700"
+                                    >
+                                      <AlertCircle className="mr-2 h-4 w-4" />
+                                      Revoke
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openConfirmDialog(token.name, 'delete')}
+                                  className="cursor-pointer text-xs font-semibold text-red-600 focus:bg-red-50 focus:text-red-700"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>
         )}
-
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Create Token Dialog */}
@@ -1599,9 +1528,9 @@ const ductape = new Ductape({
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-grey">Create New Token</DialogTitle>
+            <DialogTitle className="text-grey">Create secret</DialogTitle>
             <DialogDescription>
-              Create a new API token for accessing your workspace resources
+              Add a workspace secret you can reference as $Secret{'{name}'} in the SDK and workflows.
             </DialogDescription>
           </DialogHeader>
 

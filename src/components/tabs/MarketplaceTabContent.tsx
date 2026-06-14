@@ -24,7 +24,8 @@ import marketplaceServices from '@/services/marketplaceServices';
 import appServicesReal from '@/services/appServicesReal';
 import { toast } from 'react-hot-toast';
 import AppCard from '@/components/marketplace/AppCard';
-import MarketplaceSidebar from '@/components/marketplace/MarketplaceSidebar';
+import MarketplaceSidebar, { type MarketplaceViewMode } from '@/components/marketplace/MarketplaceSidebar';
+import MarketplaceSubmissionsView from '@/components/marketplace/MarketplaceSubmissionsView';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import { IntegrationProvider } from '@/context/integration-context';
 
@@ -33,7 +34,8 @@ export default function MarketplaceTabContent() {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [layoutView, setLayoutView] = useState<'grid' | 'list'>('grid');
+  const [marketplaceSection, setMarketplaceSection] = useState<MarketplaceViewMode>('browse');
   const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [integrationModalOpen, setIntegrationModalOpen] = useState(false);
@@ -55,7 +57,7 @@ export default function MarketplaceTabContent() {
       selectedDomain === 'all'
         ? marketplaceServices.fetchAppByDomains('')
         : marketplaceServices.fetchAppByDomains(selectedDomain),
-    enabled: !!domains.length,
+    enabled: !!domains.length && marketplaceSection === 'browse',
   });
 
   const appsToDisplay = apps?.data ?? [];
@@ -111,7 +113,7 @@ export default function MarketplaceTabContent() {
           type: 'app',
           title: app.app_name,
           itemId: app._id,
-          data: { ...appDetailsResponse.data, isMarketplaceApp: true },
+          data: { ...appDetailsResponse.data, isMarketplaceApp: true, appViewMode: 'general' as const },
         });
       } else {
         toast.error('Failed to load app details');
@@ -153,11 +155,15 @@ export default function MarketplaceTabContent() {
         domains={domains}
         selectedDomain={selectedDomain}
         onDomainSelect={(id) => setSelectedDomain(id || 'all')}
+        viewMode={marketplaceSection}
+        onViewModeChange={setMarketplaceSection}
         isMobileOpen={isMobileSidebarOpen}
         onMobileToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
 
-      {/* Main Content */}
+      {marketplaceSection === 'submissions' ? (
+        <MarketplaceSubmissionsView />
+      ) : (
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="bg-white border-b border-grey-400 p-4">
@@ -216,17 +222,17 @@ export default function MarketplaceTabContent() {
             {/* View Mode */}
             <div className="flex border border-grey-400 rounded-md">
               <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                variant={layoutView === 'grid' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setViewMode('grid')}
+                onClick={() => setLayoutView('grid')}
                 className="rounded-r-none"
               >
                 <Grid3x3 className="h-4 w-4" />
               </Button>
               <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                variant={layoutView === 'list' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => setLayoutView('list')}
                 className="rounded-l-none"
               >
                 <List className="h-4 w-4" />
@@ -257,7 +263,7 @@ export default function MarketplaceTabContent() {
             </div>
           ) : (
             <div className={
-              viewMode === 'grid'
+              layoutView === 'grid'
                 ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
                 : 'space-y-4'
             }>
@@ -268,13 +274,14 @@ export default function MarketplaceTabContent() {
                   domains={domains}
                   onClick={() => handleAppClick(app)}
                   onIntegrate={() => handleIntegrateApp(app)}
-                  viewMode={viewMode}
+                  viewMode={layoutView}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+      )}
 
       {/* Integration Modal */}
       {selectedApp && (

@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef} from 'react';
+import {useState, useEffect, useRef, useMemo} from 'react';
 import {IProduct} from '@/types/product';
 import {
   Database,
@@ -69,6 +69,7 @@ import InlineMessageBrokerForm from '@/components/forms/InlineMessageBrokerForm'
 import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
 import CodeSidebar from '@/components/CodeSidebar';
 import {saveTabState, getTabState} from '@/lib/tab-state-manager';
+import { resolveProductAppAccessTag } from '@/utils/productAppAccess';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -194,7 +195,6 @@ const resourceCategories: ResourceCategoryConfig[] = [
     bgColor: 'bg-amber-600/10',
     dataKey: 'intelligence',
     componentType: 'intelligence',
-    disabled: true,
   },
   {
     id: 'resilience',
@@ -204,7 +204,6 @@ const resourceCategories: ResourceCategoryConfig[] = [
     bgColor: 'bg-red-500/10',
     dataKey: 'resilience',
     componentType: 'resilience',
-    disabled: true,
   },
 ];
 
@@ -213,7 +212,7 @@ export default function ProductTabContent({
   product: initialProduct,
   productId,
 }: ProductTabContentProps) {
-  const {openTab, updateTab, activeTabId} = useWorkbenchStore();
+  const {openTab, updateTab} = useWorkbenchStore();
   const {user, currentWorkspaceId} = useAuth();
   const hasRestoredStateRef = useRef(false);
 
@@ -338,6 +337,27 @@ export default function ProductTabContent({
     staleTime: 30 * 1000, // 30 seconds - data is considered fresh
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
     refetchOnMount: 'always', // Always refetch when component mounts to get latest data
+    refetchInterval: (query) => {
+      type Provisionable = { provisionStatus?: string; envs?: Array<{ provisionStatus?: string }> };
+      const p = query.state.data as {
+        databases?: Provisionable[];
+        graphs?: Provisionable[];
+        vectors?: Provisionable[];
+        messageBrokers?: Provisionable[];
+      } | null;
+      const all = [
+        ...(p?.databases || []),
+        ...(p?.graphs || []),
+        ...(p?.vectors || []),
+        ...(p?.messageBrokers || []),
+      ];
+      const needsPoll = all.some(
+        (item) =>
+          item.provisionStatus === 'provisioning' ||
+          item.envs?.some((env) => env.provisionStatus === 'provisioning'),
+      );
+      return needsPoll ? 15_000 : false;
+    },
   });
 
   const product = fetchedProductData || initialProduct;
@@ -374,20 +394,35 @@ export default function ProductTabContent({
     refetchOnMount: 'always', // Always refetch when component mounts to get latest data
   });
 
-  const connectedApps = productAppsRes?.data || [];
+  const connectedApps = useMemo(() => {
+    const apps = productAppsRes?.data || [];
+    const links = product?.apps || [];
+    return apps.map((app: { tag?: string; app_tag?: string; access_tag?: string }) => ({
+      ...app,
+      access_tag: resolveProductAppAccessTag(
+        app.tag || app.app_tag,
+        links,
+        app.access_tag
+      ),
+    }));
+  }, [productAppsRes?.data, product?.apps]);
 
-  // Update tab with fetched data
+  // Update tab with fetched data (use tabId — inactive tabs stay mounted)
   useEffect(() => {
-    if (fetchedProductData && activeTabId && !initialProduct) {
-      updateTab(activeTabId, {data: fetchedProductData});
-    }
-  }, [fetchedProductData, activeTabId, initialProduct, updateTab]);
+    if (!fetchedProductData || !tabId || initialProduct) return;
+
+    const { tabs } = useWorkbenchStore.getState();
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab || tab.type !== 'product') return;
+
+    updateTab(tabId, { data: fetchedProductData });
+  }, [fetchedProductData, tabId, initialProduct, updateTab]);
 
   // Mutation to fetch full app data by tag
   const {mutate: fetchFullApp} = useMutation({
-    mutationFn: (params: {tag: string; user_id: string; public_key: string}) =>
+    mutationFn: (params: {tag: string; user_id: string; public_key: string; access_tag?: string}) =>
       appServicesReal.fetchAppByTag(params),
-    onSuccess: response => {
+    onSuccess: (response, variables) => {
       const fullApp = response.data;
       openTab({
         id: `app-${fullApp._id}`,
@@ -396,7 +431,9 @@ export default function ProductTabContent({
         itemId: fullApp._id,
         data: {
           ...fullApp,
-          // Pass product context so actions can be run via ductape.actions.run
+          appViewMode: 'product' as const,
+          accessTag: variables.access_tag,
+          // Pass product context so actions can be run via ductape.api.run
           productTag: product?.tag,
           productId: product?._id,
           productName: product?.name,
@@ -456,7 +493,10 @@ export default function ProductTabContent({
     }
     // Message Brokers
     if (category.id === 'messageBrokers') {
-      return (product as any)?.messageBrokers || [];
+      return ((product as any)?.messageBrokers || []).map((b: any) => ({
+        ...b,
+        _resourceType: 'messageBroker',
+      }));
     }
     // Jobs
     if (category.id === 'jobs') {
@@ -613,6 +653,42 @@ export default function ProductTabContent({
   };
 
   const handleOpenComponent = (component: any, type: string) => {
+    // Workflows: card click opens flow diagram / builder (env chips open explorer)
+    if (type === 'workflow') {
+      openTab({
+        id: `workflow-builder-${component.tag}`,
+        type: 'workflow-builder',
+        title: component.name || component.tag || 'Workflow',
+        itemId: component.tag,
+        data: {
+          workflow: component,
+          productTag: product?.tag,
+          productName: product?.name,
+          productId: product?._id,
+          productEnvs: product?.envs || [],
+        },
+      });
+      return;
+    }
+
+    // Resilience: card click opens flow diagram (env chips open scoped activity explorer)
+    if (type === 'healthcheck' || type === 'fallback' || type === 'quota') {
+      openTab({
+        id: `${type}-flow-${component.tag}`,
+        type: 'resilience-flow',
+        title: component.name || component.tag,
+        itemId: component.tag,
+        data: {
+          kind: type,
+          component,
+          productTag: product?.tag,
+          productName: product?.name,
+          productEnvs: product?.envs || [],
+        },
+      });
+      return;
+    }
+
     // Jobs: open single-job + env explorer (past/future invocations, timeline, metrics)
     if (type === 'job') {
       const env = product?.envs?.[0]
@@ -752,11 +828,22 @@ export default function ProductTabContent({
   };
 
   const handleOpenApp = (app: any) => {
-    setLoadingAppTag(app.tag || app.app_tag);
+    const appTag = app.tag || app.app_tag;
+    const accessTag = resolveProductAppAccessTag(appTag, product?.apps, app.access_tag);
+
+    if (!accessTag) {
+      toast.error(
+        'No product connection found for this app. Connect the app to this product first, then try again.'
+      );
+      return;
+    }
+
+    setLoadingAppTag(appTag);
     fetchFullApp({
-      tag: app.tag || app.app_tag,
+      tag: appTag,
       user_id: user?._id || '',
       public_key: user?.public_key || '',
+      access_tag: accessTag,
     });
   };
 
@@ -1001,7 +1088,6 @@ export default function ProductTabContent({
         isExplorer: true,
       };
     } else if (resourceType === 'fallback') {
-      // FallbackExplorerTab expects product object with tag, name, and envs
       data = {
         product: {
           tag: product?.tag,
@@ -1010,10 +1096,12 @@ export default function ProductTabContent({
           envs: product?.envs || [],
         },
         fallback: resource,
+        env: env ? { slug: env.slug, name: env.name } : undefined,
+        selectedEnv: env,
+        scopedToComponent: true,
         isExplorer: true,
       };
     } else if (resourceType === 'quota') {
-      // QuotaExplorerTab expects product object with tag, name, and envs
       data = {
         product: {
           tag: product?.tag,
@@ -1022,10 +1110,12 @@ export default function ProductTabContent({
           envs: product?.envs || [],
         },
         quota: resource,
+        env: env ? { slug: env.slug, name: env.name } : undefined,
+        selectedEnv: env,
+        scopedToComponent: true,
         isExplorer: true,
       };
     } else if (resourceType === 'healthcheck') {
-      // HealthcheckExplorerTab expects product object with tag, name, and envs
       data = {
         product: {
           tag: product?.tag,
@@ -1034,6 +1124,9 @@ export default function ProductTabContent({
           envs: product?.envs || [],
         },
         healthcheck: resource,
+        env: env ? { slug: env.slug, name: env.name } : undefined,
+        selectedEnv: env,
+        scopedToComponent: true,
         isExplorer: true,
       };
     } else if (resourceType === 'job') {
@@ -1078,17 +1171,26 @@ export default function ProductTabContent({
     const isLoadingApp =
       category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
     const isActive = item.status === 'active' || item.active;
+    const isCloudProvisioning =
+      ['database', 'graph', 'vector', 'messageBroker'].includes(item._resourceType) &&
+      (item.provisionStatus === 'provisioning' ||
+        item.envs?.some((env: { provisionStatus?: string }) => env.provisionStatus === 'provisioning'));
+    const isCloudProvisionFailed =
+      ['database', 'graph', 'vector', 'messageBroker'].includes(item._resourceType) &&
+      (item.provisionStatus === 'failed' ||
+        item.envs?.some((env: { provisionStatus?: string }) => env.provisionStatus === 'failed'));
 
     // For combined categories, determine the actual resource type
     const resourceType = item._resourceType || category.componentType;
 
     // Check if this resource has environments configured
-    // Caches, sessions, jobs, and workflows (product-level) use product environments for env chips
+    // Product-level env chips for resources that run per environment
     const useProductEnvs =
       (category.id === 'caches' ||
         category.id === 'sessions' ||
         category.id === 'jobs' ||
-        category.id === 'workflows') &&
+        category.id === 'workflows' ||
+        category.id === 'resilience') &&
       product?.envs?.length;
     const itemEnvs =
       Array.isArray(item.envs) && item.envs.length > 0
@@ -1473,10 +1575,7 @@ export default function ProductTabContent({
     const cardContent = (
       <div
         onClick={() => {
-          if (category.id === 'workflows') {
-            // Workflows: only env chips open the explorer; card click does nothing
-            return;
-          }
+          if (isCloudProvisioning) return;
           if (category.id === 'apps') {
             handleOpenApp(item);
           } else if (category.id === 'environments') {
@@ -1489,8 +1588,8 @@ export default function ProductTabContent({
           'bg-white rounded-lg border border-grey-400 transition-all',
           // Responsive padding
           'p-3 sm:p-4',
-          category.id === 'workflows'
-            ? 'cursor-default'
+          isCloudProvisioning
+            ? 'opacity-50 cursor-not-allowed border-dashed hover:border-grey-400 hover:shadow-none'
             : 'hover:border-primary hover:shadow-md cursor-pointer',
           isLoadingApp && 'opacity-70 cursor-wait',
         )}
@@ -1526,7 +1625,24 @@ export default function ProductTabContent({
                 {itemName}
               </h3>
               {/* Status badge - Responsive */}
-              {(item.status || item.active !== undefined) && (
+              {(isCloudProvisioning || isCloudProvisionFailed) && (
+                <span
+                  className={cn(
+                    'px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border flex-shrink-0 inline-flex items-center gap-1',
+                    isCloudProvisioning
+                      ? 'bg-amber-100 text-amber-800 border-amber-200'
+                      : 'bg-red-100 text-red-700 border-red-200',
+                  )}
+                >
+                  {isCloudProvisioning && (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  )}
+                  {isCloudProvisioning ? 'Provisioning' : 'Provision failed'}
+                </span>
+              )}
+              {!isCloudProvisioning &&
+                !isCloudProvisionFailed &&
+                (item.status || item.active !== undefined) && (
                 <span
                   className={cn(
                     'px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border flex-shrink-0',
@@ -1603,11 +1719,25 @@ export default function ProductTabContent({
                 {itemEnvs.slice(0, 3).map((env: any) => (
                   <button
                     key={env.slug}
-                    onClick={e =>
-                      handleOpenResourceExplorer(item, resourceType, env, e)
+                    onClick={e => {
+                      if (isCloudProvisioning) {
+                        e.stopPropagation();
+                        return;
+                      }
+                      handleOpenResourceExplorer(item, resourceType, env, e);
+                    }}
+                    disabled={isCloudProvisioning}
+                    className={cn(
+                      'inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium transition-colors',
+                      isCloudProvisioning
+                        ? 'bg-grey-100 text-grey-500 cursor-not-allowed'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
+                    )}
+                    title={
+                      isCloudProvisioning
+                        ? 'Cloud database is still provisioning'
+                        : `Open ${env.slug} in explorer`
                     }
-                    className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                    title={`Open ${env.slug} in explorer`}
                   >
                     {env.slug}
                     <ExternalLink className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
@@ -3068,7 +3198,7 @@ export default function ProductTabContent({
                   code: `import ductape from '@ductape/sdk';
 
 // Dispatch a job that calls an app action
-const job = await ductape.actions.dispatch({
+const job = await ductape.api.dispatch({
   env: '${envSlug}',
   product: '${productTag}',
   app: 'email-service',
@@ -3083,7 +3213,7 @@ const job = await ductape.actions.dispatch({
                 {
                   title: 'Delayed App Action',
                   code: `// Schedule an app action to run after 1 hour
-const job = await ductape.actions.dispatch({
+const job = await ductape.api.dispatch({
   env: '${envSlug}',
   product: '${productTag}',
   app: 'payment-service',
@@ -3098,7 +3228,7 @@ const job = await ductape.actions.dispatch({
                 {
                   title: 'Recurring App Action (Cron)',
                   code: `// Schedule a recurring app action job
-const job = await ductape.actions.dispatch({
+const job = await ductape.api.dispatch({
   env: '${envSlug}',
   product: '${productTag}',
   app: 'analytics-service',

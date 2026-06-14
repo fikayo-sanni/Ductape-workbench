@@ -22,6 +22,7 @@ import {
   PanelLeft,
   ArrowRight,
   Slack,
+  Code,
 } from 'lucide-react';
 
 /** Discord logo icon (Lucide does not provide Discord). */
@@ -56,7 +57,8 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useSDKProxy } from '@/services/sdkProxy';
 import toast from 'react-hot-toast';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import {
   fetchNotificationLogs,
   fetchNotificationMessageLogs,
@@ -64,6 +66,8 @@ import {
   type NotificationActivityLog as INotificationActivityLog,
   type NotificationLogEntry,
 } from '@/services/logsServices';
+import CodeSidebar from '@/components/CodeSidebar';
+import payloadGenerationService from '@/services/payloadGenerationService';
 
 /** SDK notification message log item (decrypted input from notifications.getMessages) */
 export interface NotificationMessageLogItemSDK {
@@ -188,6 +192,10 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<ChannelFilter>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [generatedPayloadsByEnvMethod, setGeneratedPayloadsByEnvMethod] = useState<
+    Record<string, Record<string, Record<string, unknown>>>
+  >({});
 
   // Sync Notifier+Env mode from tab data when opening with notification+env
   useEffect(() => {
@@ -613,39 +621,6 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
     };
   }, [notificationLogs]);
 
-  // Activity timeline content (last 7 calendar days, 0 for missing) — same as DatabaseExplorerTab / StorageExplorerTab
-  const activityTimelineContent = useMemo(() => {
-    const timeline = getLast7CalendarDays(weeklyStats.dailyTrend, (d) => d.sent ?? 0);
-    const maxSent = Math.max(...timeline.map((d) => d.value), 1);
-    return (
-      <div className="space-y-3">
-        {timeline.map((day) => {
-          const percentage = maxSent > 0 ? (day.value / maxSent) * 100 : 0;
-          return (
-            <div key={day.date} className="flex items-center gap-3">
-              <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-              <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                <div
-                  className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                  style={{ width: `${percentage}%` }}
-                />
-                <div className="absolute inset-0 flex items-center px-3">
-                  <span className="text-xs font-semibold text-white drop-shadow-sm">
-                    {day.value.toLocaleString()} messages sent
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div className="pt-4 border-t border-grey-200 flex justify-between text-sm">
-          <span className="text-grey-600">Total messages</span>
-          <span className="font-semibold text-grey">{timeline.reduce((sum, d) => sum + d.value, 0).toLocaleString()}</span>
-        </div>
-      </div>
-    );
-  }, [weeklyStats.dailyTrend]);
-
   // Handle refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -696,6 +671,94 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
 
   const handleCreateMessage = () => {
     toast('Create template: coming soon');
+  };
+
+  useEffect(() => {
+    const loadPayloads = async () => {
+      if (!showCodeSidebar) return;
+      if (!displayNotification?.tag || !product?.tag) return;
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) return;
+
+      const envs = (displayNotification.envs || []).map((e: any) => e.slug);
+      if (!envs.length) return;
+
+      const methods = ['send', 'dispatch'];
+      const next: Record<string, Record<string, Record<string, unknown>>> = {};
+      await Promise.all(
+        envs.map(async (envSlug: string) => {
+          next[envSlug] = {};
+          await Promise.all(
+            methods.map(async (method) => {
+              try {
+                const result = await payloadGenerationService.generateExecutablePayload({
+                  workspace_id: currentWorkspaceId,
+                  user_id: user._id,
+                  public_key: user.public_key,
+                  product_tag: product.tag,
+                  env_slug: envSlug,
+                  operation_family: 'notification',
+                  method,
+                  targets: {
+                    notification_tag: displayNotification.tag,
+                    message_tag: (displayNotification.messages || [])[0]?.tag,
+                  },
+                });
+                next[envSlug][method] = result.payload || {};
+              } catch {
+                next[envSlug][method] = {};
+              }
+            }),
+          );
+        }),
+      );
+      setGeneratedPayloadsByEnvMethod(next);
+    };
+    loadPayloads();
+  }, [showCodeSidebar, displayNotification?.tag, displayNotification?.messages, displayNotification?.envs, product?.tag, currentWorkspaceId, user?._id, user?.public_key]);
+
+  const generateNotificationCodeSections = (language: string, env?: string) => {
+    const envSlug = env || selectedEnv || 'prd';
+    const byMethod = generatedPayloadsByEnvMethod[envSlug] || {};
+    const buildCode = (method: 'send' | 'dispatch', fallback: string) => {
+      const tpl = byMethod[method];
+      const input = (tpl?.input as Record<string, unknown>) || null;
+      if (!input) return fallback;
+      const json = JSON.stringify(input, null, 2);
+      if (language === 'python') {
+        return `result = ductape.notifications.${method}(${json.replace(/"([^"]+)":/g, "'$1':")})
+print('Result:', result)`;
+      }
+      return `const result = await ductape.notifications.${method}(${json});
+console.log('Result:', result);`;
+    };
+
+    return [
+      {
+        title: 'Send Notification',
+        code: buildCode(
+          'send',
+          `const result = await ductape.notifications.send({
+  product: '${product.tag}',
+  env: '${envSlug}',
+  event: '${displayNotification?.tag || 'notification:message'}',
+  input: { email: { recipients: ['user@example.com'], subject: 'Hello', template: 'Welcome' } }
+});`,
+        ),
+      },
+      {
+        title: 'Dispatch Notification',
+        code: buildCode(
+          'dispatch',
+          `const result = await ductape.notifications.dispatch({
+  product: '${product.tag}',
+  env: '${envSlug}',
+  notification: '${displayNotification?.tag || 'notification_tag'}',
+  event: '${(displayNotification?.messages || [])[0]?.tag || 'message_tag'}',
+  input: { key: 'value' }
+});`,
+        ),
+      },
+    ];
   };
 
   // Channel count = number of messages in that channel (from notification message log / integrations API)
@@ -778,6 +841,14 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Template
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCodeSidebar(true)}
+              >
+                <Code className="h-4 w-4 mr-2" />
+                View Code
               </Button>
             </div>
           </div>
@@ -1027,6 +1098,15 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setShowCodeSidebar(true)}
+                  className="border-border text-grey-600 hover:text-grey hover:bg-background-secondary"
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  Code
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleRefresh}
                   disabled={isRefreshing}
                   className="border-border text-grey-600 hover:text-grey hover:bg-background-secondary"
@@ -1122,23 +1202,14 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
               </div>
             </div>
 
-            {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab / StorageExplorerTab */}
-            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-                {isLoadingNotificationLogs && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-              </div>
-              {isLoadingNotificationLogs ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              ) : activityTimelineContent}
-            </div>
+            <ActivityTimelinePanel
+              title="Activity timeline"
+              kind="notification"
+              productTag={product.tag}
+              countLabel="messages"
+              enabled={!!product.tag}
+              className="mb-6"
+            />
 
             {/* Channel Distribution - Session Dashboard Style */}
             <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1529,6 +1600,16 @@ export default function NotificationExplorerTab({ data }: NotificationExplorerTa
         )}
 
       </div>
+      {showCodeSidebar && (
+        <CodeSidebar
+          title={displayNotification?.name || 'Notifications'}
+          subtitle={`SDK payload templates for ${displayNotification?.tag || product.tag}`}
+          tag={displayNotification?.tag || product.tag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateNotificationCodeSections}
+          environments={displayNotification?.envs || product.envs || []}
+        />
+      )}
     </div>
   );
 }

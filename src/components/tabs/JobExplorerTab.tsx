@@ -19,10 +19,13 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
+import CodeSidebar from '@/components/CodeSidebar';
+import payloadGenerationService from '@/services/payloadGenerationService';
 import {
   fetchJobExecutions,
   phaseToStatus,
@@ -158,6 +161,8 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
   const { user, currentWorkspaceId } = useAuth();
   const [activeSection, setActiveSectionState] = useState<'overview' | 'past' | 'future'>(initialActiveSection ?? 'overview');
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [generatedDispatchPayload, setGeneratedDispatchPayload] = useState<Record<string, unknown> | null>(null);
 
   const setActiveSection = (section: 'overview' | 'past' | 'future') => {
     setActiveSectionState(section);
@@ -285,6 +290,57 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
     setExpandedRunId((id) => (id === run.id ? null : run.id));
   };
 
+  useEffect(() => {
+    const loadDispatchTemplate = async () => {
+      if (!showCodeSidebar) return;
+      if (!currentWorkspaceId || !user?._id || !user?.public_key || !productTag) return;
+
+      try {
+        const result = await payloadGenerationService.generateExecutablePayload({
+          workspace_id: currentWorkspaceId,
+          user_id: user._id,
+          public_key: user.public_key,
+          product_tag: productTag,
+          env_slug: envSlug,
+          operation_family: 'action',
+          method: 'dispatch',
+          targets: {
+            action_tag: job?.event || jobTag,
+            access_tag: (job as any)?.app || (job as any)?.appTag || 'app_tag',
+          },
+        });
+        setGeneratedDispatchPayload(result.payload || {});
+      } catch {
+        setGeneratedDispatchPayload(null);
+      }
+    };
+    loadDispatchTemplate();
+  }, [showCodeSidebar, currentWorkspaceId, user?._id, user?.public_key, productTag, envSlug, job?.event, jobTag, (job as any)?.app, (job as any)?.appTag]);
+
+  const generateJobCodeSections = (language: string) => {
+    const fallback = `const result = await ductape.api.dispatch({
+  product: '${productTag}',
+  env: '${envSlug}',
+  app: '${(job as any)?.app || (job as any)?.appTag || 'app_tag'}',
+  action: '${job?.event || jobTag}',
+  input: { key: 'value' }
+});
+console.log('Result:', result);`;
+
+    const input = (generatedDispatchPayload?.input as Record<string, unknown>) || null;
+    const generated = input
+      ? language === 'python'
+        ? `result = ductape.api.dispatch(${JSON.stringify(input, null, 2).replace(/"([^"]+)":/g, "'$1':")})
+print('Result:', result)`
+        : `const result = await ductape.api.dispatch(${JSON.stringify(input, null, 2)});
+console.log('Result:', result);`
+      : fallback;
+
+    return [
+      { title: 'Dispatch Job', code: generated },
+    ];
+  };
+
   return (
     <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-background-tertiary">
       {/* Sidebar */}
@@ -350,6 +406,14 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
               >
                 <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
                 Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCodeSidebar(true)}
+                className="border-border text-grey-600 hover:text-grey hover:bg-grey-100"
+              >
+                Code
               </Button>
             </div>
           </div>
@@ -427,34 +491,16 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-                <h2 className="text-lg font-semibold text-grey mb-4">Activity Timeline (Last 7 Days)</h2>
-                <div className="space-y-3">
-                  {(() => {
-                    const timeline = getLast7CalendarDays(weeklyTrend, (d) => d.executions ?? 0);
-                    const maxActivity = Math.max(...timeline.map((d) => d.value), 1);
-                    return timeline.map((day) => {
-                      const pct = maxActivity > 0 ? (day.value / maxActivity) * 100 : 0;
-                      return (
-                        <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                            <div
-                              className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center px-3">
-                              <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                {day.value.toLocaleString()} runs
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
+              <ActivityTimelinePanel
+                title="Activity timeline"
+                kind="job"
+                productTag={productTag}
+                componentTag={jobTag}
+                env={envSlug}
+                countLabel="runs"
+                enabled={!!productTag}
+                className="mb-6"
+              />
 
               <div className="bg-white rounded-lg border border-border shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -617,6 +663,16 @@ export default function JobExplorerTab({ tabId, job, product, env, initialActive
           )}
         </div>
       </div>
+      {showCodeSidebar && (
+        <CodeSidebar
+          title={job?.name || jobTag}
+          subtitle={`Dispatch snippets for ${jobTag}`}
+          tag={jobTag}
+          onClose={() => setShowCodeSidebar(false)}
+          generateCodeSections={generateJobCodeSections}
+          environments={product?.envs || []}
+        />
+      )}
     </div>
   );
 }

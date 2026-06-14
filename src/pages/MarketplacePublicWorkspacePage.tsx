@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/store/useAuth';
-import { useLoginModalStore } from '@/stores/login-modal-store';
 import { fetchWorkspacePublicByTag } from '@/services/publicWorkspaceServices';
 import marketplaceServices from '@/services/marketplaceServices';
 import AppCard from '@/components/marketplace/AppCard';
@@ -17,7 +16,6 @@ export default function MarketplacePublicWorkspacePage() {
   const { workspaceTag } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { openLoginModal } = useLoginModalStore();
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [integrationModalOpen, setIntegrationModalOpen] = useState(false);
@@ -52,7 +50,7 @@ export default function MarketplacePublicWorkspacePage() {
             {!user && (
               <Button
                 className="rounded-md px-6 bg-primary hover:bg-primary/90 text-white font-bold transition-all h-9 text-xs"
-                onClick={openLoginModal}
+                onClick={() => navigate('/login')}
               >
                 Sign in to integrate
               </Button>
@@ -142,7 +140,7 @@ export default function MarketplacePublicWorkspacePage() {
                         if (tag) navigate(`/marketplace/app/${encodeURIComponent(tag)}`);
                       }}
                       onIntegrate={() => {
-                        if (!user) return openLoginModal();
+                        if (!user) return navigate('/login');
                         setSelectedApp(app);
                         setIntegrationModalOpen(true);
                       }}

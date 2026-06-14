@@ -16,6 +16,7 @@ import {
   ListTree,
   Key,
   Layers,
+  Cloud,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 
@@ -24,10 +25,19 @@ interface NewItemOption {
   label: string;
   icon: typeof FileText;
   description: string;
-  category: 'common' | 'product' | 'app';
+  category: 'cloud' | 'common' | 'product' | 'app';
 }
 
 const newItemOptions: NewItemOption[] = [
+  // Cloud
+  {
+    id: 'cloud',
+    label: 'Cloud connection',
+    icon: Cloud,
+    description: 'Link AWS, GCP, or Azure account',
+    category: 'cloud',
+  },
+
   // Common
   {
     id: 'request',
@@ -140,6 +150,7 @@ export default function NewItemDropdown({onSelect}: NewItemDropdownProps) {
 
   const categories = [
     {id: 'common', label: 'Common'},
+    {id: 'cloud', label: 'Cloud'},
     {id: 'app', label: 'Application'},
     {id: 'product', label: 'Product Features'},
   ];

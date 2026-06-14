@@ -13,10 +13,11 @@ export interface Workspace {
   logo?: string;
   user_id: string;
   default: boolean;
-  created_at?: string;
-  updated_at?: string;
+  admin?: boolean;
   accepted?: boolean;
   access_level?: string;
+  created_at?: string;
+  updated_at?: string;
   date_joined?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -41,6 +42,13 @@ export function filterAcceptedWorkspaceRows<T extends {accepted?: boolean}>(
 ): T[] {
   if (!workspaces?.length) return [];
   return workspaces.filter(w => w.accepted !== false);
+}
+
+export function filterPendingWorkspaceRows<T extends {accepted?: boolean}>(
+  workspaces: T[] | undefined | null,
+): T[] {
+  if (!workspaces?.length) return [];
+  return workspaces.filter(w => w.accepted === false);
 }
 
 interface CreateWorkspaceResponse {
@@ -207,6 +215,34 @@ const updateWorkspaceEnvs = async (data: {
   return response.data;
 };
 
+interface WorkspaceDetailResponse {
+  data: Workspace & {
+    name?: string;
+    admin?: boolean;
+  };
+  status?: boolean;
+  message?: string;
+}
+
+const fetchWorkspaceById = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<WorkspaceDetailResponse | null> => {
+  const { workspace_id, user_id, public_key } = data;
+
+  try {
+    const response = await apiClient.get<WorkspaceDetailResponse>(
+      `/workspaces/v1/get/${workspace_id}`,
+      { params: { public_key, user_id } },
+    );
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Failed to fetch workspace:', error);
+    return null;
+  }
+};
+
 const fetchDashboardData = async (data: {
   workspace_id: string;
   user_id: string;
@@ -257,8 +293,46 @@ const updateWorkspace = async (data: {
   return response.data;
 };
 
+interface RespondToInviteResponse {
+  data?: {
+    action?: 'accept' | 'reject';
+    workspaces?: Workspace[];
+  };
+  status?: boolean;
+  message?: string;
+}
+
+const respondToInvite = async (data: {
+  access_id: string;
+  user_id: string;
+  public_key: string;
+  action: 'accept' | 'reject';
+}): Promise<RespondToInviteResponse> => {
+  const { access_id, user_id, public_key, action } = data;
+
+  const response = await apiClient.put<RespondToInviteResponse>(
+    `/workspaces/v1/invites/${access_id}/respond`,
+    { action },
+    { params: { public_key, user_id } },
+  );
+
+  const body = response.data;
+  if (body?.status === false) {
+    const message =
+      (typeof body.message === 'string' && body.message) ||
+      (typeof (body as { errors?: string }).errors === 'string'
+        ? (body as { errors?: string }).errors
+        : undefined) ||
+      `Failed to ${action} invite`;
+    throw new Error(message);
+  }
+
+  return body;
+};
+
 const workspaceServices = {
   fetchWorkspaces,
+  fetchWorkspaceById,
   changeDefaultWorkspace,
   createWorkspace,
   inviteMember,
@@ -269,6 +343,7 @@ const workspaceServices = {
   updateWorkspace,
   updateWorkspaceEnvs,
   fetchDashboardData,
+  respondToInvite,
 };
 
 export default workspaceServices;

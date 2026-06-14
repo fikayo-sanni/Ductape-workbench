@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { getTabState, saveTabState } from '@/lib/tab-state-manager';
@@ -908,34 +909,15 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
                 </div>
               </div>
 
-              {/* Activity Timeline – last 7 calendar days (e.g. Jan 28 … Feb 3) */}
-              <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-                </div>
-                <div className="space-y-3">
-                  {metrics.weeklyStats.last7CalendarDays.map((day) => {
-                    const maxActivity = Math.max(...metrics.weeklyStats.last7CalendarDays.map((d) => d.executions), 1);
-                    const percentage = maxActivity > 0 ? (day.executions / maxActivity) * 100 : 0;
-                    return (
-                      <div key={day.dateKey} className="flex items-center gap-3">
-                        <div className="w-14 text-xs font-medium text-grey-600">{day.label}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white drop-shadow-sm">
-                              {day.executions.toLocaleString()} executions
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <ActivityTimelinePanel
+                title="Activity timeline"
+                kind="workflow"
+                productTag={productTag}
+                componentTag={workflowTag}
+                countLabel="executions"
+                enabled={!!productTag && !!workflowTag}
+                className="mb-6"
+              />
 
               {/* Current Session Metrics Dashboard */}
               <div className="grid grid-cols-6 gap-4 mb-6">

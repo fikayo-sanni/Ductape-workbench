@@ -79,7 +79,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, getLast7DaysNormalized } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -528,34 +529,6 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     },
     enabled: !!graphService && !!graph.productTag && isConnected,
     staleTime: 30000,
-  });
-
-  // Query for fetching graph activity metrics from logs service
-  const { data: graphActivityData, isLoading: isLoadingActivity } = useQuery<GraphDashboardMetrics | null>({
-    queryKey: ['graph-activity', graph.productTag, graph.tag, graph.env.slug],
-    queryFn: async () => {
-      if (!graph.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
-        return null;
-      }
-      try {
-        const result = await logsServices.fetchGraphDashboard(
-          currentWorkspaceId,
-          user._id,
-          user.public_key,
-          {
-            product_tag: graph.productTag,
-            graph_tag: graph.tag,
-            env: graph.env.slug,
-          }
-        );
-        return result;
-      } catch (error) {
-        console.error('Error fetching graph activity data:', error);
-        return null;
-      }
-    },
-    enabled: !!graph.productTag && !!currentWorkspaceId && !!user?._id,
-    staleTime: 60000, // Cache for 1 minute
   });
 
   // Sidebar collapsed and width state
@@ -5060,49 +5033,15 @@ await ductape.init();`,
               </div>
             </div>
 
-            {/* Activity Timeline (7 Days) */}
-            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (7 Days)</h2>
-                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-              </div>
-              {isLoadingActivity ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {(() => {
-                    const normalized = getLast7DaysNormalized(graphActivityData?.activityTimeline ?? [], (d) => d.sessions ?? 0);
-                    const maxOperations = Math.max(...normalized.map((d) => d.value), 1);
-                    return normalized.map((day) => {
-                      const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
-                      return (
-                        <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.date}</div>
-                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                              style={{ width: `${percentage}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center px-3">
-                              <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                {day.value.toLocaleString()} operations
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
+            <ActivityTimelinePanel
+              title="Activity timeline"
+              kind="graph"
+              productTag={graph.productTag}
+              componentTag={graph.tag}
+              env={graph.env.slug}
+              countLabel="operations"
+              enabled={!!graph.productTag}
+            />
 
             {/* Quick Actions */}
             <div>

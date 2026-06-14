@@ -1018,7 +1018,7 @@ ${generateFlatInput('    ')}
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.actions.run(payload);
+            code: `const result = await ductape.api.run(payload);
 console.log('Action result:', result);`
           }
         ];
@@ -1048,7 +1048,7 @@ ${generateFlatInput('    ')}
           },
           {
             title: 'Execute',
-            code: `const result = await ductape.actions.run(payload);
+            code: `const result = await ductape.api.run(payload);
 console.log('Action result:', result);`
           }
         ];

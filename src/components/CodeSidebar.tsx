@@ -16,11 +16,15 @@ export interface CodeSidebarProps {
   subtitle?: string;
   tag?: string;
   onClose?: () => void;
+  /** Sticky header label (default: "Code Examples") */
+  panelTitle?: string;
   // Option 1: Dynamic code generation (runtime: 'vanilla' | 'react' | 'node' for frontend/backend variants)
   generateCodeSections?: (language: string, env?: string, runtime?: string) => CodeSection[];
   environments?: Array<{ slug: string; env_name?: string }>;
   /** When true, show Runtime selector (Vanilla JS, React, Node.js) and pass to generateCodeSections */
   showRuntimeSelector?: boolean;
+  /** Fixed sections (e.g. sample payload) without language/env selectors */
+  staticSections?: CodeSection[];
   // Option 2: Simple static code
   language?: string;
   code?: string;
@@ -36,9 +40,11 @@ export default function CodeSidebar({
   subtitle,
   tag,
   onClose,
+  panelTitle = 'Code Examples',
   generateCodeSections,
   environments = [],
   showRuntimeSelector = false,
+  staticSections,
   language: staticLanguage,
   code: staticCode,
   additionalControls,
@@ -55,66 +61,136 @@ export default function CodeSidebar({
   const [showTransactions, setShowTransactions] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
 
-  // Use static code if provided, otherwise use generateCodeSections (pass runtime when showRuntimeSelector)
-  const sections: CodeSection[] = staticCode
-    ? [{ title: 'Code', code: staticCode }]
-    : generateCodeSections
-    ? generateCodeSections(selectedLanguage, selectedEnv, showRuntimeSelector ? selectedRuntime : undefined)
-    : [];
+  const isDetailPanelMode = Boolean(staticSections?.length) && !generateCodeSections;
+  const isSimpleMode = Boolean(staticCode) && !generateCodeSections && !isDetailPanelMode;
+
+  const sections: CodeSection[] = isDetailPanelMode
+    ? staticSections!
+    : staticCode
+      ? [{ title: staticLanguage || 'Code', code: staticCode }]
+      : generateCodeSections
+        ? generateCodeSections(
+            selectedLanguage,
+            selectedEnv,
+            showRuntimeSelector ? selectedRuntime : undefined
+          )
+        : [];
 
   const copySection = (code: string, sectionTitle: string) => {
     navigator.clipboard.writeText(code);
     toast.success(`${sectionTitle} copied to clipboard`);
   };
 
-  // Simple mode - just show code without sidebar chrome
-  const isSimpleMode = staticCode && !generateCodeSections;
+  const renderSections = () => (
+    <div className="space-y-4">
+      {sections.map((section, index) => {
+        const isInitialize = section.title.toLowerCase().includes('init');
+        const isTransaction = section.title.toLowerCase().includes('transaction');
+        const isConnection = section.title.toLowerCase().includes('connection');
+        const isCollapsible = isInitialize || isTransaction || isConnection;
+        const isHidden =
+          (isInitialize && !showInitialize) ||
+          (isTransaction && !showTransactions) ||
+          (isConnection && !showConnection);
+        const shouldRenderControlsAfter = additionalControlsAfterSection === section.title;
 
-  if (isSimpleMode) {
+        return (
+          <div key={index}>
+            <div className="space-y-2">
+              {isCollapsible ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isInitialize) {
+                      setShowInitialize(!showInitialize);
+                    } else if (isTransaction) {
+                      setShowTransactions(!showTransactions);
+                    } else if (isConnection) {
+                      setShowConnection(!showConnection);
+                    }
+                  }}
+                  className="flex items-center gap-2 text-sm font-semibold text-grey-700 hover:text-primary transition-colors"
+                >
+                  {(isInitialize && showInitialize) ||
+                  (isTransaction && showTransactions) ||
+                  (isConnection && showConnection) ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  {section.title}
+                </button>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold text-grey-700">{section.title}</Label>
+                  <div className="flex items-center gap-2">
+                    {onSectionAction && onSectionAction(section.title)}
+                    <Button
+                      onClick={() => copySection(section.code, section.title)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 h-7 px-2 text-xs"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!isHidden && (
+                <>
+                  {sectionFooter && sectionFooter(section.title)}
+                  <Textarea
+                    value={section.code}
+                    readOnly
+                    className="font-mono text-sm bg-grey-50 resize-none"
+                    rows={Math.min(Math.max(section.code.split('\n').length, 4), 24)}
+                  />
+                </>
+              )}
+            </div>
+
+            {shouldRenderControlsAfter && additionalControls && (
+              <div className="border-t border-grey-300 pt-4 mt-4">{additionalControls}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (isSimpleMode && staticCode) {
     return (
       <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
             <Code className="w-5 h-5" />
-            {title}
+            {panelTitle}
           </h3>
           {onClose && (
             <Button onClick={onClose} variant="ghost" size="sm">
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </Button>
           )}
         </div>
 
-        <div className="p-4 space-y-4">
-          {subtitle && (
-            <p className="text-sm text-grey-600">{subtitle}</p>
-          )}
-          {tag && (
-            <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded font-mono">
-              {tag}
-            </span>
+        <div className="p-4 space-y-6">
+          <div>
+            <h4 className="text-lg font-bold text-grey mb-2">{title}</h4>
+            {tag && (
+              <span className="text-xs px-2 py-1 bg-primary/15 text-primary rounded font-mono">
+                {tag}
+              </span>
+            )}
+            {subtitle && <p className="text-sm text-grey-600 mt-2">{subtitle}</p>}
+          </div>
+
+          {additionalControls && !additionalControlsAfterSection && (
+            <div className="border-t border-grey-300 pt-4">{additionalControls}</div>
           )}
 
-          <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm font-semibold text-grey-700">
-              {staticLanguage || 'Code'}
-            </Label>
-            <Button
-              onClick={() => copySection(staticCode, 'Code')}
-              variant="outline"
-              size="sm"
-              className="gap-2 h-7 px-2 text-xs"
-            >
-              <Copy className="h-3 w-3" />
-              Copy
-            </Button>
-          </div>
-          <Textarea
-            value={staticCode}
-            readOnly
-            className="font-mono text-sm bg-grey-50 resize-none"
-            rows={Math.min(staticCode.split('\n').length, 30)}
-          />
+          {renderSections()}
         </div>
       </div>
     );
@@ -125,7 +201,7 @@ export default function CodeSidebar({
       <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
           <Code className="w-5 h-5" />
-          Code Examples
+          {panelTitle}
         </h3>
         {onClose && (
           <Button onClick={onClose} variant="ghost" size="sm">
@@ -149,7 +225,7 @@ export default function CodeSidebar({
         </div>
 
         {/* Environment Selector */}
-        {environments.length > 0 && (
+        {environments.length > 0 && generateCodeSections && (
           <div>
             <Label className="text-sm font-semibold text-grey-700 mb-2 block">
               Environment
@@ -170,7 +246,7 @@ export default function CodeSidebar({
         )}
 
         {/* Runtime Selector (Vanilla / React / Node) */}
-        {generateCodeSections && showRuntimeSelector && (
+        {generateCodeSections && showRuntimeSelector && !isDetailPanelMode && (
           <div>
             <Label className="text-sm font-semibold text-grey-700 mb-2 block">
               Runtime
@@ -189,7 +265,7 @@ export default function CodeSidebar({
         )}
 
         {/* Language Selector */}
-        {generateCodeSections && (
+        {generateCodeSections && !isDetailPanelMode && (
           <div>
             <Label className="text-sm font-semibold text-grey-700 mb-2 block">
               Language
@@ -221,82 +297,7 @@ export default function CodeSidebar({
           </div>
         )}
 
-        {/* Code Sections */}
-        <div className="space-y-4">
-          {sections.map((section, index) => {
-            const isInitialize = section.title.toLowerCase().includes('init');
-            const isTransaction = section.title.toLowerCase().includes('transaction');
-            const isConnection = section.title.toLowerCase().includes('connection');
-            const isCollapsible = isInitialize || isTransaction || isConnection;
-            const isHidden = (isInitialize && !showInitialize) || (isTransaction && !showTransactions) || (isConnection && !showConnection);
-            const shouldRenderControlsAfter = additionalControlsAfterSection === section.title;
-
-            return (
-              <div key={index}>
-                <div className="space-y-2">
-                  {isCollapsible ? (
-                    <button
-                      onClick={() => {
-                        if (isInitialize) {
-                          setShowInitialize(!showInitialize);
-                        } else if (isTransaction) {
-                          setShowTransactions(!showTransactions);
-                        } else if (isConnection) {
-                          setShowConnection(!showConnection);
-                        }
-                      }}
-                      className="flex items-center gap-2 text-sm font-semibold text-grey-700 hover:text-primary transition-colors"
-                    >
-                      {(isInitialize && showInitialize) || (isTransaction && showTransactions) || (isConnection && showConnection) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      {section.title}
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold text-grey-700">
-                        {section.title}
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        {onSectionAction && onSectionAction(section.title)}
-                        <Button
-                          onClick={() => copySection(section.code, section.title)}
-                          variant="outline"
-                          size="sm"
-                          className="gap-2 h-7 px-2 text-xs"
-                        >
-                          <Copy className="h-3 w-3" />
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isHidden && (
-                    <>
-                      {sectionFooter && sectionFooter(section.title)}
-                      <Textarea
-                        value={section.code}
-                        readOnly
-                        className="font-mono text-sm bg-grey-50 resize-none"
-                        rows={section.code.split('\n').length}
-                      />
-                    </>
-                  )}
-                </div>
-
-                {/* Render additional controls after this section if specified */}
-                {shouldRenderControlsAfter && additionalControls && (
-                  <div className="border-t border-grey-300 pt-4 mt-4">
-                    {additionalControls}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {renderSections()}
       </div>
     </div>
   );

@@ -91,7 +91,7 @@ export default function NewWebhookTabContent({
   // Helper to add a new event
   const addEvent = () => {
     const newEvent: WebhookEvent = {
-      id: `event-${Date.now()}`,
+      id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: "",
       tag: "",
       description: "",
@@ -185,6 +185,29 @@ export default function NewWebhookTabContent({
     setTag(sanitized);
   };
 
+  const formatEventsForCreate = (webhookTag: string, eventsToFormat: WebhookEvent[]) => {
+    return eventsToFormat
+      .filter((e) => e.name.trim() && e.tag.trim() && e.selector)
+      .map((event) => {
+        let parsedSample = {};
+        try {
+          parsedSample = JSON.parse(event.sample);
+        } catch {
+          // Use empty object if invalid
+        }
+
+        const formattedSelector = `$Event{${event.selector.split('.').join('}{')}}`;
+
+        return {
+          name: event.name,
+          tag: `${webhookTag}:${event.tag}`,
+          description: event.description,
+          selector: formattedSelector,
+          sample: parsedSample,
+        };
+      });
+  };
+
   const { mutateAsync: createWebhook, isPending: isCreating } = useMutation({
     mutationFn: async (payload: any) => {
       if (!ductape) throw new Error("Ductape not initialized");
@@ -194,45 +217,30 @@ export default function NewWebhookTabContent({
 
       await ductape.init(contextTag);
 
-      // Create webhook with environments (Generate a link type - only slug needed)
-      const webhookData = await ductape.webhooks.create({
+      const formattedEvents = formatEventsForCreate(payload.tag, payload.events || []);
+
+      return ductape.webhooks.createWithEvents(contextTag, {
         name: payload.name,
         tag: payload.tag,
         description: payload.description,
         envs: payload.envs.map((slug: string) => ({ slug })),
+        events: formattedEvents,
       });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
 
-      // Create events if any
-      if (payload.events && payload.events.length > 0) {
-        for (const event of payload.events) {
-          // Parse sample JSON
-          let parsedSample = {};
-          try {
-            parsedSample = JSON.parse(event.sample);
-          } catch (e) {
-            // Use empty object if invalid
-          }
+      const eventErrors = result?.eventErrors || [];
+      const createdCount = result?.events?.length || 0;
 
-          // Format selector: convert "field.subfield" to "$Event{field}{subfield}"
-          const formattedSelector = event.selector
-            ? `$Event{${event.selector.split(".").join("}{")}}`
-            : "";
-
-          await ductape.webhooks.events.create({
-            name: event.name,
-            tag: `${payload.tag}:${event.tag}`,
-            description: event.description,
-            selector: formattedSelector,
-            sample: parsedSample,
-          });
-        }
+      if (eventErrors.length > 0) {
+        toast.error(
+          `Webhook created with ${createdCount} event(s). ${eventErrors.length} event(s) failed — check sample payload and selector fields.`
+        );
+      } else {
+        toast.success("Webhook Channel created successfully!");
       }
 
-      return webhookData;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
-      toast.success("Webhook Channel created successfully!");
       closeTab(tabId);
 
       // Open/focus the app tab and refresh its content
@@ -272,12 +280,13 @@ export default function NewWebhookTabContent({
   // Validate all events have required fields
   const areEventsValid = events.every(event => {
     if (!event.name.trim() || !event.tag.trim()) return false;
-    // Selector is required if sample is provided
-    if (event.sample && event.sample.trim() !== '{}' && event.sample.trim() !== '' && !event.selector) {
-      return false;
-    }
+
     const validation = validateEventSample(event.sample);
-    return validation.isValid;
+    if (!validation.isValid) return false;
+    if (validation.selectorOptions.length === 0) return false;
+    if (!event.selector) return false;
+
+    return true;
   });
 
   const handleSave = async () => {
@@ -292,7 +301,7 @@ export default function NewWebhookTabContent({
     }
 
     if (events.length > 0 && !areEventsValid) {
-      toast.error("Please complete all event fields correctly");
+      toast.error("Each event needs a name, tag, sample payload with fields, and a selector");
       return;
     }
 
@@ -302,7 +311,7 @@ export default function NewWebhookTabContent({
       description,
       active,
       envs: selectedEnvSlugs,
-      events: events.filter(e => e.name.trim() && e.tag.trim()),
+      events,
     });
   };
 
@@ -674,6 +683,18 @@ export default function NewWebhookTabContent({
                   </div>
                 );
               })}
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addEvent}
+                  className="gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Event
+                </Button>
+              </div>
             </div>
           )}
         </div>

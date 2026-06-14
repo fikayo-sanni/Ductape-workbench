@@ -56,7 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import { useDebouncedValue } from '@wojtekmaj/react-hooks';
 import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -840,27 +841,17 @@ export default function SessionUserTab({
     return () => observer.disconnect();
   }, [viewMode, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Activity timeline from backend (pre-aggregated)
-  const activityTimeline = useMemo(() => {
-    return userDashboard?.activityTimeline || [];
-  }, [userDashboard?.activityTimeline]);
-
   // Peak activity hours from backend (pre-aggregated)
   const peakActivityHours = useMemo(() => {
     if (!userDashboard?.peakHours) return [];
 
     // Transform to expected format with label
     return userDashboard.peakHours.map(h => ({
-      hour: parseInt(h.hour),
+      hour: parseInt(h.hour, 10),
       count: h.count,
       label: h.hour,
     }));
   }, [userDashboard?.peakHours]);
-
-  // Get max count for timeline scaling
-  const maxTimelineCount = useMemo(() => {
-    return Math.max(...activityTimeline.map(d => d.count), 1);
-  }, [activityTimeline]);
 
   // Success rate from backend
   const successRate = userDashboard?.successRate ?? 0;
@@ -1152,67 +1143,16 @@ export default function SessionUserTab({
                   </div>
                 )}
 
-                {/* Activity Timeline (Last 7 Days) - last 7 calendar days with 0 for no activity */}
-                <div className="bg-white rounded-lg border border-grey-300 overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-grey-400 bg-grey-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-blue-600" />
-                        <h3 className="text-base font-semibold text-grey">Activity Timeline (Last 7 Days)</h3>
-                      </div>
-                      {dashboardLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-                    </div>
-                    <p className="text-sm text-grey-600 mt-1">User activity over the last 7 days</p>
-                  </div>
-                  <div className="p-5">
-                    {dashboardLoading ? (
-                      <div className="space-y-3">
-                        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                          <div key={i} className="flex items-center gap-3">
-                            <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                            <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="space-y-3">
-                          {(() => {
-                            const normalized = getLast7CalendarDays(activityTimeline, (d) => d.count ?? 0);
-                            const maxCount = Math.max(...normalized.map((d) => d.value), 1);
-                            return normalized.map((day) => {
-                              const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
-                              return (
-                                <div key={day.date} className="flex items-center gap-3">
-                                  <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                                  <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                                    <div
-                                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                    <div className="absolute inset-0 flex items-center px-3">
-                                      <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                        {day.value.toLocaleString()} events
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                        <div className="pt-4 border-t border-grey-400">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-grey-600">Total Events</span>
-                            <span className="text-lg font-semibold text-grey">
-                              {userDashboard?.totalLogs ?? totalLogsCount} events
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ActivityTimelinePanel
+                  title="Activity timeline"
+                  kind="session-user"
+                  productTag={productTag}
+                  sessionTag={sessionTag}
+                  sessionUserId={user?.identifier}
+                  env={envSlug}
+                  countLabel="events"
+                  enabled={!!productTag && !!sessionTag && !!user?.identifier}
+                />
 
                 {/* Peak Activity Hours Card */}
                 <div className="bg-white rounded-lg border border-grey-400 overflow-hidden">

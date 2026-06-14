@@ -11,6 +11,21 @@
 import apiClient from '@/config/axiosinstance';
 import { encryptProxyPayload } from '@/utils/proxyEncryption';
 
+/** Match backend/proxy db-proxy.types.ts METHOD_TIMEOUTS for long operations. */
+const DB_PROXY_METHOD_TIMEOUTS: Record<string, number> = {
+  create: 1_200_000,
+  register: 1_200_000,
+  'migration.run': 600_000,
+  'migration.rollback': 600_000,
+  'schema.createIndex': 300_000,
+};
+
+const DEFAULT_DB_PROXY_TIMEOUT_MS = 60_000;
+
+function getDbProxyMethodTimeout(method: string): number {
+  return DB_PROXY_METHOD_TIMEOUTS[method] ?? DEFAULT_DB_PROXY_TIMEOUT_MS;
+}
+
 /**
  * Configuration for the Database Proxy Service
  */
@@ -114,6 +129,7 @@ export class DatabaseProxyService {
         headers: {
           'x-access-token': this.config.token,
         },
+        timeout: getDbProxyMethodTimeout(method),
       }
     );
 

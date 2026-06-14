@@ -72,7 +72,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { cn, getLast7CalendarDays, getLast7DaysNormalized } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -81,6 +82,7 @@ import { SDKProxyService, SDKProxyConfig } from '@/services/sdkProxy';
 import logsServices, { StorageDashboardMetrics } from '@/services/logsServices';
 import { saveTabState, getTabState } from '@/lib/tab-state-manager';
 import CodeSidebar from '@/components/CodeSidebar';
+import payloadGenerationService from '@/services/payloadGenerationService';
 
 /**
  * Storage file info from SDK - matches IStorageFileInfo from @ductape/sdk
@@ -134,6 +136,7 @@ interface StorageExplorerTabProps {
     productTag?: string;
     productName?: string;
     productId?: string;
+    productEnvironments?: Array<{ slug: string }>;
     env: {
       slug: string;
       config: any;
@@ -254,6 +257,9 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
   const [selectedFileType, setSelectedFileType] = useState<FileTypeFilter>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [generatedPayloadsByEnvOperation, setGeneratedPayloadsByEnvOperation] = useState<
+    Record<string, Record<string, Record<string, unknown>>>
+  >({});
   const [selectedStorageOperation, setSelectedStorageOperation] = useState<string>('read');
 
   // Data State
@@ -480,40 +486,6 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
       fetchDashboardMetrics();
     }
   }, [fetchDashboardMetrics, storage.productTag, storage.tag, storage.env.slug]);
-
-  // Last 7 days activity from logs (same pattern as DatabaseExplorerTab Activity Timeline)
-  const toYYYYMMDD = (d: Date) => d.toISOString().split('T')[0];
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 6);
-  const { data: storageActivityData, isLoading: isLoadingActivity } = useQuery<StorageDashboardMetrics | null>({
-    queryKey: ['storage-activity', storage.productTag, storage.tag, storage.env.slug],
-    queryFn: async () => {
-      if (!storage.productTag || !currentWorkspaceId || !user?._id || !user?.public_key) {
-        return null;
-      }
-      try {
-        return await logsServices.fetchStorageDashboard(
-          currentWorkspaceId,
-          user._id,
-          user.public_key,
-          {
-            product_tag: storage.productTag,
-            storage_tag: storage.tag,
-            env: storage.env.slug,
-            groupBy: 'day',
-            start_date: toYYYYMMDD(startDate),
-            end_date: toYYYYMMDD(endDate),
-          }
-        );
-      } catch (error) {
-        console.error('[StorageExplorer] Error fetching storage activity:', error);
-        return null;
-      }
-    },
-    enabled: !!storage.productTag && !!currentWorkspaceId && !!user?._id,
-    staleTime: 60000,
-  });
 
   /**
    * Fetch storage stats from SDK stats() API
@@ -860,15 +832,113 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
   // Get the provider from props or use storage type
   const storageProvider = storage.provider || storage.type || 'cloud';
 
+  useEffect(() => {
+    const loadGeneratedPayloads = async () => {
+      if (!showCodeSidebar || !storage?.tag || !storage?.productTag) return;
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) return;
+
+      const envs = (storage.productEnvironments || []).map((e: any) => e.slug);
+      if (!envs.length) return;
+
+      const operationToMethod: Record<string, string> = {
+        upload: 'upload',
+        download: 'download',
+        list: 'listFiles',
+        delete: 'remove',
+        signedUrl: 'getSignedUrl',
+        stats: 'stats',
+        dispatch: 'dispatch',
+        read: 'download',
+      };
+
+      const operations = Object.keys(operationToMethod);
+      const nextState: Record<string, Record<string, Record<string, unknown>>> = {};
+
+      await Promise.all(
+        envs.map(async (envSlug: string) => {
+          nextState[envSlug] = {};
+          await Promise.all(
+            operations.map(async (operation) => {
+              try {
+                const result = await payloadGenerationService.generateExecutablePayload({
+                  workspace_id: currentWorkspaceId,
+                  user_id: user._id,
+                  public_key: user.public_key,
+                  product_tag: storage.productTag!,
+                  env_slug: envSlug,
+                  operation_family: 'storage',
+                  method: operationToMethod[operation],
+                  targets: {
+                    storage_tag: storage.tag,
+                  },
+                  schema_mode: 'best_effort',
+                });
+                nextState[envSlug][operation] = result.payload || {};
+              } catch {
+                nextState[envSlug][operation] = {};
+              }
+            }),
+          );
+        }),
+      );
+
+      setGeneratedPayloadsByEnvOperation(nextState);
+    };
+
+    loadGeneratedPayloads();
+  }, [
+    showCodeSidebar,
+    storage?.tag,
+    storage?.productTag,
+    storage?.productEnvironments,
+    currentWorkspaceId,
+    user?._id,
+    user?.public_key,
+  ]);
+
+  const buildDynamicStorageCode = (
+    language: string,
+    operation: string,
+    payloadTemplate: Record<string, unknown> | undefined,
+  ): string | null => {
+    if (!payloadTemplate || !Object.keys(payloadTemplate).length) return null;
+    const methodMap: Record<string, string> = {
+      upload: 'upload',
+      download: 'download',
+      list: 'listFiles',
+      delete: 'remove',
+      signedUrl: 'getSignedUrl',
+      stats: 'stats',
+      dispatch: 'dispatch',
+      read: 'download',
+    };
+    const method = methodMap[operation] || 'upload';
+    const inputPayload = (payloadTemplate.input as Record<string, unknown>) || {};
+    const json = JSON.stringify(inputPayload, null, 2);
+
+    if (language === 'typescript' || language === 'javascript') {
+      return `const result = await ductape.storage.${method}(${json});
+
+console.log('Result:', result);`;
+    }
+    if (language === 'python') {
+      return `result = ductape.storage.${method}(${json.replace(/"([^"]+)":/g, "'$1':")})
+print('Result:', result)`;
+    }
+    return null;
+  };
+
   // Generate code examples for storage operations
   const generateCodeSections = useCallback((language: string, env?: string, runtime?: string) => {
     const storageTag = storage.tag;
     const productTag = storage.productTag || 'your_product';
     const envSlug = env || storage.env.slug || 'prd';
+    const dynamicTemplate = generatedPayloadsByEnvOperation[envSlug]?.[selectedStorageOperation];
+    const dynamicCode = buildDynamicStorageCode(language, selectedStorageOperation, dynamicTemplate);
 
     // Frontend / Node runtime-specific examples (init + upload mutation)
     if (runtime === 'vanilla') {
-      return [
+      const sections = [
         {
           title: 'Init (Vanilla JS, publishable key)',
           code: `import { Ductape } from '@ductape/client';
@@ -879,7 +949,7 @@ const ductape = new Ductape({
         },
         {
           title: 'Mutation (upload)',
-          code: `// e.g. from <input type="file" />
+          code: dynamicCode || `// e.g. from <input type="file" />
 const file = fileInputElement.files[0];
 const result = await ductape.storage.upload({
   storage: '${storageTag}',
@@ -889,6 +959,7 @@ const result = await ductape.storage.upload({
 console.log('Uploaded:', result);`,
         },
       ];
+      return sections;
     }
     if (runtime === 'react') {
       const init = {
@@ -1786,52 +1857,15 @@ console.log('Files by type:', stats.byType);`,
               </div>
             </div>
 
-            {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab */}
-            <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-                {isLoadingActivity && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-              </div>
-              {isLoadingActivity ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                      <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {(() => {
-                    const timeline = getLast7CalendarDays(
-                      storageActivityData?.activityTimeline ?? [],
-                      (d) => d.sessions ?? 0
-                    );
-                    const maxOperations = Math.max(...timeline.map((d) => d.value), 1);
-                    return timeline.map((day) => {
-                      const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
-                      return (
-                        <div key={day.date} className="flex items-center gap-3">
-                          <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                          <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                              style={{ width: `${percentage}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center px-3">
-                              <span className="text-xs font-semibold text-white drop-shadow-sm">
-                                {day.value.toLocaleString()} operations
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
+            <ActivityTimelinePanel
+              title="Activity timeline"
+              kind="storage"
+              productTag={storage.productTag}
+              componentTag={storage.tag}
+              env={storage.env.slug}
+              countLabel="operations"
+              enabled={!!storage.productTag}
+            />
 
             {/* Storage Info & Performance */}
             <div className="grid grid-cols-2 gap-4">

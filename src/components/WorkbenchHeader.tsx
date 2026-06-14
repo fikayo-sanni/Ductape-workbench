@@ -41,7 +41,7 @@ interface ApiError {
 export default function WorkbenchHeader() {
   const {user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId} =
     useAuth();
-  const {openTab, activeView, setActiveView, clearAllTabs} =
+  const {openTab, activeView, setActiveView, setActiveIconSidebar, clearAllTabs} =
     useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -154,21 +154,23 @@ export default function WorkbenchHeader() {
   ]);
 
   useEffect(() => {
+    if (selectedWorkspace) return;
+
     if (defaultWorkspace) {
       setSelectedWorkspace(defaultWorkspace.workspace_id);
-      // Also update the auth store
-      setCurrentWorkspaceId(defaultWorkspace.workspace_id);
+      if (!currentWorkspaceId) {
+        setCurrentWorkspaceId(defaultWorkspace.workspace_id);
+      }
     } else if (acceptedWorkspaces.length === 1) {
       const singleWorkspace = acceptedWorkspaces[0];
-      if (selectedWorkspace !== singleWorkspace.workspace_id) {
-        handleChangeWorkspace(singleWorkspace.workspace_id);
-      }
+      handleChangeWorkspace(singleWorkspace.workspace_id);
     }
   }, [
     defaultWorkspace,
     acceptedWorkspaces,
     handleChangeWorkspace,
     selectedWorkspace,
+    currentWorkspaceId,
     setCurrentWorkspaceId,
   ]);
 
@@ -180,6 +182,14 @@ export default function WorkbenchHeader() {
   const handleNewItem = async (itemId: string) => {
     // Close mobile menu if open
     setShowMobileMenu(false);
+
+    // Cloud connection — workspace-level, no product selection
+    if (itemId === 'cloud') {
+      setActiveIconSidebar('cloud');
+      setActiveView('cloud');
+      useWorkbenchStore.getState().setCloudAddConnectionModalOpen(true);
+      return;
+    }
 
     // If on dashboard, switch to products view first
     if (activeView === 'dashboard') {
@@ -612,6 +622,7 @@ export default function WorkbenchHeader() {
   return (
     <>
       <header
+        data-testid="workbench-header"
         className="h-16 sticky top-0 z-30 border-b border-grey-400 bg-white flex items-center px-4 flex-shrink-0 shadow-sm"
         data-intro="header"
       >
@@ -701,7 +712,7 @@ export default function WorkbenchHeader() {
             <Skeleton className="w-[180px] md:w-[280px] h-9 md:h-10 bg-slate-200" />
           ) : (
             <Select
-              value={selectedWorkspace}
+              value={selectedWorkspace ?? ''}
               onValueChange={handleChangeWorkspace}
             >
               <SelectTrigger className="w-[200px] md:w-[280px] h-9 md:h-10 shadow-sm">

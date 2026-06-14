@@ -10,7 +10,7 @@ npm run dev
 
 **That's it!** The `.env` file is already configured with the correct values.
 
-Open `http://localhost:5173` and login with your Ductape account.
+Open `http://localhost:4310` and login with your Ductape account.
 
 ---
 
@@ -66,7 +66,7 @@ To use a local backend instead of production:
 
 1. Edit `.env`:
    ```bash
-   VITE_API_BASE_URL=http://localhost:8000/api/
+   VITE_API_BASE_URL=http://localhost:4311/
    ```
 
 2. Restart dev server:

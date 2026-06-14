@@ -71,7 +71,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { JsonViewer } from '@/components/JsonViewer';
@@ -1963,52 +1964,15 @@ await ductape.init();`,
         </div>
       </div>
 
-      {/* Activity Timeline (Last 7 Days) - same as DatabaseExplorerTab / StorageExplorerTab */}
-      <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-          {isLoadingDashboard && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-        </div>
-        {isLoadingDashboard ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {(() => {
-              const timeline = getLast7CalendarDays(
-                dashboardMetrics?.activityTimeline ?? [],
-                (d) => d.operations ?? 0
-              );
-              const maxOperations = Math.max(...timeline.map((d) => d.value), 1);
-              return timeline.map((day) => {
-                const percentage = maxOperations > 0 ? (day.value / maxOperations) * 100 : 0;
-                return (
-                  <div key={day.date} className="flex items-center gap-3">
-                    <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                    <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                        style={{ width: `${percentage}%` }}
-                      />
-                      <div className="absolute inset-0 flex items-center px-3">
-                        <span className="text-xs font-semibold text-white drop-shadow-sm">
-                          {day.value.toLocaleString()} operations
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        )}
-      </div>
+      <ActivityTimelinePanel
+        title="Activity timeline"
+        kind="vector"
+        productTag={vector.productTag}
+        componentTag={vector.vector}
+        env={currentEnvSlug}
+        countLabel="operations"
+        enabled={!!vector.productTag}
+      />
 
       {/* Quick Actions */}
       <div>

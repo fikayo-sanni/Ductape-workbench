@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown, Users, Activity, Clock, BarChart3, UserPlus, Loader2 } from 'lucide-react';
-import { cn, getLast7CalendarDays } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import { ISessionDashboardResult } from '@/services/sessionUsersService';
 
 interface SessionDashboardProps {
@@ -25,6 +26,7 @@ const FALLBACK_DATA = {
 
 export default function SessionDashboard({
   sessionTag,
+  productTag,
   productName,
   dashboardData,
   isLoading = false,
@@ -240,57 +242,15 @@ export default function SessionDashboard({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Activity Timeline (7 Days) - last 7 days with 0 for no activity */}
-          <div className="lg:col-span-2 bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">Activity Timeline (Last 7 Days)</h2>
-              {isLoading && <Loader2 className="h-4 w-4 animate-spin text-grey-400" />}
-            </div>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-12 h-4 bg-grey-200 rounded animate-pulse" />
-                    <div className="flex-1 h-8 bg-grey-100 rounded-lg animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {(() => {
-                  const normalized = getLast7CalendarDays(data?.activityTimeline ?? [], (d) => d.sessions ?? 0);
-                  const maxCount = Math.max(...normalized.map((d) => d.value), 1);
-                  return normalized.map((day) => {
-                    const percentage = maxCount > 0 ? (day.value / maxCount) * 100 : 0;
-                    return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-12 text-xs font-medium text-grey-600">{day.label}</div>
-                        <div className="flex-1 h-8 bg-grey-100 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white drop-shadow-sm">
-                              {day.value.toLocaleString()} sessions
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-                <div className="pt-4 border-t border-grey-400">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-grey-600">Total sessions</span>
-                    <span className="font-semibold text-grey">
-                      {getLast7CalendarDays(data?.activityTimeline ?? [], (d) => d.sessions ?? 0).reduce((sum, d) => sum + d.value, 0)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <ActivityTimelinePanel
+            title="Activity timeline"
+            kind="session"
+            productTag={productTag}
+            componentTag={sessionTag}
+            countLabel="sessions"
+            enabled={!!productTag && !!sessionTag && !isLoading}
+            className="lg:col-span-2"
+          />
 
           {/* Peak Hours */}
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">

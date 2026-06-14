@@ -1,8 +1,8 @@
-import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Lock, Users, Store, MessageCircle, Handshake, Receipt } from 'lucide-react';
+import { Package, Grid3x3, Settings2, LayoutDashboard, SquareTerminal, Lock, Users, Store, MessageCircle, Handshake, Receipt, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 
-type SidebarView = 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
+type SidebarView = 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
 
 interface IconSidebarProps {
   activeView: SidebarView;
@@ -18,6 +18,11 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
     label: string;
     disabled?: boolean;
   }> = [
+    {
+      id: 'cloud',
+      icon: Cloud,
+      label: 'Cloud',
+    },
     {
       id: 'products',
       icon: Package,
@@ -51,7 +56,10 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
   ];
 
   return (
-    <div className="w-16 h-screen bg-white-700 border-r border-grey-400 flex flex-col items-center py-4 gap-2">
+    <div
+      data-testid="icon-sidebar"
+      className="w-16 h-screen bg-white-700 border-r border-grey-400 flex flex-col items-center py-4 gap-2"
+    >
       {menuItems.map((item) => {
         const Icon = item.icon;
         // Check if this icon is the active sidebar icon
@@ -61,6 +69,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         return (
           <button
             key={item.id}
+            data-testid={`icon-sidebar-${item.id}`}
             disabled={isDisabled}
             onClick={() => {
               if (isDisabled) return;
@@ -82,7 +91,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
                   toggleSidebar();
                 }
               } else {
-                // Products, Apps, Environments, Partnership - open sidebar if collapsed
+                // Cloud, Products, Apps, Environments, Partnership - open sidebar if collapsed
                 if (sidebarCollapsed) {
                   toggleSidebar();
                 }

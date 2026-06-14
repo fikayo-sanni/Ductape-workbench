@@ -1,18 +1,17 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Store, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
-import { useLoginModalStore } from '@/stores/login-modal-store';
 
 export default function MarketplacePublicLayout() {
   const { user } = useAuth();
-  const { openLoginModal } = useLoginModalStore();
+  const navigate = useNavigate();
   const location = useLocation();
 
   return (
     <div className="min-h-screen bg-grey-100 font-sans">
       {/* Workbench-aligned Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-grey-400 shadow-sm">
+      <div data-testid="marketplace-header" className="sticky top-0 z-50 bg-white border-b border-grey-400 shadow-sm">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <Link to="/marketplace" className="flex items-center gap-2 group">
@@ -63,7 +62,7 @@ export default function MarketplacePublicLayout() {
                 className="h-8 rounded-md bg-primary hover:bg-primary/90 text-white font-semibold text-xs"
                 onClick={() => {
                   localStorage.setItem('postLoginReturnTo', location.pathname + location.search);
-                  openLoginModal();
+                  navigate('/login');
                 }}
               >
                 Sign in

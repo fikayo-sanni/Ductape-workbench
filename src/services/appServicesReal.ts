@@ -41,6 +41,9 @@ const appServicesReal = {
   fetchWorkspaceApps: async (params: FetchWorkspaceAppsParams) => {
     return await appServices.fetchWorkspaceApps(params);
   },
+
+  listReviewFeedback: appServices.listReviewFeedback,
+  postReviewFeedback: appServices.postReviewFeedback,
 };
 
 export default appServicesReal;

@@ -39,12 +39,15 @@ interface AppIntegrationModalProps {
   app: MarketplaceApp;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set, this product is omitted from the product picker (e.g. current product context) */
+  excludeProductTag?: string;
 }
 
 export default function AppIntegrationModal({
   app,
   open,
-  onOpenChange
+  onOpenChange,
+  excludeProductTag,
 }: AppIntegrationModalProps) {
   const { openTab } = useWorkbenchStore();
   const { data: integrationData, resetIntegration } = useIntegration();
@@ -140,9 +143,13 @@ export default function AppIntegrationModal({
               )}
             </div>
             <div>
-              <DialogTitle className="dark:text-white">Integrate {app.app_name}</DialogTitle>
+              <DialogTitle className="dark:text-white">
+                {excludeProductTag ? `Connect ${app.app_name} to another product` : `Integrate ${app.app_name}`}
+              </DialogTitle>
               <DialogDescription className="dark:text-gray-300">
-                Add this app to your product and start using its features
+                {excludeProductTag
+                  ? 'Choose a different product to use this app'
+                  : 'Add this app to your product and start using its features'}
               </DialogDescription>
             </div>
           </div>
@@ -154,6 +161,7 @@ export default function AppIntegrationModal({
               goToNextStep={handleStepComplete}
               app={app}
               setAppDetails={setAppDetails}
+              excludeProductTag={excludeProductTag}
             />
           )}
 
