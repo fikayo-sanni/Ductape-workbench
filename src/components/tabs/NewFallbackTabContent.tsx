@@ -107,7 +107,7 @@ export default function NewFallbackTabContent({ tabId, data }: NewFallbackTabCon
       apps: productAppsRes?.data || [],
       features: details?.features || data?.productFeatures || [],
       databases: details?.databases || data?.productDatabases || [],
-      storages: details?.storage || details?.storages || data?.productStorages || [],
+      storages: details?.storage || data?.productStorages || [],
       notifications: details?.notifications || data?.productNotifications || [],
       graphs: details?.graphs || [],
       vectors: details?.vectors || [],

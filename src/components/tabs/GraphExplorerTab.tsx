@@ -46,12 +46,14 @@ import type {
   IGraphActionParameter,
   GraphActionParameterType,
   IGraphLabel,
+} from '@ductape/sdk';
+import type {
   IGraphLabelProperty,
   GraphPropertyType,
   IGraphRelationshipType,
   IGraphIndex,
   IGraphConstraint,
-} from '@ductape/sdk';
+} from '@ductape/sdk/dist/graph/types/schema.interface';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
