@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-The app will start at `http://localhost:5173`
+The app will start at `http://localhost:4310`
 
 ## Environment Variables Explained
 
@@ -42,7 +42,7 @@ VITE_API_BASE_URL=https://api.ductape.app/
 **Local Development:**
 If you have the Ductape backend running locally, use:
 ```
-VITE_API_BASE_URL=http://localhost:8000/api/
+VITE_API_BASE_URL=http://localhost:4311/
 ```
 
 All API calls will be made to this base URL:
@@ -165,7 +165,7 @@ The `apiClient` automatically:
 
 **Solution:**
 - Ensure backend OAuth callback includes workbench URL in allowed redirects
-- For local dev: Add `http://localhost:5173` to backend OAuth config
+- For local dev: Add `http://localhost:4310` to backend OAuth config
 
 ## Testing Authentication
 
@@ -213,7 +213,7 @@ localStorage.removeItem('user')
 **Switch to local backend:**
 ```bash
 # In .env, change:
-VITE_API_BASE_URL=http://localhost:8000/api/
+VITE_API_BASE_URL=http://localhost:4311/
 ```
 
 **Switch back to production:**

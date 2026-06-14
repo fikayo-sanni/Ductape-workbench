@@ -37,7 +37,8 @@ import {
   Copy,
 } from 'lucide-react';
 import {Link} from 'react-router-dom';
-import {cn, getLast7DaysNormalized} from '@/lib/utils';
+import {cn} from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {useAuth} from '@/store/useAuth';
 import {
@@ -70,12 +71,23 @@ import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useAppDashboard} from '@/hooks/useAnalytics';
 import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
+import productServices from '@/services/productServices';
+import { resolveProductAppAccessTag } from '@/utils/productAppAccess';
+import {
+  findProductAppEnvMappings,
+  resolveMappedProductEnvs,
+} from '@/utils/productWebhookRegistration';
 import ActionViewTabContent from './ActionViewTabContent';
-import WebhookTabContent from './WebhookTabContent';
 import RequestBuilder from './RequestBuilder';
 import InlineWebhookForm from '@/components/forms/InlineWebhookForm';
+import WebhookImportModal from '@/components/webhooks/WebhookImportModal';
+import type { WebhookViewMode } from './WebhookTabContent';
+import { AppWebhookAddEventsForm } from '@/components/app-webhooks/AppWebhookAddEventsForm';
+import { AppWebhooksList } from '@/components/app-webhooks/AppWebhooksList';
 
 interface AppTabContentProps {
+  /** Workbench tab id — required when rendered inside TabContent so fetches update the correct tab */
+  tabId?: string;
   app?: IApp;
   appId?: string;
   isMarketplace?: boolean;
@@ -95,17 +107,18 @@ interface FolderTreeNode {
 }
 
 export default function AppTabContent({
+  tabId,
   app,
   appId,
   isMarketplace,
 }: AppTabContentProps) {
-  const {openTab, tabs, activeTabId} = useWorkbenchStore();
+  const {openTab, tabs} = useWorkbenchStore();
   const {currentWorkspaceId, user} = useAuth();
   const queryClient = useQueryClient();
 
-  // Get itemId and initialization data from active tab if app is undefined (after refresh)
-  const activeTab = tabs.find(t => t.id === activeTabId);
-  const effectiveAppId = app?._id || appId || activeTab?.itemId;
+  // Resolve this tab's data — never use global activeTabId (other tab types stay mounted)
+  const ownTab = tabs.find(t => t.id === tabId);
+  const effectiveAppId = app?._id || appId || ownTab?.itemId;
 
   // Persistent state key based on app identifier
   const stateKey = `app-tab-state-${app?.tag || effectiveAppId}`;
@@ -153,6 +166,8 @@ export default function AppTabContent({
     persistedState?.sidebarView || 'overview',
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddingWebhookEvents, setIsAddingWebhookEvents] = useState(false);
+  const [webhookForAddEvents, setWebhookForAddEvents] = useState<any | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set(persistedState?.expandedFolders || []),
   );
@@ -184,6 +199,7 @@ export default function AppTabContent({
 
   // State for creating a new webhook inline
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+  const [isImportingWebhooks, setIsImportingWebhooks] = useState(false);
 
   // Resizable sidebar state
   const [sidebarWidth, setSidebarWidth] = useState<number>(
@@ -265,19 +281,178 @@ export default function AppTabContent({
   });
 
   // Use fetched app details if available, otherwise use the passed app
-  const currentApp = appDetails?.data || app;
+  const contextSource = app || ownTab?.data;
+  const productContext = {
+    productTag: (contextSource as { productTag?: string })?.productTag,
+    productName: (contextSource as { productName?: string })?.productName,
+    productId: (contextSource as { productId?: string })?.productId,
+    productEnvs: (contextSource as { productEnvs?: Array<{ slug?: string; env_name?: string; active?: boolean }> })?.productEnvs,
+    appViewMode: (contextSource as { appViewMode?: 'product' | 'general' })?.appViewMode,
+    isMarketplaceApp: (contextSource as { isMarketplaceApp?: boolean })?.isMarketplaceApp,
+    accessTag:
+      (contextSource as { accessTag?: string })?.accessTag ||
+      (contextSource as { access_tag?: string })?.access_tag,
+  };
+
+  const baseApp = appDetails?.data || app || ownTab?.data;
+  const currentApp = baseApp
+    ? {
+        ...baseApp,
+        ...(productContext.productTag && { productTag: productContext.productTag }),
+        ...(productContext.productName && { productName: productContext.productName }),
+        ...(productContext.productId && { productId: productContext.productId }),
+        ...(productContext.productEnvs && { productEnvs: productContext.productEnvs }),
+        ...(productContext.appViewMode && { appViewMode: productContext.appViewMode }),
+        ...(productContext.isMarketplaceApp && { isMarketplaceApp: productContext.isMarketplaceApp }),
+        ...(productContext.accessTag && {
+          accessTag: productContext.accessTag,
+          access_tag: productContext.accessTag,
+        }),
+      }
+    : undefined;
 
   // Determine if app is internal or third-party
   // Use currentApp to ensure we have workspace_id after data is fetched (e.g., after page refresh)
   const isInternalApp = currentApp?.workspace_id === currentWorkspaceId;
 
-  // Update tab with fetched data
-  useEffect(() => {
-    if (appDetails?.data && activeTabId && !app) {
-      const {updateTab} = useWorkbenchStore.getState();
-      updateTab(activeTabId, {data: appDetails.data});
+  // Product-connected view (opened from a product's Connected Apps) vs general app view
+  const productTag = (currentApp as { productTag?: string })?.productTag;
+  const productName = (currentApp as { productName?: string })?.productName;
+  const productEnvs = (currentApp as { productEnvs?: Array<{ slug?: string; env_name?: string; active?: boolean }> })?.productEnvs;
+  const isProductView =
+    (currentApp as { appViewMode?: string })?.appViewMode === 'product' ||
+    Boolean(productTag);
+  const productDisplayName = productName || productTag;
+  const accessTagFromTab = (currentApp as { accessTag?: string; access_tag?: string })?.accessTag
+    || (currentApp as { access_tag?: string })?.access_tag;
+
+  const productIdForAccess = (currentApp as { productId?: string })?.productId;
+
+  const { data: productForAccessResolve } = useQuery({
+    queryKey: ['product', productIdForAccess, 'app-access'],
+    queryFn: async () => {
+      if (!productIdForAccess || !user?._id || !user?.public_key || !currentWorkspaceId) {
+        return null;
+      }
+      const response = await productServices.fetchProduct({
+        product_id: productIdForAccess,
+        user_id: user._id,
+        public_key: user.public_key,
+        workspace_id: currentWorkspaceId,
+      });
+      return response.data;
+    },
+    enabled:
+      isProductView &&
+      !!productIdForAccess &&
+      !!user?._id &&
+      !!user?.public_key &&
+      !!currentWorkspaceId,
+    staleTime: 30 * 1000,
+  });
+
+  const accessTag = useMemo(
+    () =>
+      resolveProductAppAccessTag(
+        currentApp?.tag,
+        productForAccessResolve?.apps,
+        accessTagFromTab
+      ),
+    [currentApp?.tag, productForAccessResolve?.apps, accessTagFromTab]
+  );
+
+  const mappedProductEnvs = useMemo(() => {
+    if (!isProductView || !productEnvs?.length) {
+      return [];
     }
-  }, [appDetails, activeTabId, app]);
+    const mappings = findProductAppEnvMappings(
+      productForAccessResolve?.apps,
+      accessTag,
+      currentApp?.tag
+    );
+    return resolveMappedProductEnvs(productEnvs, mappings);
+  }, [
+    isProductView,
+    productEnvs,
+    productForAccessResolve?.apps,
+    accessTag,
+    currentApp?.tag,
+  ]);
+
+  const webhookPageMode: WebhookViewMode = isProductView
+    ? 'product'
+    : isInternalApp
+      ? 'internal'
+      : 'readonly';
+
+  // Update tab with fetched data while preserving product/marketplace context
+  useEffect(() => {
+    if (!appDetails?.data || !tabId) return;
+
+    const {updateTab, tabs} = useWorkbenchStore.getState();
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || tab.type !== 'app') return;
+
+    const existing = (tab.data || app || {}) as Record<string, unknown>;
+    const fetched = appDetails.data as Record<string, unknown>;
+
+    const resolvedAccess = resolveProductAppAccessTag(
+      String(fetched.tag || existing.tag || ''),
+      (existing as { productApps?: unknown[] }).productApps as
+        | Array<{ access_tag?: string; app_tag?: string }>
+        | undefined,
+      (existing.accessTag as string | undefined) ||
+        (existing.access_tag as string | undefined)
+    );
+
+    const merged = {
+      ...fetched,
+      ...(existing.productTag ? {productTag: existing.productTag} : {}),
+      ...(existing.productName ? {productName: existing.productName} : {}),
+      ...(existing.productId ? {productId: existing.productId} : {}),
+      ...(existing.productEnvs ? {productEnvs: existing.productEnvs} : {}),
+      ...(existing.appViewMode ? {appViewMode: existing.appViewMode} : {}),
+      ...(existing.isMarketplaceApp ? {isMarketplaceApp: existing.isMarketplaceApp} : {}),
+      ...(resolvedAccess
+        ? { accessTag: resolvedAccess, access_tag: resolvedAccess }
+        : existing.accessTag || existing.access_tag
+          ? {
+              accessTag: existing.accessTag || existing.access_tag,
+              access_tag: existing.accessTag || existing.access_tag,
+            }
+          : {}),
+    };
+
+    // Avoid re-writing tab data when nothing changed (prevents render loops)
+    if (
+      existing._id === merged._id &&
+      existing.updated_at === merged.updated_at &&
+      existing.productTag === merged.productTag &&
+      existing.appViewMode === merged.appViewMode &&
+      existing.isMarketplaceApp === merged.isMarketplaceApp &&
+      existing.accessTag === merged.accessTag
+    ) {
+      return;
+    }
+
+    updateTab(tabId, {data: merged});
+  }, [appDetails?.data, tabId, app]);
+
+  // Persist access tag once resolved from product.apps (e.g. after refresh)
+  useEffect(() => {
+    if (!tabId || !accessTag || accessTag === accessTagFromTab) return;
+
+    const { updateTab, tabs } = useWorkbenchStore.getState();
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab || tab.type !== 'app') return;
+
+    const data = tab.data as { accessTag?: string; access_tag?: string } | undefined;
+    if (!data || data.accessTag === accessTag) return;
+
+    updateTab(tabId, {
+      data: { ...data, accessTag, access_tag: accessTag },
+    });
+  }, [tabId, accessTag, accessTagFromTab]);
 
   // Calculate selected version
   const selectedVersion =
@@ -293,16 +468,19 @@ export default function AppTabContent({
   const authsCount = selectedVersion?.auths?.length || 0;
   const variablesCount = selectedVersion?.variables?.length || 0;
   const constantsCount = selectedVersion?.constants?.length || 0;
-  const webhooksCount =
-    selectedVersion?.webhooks?.length ||
-    (currentApp as any)?.webhooks_count ||
-    0;
+  const webhooksEventsCount = selectedVersion?.webhooks?.reduce(
+    (total: number, webhook: any) => total + (webhook.events?.length || 0),
+    0,
+  ) ?? (selectedVersion as any)?.events_count ?? (currentApp as any)?.events_count ?? 0;
 
-  // Fetch app dashboard analytics (logs filtered by parent_tag = app tag)
+  // Fetch app dashboard analytics
+  // Product view: logs where product_tag + parent_tag (app tag)
+  // General view: logs where parent_tag = app tag only
   const {data: dashboardMetrics, isLoading: isLoadingMetrics} = useAppDashboard(
     {
       app_id: currentApp?._id || '',
       app_tag: (currentApp as any)?.tag,
+      product_tag: isProductView ? productTag : undefined,
       version: selectedVersionTag || undefined,
       app_env: selectedVersion?.envs?.find((e: any) => e.active)?.slug,
       groupBy: 'day',
@@ -405,17 +583,6 @@ export default function AppTabContent({
       folderContainsMatch(folder, searchQuery),
     );
   }, [folderTree, searchQuery]);
-
-  // Filter webhooks based on search (must be before early returns to follow hooks rules)
-  const filteredWebhooks = useMemo(() => {
-    if (!selectedVersion?.webhooks) return [];
-    if (!searchQuery) return selectedVersion.webhooks;
-    return selectedVersion.webhooks.filter(
-      (webhook: any) =>
-        webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
-  }, [selectedVersion?.webhooks, searchQuery]);
 
   // Auto-select latest version when app data changes
   useEffect(() => {
@@ -523,6 +690,8 @@ export default function AppTabContent({
           appLogo: currentApp?.logo,
           version: selectedVersionTag,
           app: currentApp,
+          productTag,
+          accessTag,
         });
       } else {
         // Webhook not found, clear the pending restore
@@ -815,17 +984,17 @@ export default function AppTabContent({
   };
 
   // Handle selecting a webhook
-  const handleSelectWebhook = (webhook: any) => {
-    // Clear creating action state if active
+  const handleAddWebhookEvents = (webhook: any) => {
+    setSidebarView('webhooks');
     setIsCreatingAction(false);
+    setIsCreatingWebhook(false);
+    setIsAddingWebhookEvents(true);
     setNewActionFolderId(null);
     setSelectedAction(null);
-    setSelectedWebhook({
+    setWebhookForAddEvents({
       ...webhook,
       appName: currentApp?.app_name,
       appTag: currentApp?.tag,
-      appLogo: currentApp?.logo,
-      version: selectedVersionTag,
       app: currentApp,
     });
   };
@@ -1030,9 +1199,30 @@ export default function AppTabContent({
     );
   };
 
-  // Render webhooks content for the Webhooks view (matching ProductTabContent design)
   const renderWebhooksContent = () => {
-    // Show inline form if creating webhook
+    if (isAddingWebhookEvents && webhookForAddEvents && currentApp) {
+      return (
+        <AppWebhookAddEventsForm
+          webhook={webhookForAddEvents}
+          app={{
+            _id: currentApp._id || '',
+            tag: currentApp.tag || '',
+            app_name: currentApp.app_name,
+            workspace_id: currentApp.workspace_id,
+          }}
+          onCancel={() => {
+            setIsAddingWebhookEvents(false);
+            setWebhookForAddEvents(null);
+          }}
+          onSuccess={() => {
+            setIsAddingWebhookEvents(false);
+            setWebhookForAddEvents(null);
+            queryClient.invalidateQueries({queryKey: ['app', currentApp._id]});
+          }}
+        />
+      );
+    }
+
     if (isCreatingWebhook && currentApp) {
       return (
         <InlineWebhookForm
@@ -1048,7 +1238,6 @@ export default function AppTabContent({
           onCancel={() => setIsCreatingWebhook(false)}
           onSuccess={() => {
             setIsCreatingWebhook(false);
-            // Refresh app data to show new webhook
             queryClient.invalidateQueries({queryKey: ['app', currentApp._id]});
           }}
         />
@@ -1056,201 +1245,27 @@ export default function AppTabContent({
     }
 
     const webhooks = selectedVersion?.webhooks || [];
-    const webhooksLength = webhooks.length;
-
-    // Filter webhooks based on search query
-    const displayedWebhooks = searchQuery
-      ? webhooks.filter(
-          (webhook: any) =>
-            webhook.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            webhook.tag?.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-      : webhooks;
 
     return (
-      <div className="h-full overflow-auto bg-grey-50">
-        {/* Header Section */}
-        <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue/10">
-                  <Webhook className="h-6 w-6 text-blue" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-grey">Webhooks</h1>
-                  <p className="text-sm text-grey-500">
-                    {webhooksLength}{' '}
-                    {webhooksLength === 1 ? 'webhook' : 'webhooks'} configured
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {/* Search bar */}
-                {webhooksLength > 0 && (
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search webhooks..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="pl-10 w-64 bg-grey-50 border-grey-300 focus:bg-white"
-                    />
-                  </div>
-                )}
-                {isInternalApp && (
-                  <Button
-                    onClick={() => setIsCreatingWebhook(true)}
-                    className="gap-2 shadow-sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Webhook
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Section */}
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          {displayedWebhooks.length > 0 ? (
-            <>
-              {/* Results count when searching */}
-              {searchQuery && (
-                <p className="text-sm text-grey-500 mb-4">
-                  Showing {displayedWebhooks.length} of {webhooksLength}{' '}
-                  {webhooksLength === 1 ? 'webhook' : 'webhooks'}
-                </p>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {displayedWebhooks.map((webhook: any) => {
-                  const eventsCount = webhook.events?.length || 0;
-
-                  return (
-                    <div
-                      key={webhook._id || webhook.tag}
-                      onClick={() => handleSelectWebhook(webhook)}
-                      className="bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Icon */}
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue/10">
-                          <Webhook className="h-5 w-5 text-blue" />
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-sm font-medium text-grey truncate">
-                              {webhook.name || webhook.tag}
-                            </h3>
-                            {/* Events count badge */}
-                            {eventsCount > 0 && (
-                              <span className="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 bg-blue/10 text-blue">
-                                {eventsCount}{' '}
-                                {eventsCount === 1 ? 'event' : 'events'}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-grey-500 truncate">
-                            {webhook.tag}
-                          </p>
-
-                          {/* Description */}
-                          {webhook.description && (
-                            <p className="text-xs text-grey-600 mt-1.5 line-clamp-2">
-                              {webhook.description}
-                            </p>
-                          )}
-
-                          {/* Events preview */}
-                          {eventsCount > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {webhook.events
-                                .slice(0, 3)
-                                .map((event: any, idx: number) => (
-                                  <span
-                                    key={idx}
-                                    className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600"
-                                  >
-                                    {event.name ||
-                                      event.tag ||
-                                      `Event ${idx + 1}`}
-                                  </span>
-                                ))}
-                              {eventsCount > 3 && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-grey-100 text-grey-600">
-                                  +{eventsCount - 3} more
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-20">
-              {/* Decorative background */}
-              <div className="relative mb-8">
-                <div className="w-24 h-24 rounded-2xl flex items-center justify-center bg-blue/10">
-                  <Webhook className="h-12 w-12 text-blue" />
-                </div>
-                {/* Decorative dots */}
-                <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-grey-200" />
-                <div className="absolute -bottom-1 -left-3 w-3 h-3 rounded-full bg-grey-300" />
-                <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
-              </div>
-
-              {searchQuery ? (
-                <>
-                  <h3 className="text-xl font-semibold text-grey mb-2">
-                    No results found
-                  </h3>
-                  <p className="text-grey-500 text-center max-w-md mb-6">
-                    We couldn't find any webhooks matching "
-                    <span className="font-medium text-grey">{searchQuery}</span>
-                    "
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSearchQuery('')}
-                    className="gap-2"
-                  >
-                    Clear search
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-xl font-semibold text-grey mb-2">
-                    No webhooks yet
-                  </h3>
-                  <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
-                    Set up webhooks to receive real-time notifications when
-                    events occur in your application.
-                  </p>
-                  {isInternalApp && (
-                    <Button
-                      onClick={() => setIsCreatingWebhook(true)}
-                      className="gap-2 shadow-sm"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create your first webhook
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <AppWebhooksList
+        webhooks={webhooks}
+        app={{
+          _id: currentApp._id || '',
+          tag: currentApp.tag || '',
+          workspace_id: currentApp.workspace_id,
+        }}
+        onAddEvents={handleAddWebhookEvents}
+        mode={webhookPageMode}
+        productTag={productTag}
+        accessTag={accessTag}
+        productEnvs={mappedProductEnvs}
+        onCreate={() => {
+          setIsAddingWebhookEvents(false);
+          setWebhookForAddEvents(null);
+          setIsCreatingWebhook(true);
+        }}
+        onImport={() => setIsImportingWebhooks(true)}
+      />
     );
   };
 
@@ -1267,16 +1282,6 @@ export default function AppTabContent({
           appTag={currentApp?.tag}
           productTag={(currentApp as any)?.productTag}
           envSlug={selectedVersion?.envs?.find((e: any) => e.active)?.slug}
-        />
-      );
-    }
-
-    if (selectedWebhook) {
-      // Use unique key combining type prefix + id to force remount when switching between different webhooks
-      return (
-        <WebhookTabContent
-          key={`webhook-${selectedWebhook.tag || selectedWebhook._id}`}
-          webhook={selectedWebhook}
         />
       );
     }
@@ -1336,15 +1341,6 @@ export default function AppTabContent({
             {method: 'PUT', count: 0, percentage: 0},
             {method: 'DELETE', count: 0, percentage: 0},
           ].filter(m => m.count > 0 || !hasMetrics);
-
-    // Normalize to last 7 days (Mon–Sun) with 0 for days that have no activity
-    const recentActivity = getLast7DaysNormalized(
-      hasMetrics && dashboardMetrics.dailyActivity?.length
-        ? dashboardMetrics.dailyActivity
-        : [],
-      (d: {day?: string; date?: string; requests?: number; count?: number}) =>
-        d.requests ?? d.count ?? 0,
-    );
 
     // Use real top endpoints or fallback to action-based placeholders
     const topEndpoints =
@@ -1451,8 +1447,15 @@ export default function AppTabContent({
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-grey mb-2">
-                    {currentApp?.app_name} Dashboard
+                    {isProductView
+                      ? `${currentApp?.app_name} in ${productDisplayName}`
+                      : `${currentApp?.app_name} Dashboard`}
                   </h1>
+                  <p className="text-sm text-grey-600 mb-2">
+                    {isProductView
+                      ? 'Usage and performance for this app within the connected product.'
+                      : 'Workspace-wide usage across all products that call this app.'}
+                  </p>
                   <div className="flex items-center gap-2 text-sm flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-grey-100 dark:bg-grey-700 text-grey-700 dark:text-grey font-mono font-medium">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
@@ -1495,13 +1498,21 @@ export default function AppTabContent({
                       {isInternalApp ? 'Internal' : 'Third-party'}
                     </span>
                     {/* Product Context - shown when app was opened from ProductTabContent */}
-                    {(currentApp as any)?.productTag && (
+                    {isProductView && (
                       <>
                         <span className="text-grey-400">•</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-purple-500/10 text-purple-600">
                           <Box className="h-3 w-3" />
-                          {(currentApp as any)?.productName ||
-                            (currentApp as any)?.productTag}
+                          Product scope
+                        </span>
+                      </>
+                    )}
+                    {!isProductView && (
+                      <>
+                        <span className="text-grey-400">•</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-grey-100 text-grey-600">
+                          <Globe className="h-3 w-3" />
+                          All products
                         </span>
                       </>
                     )}
@@ -1559,7 +1570,7 @@ export default function AppTabContent({
                     Share
                   </Button>
                 )}
-                {selectedVersion && (
+                {selectedVersion && !isProductView && (
                   <Button
                     onClick={handleIntegrateApp}
                     size="sm"
@@ -1570,6 +1581,18 @@ export default function AppTabContent({
                     <Plug className="h-4 w-4 mr-1" />
                     Integrate
                   </Button>
+                )}
+                {selectedVersion && isProductView && (
+                  <button
+                    type="button"
+                    onClick={handleIntegrateApp}
+                    disabled={selectedVersion?.status == 'draft'}
+                    className="text-xs text-grey-600 hover:text-primary transition-colors flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-grey-100 disabled:opacity-50 disabled:pointer-events-none"
+                    title="Add this app to another product in your workspace"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Connect to another product
+                  </button>
                 )}
               </div>
             </div>
@@ -1633,55 +1656,17 @@ export default function AppTabContent({
             )}
           </div>
 
-          {/* Request Activity Timeline */}
-          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-grey">
-                Request Activity (Last 7 Days)
-              </h2>
-              {isLoadingMetrics && (
-                <Loader2 className="h-4 w-4 animate-spin text-grey-400" />
-              )}
-            </div>
-            <div className="space-y-3">
-              {recentActivity.map(day => {
-                const maxRequests = Math.max(
-                  ...recentActivity.map(d => d.value),
-                  1,
-                );
-                const percentage =
-                  maxRequests > 0 ? (day.value / maxRequests) * 100 : 0;
-
-                return (
-                  <div
-                    key={day.date}
-                    className="flex items-center gap-3 relative"
-                  >
-                    <div className="w-12 text-xs font-medium text-grey-600 flex-shrink-0">
-                      {day.date}
-                    </div>
-                    <div className="flex-1 h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
-                      {isLoadingMetrics ? (
-                        <div className="h-full w-full bg-grey-300 dark:bg-grey-600 animate-pulse rounded-lg" />
-                      ) : (
-                        <>
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{width: `${percentage}%`}}
-                          />
-                          <div className="absolute inset-0 flex items-center px-3">
-                            <span className="text-xs font-semibold text-white dark:text-grey">
-                              {day.value.toLocaleString()} requests
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ActivityTimelinePanel
+            title={isProductView ? 'Product request activity' : 'Request activity'}
+            kind="app"
+            appId={effectiveAppId || currentApp?._id}
+            productTag={isProductView ? productTag : undefined}
+            componentTag={(currentApp as { tag?: string })?.tag}
+            env={selectedVersion?.envs?.find((e: { active?: boolean }) => e.active)?.slug}
+            countLabel="requests"
+            enabled={!!effectiveAppId || !!(currentApp as { tag?: string })?.tag}
+            className="bg-grey-50 dark:bg-background border-grey-300 dark:border-grey-400"
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Requests by Method */}
@@ -1842,14 +1827,18 @@ export default function AppTabContent({
           {/* Environment Status */}
           <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
             <h2 className="text-lg font-semibold text-grey mb-4">
-              Environment Status
+              {isProductView ? 'Product environments' : 'Environment Status'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(selectedVersion?.envs || []).map((env: any) => (
+              {(isProductView ? productEnvs || [] : selectedVersion?.envs || []).map((env: any) => (
                 <div
                   key={env.slug}
-                  className="p-4 bg-grey-100 dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg hover:border-primary/50 transition-colors cursor-pointer"
+                  className={cn(
+                    'p-4 bg-grey-100 dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg transition-colors',
+                    !isProductView && 'hover:border-primary/50 cursor-pointer',
+                  )}
                   onClick={() => {
+                    if (isProductView) return;
                     setEditingEnv(env);
                     setShowUpdateEnvModal(true);
                   }}
@@ -1875,18 +1864,21 @@ export default function AppTabContent({
                     )}
                   </div>
                   <p className="text-xs text-grey-600 truncate">
-                    {env.base_url || 'No base URL configured'}
+                    {isProductView
+                      ? 'Environment used by this product integration'
+                      : env.base_url || 'No base URL configured'}
                   </p>
                 </div>
               ))}
-              {(!selectedVersion?.envs ||
-                selectedVersion.envs.length === 0) && (
+              {((isProductView ? productEnvs : selectedVersion?.envs) || []).length === 0 && (
                 <div className="col-span-3 text-center py-8">
                   <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
                   <p className="text-sm text-grey-600">
-                    No environments configured
+                    {isProductView
+                      ? 'No product environments configured'
+                      : 'No environments configured'}
                   </p>
-                  {isInternalApp && (
+                  {isInternalApp && !isProductView && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -1911,10 +1903,10 @@ export default function AppTabContent({
                   Quick Actions
                 </h3>
                 <p className="text-sm text-grey-600">
-                  Select an action from the sidebar to test API endpoints. Use
-                  the tabs to switch between Actions, Webhooks, and
-                  Environments.
-                  {isInternalApp &&
+                  {isProductView
+                    ? 'Select an action from the sidebar to test endpoints using this product\'s credentials and environment.'
+                    : 'Select an action from the sidebar to test API endpoints. Use the tabs to switch between Actions, Webhooks, and Environments.'}
+                  {isInternalApp && !isProductView &&
                     ' Click the + button to create new resources.'}
                 </p>
               </div>
@@ -2102,6 +2094,8 @@ export default function AppTabContent({
                 setSelectedWebhook(null);
                 setIsCreatingAction(false);
                 setIsCreatingWebhook(false);
+                setIsAddingWebhookEvents(false);
+                setWebhookForAddEvents(null);
               }}
               className={cn(
                 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
@@ -2111,13 +2105,13 @@ export default function AppTabContent({
                 isSidebarCollapsed && 'justify-center px-2',
               )}
               title={
-                isSidebarCollapsed ? `Webhooks (${webhooksCount})` : undefined
+                isSidebarCollapsed ? `Webhooks (${webhooksEventsCount} events)` : undefined
               }
             >
               <Webhook
                 className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  sidebarView === 'webhooks' ? 'text-primary' : 'text-blue',
+                  sidebarView === 'webhooks' ? 'text-primary' : 'text-grey-600',
                 )}
               />
               {!isSidebarCollapsed && (
@@ -2131,7 +2125,7 @@ export default function AppTabContent({
                         : 'bg-grey-100 text-grey-600',
                     )}
                   >
-                    {webhooksCount}
+                    {webhooksEventsCount}
                   </span>
                 </>
               )}
@@ -2278,9 +2272,13 @@ export default function AppTabContent({
             ? `creating-${inlineActionTabId}`
             : selectedAction
               ? `action-view-${selectedAction.tag || selectedAction._id}`
-              : selectedWebhook
-                ? `webhook-view-${selectedWebhook.tag || selectedWebhook._id}`
-                : 'overview'
+              : isAddingWebhookEvents
+                ? `webhooks-add-events-${webhookForAddEvents?.tag || 'new'}`
+                : sidebarView === 'webhooks'
+                  ? 'webhooks-view'
+                  : sidebarView === 'environments'
+                    ? 'environments-view'
+                    : 'overview'
         }
         className={cn(
           'flex-1 flex flex-col min-h-0 overflow-hidden bg-grey-50 transition-all duration-300',
@@ -2319,6 +2317,21 @@ export default function AppTabContent({
       </div>
 
       {/* Modals */}
+      {currentApp && (
+        <WebhookImportModal
+          open={isImportingWebhooks}
+          onOpenChange={setIsImportingWebhooks}
+          app={{
+            _id: currentApp._id,
+            tag: currentApp.tag || '',
+            workspace_id: currentApp.workspace_id,
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({queryKey: ['app', currentApp._id]});
+          }}
+        />
+      )}
+
       {showAppCreatedModal && (
         <AppCreatedModal
           app={currentApp}
@@ -2407,6 +2420,7 @@ export default function AppTabContent({
             }
             open={showIntegrationModal}
             onOpenChange={setShowIntegrationModal}
+            excludeProductTag={isProductView ? productTag : undefined}
           />
         </IntegrationProvider>
       )}

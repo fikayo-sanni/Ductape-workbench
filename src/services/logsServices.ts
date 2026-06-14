@@ -169,8 +169,9 @@ export interface StorageDashboardMetrics {
     downloads: number;
     totalSize: number;
   }[];
-  // Activity timeline (last 7 days by day name) - same format as graph dashboard
   activityTimeline: Array<{ date: string; sessions: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   dailyActivity: {
     day: string;
     date: string;
@@ -269,6 +270,9 @@ export interface CacheDashboardMetrics {
     hits: number;
     misses: number;
   }[];
+  activityTimeline: Array<{ date: string; operations: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   dailyActivity: {
     day: string;
     date: string;
@@ -378,6 +382,9 @@ export interface MessageBrokerDashboardMetrics {
     acknowledged: number;
     rejected: number;
   }[];
+  activityTimeline: Array<{ date: string; operations: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   dailyActivity: {
     day: string;
     date: string;
@@ -477,6 +484,9 @@ export interface NotificationDashboardMetrics {
     successful: number;
     failed: number;
   }[];
+  activityTimeline: Array<{ date: string; operations: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   byChannel: {
     email: { sent: number; delivered: number; failed: number };
     push: { sent: number; delivered: number; failed: number };
@@ -780,6 +790,8 @@ export interface AppDashboardQuery {
   app_id: string;
   /** App tag (e.g. domain/tag) – used as parent_tag when querying logs table */
   app_tag?: string;
+  /** When set, scopes metrics to this product (logs.product_tag) in addition to parent_tag */
+  product_tag?: string;
   version?: string;
   app_env?: string;
   groupBy?: 'hour' | 'day' | 'week' | 'month';
@@ -859,6 +871,7 @@ export const fetchAppDashboard = async (
     component: 'app',
     app_id,
     ...(app_tag && { parent_tag: app_tag }),
+    ...(product_tag && { product_tag }),
     app_env,
     version,
     groupBy,
@@ -1151,6 +1164,8 @@ export interface DatabaseDashboardMetrics {
   newOperationsThisWeek: number;
   avgExecutionTime: { current: string; previous: string; change: number };
   activityTimeline: Array<{ date: string; sessions: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   peakHours: Array<{ hour: string; count: number }>;
   environmentBreakdown: Array<{ env: string; count: number; percentage: number }>;
   methodBreakdown: Array<{ method: string; count: number; percentage: number }>;
@@ -1210,8 +1225,9 @@ export interface VectorDashboardMetrics {
   // Performance
   avgExecutionTime: { current: string; previous: string; change: number };
 
-  // Activity timeline (last 7 days by day name)
   activityTimeline: Array<{ date: string; operations: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
 
   // Peak activity hours
   peakHours: Array<{ hour: string; count: number }>;
@@ -1332,12 +1348,17 @@ export interface SessionUserDashboardQuery {
   session_tag: string;
   identifier: string;
   env?: string;
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface SessionUserDashboardResult {
   totalLogs: number;
   successRate: number;
-  activityTimeline: Array<{ day: string; count: number }>;
+  activityTimeline: Array<{ date: string; operations: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
   peakHours: Array<{ hour: string; count: number }>;
 }
 
@@ -1394,8 +1415,9 @@ export interface GraphDashboardMetrics {
   // Performance
   avgExecutionTime: { current: string; previous: string; change: number };
 
-  // Activity timeline (last 7 days by day name)
   activityTimeline: Array<{ date: string; sessions: number }>;
+  latencyTimeline: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline: Array<{ date: string; successful: number; failed: number }>;
 
   // Peak activity hours
   peakHours: Array<{ hour: string; count: number }>;

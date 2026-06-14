@@ -1,53 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import {
-  Timer,
-  Plus,
-  Search,
-  RefreshCw,
-  ChevronRight,
-  Code,
-  Loader2,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  MoreVertical,
-  Eye,
-  Trash2,
-  LayoutDashboard,
-  X,
-  Zap,
-  Database,
-  LayoutList,
-  Activity,
-  BarChart3,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  ColumnDef,
-  createColumnHelper,
-  getPaginationRowModel,
-} from '@tanstack/react-table';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Loader2, RefreshCw, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -56,19 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useResilienceProxy } from '@/hooks/useResilienceProxy';
 import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
 import CodeSidebar from '@/components/CodeSidebar';
+import { normalizeSdkList, ResilienceViewMode } from '@/components/resilience-explorer/utils';
+import { QuotaExplorerSidebar } from '@/components/quota-explorer/QuotaExplorerSidebar';
+import { QuotaExplorerOverview } from '@/components/quota-explorer/QuotaExplorerOverview';
+import { QuotaExplorerDetailPanel } from '@/components/quota-explorer/QuotaExplorerDetailPanel';
+import { ProductQuota } from '@/components/quota-explorer/types';
 
 interface QuotaExplorerTabProps {
   product: {
@@ -77,186 +27,129 @@ interface QuotaExplorerTabProps {
     logo?: string;
     envs?: Array<{ slug: string; name?: string }>;
   };
+  initialQuotaTag?: string;
+  initialEnv?: string;
+  scopedToComponent?: boolean;
 }
 
-interface QuotaOption {
-  type: string;
-  app?: string;
-  event: string;
-  quota: number;
-  input: Record<string, any>;
-  output: Record<string, any>;
-  retries: number;
-  healthcheck?: string;
-}
-
-interface Quota {
-  _id?: string;
-  name: string;
-  tag: string;
-  description?: string;
-  input?: Record<string, any>;
-  options?: QuotaOption[];
-  created_at?: string | Date;
-  updated_at?: string | Date;
-}
-
-type ViewMode = 'overview' | 'list';
-
-export default function QuotaExplorerTab({ product }: QuotaExplorerTabProps) {
+export default function QuotaExplorerTab({
+  product,
+  initialQuotaTag,
+  initialEnv,
+  scopedToComponent = false,
+}: QuotaExplorerTabProps) {
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
-  const { user, currentWorkspaceId } = useAuth();
+  const proxy = useResilienceProxy();
+  const queryClient = useQueryClient();
 
-  // Collapse workbench sidebar when explorer opens
   useEffect(() => {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
-  // Initialize SDK
-  const ductape = useDuctape({
-    workspace_id: currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product',
-  });
-
-  const queryClient = useQueryClient();
-
-  // State
-  const [viewMode, setViewMode] = useState<ViewMode>('overview');
-  const [selectedQuota, setSelectedQuota] = useState<Quota | null>(null);
-  const [selectedEnv, setSelectedEnv] = useState<string>(product.envs?.[0]?.slug || 'prd');
+  const [viewMode, setViewMode] = useState<ResilienceViewMode>(
+    scopedToComponent ? 'list' : initialQuotaTag ? 'list' : 'overview',
+  );
+  const [selectedQuota, setSelectedQuota] = useState<ProductQuota | null>(null);
+  const [selectedEnv, setSelectedEnv] = useState(initialEnv || product.envs?.[0]?.slug || 'prd');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [envFilter, setEnvFilter] = useState<string>('all');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [quotaToDelete, setQuotaToDelete] = useState<Quota | null>(null);
+  const [quotaToDelete, setQuotaToDelete] = useState<ProductQuota | null>(null);
 
-  // Fetch all quotas for the product
-  const { data: quotas, isLoading: isLoadingQuotas, refetch: refetchQuotas } = useQuery({
+  const { data: quotas, isLoading, refetch } = useQuery({
     queryKey: ['quotas', product.tag],
     queryFn: async () => {
-      if (!ductape || !product.tag) return [];
-      try {
-        await ductape.init(product.tag);
-        // @ts-ignore - SDK type might not include this
-        const result = await ductape.quotas.list();
-        console.log('[Quota-Explorer] Fetched quotas:', result);
-        return result || [];
-      } catch (error) {
-        console.error('Error fetching quotas:', error);
-        return [];
-      }
+      if (!proxy || !product.tag) return [];
+      await proxy.product.init(product.tag);
+      const result = await proxy.quotas.list(product.tag);
+      return normalizeSdkList<ProductQuota>(result);
     },
-    enabled: !!ductape && !!product.tag,
+    enabled: !!proxy && !!product.tag,
     staleTime: 30000,
   });
 
-  // Calculate metrics
-  const metrics = useMemo(() => {
-    if (!quotas) return { total: 0, options: 0, totalQuotaWeight: 0, byType: {} };
+  const list = quotas || [];
+  const scopedList = useMemo(() => {
+    if (!scopedToComponent || !initialQuotaTag) return list;
+    return list.filter((q) => q.tag === initialQuotaTag);
+  }, [list, scopedToComponent, initialQuotaTag]);
+  const activeList = scopedToComponent ? scopedList : list;
 
+  useEffect(() => {
+    if (!initialQuotaTag || activeList.length === 0) return;
+    const match = activeList.find((q) => q.tag === initialQuotaTag);
+    if (match) {
+      setSelectedQuota(match);
+      setViewMode('list');
+    }
+  }, [initialQuotaTag, activeList]);
+
+  const metrics = useMemo(() => {
     let totalOptions = 0;
     let totalQuotaWeight = 0;
     const byType: Record<string, number> = {};
-
-    (quotas as Quota[]).forEach((q) => {
+    activeList.forEach((q) => {
       const opts = q.options || [];
       totalOptions += opts.length;
-      opts.forEach((opt: QuotaOption) => {
+      opts.forEach((opt) => {
         totalQuotaWeight += opt.quota || 0;
         byType[opt.type] = (byType[opt.type] || 0) + 1;
       });
     });
+    return { total: activeList.length, options: totalOptions, totalQuotaWeight, byType };
+  }, [activeList]);
 
-    return {
-      total: (quotas as Quota[]).length,
-      options: totalOptions,
-      totalQuotaWeight,
-      byType,
-    };
-  }, [quotas]);
-
-  // Filter quotas based on search
   const filteredQuotas = useMemo(() => {
-    if (!quotas) return [];
-    if (!searchQuery) return quotas as Quota[];
-    return (quotas as Quota[]).filter((q: Quota) =>
-      q.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!searchQuery) return activeList;
+    const q = searchQuery.toLowerCase();
+    return activeList.filter(
+      (item) => item.name?.toLowerCase().includes(q) || item.tag?.toLowerCase().includes(q)
     );
-  }, [quotas, searchQuery]);
+  }, [activeList, searchQuery]);
 
-  // Handle refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetchQuotas();
+    await refetch();
     setIsRefreshing(false);
     toast.success('Quotas refreshed');
   };
 
-  // Clear filters
-  const clearFilters = () => {
-    setEnvFilter('all');
-    setSearchQuery('');
-    setCurrentPage(1);
-  };
-
-  const hasActiveFilters = envFilter !== 'all' || searchQuery !== '';
-
-  // Delete quota mutation
-  const deleteQuotaMutation = useMutation({
-    mutationFn: async (quota: Quota) => {
-      if (!ductape || !product.tag) throw new Error('SDK not initialized');
-      await ductape.init(product.tag);
-      // @ts-ignore - SDK type might not include this
-      return await ductape.quotas.delete(quota.tag);
+  const deleteMutation = useMutation({
+    mutationFn: async (quota: ProductQuota) => {
+      if (!proxy || !product.tag) throw new Error('SDK not initialized');
+      await proxy.product.init(product.tag);
+      return proxy.quotas.delete(product.tag, quota.tag);
     },
     onSuccess: () => {
-      toast.success('Quota deleted successfully');
+      toast.success('Quota deleted');
       queryClient.invalidateQueries({ queryKey: ['quotas', product.tag] });
       setShowDeleteDialog(false);
       setQuotaToDelete(null);
+      setSelectedQuota(null);
     },
-    onError: (error: any) => {
-      console.error('Error deleting quota:', error);
+    onError: (error: { message?: string }) => {
       toast.error(error.message || 'Failed to delete quota');
     },
   });
 
-  // Handle delete quota
-  const handleDeleteQuota = (quota: Quota) => {
-    setQuotaToDelete(quota);
-    setShowDeleteDialog(true);
-  };
-
-  // Confirm delete
-  const confirmDelete = () => {
-    if (quotaToDelete) {
-      deleteQuotaMutation.mutate(quotaToDelete);
-    }
-  };
-
-  // Open quota in view tab
-  const handleViewQuota = (quota: Quota) => {
+  const handleViewQuota = (quota: ProductQuota) => {
     openTab({
-      id: `quota-${quota._id}-${Date.now()}`,
-      type: 'quota',
+      id: `quota-flow-${quota.tag}`,
+      type: 'resilience-flow',
       title: quota.name,
-      itemId: quota._id,
+      itemId: quota.tag,
       data: {
-        ...quota,
+        kind: 'quota',
+        component: quota,
         productTag: product.tag,
         productName: product.name,
+        productEnvs: product.envs || [],
       },
     });
   };
 
-  // Open new quota creation tab
   const handleCreateQuota = () => {
     openTab({
       id: `new-quota-${Date.now()}`,
@@ -275,762 +168,181 @@ export default function QuotaExplorerTab({ product }: QuotaExplorerTabProps) {
     });
   };
 
-  // Generate code sections for CodeSidebar
   const generateCodeSections = (language: string, env?: string) => {
     if (!selectedQuota) return [];
-
-    const envSlug = env || selectedEnv || 'prd';
-
+    const envSlug = env || selectedEnv;
     if (language === 'javascript' || language === 'typescript') {
-      const importStatement = language === 'typescript'
-        ? `import Ductape from "@ductape/sdk"`
-        : `const Ductape = require("@ductape/sdk")`;
-
-      const sections = [
+      const imp = language === 'typescript' ? `import Ductape from "@ductape/sdk";\n\n` : '';
+      return [
         {
-          title: 'Init Ductape',
-          code: `${importStatement}
-
-const ductape = new Ductape({
-  accessKey: 'your-access-key',
-});`
-        },
-        {
-          title: 'Execute Quota',
-          code: `// Execute quota with load balancing
-const result = await ductape.processor.quota.execute({
+          title: 'Check quota',
+          code: `${imp}const allowed = await ductape.quotas.check({
   env: '${envSlug}',
   product: '${product.tag}',
   event: '${selectedQuota.tag}',
-  input: {
-    // Add your input parameters here
-${Object.keys(selectedQuota.input || {}).map(key => `    ${key}: 'value'`).join(',\n')}
-  },
-  retries: 3
-});
-
-console.log('Quota result:', result);`
+  input: { /* your input */ }
+});`,
         },
         {
-          title: 'Check Quota Status',
-          code: `// Check remaining quota
-const status = await ductape.quotas.check({
+          title: 'Consume quota',
+          code: `${imp}await ductape.quotas.consume({
+  env: '${envSlug}',
   product: '${product.tag}',
   event: '${selectedQuota.tag}',
-  env: '${envSlug}'
-});
-
-console.log('Quota status:', status);`
-        }
+  input: { /* your input */ }
+});`,
+        },
       ];
-
-      return sections;
     }
-
     return [];
   };
 
-  // Get icon for option type
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'action':
-        return <Zap className="h-3 w-3" />;
-      case 'db_action':
-        return <Database className="h-3 w-3" />;
-      case 'feature':
-        return <LayoutList className="h-3 w-3" />;
-      default:
-        return <Activity className="h-3 w-3" />;
+  const handleViewModeChange = (mode: ResilienceViewMode) => {
+    setViewMode(mode);
+    if (mode === 'list' && list.length > 0 && !selectedQuota) {
+      setSelectedQuota(list[0]);
     }
   };
 
-  // Calculate total quota weight for a quota
-  const getTotalWeight = (options: QuotaOption[]) => {
-    return options.reduce((sum, opt) => sum + (opt.quota || 0), 0);
+  const handleSelectQuota = (q: ProductQuota) => {
+    setSelectedQuota(q);
+    if (viewMode === 'overview') setViewMode('list');
   };
 
-  // Table columns
-  const columnHelper = createColumnHelper<Quota>();
-  const columns = useMemo<ColumnDef<Quota, any>[]>(
-    () => [
-      columnHelper.accessor('name', {
-        header: 'Quota',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center">
-              <Timer className="h-4 w-4 text-orange" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-grey">{row.original.name}</span>
-              <p className="text-xs text-grey-600 truncate">{row.original.tag}</p>
-            </div>
-          </div>
-        ),
-      }),
-      columnHelper.display({
-        id: 'options',
-        header: 'Options',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1.5">
-            {(row.original.options || []).slice(0, 3).map((opt, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center text-xs px-2 py-0.5 rounded border bg-grey-100 text-grey-700 border-grey-200"
-                title={`Weight: ${opt.quota}`}
-              >
-                {getTypeIcon(opt.type)}
-                <span className="ml-1">{opt.event?.split(':').pop() || opt.type}</span>
-                <span className="ml-1 text-grey-500">({opt.quota})</span>
-              </span>
-            ))}
-            {(row.original.options?.length || 0) > 3 && (
-              <span className="text-xs text-grey-600">
-                +{(row.original.options?.length || 0) - 3} more
-              </span>
-            )}
-          </div>
-        ),
-      }),
-      columnHelper.display({
-        id: 'weight',
-        header: 'Total Weight',
-        cell: ({ row }) => {
-          const totalWeight = getTotalWeight(row.original.options || []);
-          return (
-            <Badge variant="outline" className="text-xs bg-orange/10 text-orange border-orange/20">
-              {totalWeight}
-            </Badge>
-          );
-        },
-      }),
-      columnHelper.display({
-        id: 'inputs',
-        header: 'Inputs',
-        cell: ({ row }) => {
-          const inputCount = Object.keys(row.original.input || {}).length;
-          return (
-            <Badge variant="outline" className="text-xs">
-              {inputCount} input{inputCount !== 1 ? 's' : ''}
-            </Badge>
-          );
-        },
-      }),
-      columnHelper.accessor('created_at', {
-        header: 'Created',
-        cell: ({ row }) => (
-          <span className="text-sm text-grey-600">
-            {row.original.created_at
-              ? format(new Date(String(row.original.created_at)), 'MMM dd, yyyy')
-              : '-'}
-          </span>
-        ),
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                <MoreVertical className="h-4 w-4 text-grey-600" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                handleViewQuota(row.original);
-              }}>
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation();
-                setSelectedQuota(row.original);
-                setShowCodeSidebar(true);
-              }}>
-                <Code className="h-4 w-4 mr-2" />
-                View Code
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteQuota(row.original);
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      }),
-    ],
-    [product.tag]
-  );
-
-  const table = useReactTable({
-    data: filteredQuotas,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    state: {
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize,
-      },
-    },
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const newState = updater({ pageIndex: currentPage - 1, pageSize });
-        setCurrentPage(newState.pageIndex + 1);
-        setPageSize(newState.pageSize);
-      }
-    },
-    manualPagination: false,
-  });
-
-  // Loading state
-  if (isLoadingQuotas) {
+  if (!product.tag) {
     return (
-      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-background-tertiary">
+      <div className="flex-1 flex items-center justify-center bg-grey-100 p-8">
+        <p className="text-sm text-grey-600">Missing product context. Reopen from your product tab.</p>
+          </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-orange mx-auto mb-2" />
-          <p className="text-sm text-grey-600">Loading quotas...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-orange-600 mx-auto mb-2" />
+          <p className="text-sm text-grey-600">Loading quotas…</p>
         </div>
       </div>
     );
   }
 
+  const toolbarTitle =
+    viewMode === 'overview' ? 'Overview' : selectedQuota ? selectedQuota.name : 'All quotas';
+
   return (
-    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-background-tertiary">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden">
-        {/* Header */}
-        <div className="flex-shrink-0 p-4 border-b border-grey-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Timer className="h-5 w-5 text-orange" />
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-grey text-sm truncate">{product.name}</h2>
-              <p className="text-xs text-grey-600 truncate">Quotas</p>
-            </div>
-          </div>
+    <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-grey-100">
+      <QuotaExplorerSidebar
+        productName={product.name}
+        productTag={product.tag}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        totalCount={metrics.total}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        selectedEnv={selectedEnv}
+        onEnvChange={setSelectedEnv}
+        productEnvs={product.envs || []}
+        filteredQuotas={filteredQuotas}
+        selectedTag={selectedQuota?.tag ?? null}
+        onSelectQuota={handleSelectQuota}
+        onCreate={handleCreateQuota}
+        isRefreshing={isRefreshing}
+        onRefresh={handleRefresh}
+      />
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-            <Input
-              type="text"
-              placeholder="Search quotas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-0">
-          {/* Overview Link */}
-          <div className="mb-2">
-            <button
-              onClick={() => setViewMode('overview')}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                viewMode === 'overview'
-                  ? 'bg-orange/10 text-orange'
-                  : 'text-grey hover:bg-background-secondary'
-              )}
-            >
-              <LayoutDashboard className={cn(
-                'h-4 w-4',
-                viewMode === 'overview' ? 'text-orange' : 'text-grey-600'
-              )} />
-              <span className="flex-1 text-left font-medium">Overview</span>
-            </button>
-          </div>
-
-          {/* All Quotas Link */}
-          <div className="mb-4">
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                viewMode === 'list'
-                  ? 'bg-orange/10 text-orange'
-                  : 'text-grey hover:bg-background-secondary'
-              )}
-            >
-              <Timer className={cn(
-                'h-4 w-4',
-                viewMode === 'list' ? 'text-orange' : 'text-grey-600'
-              )} />
-              <span className="flex-1 text-left font-medium">All Quotas</span>
-              <span className={cn(
-                'text-xs px-1.5 py-0.5 rounded',
-                viewMode === 'list'
-                  ? 'bg-orange/20 text-orange'
-                  : 'bg-background-secondary text-grey-600'
-              )}>
-                {(quotas as Quota[] || []).length}
-              </span>
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-              Option Types
-            </div>
-            <button
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+        <div className="flex-shrink-0 h-12 border-b border-grey-300 bg-white px-4 flex items-center justify-between">
+          <p className="text-sm text-grey-600 truncate">{toolbarTitle}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="text-grey-600 hover:text-orange transition-colors"
-              title="Refresh quotas"
             >
-              <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-            </button>
-          </div>
-
-          <div className="space-y-0.5">
-            {Object.entries(metrics.byType).map(([type, count]) => (
-              <div
-                key={type}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-grey"
-              >
-                <span className="text-grey-600">
-                  {getTypeIcon(type)}
-                </span>
-                <span className="flex-1 text-left capitalize">{type.replace('_', ' ')}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-background-secondary text-grey-600">
-                  {count}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Environment Filter */}
-          <div className="mt-4 px-2">
-            <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide mb-2">
-              Environment
-            </div>
-            <Select value={envFilter} onValueChange={setEnvFilter}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="All Environments" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Environments</SelectItem>
-                {(product.envs || []).map((env) => (
-                  <SelectItem key={env.slug} value={env.slug}>
-                    {env.name || env.slug}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {hasActiveFilters && (
-            <div className="mt-3 px-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="w-full text-grey-600 hover:text-grey"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Clear Filters
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Create Button */}
-        <div className="flex-shrink-0 p-4 border-t border-grey-400">
-          <Button
-            className="w-full bg-orange hover:bg-orange/90 text-white"
-            onClick={handleCreateQuota}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Quota
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        {/* Header */}
-        <div className="flex-shrink-0 border-b border-border bg-white">
-          <div className="px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-orange/10 flex items-center justify-center">
-                  <Timer className="h-6 w-6 text-orange" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-grey">Quotas</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="text-sm text-grey-600 font-mono">{product.tag}</code>
-                    <span className={cn(
-                      'px-2 py-0.5 text-xs font-semibold rounded-full bg-orange/10 text-orange'
-                    )}>
-                      {metrics.total} quota{metrics.total !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="border-border text-grey-600 hover:text-grey hover:bg-background-secondary"
-                >
-                  <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-                  Refresh
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
                 <Button
+              type="button"
                   size="sm"
-                  className="bg-orange hover:bg-orange/90 text-white"
+              className="h-8 gap-1.5 bg-orange-600 hover:bg-orange-700"
                   onClick={handleCreateQuota}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Quota
+              <Plus className="h-3.5 w-3.5" />
+              New
                 </Button>
-              </div>
-            </div>
           </div>
         </div>
 
         {viewMode === 'overview' ? (
-          /* Overview Content */
-          <div className="flex-1 overflow-auto p-6">
-            {/* Metrics Dashboard */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {/* Total Quotas */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Quotas</span>
-                  <Timer className="h-4 w-4 text-orange" />
-                </div>
-                <p className="text-2xl font-bold text-grey">{metrics.total}</p>
-                <p className="text-xs text-grey-500 mt-2">{metrics.options} total options</p>
-              </div>
-
-              {/* Total Weight */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Total Weight</span>
-                  <BarChart3 className="h-4 w-4 text-purple-500" />
-                </div>
-                <p className="text-2xl font-bold text-purple-500">{metrics.totalQuotaWeight}</p>
-                <p className="text-xs text-grey-500 mt-2">load distribution</p>
-              </div>
-
-              {/* Actions */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Actions</span>
-                  <Zap className="h-4 w-4 text-blue" />
-                </div>
-                <p className="text-2xl font-bold text-blue">{metrics.byType['action'] || 0}</p>
-                <p className="text-xs text-grey-500 mt-2">action options</p>
-              </div>
-
-              {/* Environments */}
-              <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-grey-600">Environments</span>
-                  <LayoutDashboard className="h-4 w-4 text-grey-400" />
-                </div>
-                <p className="text-2xl font-bold text-grey">{product.envs?.length || 0}</p>
-                <p className="text-xs text-grey-500 mt-2">configured</p>
-              </div>
-            </div>
-
-            {/* All Quotas */}
-            <div className="bg-white rounded-lg border border-border shadow-sm">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-grey">All Quotas</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="text-orange hover:text-orange/80 text-xs"
-                >
-                  View All
-                  <ChevronRight className="h-3 w-3 ml-1" />
-                </Button>
-              </div>
-              <div className="divide-y divide-border">
-                {(quotas as Quota[] || []).length === 0 ? (
-                  <div className="px-5 py-8 text-center">
-                    <Timer className="h-8 w-8 text-grey-400 mx-auto mb-2" />
-                    <p className="text-sm text-grey-600">No quotas yet</p>
-                    <p className="text-xs text-grey-500 mt-1">Create a quota to get started with load balancing</p>
-                  </div>
-                ) : (
-                  (quotas as Quota[] || []).slice(0, 5).map((quota) => (
-                    <div
-                      key={quota.tag}
-                      className="px-5 py-3 flex items-center justify-between hover:bg-background-secondary transition-colors cursor-pointer group"
-                      onClick={() => handleViewQuota(quota)}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center flex-shrink-0">
-                          <Timer className="h-4 w-4 text-orange" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-grey truncate">{quota.name}</p>
-                          <p className="text-xs text-grey-500 truncate">
-                            {quota.tag} - {quota.options?.length || 0} options (weight: {getTotalWeight(quota.options || [])})
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {(quota.options || []).slice(0, 2).map((opt, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center text-xs px-1.5 py-0.5 rounded bg-grey-100 text-grey-700"
-                          >
-                            {getTypeIcon(opt.type)}
-                          </span>
-                        ))}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4 text-grey-600" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewQuota(quota);
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedQuota(quota);
-                              setShowCodeSidebar(true);
-                            }}>
-                              <Code className="h-4 w-4 mr-2" />
-                              View Code
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteQuota(quota);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <ChevronRight className="h-4 w-4 text-grey-400" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+          <QuotaExplorerOverview
+            metrics={metrics}
+            quotas={list}
+            onViewAll={() => {
+              setViewMode('list');
+              if (list.length > 0) setSelectedQuota(list[0]);
+            }}
+            onSelect={handleSelectQuota}
+          />
         ) : (
-          /* List View */
-          <>
-            {/* Toolbar */}
-            <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-grey-600">
-                    Showing <span className="font-medium text-grey">{filteredQuotas.length}</span> quotas
-                  </span>
-                  {hasActiveFilters && (
-                    <span className="text-xs text-grey-500">(filtered)</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
-                {isRefreshing ? (
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <Loader2 className="animate-spin w-8 h-8 text-orange mb-4" />
-                    <p className="text-sm font-medium text-grey">Loading quotas...</p>
-                  </div>
-                ) : filteredQuotas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <div className="w-16 h-16 rounded-full bg-border flex items-center justify-center mb-4">
-                      <Timer className="h-8 w-8 text-grey-500" />
-                    </div>
-                    <p className="text-grey font-medium">No quotas found</p>
-                    {hasActiveFilters && (
-                      <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
-                    )}
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id} className="border-b border-border bg-background-secondary">
-                          {headerGroup.headers.map((header) => (
-                            <TableHead
-                              key={header.id}
-                              className="text-grey-600 font-medium text-xs uppercase tracking-wider px-6 py-3"
-                            >
-                              {header.isPlaceholder ? null : (
-                                <div
-                                  {...{
-                                    className: header.column.getCanSort()
-                                      ? 'cursor-pointer select-none flex items-center hover:text-grey'
-                                      : 'flex items-center',
-                                    onClick: header.column.getToggleSortingHandler(),
-                                  }}
-                                >
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  {
-                                    {
-                                      asc: <ChevronUpIcon className="ml-1 h-4 w-4" />,
-                                      desc: <ChevronDownIcon className="ml-1 h-4 w-4" />,
-                                    }[header.column.getIsSorted() as string] ?? null
-                                  }
-                                </div>
-                              )}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableHeader>
-                    <TableBody>
-                      {table.getRowModel().rows.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          className="border-b border-border hover:bg-background-secondary transition-colors cursor-pointer"
-                          onClick={() => handleViewQuota(row.original)}
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-6 py-3">
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Pagination */}
-        {viewMode === 'list' && filteredQuotas.length > 0 && (
-          <div className="flex-shrink-0 px-6 py-3 bg-white border-t border-border">
-            <div className="flex items-center justify-between text-sm text-grey-600">
-              <div className="flex items-center gap-4">
-                <span>
-                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredQuotas.length)} of {filteredQuotas.length}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">Rows:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="h-7 px-2 text-xs border border-grey-400 rounded bg-white"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs px-2">
-                  Page {currentPage} of {Math.ceil(filteredQuotas.length / pageSize)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= Math.ceil(filteredQuotas.length / pageSize)}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+          <div className="flex-1 flex min-h-0 overflow-hidden">
+            <QuotaExplorerDetailPanel
+              quota={selectedQuota ?? undefined}
+              selectedEnv={selectedEnv}
+              onOpenTab={() => selectedQuota && handleViewQuota(selectedQuota)}
+              onViewCode={() => selectedQuota && setShowCodeSidebar(true)}
+              onDelete={() => {
+                if (selectedQuota) {
+                  setQuotaToDelete(selectedQuota);
+                  setShowDeleteDialog(true);
+                }
+              }}
+            />
           </div>
         )}
       </div>
 
-      {/* Code Sidebar */}
       {showCodeSidebar && selectedQuota && (
         <CodeSidebar
           title={selectedQuota.name}
-          subtitle={`Execute quota with load balancing using ${selectedQuota.tag}`}
+          subtitle={`Quota ${selectedQuota.tag}`}
           tag={selectedQuota.tag}
-          onClose={() => {
-            setShowCodeSidebar(false);
-          }}
+          onClose={() => setShowCodeSidebar(false)}
           generateCodeSections={generateCodeSections}
           environments={product.envs || []}
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Quota</DialogTitle>
+            <DialogTitle>Delete quota</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{quotaToDelete?.name}"? This action cannot be undone.
+              Delete &quot;{quotaToDelete?.name}&quot;? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setQuotaToDelete(null);
-              }}
-            >
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteQuotaMutation.isPending}
+              onClick={() => quotaToDelete && deleteMutation.mutate(quotaToDelete)}
+              disabled={deleteMutation.isPending}
             >
-              {deleteQuotaMutation.isPending ? (
+              {deleteMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  Deleting…
                 </>
               ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </>
+                'Delete'
               )}
             </Button>
           </DialogFooter>

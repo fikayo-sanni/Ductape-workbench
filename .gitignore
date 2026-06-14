@@ -34,8 +34,17 @@ release
 # Environment variables
 .env
 .env.local
+.env.e2e
 .env.production.local
 .env.development.local
 
 # Keep the example
 !.env.example
+!.env.e2e.example
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.auth/user.json

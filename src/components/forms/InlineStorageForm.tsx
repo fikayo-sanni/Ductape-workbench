@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
+import CloudLinkPanel from '@/components/cloud/CloudLinkPanel';
+import { isSecretRef, getStorageBucketName, mergeStorageEnvFromDraft, shouldHideManualCloudCredentials } from '@/utils/cloudDraftMerge';
 
 interface InlineStorageFormProps {
   product: {
@@ -49,6 +51,35 @@ interface EnvConfig {
   gcpAuthProviderX509CertUrl: string;
   gcpClientX509CertUrl: string;
   gcpUniverseDomain: string;
+  /** Cloud connection tag when linking from a workspace cloud account */
+  cloud?: string;
+  location?: string;
+  linkedFromCloud?: boolean;
+}
+
+function showCloudLinkPanel(
+  sdkProxy: ReturnType<typeof useSDKProxy>,
+  formTag: string,
+  provider: string,
+): boolean {
+  return Boolean(sdkProxy && formTag && ['aws', 'azure', 'gcp'].includes(provider));
+}
+
+function isStorageEnvCloudLinked(env: EnvConfig): boolean {
+  if (env.cloud) return true;
+  const bucket = getStorageBucketName(env);
+  if (!bucket) return false;
+  if (env.linkedFromCloud) return true;
+  if (env.type === 'aws') {
+    return isSecretRef(env.accessKeyId) || isSecretRef(env.secretAccessKey);
+  }
+  if (env.type === 'azure') {
+    return isSecretRef(env.connectionString);
+  }
+  if (env.type === 'gcp') {
+    return isSecretRef(env.gcpPrivateKey) || isSecretRef(env.gcpClientEmail);
+  }
+  return false;
 }
 
 export default function InlineStorageForm({ product, onCancel, onSuccess }: InlineStorageFormProps) {
@@ -104,6 +135,8 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
           gcpAuthProviderX509CertUrl: 'https://www.googleapis.com/oauth2/v1/certs',
           gcpClientX509CertUrl: '',
           gcpUniverseDomain: 'googleapis.com',
+          cloud: '',
+          location: 'US',
         }))
       );
     }
@@ -111,6 +144,30 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
 
   // Build provider-specific config
   const buildConfigForProvider = (env: EnvConfig, type: string) => {
+    if (env.cloud) {
+      const bucket = getStorageBucketName(env as unknown as Record<string, unknown>);
+      if (type.toLowerCase() === 'aws') {
+        return {
+          cloud: env.cloud,
+          bucketName: bucket,
+          region: env.region || 'us-east-1',
+        };
+      }
+      if (type.toLowerCase() === 'gcp') {
+        return {
+          cloud: env.cloud,
+          bucketName: bucket,
+          location: env.location || 'US',
+        };
+      }
+      if (type.toLowerCase() === 'azure') {
+        return {
+          cloud: env.cloud,
+          containerName: bucket || env.containerName,
+        };
+      }
+    }
+
     switch (type.toLowerCase()) {
       case 'aws':
         return {
@@ -142,7 +199,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
         if (env.gcpClientX509CertUrl) gcpConfig.client_x509_cert_url = env.gcpClientX509CertUrl;
 
         return {
-          bucketName: env.gcpBucketName,
+          bucketName: getStorageBucketName(env as unknown as Record<string, unknown>),
           config: gcpConfig,
         };
       default:
@@ -202,22 +259,62 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
     // Validate configured environments have required fields
     for (const env of envConfigs) {
       if (env.type) {
-        if (env.type === 'AWS' && !env.bucketName) {
-          toast.error(`Please enter bucket name for ${env.env_name}`);
+        if (env.cloud) {
+          if (!getStorageBucketName(env as unknown as Record<string, unknown>)) {
+            toast.error(`Select or enter a bucket for ${env.env_name}`);
+            return;
+          }
+          continue;
+        }
+        if (env.type === 'aws' && !getStorageBucketName(env)) {
+          toast.error(
+            env.linkedFromCloud
+              ? `Select a bucket to link for ${env.env_name}`
+              : `Link or enter a bucket name for ${env.env_name}`,
+          );
           return;
         }
-        if (env.type === 'Azure' && !env.containerName) {
+        if (
+          env.type === 'aws' &&
+          !isSecretRef(env.accessKeyId) &&
+          (!env.accessKeyId || !env.secretAccessKey)
+        ) {
+          toast.error(`Enter credentials or link a cloud account for ${env.env_name}`);
+          return;
+        }
+        if (env.type === 'azure' && !env.containerName) {
           toast.error(`Please enter container name for ${env.env_name}`);
           return;
         }
-        if (env.type === 'GCP') {
-          if (!env.gcpBucketName) {
-            toast.error(`Please enter bucket name for ${env.env_name}`);
+        if (
+          env.type === 'azure' &&
+          !isSecretRef(env.connectionString) &&
+          !env.connectionString
+        ) {
+          toast.error(`Enter connection string or link a cloud account for ${env.env_name}`);
+          return;
+        }
+        if (env.type === 'gcp') {
+          if (!getStorageBucketName(env)) {
+            toast.error(
+              env.linkedFromCloud
+                ? `Select a bucket to link for ${env.env_name}`
+                : `Link or enter a bucket name for ${env.env_name}`,
+            );
             return;
           }
-          // GCP requires service account credentials - check for essential fields
-          if (!env.gcpProjectId || !env.gcpClientEmail || !env.gcpPrivateKey) {
-            toast.error(`Please upload service account JSON file for ${env.env_name}`);
+          const hasCloudCreds =
+            isSecretRef(env.gcpPrivateKey) ||
+            isSecretRef(env.gcpClientEmail);
+          if (
+            !hasCloudCreds &&
+            (!env.gcpProjectId || !env.gcpClientEmail || !env.gcpPrivateKey)
+          ) {
+            toast.error(
+              env.linkedFromCloud
+                ? `Wait for cloud import to finish for ${env.env_name}, then try again`
+                : `Link a cloud account or upload service account JSON for ${env.env_name}`,
+            );
             return;
           }
         }
@@ -365,7 +462,12 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                 <p className="text-sm text-grey-600">Configure storage for each environment</p>
               </div>
 
-              {envConfigs.map((env, index) => (
+              {envConfigs.map((env, index) => {
+                const useCloudLink = showCloudLinkPanel(sdkProxy, formData.tag, env.type);
+                const cloudLinked = isStorageEnvCloudLinked(env);
+                const hideManualCredentials = shouldHideManualCloudCredentials(env, useCloudLink);
+
+                return (
                 <div key={env.slug} className="p-4 bg-grey-100 rounded-lg space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-grey">{env.env_name}</h4>
@@ -389,8 +491,54 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                     </Select>
                   </div>
 
-                  {/* AWS Configuration */}
-                  {env.type === 'aws' && (
+                  {useCloudLink && (
+                    <CloudLinkPanel
+                      sdkProxy={sdkProxy!}
+                      productTag={product.tag}
+                      componentTag={formData.tag}
+                      componentType="storage"
+                      envSlug={env.slug}
+                      storageProvider={env.type as 'aws' | 'azure' | 'gcp'}
+                      onDraftApplied={(draft) => {
+                        setEnvConfigs((prev) => {
+                          const updated = [...prev];
+                          updated[index] = {
+                            ...updated[index],
+                            ...(mergeStorageEnvFromDraft(
+                              updated[index] as unknown as Record<string, unknown>,
+                              draft,
+                            ) as Partial<EnvConfig>),
+                            linkedFromCloud: Boolean(draft.linkedFromCloud ?? updated[index].linkedFromCloud),
+                          };
+                          return updated;
+                        });
+                      }}
+                    />
+                  )}
+
+                  {useCloudLink && cloudLinked && (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 space-y-1">
+                      <p className="text-sm font-medium text-grey flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        Cloud account linked — bucket will be imported or created on save
+                      </p>
+                      {env.cloud && (
+                        <p className="text-xs text-grey-600 pl-6">Cloud: {env.cloud}</p>
+                      )}
+                      {env.type === 'aws' && getStorageBucketName(env) && (
+                        <p className="text-xs text-grey-600 pl-6">Bucket: {getStorageBucketName(env)}</p>
+                      )}
+                      {env.type === 'azure' && env.containerName && (
+                        <p className="text-xs text-grey-600 pl-6">Container: {env.containerName}</p>
+                      )}
+                      {env.type === 'gcp' && getStorageBucketName(env) && (
+                        <p className="text-xs text-grey-600 pl-6">Bucket: {getStorageBucketName(env)}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AWS manual configuration — hidden when using cloud link */}
+                  {env.type === 'aws' && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -453,8 +601,8 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                     </div>
                   )}
 
-                  {/* Azure Configuration */}
-                  {env.type === 'azure' && (
+                  {/* Azure manual configuration — hidden when using cloud link */}
+                  {env.type === 'azure' && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div>
                         <Label htmlFor={`containerName-${index}`} className="required">Container Name</Label>
@@ -480,8 +628,8 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                     </div>
                   )}
 
-                  {/* GCP Configuration */}
-                  {env.type === 'gcp' && (
+                  {/* GCP manual configuration — hidden when using cloud link */}
+                  {env.type === 'gcp' && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div className="flex items-center justify-between">
                         <h5 className="text-sm font-medium text-grey">Service Account Credentials</h5>
@@ -617,7 +765,8 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">

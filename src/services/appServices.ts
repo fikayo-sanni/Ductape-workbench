@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import apiClient from "@/config/axiosinstance";
 import { IApp } from "@/types/app";
+import type { ReviewFeedbackMessage, ReviewFeedbackTopic } from "@/lib/reviewFeedback";
 
 export interface AppsResponse {
   data: IApp[];
@@ -121,6 +122,58 @@ const fetchAppComponents = async (data: {
   return response.data;
 };
 
+const listReviewFeedback = async (data: {
+  app_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<{ data: ReviewFeedbackMessage[] }> => {
+  const { app_id, workspace_id, user_id, public_key } = data;
+  const response = await apiClient.get<{ data: ReviewFeedbackMessage[] }>(
+    `/apps/v1/${app_id}/review-feedback`,
+    { params: { workspace_id, user_id, public_key } },
+  );
+  return response.data;
+};
+
+const postReviewFeedback = async (data: {
+  app_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  message: string;
+  topic: ReviewFeedbackTopic;
+  author_name?: string;
+  resource_id?: string;
+  resource_label?: string;
+}): Promise<{ data: ReviewFeedbackMessage }> => {
+  const {
+    app_id,
+    workspace_id,
+    user_id,
+    public_key,
+    message,
+    topic,
+    author_name,
+    resource_id,
+    resource_label,
+  } = data;
+  const response = await apiClient.post<{ data: ReviewFeedbackMessage }>(
+    `/apps/v1/${app_id}/review-feedback`,
+    {
+      workspace_id,
+      user_id,
+      public_key,
+      message,
+      topic,
+      author_name,
+      resource_id,
+      resource_label,
+    },
+  );
+  return response.data;
+};
+
 const appServices = {
   fetchApps,
   fetchApp,
@@ -129,6 +182,8 @@ const appServices = {
   createApp,
   updateApp,
   fetchAppComponents,
+  listReviewFeedback,
+  postReviewFeedback,
 };
 
 export default appServices;

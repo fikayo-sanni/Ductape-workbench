@@ -80,7 +80,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
   // Helper to add a new event
   const addEvent = () => {
     const newEvent: WebhookEvent = {
-      id: `event-${Date.now()}`,
+      id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: '',
       tag: '',
       description: '',
@@ -175,8 +175,10 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
 
       await ductape.init(app.tag);
 
-      // Prepare valid events
-      const validEvents = events.filter((e) => e.name.trim() && e.tag.trim());
+      // Prepare valid events — backend requires at least one selector per event
+      const validEvents = events.filter(
+        (e) => e.name.trim() && e.tag.trim() && e.selectors.length > 0
+      );
       const formattedEvents = validEvents.map((event) => {
         // Parse sample JSON
         let parsedSample = {};
@@ -211,12 +213,22 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
 
       return webhookData;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       queryClient.invalidateQueries({ queryKey: ['apps'] });
       queryClient.invalidateQueries({ queryKey: ['app', app?._id] });
 
-      toast.success('Webhook created successfully');
+      const eventErrors = result?.eventErrors || [];
+      const createdCount = result?.events?.length || 0;
+
+      if (eventErrors.length > 0) {
+        toast.error(
+          `Webhook created with ${createdCount} event(s). ${eventErrors.length} event(s) failed — check sample payload and selector fields.`
+        );
+      } else {
+        toast.success('Webhook created successfully');
+      }
+
       onSuccess();
     },
     onError: (error: any) => {
@@ -227,11 +239,13 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
   // Validate all events have required fields
   const areEventsValid = events.every((event) => {
     if (!event.name.trim() || !event.tag.trim()) return false;
-    if (event.sample && event.sample.trim() !== '{}' && event.sample.trim() !== '' && event.selectors.length === 0) {
-      return false;
-    }
+
     const validation = validateEventSample(event.sample);
-    return validation.isValid;
+    if (!validation.isValid) return false;
+    if (validation.selectorOptions.length === 0) return false;
+    if (event.selectors.length === 0) return false;
+
+    return true;
   });
 
   const handleSave = async () => {
@@ -246,7 +260,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
     }
 
     if (events.length > 0 && !areEventsValid) {
-      toast.error('Please complete all event fields correctly');
+      toast.error('Each event needs a name, tag, sample payload with fields, and at least one selector');
       return;
     }
 
@@ -256,35 +270,32 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
   const isFormComplete = name.trim().length > 0 && tag.trim().length > 0 && selectedEnvSlugs.length > 0;
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onCancel}
-                className="text-grey-500 hover:text-grey -ml-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-blue/10">
-                <Webhook className="h-6 w-6 text-blue" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-grey">Create New Webhook</h1>
-                <p className="text-sm text-grey-600">
-                  Adding to {app.app_name}
-                </p>
-              </div>
+    <div className="h-full overflow-auto bg-grey-50">
+      <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 py-5">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              className="h-10 w-10 p-0 -ml-2 text-grey-500 hover:text-grey"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
+              <Webhook className="h-6 w-6 text-blue-500" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-grey">New webhook</h1>
+              <p className="text-sm text-grey-500 truncate">{app.app_name}</p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+      <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-6 space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -341,10 +352,9 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
           </div>
         </div>
 
-        {/* Environments Section */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <Globe className="h-5 w-5 text-blue-500" />
+            <Globe className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-lg font-semibold text-grey">Environments</h2>
               <p className="text-xs text-grey-600">
@@ -363,7 +373,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                     'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
                     selectedEnvSlugs.includes(env.slug)
                       ? 'border-primary bg-primary/5'
-                      : 'border-grey-300 hover:border-grey-400'
+                      : 'border-grey-300 bg-white hover:border-grey-400'
                   )}
                 >
                   <div
@@ -396,11 +406,10 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
           )}
         </div>
 
-        {/* Events Section */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Zap className="h-5 w-5 text-amber-500" />
+              <Zap className="h-5 w-5 text-purple-600" />
               <div>
                 <h2 className="text-lg font-semibold text-grey">Events (Optional)</h2>
                 <p className="text-xs text-grey-600">
@@ -425,14 +434,14 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
               {events.map((event, index) => {
                 const validation = validateEventSample(event.sample);
                 return (
-                  <div key={event.id} className="border border-grey-300 rounded-lg overflow-hidden">
+                  <div key={event.id} className="bg-white border border-grey-400 rounded-lg overflow-hidden">
                     {/* Event Header */}
                     <div
                       className="flex items-center justify-between p-3 bg-grey-50 cursor-pointer"
                       onClick={() => toggleEventExpanded(event.id)}
                     >
                       <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-amber-500" />
+                        <Zap className="h-4 w-4 text-purple-600" />
                         <span className="font-medium text-grey">{event.name || `Event ${index + 1}`}</span>
                         {event.tag && (
                           <code className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono">
@@ -608,10 +617,15 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                   </div>
                 );
               })}
+              <div className="flex justify-end pt-2">
+                <Button type="button" variant="outline" size="sm" onClick={addEvent} className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add Event
+                </Button>
+              </div>
             </div>
           )}
 
-          {/* Actions at bottom of events section */}
           <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-grey-400">
             <Button variant="outline" onClick={onCancel} disabled={isCreating}>
               Cancel

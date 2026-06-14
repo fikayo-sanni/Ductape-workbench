@@ -28,7 +28,7 @@ export default function AppsSidebar() {
         type: 'app',
         title: fullApp.app_name,
         itemId: fullApp._id,
-        data: fullApp,
+        data: { ...fullApp, appViewMode: 'general' as const },
       });
       setLoadingAppTag(null);
       // Automatically collapse the main sidebar after opening an app

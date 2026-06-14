@@ -21,6 +21,7 @@ import productServices from '@/services/productServices';
 import appServices from '@/services/appServices';
 import { reconstructActionPayload } from '@/utils/payloadReconstruction';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
+import { SearchableActionPicker } from '@/components/workflow-builder';
 
 interface NewHealthcheckTabContentProps {
   data?: any;
@@ -58,6 +59,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       selectedDatabase: '',
       selectedMessageBroker: '',
       selectedFeature: '',
+      selectedWorkflow: '',
     }
   );
   const [selectedAction, setSelectedAction] = useState(savedTabState?.selectedAction || '');
@@ -107,6 +109,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   const databases = productDetails?.databases || [];
   const messageBrokers = productDetails?.messageBrokers || [];
   const features = productDetails?.features || [];
+  const workflows = productDetails?.workflows || [];
 
   // Initialize Ductape SDK for product
   const ductape = useDuctape({
@@ -140,17 +143,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   });
 
   const actions = appActionsRes?.data || [];
-
-  // Filter actions based on search term
-  const filteredActions = useMemo(() => {
-    if (!actionSearchTerm.trim()) return actions;
-    const searchLower = actionSearchTerm.toLowerCase();
-    return actions.filter((action: any) =>
-      (action.name?.toLowerCase().includes(searchLower)) ||
-      (action.tag?.toLowerCase().includes(searchLower)) ||
-      (action.method?.toLowerCase().includes(searchLower))
-    );
-  }, [actions, actionSearchTerm]);
 
   // Auto-generate tag from name
   useEffect(() => {
@@ -295,6 +287,9 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       } else if (formData.type === 'feature') {
         if (!formData.selectedFeature) throw new Error('Please select a feature');
         payload.feature = formData.selectedFeature;
+      } else if (formData.type === 'workflow') {
+        if (!formData.selectedWorkflow) throw new Error('Please select a workflow');
+        payload.workflow = formData.selectedWorkflow;
       }
 
       const healthcheck = await ductape.apps.health.create(payload);
@@ -356,6 +351,11 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
         toast.error('Please select a feature');
         return;
       }
+    } else if (formData.type === 'workflow') {
+      if (!formData.selectedWorkflow) {
+        toast.error('Please select a workflow');
+        return;
+      }
     }
 
     createHealthcheck();
@@ -378,6 +378,8 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       return formData.selectedMessageBroker !== '';
     } else if (formData.type === 'feature') {
       return formData.selectedFeature !== '';
+    } else if (formData.type === 'workflow') {
+      return formData.selectedWorkflow !== '';
     }
 
     return false;
@@ -604,6 +606,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                      <SelectItem value="database">Database</SelectItem>
                      <SelectItem value="message_broker">Messaging</SelectItem>
                      <SelectItem value="feature">Feature</SelectItem>
+                     <SelectItem value="workflow">Workflow</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-grey-600 mt-1">
@@ -652,52 +655,12 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </div>
 
                   {formData.selectedApp && (
-                <div>
-                  <Label htmlFor="action" className="required">
-                    Action
-                  </Label>
-                  <Select
-                    value={selectedAction}
-                    onValueChange={setSelectedAction}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select an action" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="px-2 pb-2 pt-1 sticky top-0 bg-white border-b">
-                        <Input
-                          placeholder="Search actions..."
-                          value={actionSearchTerm}
-                          onChange={(e) => setActionSearchTerm(e.target.value)}
-                          className="h-8"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {filteredActions.length > 0 ? (
-                          filteredActions.map((action: any) => (
-                            <SelectItem key={action.tag} value={action.tag}>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{action.name || action.tag}</span>
-                                {action.method && (
-                                  <span className="text-xs text-grey-600 uppercase">({action.method})</span>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-2 py-6 text-center text-sm text-grey-600">
-                            No actions found
-                          </div>
-                        )}
-                      </div>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-grey-600 mt-1">
-                    Select the action to run for health checks
-                  </p>
-                </div>
-              )}
+                    <SearchableActionPicker
+                      actions={actions}
+                      selectedTag={selectedAction}
+                      onSelect={(action) => setSelectedAction(action.tag)}
+                    />
+                  )}
 
               {selectedAction && selectedActionData && (
                 <div className="space-y-6 border-t border-grey-400 pt-6 mt-6">
@@ -930,6 +893,38 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </Select>
                   <p className="text-xs text-grey-600 mt-1">
                     Select the feature to monitor with this health check
+                  </p>
+                </div>
+              )}
+
+              {formData.type === 'workflow' && (
+                <div>
+                  <Label htmlFor="workflow" className="required">
+                    Workflow probe
+                  </Label>
+                  <Select
+                    value={formData.selectedWorkflow}
+                    onValueChange={(value) => setFormData({ ...formData, selectedWorkflow: value })}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select a workflow" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workflows.length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No workflows on this product
+                        </SelectItem>
+                      ) : (
+                        workflows.map((wf: any) => (
+                          <SelectItem key={wf.tag} value={wf.tag}>
+                            {wf.name || wf.tag}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-grey-600 mt-1">
+                    Executes the workflow on each interval and checks completion status
                   </p>
                 </div>
               )}

@@ -16,7 +16,8 @@ import {
   X as CloseIcon,
   Layers,
 } from 'lucide-react';
-import {cn, getLast7DaysNormalized} from '@/lib/utils';
+import {cn} from '@/lib/utils';
+import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import {useAuth} from '@/store/useAuth';
 import {useQuery} from '@tanstack/react-query';
 import workspaceServices from '@/services/workspaceServices';
@@ -122,69 +123,70 @@ export default function Dashboard() {
     selectedProductId !== 'all' ||
     selectedTimeRange !== '7d';
 
+  const dashboardPayload = dashboardData?.data ?? dashboardData;
+  const statsFromApi: Array<{
+    title?: string;
+    value?: string;
+    change?: string;
+    trend?: string;
+  }> = dashboardPayload?.stats ?? [];
+
+  const stat = (index: number) => statsFromApi[index] ?? {};
+
   // Map backend data to component props
   const stats = [
     {
       title: 'Active Products',
-      value: dashboardData?.data?.stats[0]?.value || '0',
-      change: dashboardData?.data?.stats[0]?.change || '0%',
-      trend: dashboardData?.data?.stats[0]?.trend || 'up',
+      value: stat(0).value || '0',
+      change: stat(0).change || '0%',
+      trend: stat(0).trend || 'up',
       icon: Package,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
     },
     {
       title: 'Internal Calls',
-      value: dashboardData?.data?.stats[1]?.value || '0',
-      change: dashboardData?.data?.stats[1]?.change || '0%',
-      trend: dashboardData?.data?.stats[1]?.trend || 'up',
+      value: stat(1).value || '0',
+      change: stat(1).change || '0%',
+      trend: stat(1).trend || 'up',
       icon: Activity,
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
     },
     {
       title: 'External Outbound',
-      value: dashboardData?.data?.stats[2]?.value || '0',
-      change: dashboardData?.data?.stats[2]?.change || '0%',
-      trend: dashboardData?.data?.stats[2]?.trend || 'up',
+      value: stat(2).value || '0',
+      change: stat(2).change || '0%',
+      trend: stat(2).trend || 'up',
       icon: Zap,
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
     },
     {
       title: 'External Inbound',
-      value: dashboardData?.data?.stats[3]?.value || '0',
-      change: dashboardData?.data?.stats[3]?.change || '0%',
-      trend: dashboardData?.data?.stats[3]?.trend || 'up',
+      value: stat(3).value || '0',
+      change: stat(3).change || '0%',
+      trend: stat(3).trend || 'up',
       icon: Zap,
       color: 'text-green',
       bgColor: 'bg-green/10',
     },
     {
       title: 'Total Resources',
-      value: dashboardData?.data?.stats[4]?.value || '0',
-      change: dashboardData?.data?.stats[4]?.change || '0%',
-      trend: dashboardData?.data?.stats[4]?.trend || 'up',
+      value: stat(4).value || '0',
+      change: stat(4).change || '0%',
+      trend: stat(4).trend || 'up',
       icon: Database,
       color: 'text-yellow',
       bgColor: 'bg-yellow/10',
     },
   ];
 
-  const rawActivityTimeline: Array<{
-    date?: string;
-    day?: string;
-    count: number;
-  }> = dashboardData?.data?.activityTimeline || [];
-  const activityTimeline = getLast7DaysNormalized(
-    rawActivityTimeline,
-    d => d.count ?? 0,
-  );
   const activityByType: Array<{
     type: string;
     count: number;
     percentage: number;
-  }> = dashboardData?.data?.activityByType || [];
+  }> = dashboardPayload?.activityByType || [];
   const topProducts: Array<{
     name: string;
     resources: number;
@@ -192,19 +194,19 @@ export default function Dashboard() {
     externalOutbound: string;
     externalInbound: string;
     growth: string;
-  }> = dashboardData?.data?.topProducts || [];
+  }> = dashboardPayload?.topProducts || [];
   const resourceUsage: Array<{
     name: string;
     count: number;
     type: string;
     status: string;
-  }> = dashboardData?.data?.resourceUsage || [];
+  }> = dashboardPayload?.resourceUsage || [];
 
   // Show loading state
   if (isLoading) {
     return (
-      <div className="bg-grey-100 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-center min-h-[calc(100vh-200px)] sm:h-96">
+      <div className="bg-grey-100 p-4 sm:p-6 w-full">
+        <div className="max-w-7xl mx-auto flex items-center justify-center py-16">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
             <p className="text-sm sm:text-base text-grey-600">
@@ -219,8 +221,8 @@ export default function Dashboard() {
   // Show error state
   if (error || !dashboardData) {
     return (
-      <div className="bg-grey-100 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-center min-h-[calc(100vh-200px)] sm:h-96">
+      <div className="bg-grey-100 p-4 sm:p-6 w-full">
+        <div className="max-w-7xl mx-auto flex items-center justify-center py-16">
           <div className="text-center">
             <AlertTriangle className="h-8 w-8 mx-auto text-red mb-4" />
             <p className="text-sm sm:text-base text-grey-600">
@@ -236,7 +238,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="bg-grey-100 min-h-screen p-3 sm:p-4 md:p-6">
+    <div className="bg-grey-100 w-full p-3 sm:p-4 md:p-6 pb-10">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -469,77 +471,13 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Activity Timeline (Last 7 days) */}
-          <div className="lg:col-span-2 bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-semibold text-grey">
-                Activity Timeline (Last 7 days)
-              </h2>
-              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-grey-600" />
-            </div>
-            <div className="space-y-2 sm:space-y-3">
-              {activityTimeline.some(d => d.value > 0) ? (
-                <>
-                  {activityTimeline.map((day, index) => {
-                    const maxCount = Math.max(
-                      ...activityTimeline.map(d => d.value),
-                      1,
-                    );
-                    const percentage =
-                      maxCount > 0 ? (day.value / maxCount) * 100 : 0;
-                    return (
-                      <div
-                        key={day.date}
-                        className="flex items-center gap-2 sm:gap-3"
-                      >
-                        <div className="w-10 sm:w-12 text-[10px] sm:text-xs font-medium text-grey-600">
-                          {day.date}
-                        </div>
-                        <div className="flex-1 h-6 sm:h-8 bg-grey-200 dark:bg-grey-700 rounded-lg overflow-hidden relative">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg transition-all duration-500"
-                            style={{width: `${percentage}%`}}
-                          />
-                          <div className="absolute inset-0 flex items-center px-2 sm:px-3">
-                            <span
-                              className={cn(
-                                'text-[10px] sm:text-xs font-semibold',
-                                percentage > 30 ? 'text-white' : 'text-grey',
-                              )}
-                            >
-                              {day.value} activities
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {/* Summary */}
-                  <div className="pt-3 sm:pt-4 border-t border-grey-400">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <span className="text-grey-600">Total activities</span>
-                      <span className="font-semibold text-grey">
-                        {activityTimeline.reduce(
-                          (sum, day) => sum + day.value,
-                          0,
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-                  <Activity className="h-10 w-10 sm:h-12 sm:w-12 text-grey-400 mb-2 sm:mb-3" />
-                  <p className="text-sm sm:text-base text-grey-600 font-medium">
-                    No activity yet
-                  </p>
-                  <p className="text-xs sm:text-sm text-grey-500 mt-1 text-center px-4">
-                    Activity timeline will appear here as you use your workspace
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <ActivityTimelinePanel
+            title="Activity timeline"
+            kind="workspace"
+            countLabel="activities"
+            enabled={!!currentWorkspaceId}
+            className="lg:col-span-2 border-grey-400"
+          />
 
           {/* Activity by Type */}
           <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">

@@ -26,6 +26,8 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/store/useAuth";
 import { useSDKProxy } from "@/services/sdkProxy";
 import { MessageBrokerTypes } from "@ductape/sdk/dist/types";
+import CloudLinkPanel from "@/components/cloud/CloudLinkPanel";
+import { isSecretRef, shouldHideManualCloudCredentials, mergeBrokerEnvFromDraft } from "@/utils/cloudDraftMerge";
 
 interface InlineMessageBrokerFormProps {
   product: {
@@ -55,6 +57,9 @@ interface EnvConfig {
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   awsQueueUrl: string;
+  queueName?: string;
+  cloud?: string;
+  linkedFromCloud?: boolean;
   // Kafka
   kafkaBrokers: string;
   kafkaClientId: string;
@@ -244,6 +249,13 @@ export default function InlineMessageBrokerForm({
           password: env.redisPassword || undefined,
         };
       case "AWS_SQS":
+        if (env.cloud) {
+          return {
+            cloud: env.cloud,
+            region: env.awsRegion || 'us-east-1',
+            queueName: env.queueName || env.awsQueueUrl,
+          };
+        }
         return {
           region: env.awsRegion,
           accessKeyId: env.awsAccessKeyId,
@@ -265,6 +277,13 @@ export default function InlineMessageBrokerForm({
             : undefined,
         };
       case "GOOGLE_PUBSUB":
+        if (env.cloud) {
+          return {
+            cloud: env.cloud,
+            projectId: env.gcpProjectId || undefined,
+            queueName: env.queueName,
+          };
+        }
         return {
           projectId: env.gcpProjectId,
           credentials: {
@@ -327,7 +346,22 @@ export default function InlineMessageBrokerForm({
   });
 
   const handleSave = async () => {
-    const hasConfiguredEnv = envConfigs.some((env) => env.type.trim());
+    const hasConfiguredEnv = envConfigs.some(
+      (env) =>
+        env.type.trim() &&
+        (Boolean(env.cloud?.trim()) ||
+          Boolean(env.linkedFromCloud) ||
+          (env.type === "AWS_SQS" &&
+            (Boolean(env.awsQueueUrl.trim()) ||
+              isSecretRef(env.awsAccessKeyId) ||
+              isSecretRef(env.awsSecretAccessKey))) ||
+          (env.type === "GOOGLE_PUBSUB" &&
+            (Boolean(env.gcpProjectId.trim()) || Boolean(env.gcpClientEmail.trim()))) ||
+          (env.type === "RABBITMQ" && Boolean(env.rabbitmqUrl.trim())) ||
+          (env.type === "REDIS" && Boolean(env.redisHost.trim())) ||
+          (env.type === "KAFKA" && Boolean(env.kafkaBrokers.trim())) ||
+          (env.type === "NATS" && Boolean(env.natsServers.trim()))),
+    );
     if (!hasConfiguredEnv) {
       toast.error("Please configure at least one environment");
       return;
@@ -425,7 +459,13 @@ export default function InlineMessageBrokerForm({
                 <p className="text-sm text-grey-600">Configure messaging for each environment</p>
               </div>
 
-              {envConfigs.map((env, index) => (
+              {envConfigs.map((env, index) => {
+                const showBrokerCloudLink =
+                  Boolean(sdkProxy && formData.tag) &&
+                  (env.type === "AWS_SQS" || env.type === "GOOGLE_PUBSUB");
+                const hideManualCredentials = shouldHideManualCloudCredentials(env, showBrokerCloudLink);
+
+                return (
                 <div key={env.slug} className="border border-grey-400 rounded-lg p-6 space-y-4 bg-grey-50">
                   <div className="flex items-center justify-between mb-4 pb-4 border-b border-grey-400">
                     <div>
@@ -528,8 +568,46 @@ export default function InlineMessageBrokerForm({
                     </div>
                   )}
 
+                  {showBrokerCloudLink && (
+                    <CloudLinkPanel
+                      sdkProxy={sdkProxy}
+                      productTag={product.tag}
+                      componentTag={formData.tag}
+                      componentType="messageBrokers"
+                      envSlug={env.slug}
+                      onDraftApplied={(draft) => {
+                        const updated = [...envConfigs];
+                        updated[index] = {
+                          ...updated[index],
+                          ...(mergeBrokerEnvFromDraft(
+                            updated[index] as unknown as Record<string, unknown>,
+                            draft as { config?: Record<string, unknown> },
+                          ) as Partial<EnvConfig>),
+                        };
+                        setEnvConfigs(updated);
+                      }}
+                    />
+                  )}
+
+                  {hideManualCredentials && (env.cloud || env.linkedFromCloud) && (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 space-y-1">
+                      <p className="text-sm font-medium text-grey flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        Cloud account linked — queue will be imported or created on save
+                      </p>
+                      {env.cloud && (
+                        <p className="text-xs text-grey-600 pl-6">Cloud: {env.cloud}</p>
+                      )}
+                      {(env.queueName || env.awsQueueUrl) && (
+                        <p className="text-xs text-grey-600 pl-6">
+                          Queue: {env.queueName || env.awsQueueUrl}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* AWS SQS Configuration */}
-                  {env.type === "AWS_SQS" && (
+                  {env.type === "AWS_SQS" && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div>
                         <Label htmlFor={`awsRegion-${index}`} className="required">Region</Label>
@@ -695,7 +773,7 @@ export default function InlineMessageBrokerForm({
                   )}
 
                   {/* Google Pub/Sub Configuration */}
-                  {env.type === "GOOGLE_PUBSUB" && (
+                  {env.type === "GOOGLE_PUBSUB" && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
                       <div>
                         <Label htmlFor={`gcpProjectId-${index}`} className="required">Project ID</Label>
@@ -848,7 +926,8 @@ export default function InlineMessageBrokerForm({
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>

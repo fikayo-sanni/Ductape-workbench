@@ -1,9 +1,46 @@
 import path from "path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-export default defineConfig({
+/** Paths routed by platform/nest/docker/nginx/api-gateway.conf */
+const GATEWAY_PROXY_PATHS = [
+  "/users",
+  "/workspaces",
+  "/emails",
+  "/apps",
+  "/marketplace",
+  "/logs",
+  "/integrations",
+  "/webhooks",
+  "/notifications",
+  "/partnerships",
+  "/jobs",
+  "/pricing",
+  "/admins",
+  "/proxy",
+  "/tickets",
+  "/realtime",
+] as const;
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const gatewayTarget = env.VITE_API_GATEWAY_TARGET || "http://localhost:4311";
+  const gatewayProxy = Object.fromEntries(
+    GATEWAY_PROXY_PATHS.map((prefix) => [
+      prefix,
+      {
+        target: gatewayTarget,
+        changeOrigin: true,
+        secure: false,
+        ...(prefix === "/proxy"
+          ? { timeout: 1_200_000, proxyTimeout: 1_200_000 }
+          : {}),
+      },
+    ]),
+  );
+
+  return {
   // Use relative paths for Electron file:// protocol, absolute for web
   base: process.env.VITE_ELECTRON === 'true' ? './' : '/',
   plugins: [
@@ -109,4 +146,14 @@ export default defineConfig({
     external: ['bullmq'],
     noExternal: ['@ductape/sdk'],
   },
+  server: {
+    port: 4310,
+    strictPort: true,
+    proxy: gatewayProxy,
+  },
+  preview: {
+    port: 4310,
+    strictPort: true,
+  },
+  };
 });

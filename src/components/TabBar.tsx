@@ -33,6 +33,7 @@ import {
   User,
   Handshake,
   Boxes,
+  Cloud,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -88,12 +89,14 @@ const getTabIcon = (type: Tab['type']) => {
     partnership: Handshake,
     brief: Briefcase,
     settings: Settings,
+    cloud: Cloud,
   };
   return icons[type] || FileText;
 };
 
 export default function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, setActiveView, reorderTabs } = useWorkbenchStore();
+  const { tabs, activeTabId, setActiveTab, closeTab, setActiveView, setActiveIconSidebar, reorderTabs } =
+    useWorkbenchStore();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -105,6 +108,9 @@ export default function TabBar() {
       setActiveView('products');
     } else if (tab.type === 'app' || tab.type === 'request') {
       setActiveView('apps');
+    } else if (tab.type === 'cloud') {
+      setActiveView('cloud');
+      setActiveIconSidebar('cloud');
     }
     // Dashboard, logs, tokens, teams tabs don't need view switching
     // as they handle their own display
@@ -145,7 +151,10 @@ export default function TabBar() {
   }
 
   return (
-    <div className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-center overflow-x-auto shadow-sm tab-bar-scroll">
+    <div
+      data-testid="tab-bar"
+      className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-center overflow-x-auto shadow-sm tab-bar-scroll"
+    >
       {tabs.map((tab, index) => {
         const Icon = getTabIcon(tab.type);
         const isActive = activeTabId === tab.id;

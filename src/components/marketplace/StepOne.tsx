@@ -26,6 +26,7 @@ interface StepProps {
   app?: any;
   productTag?: string | null;
   setAppDetails?: (app: any) => void;
+  excludeProductTag?: string;
 }
 
 export default function StepOne({
@@ -33,6 +34,7 @@ export default function StepOne({
   productTag,
   app,
   setAppDetails,
+  excludeProductTag,
 }: StepProps) {
   const { user, currentWorkspaceId } = useAuth();
   const { data: integrationData, setProductTag, setAccessTag, resetIntegration } = useIntegration();
@@ -50,7 +52,9 @@ export default function StepOne({
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId,
   });
 
-  const products = productsData?.data ?? [];
+  const products = (productsData?.data ?? []).filter(
+    (product: { tag?: string }) => product.tag !== excludeProductTag,
+  );
 
   const productBuilder = useDuctape({
     workspace_id: currentWorkspaceId || '',
@@ -64,9 +68,21 @@ export default function StepOne({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      product_tag: integrationData?.productTag || productTag || '',
+      product_tag:
+        integrationData?.productTag && integrationData.productTag !== excludeProductTag
+          ? integrationData.productTag
+          : productTag && productTag !== excludeProductTag
+            ? productTag
+            : '',
     },
   });
+
+  useEffect(() => {
+    if (excludeProductTag && form.getValues('product_tag') === excludeProductTag) {
+      form.setValue('product_tag', '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excludeProductTag]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user?._id || !user?.public_key || !currentWorkspaceId) {
@@ -136,13 +152,13 @@ export default function StepOne({
   }, [integrationData?.productTag, resetIntegration]);
 
   useEffect(() => {
-    if (productTag) {
+    if (productTag && productTag !== excludeProductTag) {
       form.setValue('product_tag', productTag);
       // Auto submit if product tag is provided
       form.handleSubmit(onSubmit)();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productTag]);
+  }, [productTag, excludeProductTag]);
 
   // Early return if required data is missing or still loading
   if (!user?._id || !user?.public_key || !currentWorkspaceId) {
@@ -161,7 +177,9 @@ export default function StepOne({
         </div>
         <h2 className="text-xl font-bold text-grey mb-2">Select Product</h2>
         <p className="text-grey-600">
-          Choose which product to integrate this app with
+          {excludeProductTag
+            ? 'Choose a different product to connect this app with'
+            : 'Choose which product to integrate this app with'}
         </p>
       </div>
 
@@ -180,11 +198,17 @@ export default function StepOne({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {products.map((product: any) => (
-                        <SelectItem key={product._id} value={product.tag}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
+                      {products.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-grey-600 text-center">
+                          No other products available in this workspace.
+                        </div>
+                      ) : (
+                        products.map((product: any) => (
+                          <SelectItem key={product._id} value={product.tag}>
+                            {product.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -205,7 +229,7 @@ export default function StepOne({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || products.length === 0}
               className="flex-1 gap-2"
             >
               {isSubmitting ? (

@@ -1,4 +1,3 @@
-import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authServices } from "@/services/authServices";
-import { Loader } from "lucide-react";
+import { Eye, EyeOff, Loader } from "lucide-react";
 import { useState } from "react";
 
 const resetPasswordSchema = z.object({
@@ -112,7 +111,7 @@ export default function ResetPassword() {
     <div className="flex items-center w-full">
       {/* hack to preload the background image above */}
       <div className="mx-auto max-w-[456px] w-full flex flex-col items-center justify-center gap-10">
-        <img src="/images/logo-white.svg" alt="logo" width={129} height={33} />
+        <img src="/ductape-icon.svg" alt="Ductape" width={40} height={40} />
 
         <div className="bg-white rounded-10px px-4 sm:px-7 py-8 w-full">
           <div className="flex flex-col items-center text-center gap-1">
@@ -205,35 +204,26 @@ export default function ResetPassword() {
                             }
                           />
                           <Button
-                            variant="default"
+                            variant="ghost"
                             type="button"
-                            className="w-fit h-fit absolute top-1/2 right-2 -translate-y-1/2 p-0 mr-2"
+                            className="absolute top-1/2 right-2 -translate-y-1/2 h-6 w-6 p-0"
                             onClick={() =>
                               setShowPassword({
                                 ...showPassword,
                                 newPassword: !showPassword.newPassword,
                               })
                             }
+                            aria-label={
+                              showPassword.newPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
                           >
-                            <img
-                              src={
-                                showPassword.newPassword
-                                  ? "/images/eye-off.svg"
-                                  : "/images/eye.svg"
-                              }
-                              alt={
-                                showPassword.newPassword
-                                  ? "Hide password"
-                                  : "Show password"
-                              }
-                              title={
-                                showPassword.newPassword
-                                  ? "Hide password"
-                                  : "Show password"
-                              }
-                              width={20}
-                              height={20}
-                            />
+                            {showPassword.newPassword ? (
+                              <EyeOff className="h-4 w-4 text-grey-600" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-grey-600" />
+                            )}
                           </Button>
                         </div>
                       </FormControl>
@@ -257,35 +247,26 @@ export default function ResetPassword() {
                             }
                           />
                           <Button
-                            variant="default"
+                            variant="ghost"
                             type="button"
-                            className="w-fit h-fit absolute top-1/2 right-2 -translate-y-1/2 p-0 mr-2"
+                            className="absolute top-1/2 right-2 -translate-y-1/2 h-6 w-6 p-0"
                             onClick={() =>
                               setShowPassword({
                                 ...showPassword,
                                 confirmPassword: !showPassword.confirmPassword,
                               })
                             }
+                            aria-label={
+                              showPassword.confirmPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
                           >
-                            <img
-                              src={
-                                showPassword.confirmPassword
-                                  ? "/images/eye-off.svg"
-                                  : "/images/eye.svg"
-                              }
-                              alt={
-                                showPassword.confirmPassword
-                                  ? "Hide password"
-                                  : "Show password"
-                              }
-                              title={
-                                showPassword.confirmPassword
-                                  ? "Hide password"
-                                  : "Show password"
-                              }
-                              width={20}
-                              height={20}
-                            />
+                            {showPassword.confirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-grey-600" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-grey-600" />
+                            )}
                           </Button>
                         </div>
                       </FormControl>

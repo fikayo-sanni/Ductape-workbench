@@ -21,9 +21,75 @@ export const shouldShowOnboarding = (): boolean => {
   return isNewUser() && !hasCompletedOnboarding();
 };
 
+export const markOnboardingCompleted = () => {
+  localStorage.setItem('ductape-onboarding-completed', 'true');
+  localStorage.removeItem('ductape-is-new-user');
+  localStorage.removeItem('ductape-onboarding-step');
+  localStorage.removeItem('ductape-onboarding-data');
+  clearOnboardingSession();
+};
+
+export function clearOnboardingSession() {
+  sessionStorage.removeItem('onboardingStep');
+  sessionStorage.removeItem('onboardingWorkspaceId');
+  sessionStorage.removeItem('onboardingPlanId');
+  sessionStorage.removeItem('onboardingPayment');
+  sessionStorage.removeItem('pendingPlanId');
+  sessionStorage.removeItem('onboardingWorkspaceLocked');
+  sessionStorage.removeItem('onboardingFromInvites');
+}
+
+export function isOnboardingFromInvites(): boolean {
+  return sessionStorage.getItem('onboardingFromInvites') === 'true';
+}
+
+export function clearOnboardingFromInvites() {
+  sessionStorage.removeItem('onboardingFromInvites');
+}
+
+export function isOnboardingWorkspaceLocked(): boolean {
+  return sessionStorage.getItem('onboardingWorkspaceLocked') === 'true';
+}
+
+export function markOnboardingWorkspaceLocked() {
+  sessionStorage.setItem('onboardingWorkspaceLocked', 'true');
+}
+
+export type OnboardingStep = 'workspace' | 'plan' | 'billing' | 'complete';
+
+export function getInitialOnboardingStep(): OnboardingStep {
+  const saved = sessionStorage.getItem('onboardingStep') as OnboardingStep | null;
+  const hasWorkspace =
+    Boolean(sessionStorage.getItem('onboardingWorkspaceId')) || isOnboardingWorkspaceLocked();
+
+  if (hasWorkspace) {
+    if (saved && saved !== 'workspace') return saved;
+    return 'plan';
+  }
+
+  return saved || 'workspace';
+}
+
 // Trigger onboarding for new users (call this after successful registration)
 export const triggerOnboardingForNewUser = () => {
   markUserAsNew();
-  // The OnboardingContext will automatically detect this and show the modal
+  localStorage.removeItem('ductape-onboarding-completed');
 };
+
+export function isTestPlan(plan: { name?: string; tag?: string }): boolean {
+  const name = plan.name?.trim().toLowerCase() ?? '';
+  const tag = plan.tag?.trim().toLowerCase() ?? '';
+  return name === 'test plan' || tag === 'test-plan' || tag === 'test';
+}
+
+export function filterOnboardingPlans<T extends { name?: string; tag?: string }>(
+  plans: T[],
+  isAdminWorkspace: boolean,
+): T[] {
+  return plans.filter((plan) => {
+    if (plan.name === 'Enterprise Plan') return false;
+    if (isTestPlan(plan)) return isAdminWorkspace;
+    return true;
+  });
+}
 

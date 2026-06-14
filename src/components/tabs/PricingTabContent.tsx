@@ -1612,8 +1612,9 @@ export default function PricingTabContent() {
   };
 
   return (
-    <div className="bg-grey-100">
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-grey-100">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start justify-between">
@@ -3980,6 +3981,7 @@ export default function PricingTabContent() {
             )}
           </DialogContent>
         </Dialog>
+        </div>
       </div>
     </div>
   );

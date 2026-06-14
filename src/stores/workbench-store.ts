@@ -45,8 +45,10 @@ interface WorkbenchState {
   chatbotSidebarOpen: boolean;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
-  activeView: 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
-  activeIconSidebar: 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | 'pricing' | null;
+  activeView: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
+  activeIconSidebar: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | 'pricing' | null;
+
+  cloudAddConnectionModalOpen: boolean;
 
   // Logs Filter State
   logsFilters: {
@@ -104,6 +106,7 @@ interface WorkbenchState {
   setResponseTab: (tab: 'response' | 'headers' | 'code') => void;
   setActiveView: (view: WorkbenchState['activeView']) => void;
   setActiveIconSidebar: (icon: WorkbenchState['activeIconSidebar']) => void;
+  setCloudAddConnectionModalOpen: (open: boolean) => void;
 
   // Actions - Logs
   setLogsFilters: (filters: Partial<WorkbenchState['logsFilters']>) => void;
@@ -130,6 +133,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   responseTab: 'response',
   activeView: 'products',
   activeIconSidebar: null,
+  cloudAddConnectionModalOpen: false,
   billingView: "expenses",
   logsFilters: {
     component: 'all',
@@ -225,16 +229,38 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       );
 
       if (existingTab) {
-        // Tab already exists, just switch to it
-        // If it's a partnership tab, also switch sidebar to partnership view
+        // Tab already exists — switch to it and refresh tab data (e.g. cloud connection status)
+        const updatedTabs =
+          tab.data !== undefined
+            ? state.tabs.map((t) =>
+                t.id === existingTab.id
+                  ? {
+                      ...t,
+                      title: tab.title ?? t.title,
+                      itemId: tab.itemId ?? t.itemId,
+                      data: { ...(t.data as object), ...(tab.data as object) },
+                    }
+                  : t,
+              )
+            : state.tabs;
+
         if (existingTab.type === 'partnership' && existingTab.itemId) {
           return {
+            tabs: updatedTabs,
             activeTabId: existingTab.id,
             activeView: 'partnership',
             activeIconSidebar: 'partnership',
           };
         }
-        return { activeTabId: existingTab.id };
+        if (existingTab.type === 'cloud') {
+          return {
+            tabs: updatedTabs,
+            activeTabId: existingTab.id,
+            activeView: 'cloud',
+            activeIconSidebar: 'cloud',
+          };
+        }
+        return { tabs: updatedTabs, activeTabId: existingTab.id };
       }
 
       // Find the index of the currently active tab
@@ -255,6 +281,15 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           activeTabId: tab.id,
           activeView: 'partnership',
           activeIconSidebar: 'partnership',
+        };
+      }
+
+      if (tab.type === 'cloud') {
+        return {
+          tabs: newTabs,
+          activeTabId: tab.id,
+          activeView: 'cloud',
+          activeIconSidebar: 'cloud',
         };
       }
 
@@ -307,6 +342,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           activeTabId: tabId,
           activeView: 'partnership',
           activeIconSidebar: 'partnership',
+        };
+      }
+
+      if (tab?.type === 'cloud') {
+        return {
+          activeTabId: tabId,
+          activeView: 'cloud',
+          activeIconSidebar: 'cloud',
         };
       }
 
@@ -386,7 +429,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       const newTokensTab: Tab = {
         id: `tokens-${Date.now()}`,
         type: 'tokens',
-        title: 'Tokens',
+        title: 'Secrets',
       };
 
       return {
@@ -496,6 +539,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   setResponseTab: (tab) => set({ responseTab: tab }),
   setActiveView: (view) => set({ activeView: view }),
   setActiveIconSidebar: (icon) => set({ activeIconSidebar: icon }),
+  setCloudAddConnectionModalOpen: (open) => set({ cloudAddConnectionModalOpen: open }),
   setBillingView: (view) => set({ billingView: view }),
 
   // Logs Actions
@@ -627,6 +671,16 @@ export const useWorkbenchStore = create<WorkbenchState>()(
             events: (tab.data as any).events,
             description: (tab.data as any).description,
             active: (tab.data as any).active,
+            // Cloud connection tabs — preserve setup state across refresh
+            isSetup: (tab.data as any).isSetup,
+            status: (tab.data as any).status,
+            id: (tab.data as any).id,
+            tag: (tab.data as any).tag,
+            provider: (tab.data as any).provider,
+            display_name: (tab.data as any).display_name,
+            scopes: (tab.data as any).scopes,
+            account_identifier: (tab.data as any).account_identifier,
+            setupPayload: (tab.data as any).setupPayload,
             // Notification explorer - product + notification + env for restore after refresh
             product: (tab.data as any).product ? {
               tag: (tab.data as any).product.tag,

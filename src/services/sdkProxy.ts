@@ -11,6 +11,14 @@
 
 import apiClient from '@/config/axiosinstance';
 import { encryptProxyPayload } from '@/utils/proxyEncryption';
+import {
+  logCloud,
+  logCloudError,
+  logCloudWarn,
+  sanitizeCloudPayload,
+  summarizeCloudSetupResult,
+} from '@/utils/cloudConnectionLog';
+import { extractSdkProxyErrorMessage } from '@/utils/sdkProxyError';
 
 /** Gzip a string (for large sdk-proxy bodies to avoid 413 at gateways). */
 async function gzipString(str: string): Promise<Blob> {
@@ -52,7 +60,9 @@ export type SDKModule =
   | 'resilience'
   | 'health'
   | 'fallback'
-  | 'secrets';
+  | 'workflow'
+  | 'secrets'
+  | 'cloud';
 
 /**
  * Response from the SDK proxy endpoint
@@ -89,6 +99,22 @@ export class SDKProxyService {
    * @param params - Parameters to pass to the method
    */
   private async execute<T = any>(module: SDKModule, method: string, ...params: any[]): Promise<T> {
+    const isCloudOp = module === 'cloud';
+    const executeStart = isCloudOp ? Date.now() : 0;
+
+    if (isCloudOp) {
+      logCloud(`SDK proxy → ${method}`, {
+        workspace_id: this.config.workspace_id,
+        user_id: this.config.user_id,
+        hasToken: Boolean(this.config.token),
+        hasPublicKey: Boolean(this.config.public_key),
+        params: sanitizeCloudPayload(params),
+        apiBase: apiClient.defaults.baseURL || import.meta.env.VITE_API_BASE_URL,
+        requestUrl: new URL('/proxy/v1/sdk-proxy/execute', apiClient.defaults.baseURL || window.location.origin).href,
+        viteProxy: import.meta.env.VITE_USE_VITE_PROXY === 'true',
+      });
+    }
+
     // Log vector operations for debugging
     if (module === 'vector' && ['fetchVectors', 'listVectors', 'listNamespaces', 'getStats'].includes(method)) {
       console.log(`[SDKProxy.execute] ${module}.${method}`, params);
@@ -119,26 +145,66 @@ export class SDKProxyService {
         'x-access-token': this.config.token,
       };
       let payload: typeof body | Blob = body;
-      if (bodyStr.length > GZIP_THRESHOLD && typeof CompressionStream !== 'undefined') {
+      const willGzip =
+        bodyStr.length > GZIP_THRESHOLD && typeof CompressionStream !== 'undefined';
+      if (willGzip) {
         payload = await gzipString(bodyStr);
         headers['Content-Encoding'] = 'gzip';
       }
+
+      if (isCloudOp) {
+        logCloud(`HTTP POST ${method}`, {
+          bodyBytes: bodyStr.length,
+          gzipped: willGzip,
+          encryptedPayloadChars: encryptedPayload.length,
+        });
+      }
+
+      const httpStart = isCloudOp ? Date.now() : 0;
       const response = await apiClient.post<SDKProxyResponse<T>>(
         '/proxy/v1/sdk-proxy/execute',
         payload,
         { headers }
       );
 
-      if (!response.data.status) {
-        throw new Error(response.data.message || 'SDK operation failed');
+      if (isCloudOp) {
+        logCloud(`HTTP response ${method}`, {
+          durationMs: Date.now() - httpStart,
+          httpStatus: response.status,
+          proxyStatus: response.data.status,
+          execution_time_ms: response.data.data?.execution_time_ms,
+          request_id: response.data.data?.request_id,
+        });
       }
 
-      return response.data.data?.data as T;
+      if (!response.data.status) {
+        const failMsg = response.data.message || 'SDK operation failed';
+        if (isCloudOp) {
+          logCloudWarn(`Proxy returned status=false for ${method}`, {
+            message: failMsg,
+            code: response.data.code,
+          });
+        }
+        throw new Error(failMsg);
+      }
+
+      const result = response.data.data?.data as T;
+      if (isCloudOp) {
+        logCloud(`Success ${method}`, {
+          totalMs: Date.now() - executeStart,
+          result: summarizeCloudSetupResult(result),
+        });
+      }
+
+      return result;
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message ??
-        err?.message ??
-        'SDK operation failed';
+      if (isCloudOp) {
+        logCloudError(`Failed ${method}`, err, {
+          totalMs: Date.now() - executeStart,
+          hasResponse: Boolean(err?.response),
+        });
+      }
+      const message = extractSdkProxyErrorMessage(err);
       throw new Error(message);
     }
   }
@@ -264,11 +330,15 @@ export class SDKProxyService {
        */
       createWithEvents: <T = any>(appTag: string, data: any) =>
         this.execute<T>('webhooks', 'createWithEvents', appTag, data),
+      importBulk: <T = any>(appTag: string, data: any) =>
+        this.execute<T>('webhooks', 'importBulk', appTag, data),
       list: <T = any>(appTag: string) => this.execute<T>('webhooks', 'list', appTag),
       fetch: <T = any>(appTag: string, tag: string) =>
         this.execute<T>('webhooks', 'fetch', appTag, tag),
       update: <T = any>(appTag: string, tag: string, data: any) =>
         this.execute<T>('webhooks', 'update', appTag, tag, data),
+      delete: <T = any>(appTag: string, tag: string) =>
+        this.execute<T>('webhooks', 'delete', appTag, tag),
 
       events: {
         create: <T = any>(appTag: string, data: any) =>
@@ -279,6 +349,8 @@ export class SDKProxyService {
           this.execute<T>('webhooks', 'events.fetch', appTag, eventTag),
         update: <T = any>(appTag: string, eventTag: string, data: any) =>
           this.execute<T>('webhooks', 'events.update', appTag, eventTag, data),
+        delete: <T = any>(appTag: string, eventTag: string) =>
+          this.execute<T>('webhooks', 'events.delete', appTag, eventTag),
       },
     },
   };
@@ -784,6 +856,69 @@ export class SDKProxyService {
     status: <T = any>(data: any) => this.execute<T>('health', 'status', data),
     check: <T = any>(data: any) => this.execute<T>('health', 'check', data),
     run: <T = any>(data: any) => this.execute<T>('health', 'run', data),
+  };
+
+  // ==================== CLOUD MODULE ====================
+  cloud = {
+    connections: {
+      create: <T = any>(input: any) => this.execute<T>('cloud', 'connections.create', input),
+      list: <T = any>() => this.execute<T>('cloud', 'connections.list'),
+      fetch: <T = any>(cloud: string) =>
+        this.execute<T>('cloud', 'connections.fetch', cloud),
+      delete: <T = any>(cloud: string) =>
+        this.execute<T>('cloud', 'connections.delete', cloud),
+      update: <T = any>(cloud: string, input: any) =>
+        this.execute<T>('cloud', 'connections.update', cloud, input),
+      updateSecurityGroups: <T = any>(cloud: string, input: any) =>
+        this.execute<T>('cloud', 'connections.updateSecurityGroups', cloud, input),
+      updateManagedNetworking: <T = any>(cloud: string, input: any) =>
+        this.execute<T>('cloud', 'connections.updateManagedNetworking', cloud, input),
+      resolveNetworkingHost: <T = any>(host: string) =>
+        this.execute<T>('cloud', 'connections.resolveNetworkingHost', host),
+      updateVpcConnector: <T = any>(cloud: string, input: any) =>
+        this.execute<T>('cloud', 'connections.updateVpcConnector', cloud, input),
+      getVpcConnectorStatus: <T = any>(cloud: string) =>
+        this.execute<T>('cloud', 'connections.getVpcConnectorStatus', cloud),
+      listVpcConnectorVpcs: <T = any>(cloud: string, region: string) =>
+        this.execute<T>('cloud', 'connections.listVpcConnectorVpcs', cloud, region),
+      listVpcConnectorSubnets: <T = any>(cloud: string, region: string, vpcId: string) =>
+        this.execute<T>('cloud', 'connections.listVpcConnectorSubnets', cloud, region, vpcId),
+      complete: <T = any>(cloud: string, input: any) =>
+        this.execute<T>('cloud', 'connections.complete', cloud, input),
+      validate: <T = any>(cloud: string) =>
+        this.execute<T>('cloud', 'connections.validate', cloud),
+    },
+    resources: {
+      list: <T = any>(input: any) => this.execute<T>('cloud', 'resources.list', input),
+      import: <T = any>(input: any) => this.execute<T>('cloud', 'resources.import', input),
+      importAndPersist: <T = any>(input: any) =>
+        this.execute<T>('cloud', 'resources.importAndPersist', input),
+      provision: <T = any>(input: any) => this.execute<T>('cloud', 'resources.provision', input),
+      provisionAndPersist: <T = any>(input: any) =>
+        this.execute<T>('cloud', 'resources.provisionAndPersist', input),
+    },
+    credentials: {
+      issue: <T = any>(input: any) => this.execute<T>('cloud', 'credentials.issue', input),
+    },
+  };
+
+  // ==================== WORKFLOW MODULE ====================
+  workflow = {
+    create: <T = any>(product: string, data: any) =>
+      this.execute<T>('workflow', 'create', product, data),
+    update: <T = any>(tag: string, product: string, data: any) =>
+      this.execute<T>('workflow', 'update', tag, product, data),
+    fetch: <T = any>(tag: string, product?: string) =>
+      this.execute<T>('workflow', 'fetch', tag, product),
+    fetchAll: <T = any>(product?: string) =>
+      this.execute<T>('workflow', 'fetchAll', product),
+    delete: <T = any>(tag: string, product: string) =>
+      this.execute<T>('workflow', 'delete', tag, product),
+    execute: <T = any>(data: any) => this.execute<T>('workflow', 'execute', data),
+    dispatch: <T = any>(data: any) => this.execute<T>('workflow', 'dispatch', data),
+    status: <T = any>(data: any) => this.execute<T>('workflow', 'status', data),
+    cancel: <T = any>(data: any) => this.execute<T>('workflow', 'cancel', data),
+    history: <T = any>(data: any) => this.execute<T>('workflow', 'history', data),
   };
 
   // ==================== FALLBACK MODULE ====================

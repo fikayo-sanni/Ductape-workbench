@@ -19,10 +19,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {Button} from '@/components/ui/button';
-import {useState, useEffect} from 'react';
-import {Calendar, CreditCard, Loader} from 'lucide-react';
+import {useState, useEffect, useMemo} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {CreditCard, Loader} from 'lucide-react';
 import {
   fetchBillingInfo,
+  fetchUsdNgnExchangeRate,
   initializeTransaction,
   saveBillingInfo,
   validateAndSaveCard,
@@ -30,11 +32,15 @@ import {
 import toast from 'react-hot-toast';
 import {useAuth} from '@/store/useAuth';
 import {BillingPlan} from '@/types/pricing';
+import pricingServices from '@/services/pricingServices';
 
 interface BillingsInfoProps {
   selectedPlan: BillingPlan;
   subscriptionId?: string;
-  // Add any other props here
+  paymentCallbackUrl?: string;
+  onboardingMode?: boolean;
+  onboardingWorkspaceId?: string;
+  onOnboardingSubscriptionComplete?: () => void;
 }
 
 export interface addBillingPayload {
@@ -267,11 +273,10 @@ const formSchema = z.object({
 const CARD_TYPES = ['Visa', 'Mastercard', 'Verve', 'AmericanExpress'] as const;
 
 const paymentSchema = z.object({
-  cardNumber: z
-    .string()
-    .min(16, 'Card number must be 16 digits')
-    .max(19)
-    .regex(/^\d+$/, 'Card number must contain only numbers'),
+  cardNumber: z.string().refine(
+    (val) => /^\d{13,19}$/.test(val.replace(/\s/g, '')),
+    { message: 'Enter a valid card number (13–19 digits)' },
+  ),
   expirationDate: z
     .string()
     .regex(
@@ -300,6 +305,10 @@ const emptyBilling = {
 export default function BillingsInfo({
   selectedPlan,
   subscriptionId,
+  paymentCallbackUrl,
+  onboardingMode = false,
+  onboardingWorkspaceId,
+  onOnboardingSubscriptionComplete,
 }: BillingsInfoProps) {
   const [countryNames, setCountryNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,6 +430,116 @@ export default function BillingsInfo({
     }
   }
 
+  const isFreePlan = (selectedPlan?.monthlyPrice ?? 0) === 0;
+
+  const { data: usdNgnRate } = useQuery({
+    queryKey: ['usd-ngn-exchange-rate'],
+    queryFn: fetchUsdNgnExchangeRate,
+    enabled: !isFreePlan && (selectedPlan?.monthlyPrice ?? 0) > 0,
+    staleTime: 15 * 60 * 1000,
+  });
+
+  const ngnChargeEstimate = useMemo(() => {
+    if (!usdNgnRate?.rate || !selectedPlan?.monthlyPrice) return null;
+    return Math.ceil(selectedPlan.monthlyPrice * usdNgnRate.rate);
+  }, [usdNgnRate?.rate, selectedPlan?.monthlyPrice]);
+
+  const formatCardNumber = (value: string) => {
+    const digits = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const parts: string[] = [];
+    for (let i = 0; i < digits.length && i < 16; i += 4) {
+      parts.push(digits.substring(i, i + 4));
+    }
+    return parts.join(' ');
+  };
+
+  const formatExpirationDate = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  async function onPaymentSubmit(values: z.infer<typeof paymentSchema>) {
+    const email = user?.email;
+    const authToken = user?.auth_token || localStorage.getItem('token')?.replace(/"/g, '') || '';
+
+    if (!email) {
+      toast.error('Please log in so we can save your card securely.');
+      return;
+    }
+
+    if (!user?._id || !user.public_key || !authToken) {
+      toast.error('Missing authentication data');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const [mm, yy] = values.expirationDate.split('/');
+      await validateAndSaveCard(
+        {
+          email,
+          card: {
+            number: values.cardNumber.replace(/\s/g, ''),
+            cvv: values.cvv,
+            expiry_month: parseInt(mm!, 10),
+            expiry_year: parseInt(yy!, 10),
+            type: values.cardType,
+          },
+        },
+        {
+          userId: user._id,
+          publicKey: user.public_key,
+          authToken,
+        },
+      );
+
+      if (onboardingMode) {
+        if (!onboardingWorkspaceId || !user?._id || !user.public_key) {
+          toast.error('Missing workspace or authentication details.');
+          return;
+        }
+
+        if (isFreePlan) {
+          await pricingServices.createSubscription({
+            user_id: user._id,
+            public_key: user.public_key,
+            payload: {
+              plan_id: selectedPlan._id,
+              workspace_id: onboardingWorkspaceId,
+            },
+          });
+          toast.success(`Subscribed to ${selectedPlan.name}`);
+          onOnboardingSubscriptionComplete?.();
+          return;
+        }
+
+        await handlePayment();
+        return;
+      }
+
+      toast.success(
+        'Card validated and saved. You can use it for future plan upgrades.',
+      );
+      paymentForm.reset({
+        cardNumber: '',
+        expirationDate: '',
+        cvv: '',
+        cardType: undefined,
+      });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string };
+      const msg =
+        err?.response?.data?.error ??
+        err?.response?.data?.message ??
+        err?.message ??
+        'Card validation failed. Check details and try again.';
+      toast.error(msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   const handlePayment = async () => {
     const userId = user?._id || '';
     const publicKey = user?.public_key || '';
@@ -434,13 +553,18 @@ export default function BillingsInfo({
     setIsProcessing(true);
     if (selectedPlan?._id) {
       sessionStorage.setItem('pendingPlanId', selectedPlan._id);
+      if (onboardingMode) {
+        sessionStorage.setItem('onboardingPlanId', selectedPlan._id);
+        sessionStorage.setItem('onboardingPayment', 'true');
+      }
     }
 
     try {
       const paymentData = {
         email: user?.email || '',
-        amount: 50 * 100,
-        callback_url: `${window.location.origin}`, // Use a callback page
+        amount: Math.max((selectedPlan?.monthlyPrice ?? 0) * 100, 100),
+        callback_url: paymentCallbackUrl ?? `${window.location.origin}`,
+        currency: 'USD' as const,
       };
 
       const response = await initializeTransaction(paymentData, {
@@ -471,65 +595,21 @@ export default function BillingsInfo({
       }
     } catch (error) {
       console.error('Payment initialization failed:', error);
-      toast.error('Failed to initialize payment. Please try again.');
+      const err = error as {
+        response?: { data?: { message?: string; error?: string } };
+        message?: string;
+      };
+      const msg =
+        err?.response?.data?.error ??
+        err?.response?.data?.message ??
+        (typeof error === 'string' ? error : undefined) ??
+        err?.message ??
+        'Failed to initialize payment. Please try again.';
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
   };
-
-  // async function onPaymentSubmit(values: z.infer<typeof paymentSchema>) {
-  //   const email = (user as any)?.email;
-  //   if (!email) {
-  //     toast.error('Please log in so we can save your card securely.');
-  //     return;
-  //   }
-  //   setIsProcessing(true);
-  //   try {
-  //     const [mm, yy] = values.expirationDate.split('/');
-  //     await validateAndSaveCard({
-  //       email,
-  //       card: {
-  //         number: values.cardNumber.replace(/\s/g, ''),
-  //         cvv: values.cvv,
-  //         expiry_month: parseInt(mm!, 10),
-  //         expiry_year: parseInt(yy!, 10),
-  //         type: values.cardType,
-  //       },
-  //     });
-  //     toast.success(
-  //       'Card validated and saved. You can use it for future plan upgrades.',
-  //     );
-  //     paymentForm.reset({
-  //       cardNumber: '',
-  //       expirationDate: '',
-  //       cvv: '',
-  //       cardType: undefined,
-  //     });
-  //   } catch (e: any) {
-  //     const msg =
-  //       e?.response?.data?.message ??
-  //       e?.message ??
-  //       'Card validation failed. Check details and try again.';
-  //     toast.error(msg);
-  //   } finally {
-  //     setIsProcessing(false);
-  //   }
-  // }
-
-  //   const formatCardNumber = (value: string) => {
-  //     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-  //     const matches = v.match(/\d{4,16}/g);
-  //     const match = (matches && matches[0]) || '';
-  //     const parts = [];
-  //     for (let i = 0; i < match.length; i += 4) {
-  //       parts.push(match.substring(i, i + 4));
-  //     }
-  //     if (parts.length) {
-  //       return parts.join(' ');
-  //     } else {
-  //       return value;
-  //     }
-  //   };
 
   const handleEdit = () => {
     // Populate form with existing values when editing
@@ -799,22 +879,167 @@ export default function BillingsInfo({
           </div>
 
           {isFormSubmitted && (
-            <div className="mt-4">
-              <Button
-                type="button"
-                onClick={handlePayment}
-                className="w-full h-9 mt-4"
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  'Make Payment'
-                )}
-              </Button>
+            <div className="mt-6 pt-6 border-t border-grey-400">
+              <div className="mb-4 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="text-base font-semibold text-grey">Payment details</h3>
+                  <p className="text-xs text-grey-600 mt-0.5">
+                    {onboardingMode
+                      ? isFreePlan
+                        ? 'Add a card to activate your free plan. You will not be charged monthly.'
+                        : 'Add your card details to continue to secure checkout.'
+                      : 'Save a card for future plan changes and upgrades.'}
+                  </p>
+                  {!isFreePlan && ngnChargeEstimate ? (
+                    <p className="text-xs text-grey-600 mt-1">
+                      You will be charged approximately{' '}
+                      <span className="font-semibold text-grey">
+                        ₦{ngnChargeEstimate.toLocaleString()}
+                      </span>{' '}
+                      (live USD→NGN rate).
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <Form {...paymentForm}>
+                <form
+                  onSubmit={paymentForm.handleSubmit(onPaymentSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={paymentForm.control}
+                    name="cardType"
+                    render={({field}) => (
+                      <FormItem>
+                        <FormLabel className="text-grey font-semibold">Card type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="border border-grey-500 rounded w-full h-9 text-grey font-semibold text-sm">
+                              <SelectValue placeholder="Select card type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CARD_TYPES.map((type) => (
+                              <SelectItem key={type} value={type} className="text-grey">
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={paymentForm.control}
+                    name="cardNumber"
+                    render={({field}) => (
+                      <FormItem>
+                        <FormLabel className="text-grey font-semibold">Card number</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            inputMode="numeric"
+                            autoComplete="cc-number"
+                            placeholder="1234 5678 9012 3456"
+                            className="border border-grey-500 rounded w-full h-9"
+                            onChange={(e) =>
+                              field.onChange(formatCardNumber(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex items-start gap-4">
+                    <FormField
+                      control={paymentForm.control}
+                      name="expirationDate"
+                      render={({field}) => (
+                        <FormItem className="flex-1">
+                          <FormLabel className="text-grey font-semibold">
+                            Expiration (MM/YY)
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              inputMode="numeric"
+                              autoComplete="cc-exp"
+                              placeholder="MM/YY"
+                              className="border border-grey-500 rounded w-full h-9"
+                              onChange={(e) =>
+                                field.onChange(formatExpirationDate(e.target.value))
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={paymentForm.control}
+                      name="cvv"
+                      render={({field}) => (
+                        <FormItem className="w-28">
+                          <FormLabel className="text-grey font-semibold">CVV</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              inputMode="numeric"
+                              autoComplete="cc-csc"
+                              placeholder="123"
+                              className="border border-grey-500 rounded w-full h-9"
+                              maxLength={4}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full h-9" disabled={isProcessing}>
+                    {isProcessing ? (
+                      <>
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : onboardingMode ? (
+                      isFreePlan ? (
+                        'Add card and activate'
+                      ) : (
+                        'Add card and continue'
+                      )
+                    ) : (
+                      'Save card'
+                    )}
+                  </Button>
+                </form>
+              </Form>
+
+              {!onboardingMode ? (
+                <Button
+                  type="button"
+                  onClick={handlePayment}
+                  className="w-full h-9 mt-4"
+                  disabled={isProcessing}
+                  variant="outline"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Make Payment'
+                  )}
+                </Button>
+              ) : null}
             </div>
           )}
         </section>

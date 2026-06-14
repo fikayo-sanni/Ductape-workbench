@@ -166,7 +166,7 @@ ductape-workbench/
 ## Design
 
 The UI follows the same design system as the main Ductape frontend app:
-- **Font**: Raleway
+- **Font**: System UI stack (no custom web fonts)
 - **Primary Color**: rgb(8, 70, 166)
 - **Color Palette**: Matching grey scales and accent colors
 - **Layout**: Postman-inspired three-column layout with collapsible sidebar

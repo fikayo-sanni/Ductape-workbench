@@ -228,6 +228,7 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        data-testid="create-account-modal"
         className="max-w-md max-h-[90vh] overflow-y-auto"
         hideCloseButton={step === "otp"}
         onInteractOutside={(e) => {

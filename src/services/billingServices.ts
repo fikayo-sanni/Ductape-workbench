@@ -47,6 +47,7 @@ interface InitializeTransactionPayload {
   email: string;
   amount: number;
   callback_url: string;
+  currency?: string;
 }
 
 interface TransactionResponse {
@@ -138,16 +139,33 @@ export interface ValidateAndSaveCardPayload {
   };
 }
 
+interface ValidateAndSaveCardParams {
+  userId: string;
+  publicKey: string;
+  authToken: string;
+}
+
 /**
  * Validate the card with Paystack (tokenize) and save it only if validation succeeds.
  * Card is never stored without successful Paystack validation.
  */
 export const validateAndSaveCard = async (
-  payload: ValidateAndSaveCardPayload
+  payload: ValidateAndSaveCardPayload,
+  params: ValidateAndSaveCardParams,
 ): Promise<{ message: string; last4?: string; card_type?: string }> => {
   const response = await apiClient.post<ApiResponse<{ message: string; last4?: string; card_type?: string }>>(
     "/pricing/v1/validate-and-save-card/",
-    payload
+    payload,
+    {
+      params: {
+        user_id: params.userId,
+        public_key: params.publicKey,
+      },
+      headers: {
+        Authorization: `Bearer ${params.authToken}`,
+        "Content-Type": "application/json",
+      },
+    },
   );
   const data = response.data?.data;
   if (!data) throw new Error("Invalid response");
@@ -164,6 +182,7 @@ export const initializeTransaction = async (
       email: payload.email,
       amount: payload.amount,
       callback_url: payload.callback_url,
+      currency: payload.currency ?? 'USD',
     },
     {
       params: {
@@ -178,4 +197,20 @@ export const initializeTransaction = async (
   );
 
   return response.data?.data;
+};
+
+export interface UsdNgnExchangeRate {
+  rate: number;
+  source: string;
+  fetched_at: string;
+}
+
+/** Live USD→NGN quote (cached ~15 min on the pricing service). */
+export const fetchUsdNgnExchangeRate = async (): Promise<UsdNgnExchangeRate> => {
+  const response = await apiClient.get<ApiResponse<UsdNgnExchangeRate>>(
+    '/pricing/v1/exchange-rate/usd-ngn',
+  );
+  const data = response.data?.data;
+  if (!data?.rate) throw new Error('Exchange rate unavailable');
+  return data;
 };

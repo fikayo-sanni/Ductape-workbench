@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Timer, Save, CheckCircle, Plus, Trash2, Edit2, Database, Zap, Bell, Box, LayoutList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
-import { useDuctape } from '@/hooks/useDuctape';
+import { useResilienceProxy } from '@/hooks/useResilienceProxy';
 import { FeatureEventTypes } from '@ductape/sdk/dist/types';
 import { IFeatureInput } from '@ductape/sdk/dist/types';
 import appServicesReal from '@/services/appServicesReal';
@@ -122,14 +122,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     { state, editingInputKey, editingOptionId, selectedComponentType, selectedApp, selectedDatabase, actionSearchTerm, databaseActionType }
   );
 
-  // Initialize Ductape SDK
-  const ductape = useDuctape({
-    workspace_id: product?.workspace_id || currentWorkspaceId || '',
-    user_id: user?._id || '',
-    token: user?.auth_token || '',
-    public_key: user?.public_key || '',
-    type: 'product',
-  }) as any;
+  const proxy = useResilienceProxy();
 
   // Progressive disclosure - defined early to be available for useQuery hooks
   const showStep2 = state.name.trim().length > 0 && state.description.trim().length > 0;
@@ -404,10 +397,10 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
 
   const { mutateAsync: createQuota, isPending: isCreating } = useMutation({
     mutationFn: async () => {
-      if (!ductape) throw new Error('Product not initialized');
+      if (!proxy) throw new Error('Product not initialized');
       if (!product?.tag) throw new Error('Product tag not found');
 
-      await ductape.init(product.tag);
+      await proxy.product.init(product.tag);
 
       const payload = {
         name: state.name,
@@ -427,7 +420,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
         })),
       };
 
-      const quota = await ductape.quotas.create(payload);
+      const quota = await proxy.quotas.create(product.tag, payload);
       return quota;
     },
     onSuccess: (quota) => {

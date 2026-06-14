@@ -7,7 +7,10 @@ import {
   ChevronRight,
   ChevronDown,
   Layout,
+  ClipboardList,
 } from 'lucide-react';
+
+export type MarketplaceViewMode = 'browse' | 'submissions';
 
 interface Domain {
   _id: string;
@@ -20,6 +23,8 @@ interface MarketplaceSidebarProps {
   domains: any[];
   selectedDomain: string | null;
   onDomainSelect: (id: string | null) => void;
+  viewMode?: MarketplaceViewMode;
+  onViewModeChange?: (mode: MarketplaceViewMode) => void;
   isMobileOpen: boolean;
   onMobileToggle: () => void;
 }
@@ -28,6 +33,8 @@ export default function MarketplaceSidebar({
   domains,
   selectedDomain,
   onDomainSelect,
+  viewMode = 'browse',
+  onViewModeChange,
   isMobileOpen,
   onMobileToggle,
 }: MarketplaceSidebarProps) {
@@ -136,6 +143,42 @@ export default function MarketplaceSidebar({
         </div>
 
         <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+          {onViewModeChange && (
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold text-grey-700 uppercase tracking-widest mb-4 px-2">
+              Marketplace
+            </h3>
+
+            <button
+              onClick={() => onViewModeChange?.('browse')}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
+                viewMode === 'browse'
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
+              )}
+            >
+              <Layout className="h-4 w-4" />
+              Browse apps
+            </button>
+
+            <button
+              onClick={() => onViewModeChange?.('submissions')}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
+                viewMode === 'submissions'
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
+              )}
+            >
+              <ClipboardList className="h-4 w-4" />
+              My submissions
+            </button>
+          </div>
+          )}
+
+          {viewMode === 'browse' && (
+          <>
           <div className="mb-8">
             <h3 className="text-[10px] font-bold text-grey-700 uppercase tracking-widest mb-4 px-2">
               Browse Categories
@@ -182,6 +225,8 @@ export default function MarketplaceSidebar({
               </button>
             ))}
           </div>
+          </>
+          )}
         </div>
       </div>
     </>

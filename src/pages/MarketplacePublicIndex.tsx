@@ -19,13 +19,11 @@ import MarketplaceSidebar from '@/components/marketplace/MarketplaceSidebar';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import { IntegrationProvider } from '@/context/integration-context';
 import { useAuth } from '@/store/useAuth';
-import { useLoginModalStore } from '@/stores/login-modal-store';
 import { cn } from '@/lib/utils';
 
 export default function MarketplacePublicIndex() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { openLoginModal } = useLoginModalStore();
 
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -85,7 +83,7 @@ export default function MarketplacePublicIndex() {
 
   const integrateApp = (app: any) => {
     if (!user) {
-      openLoginModal();
+      navigate('/login');
       return;
     }
     setSelectedApp(app);
@@ -158,6 +156,7 @@ export default function MarketplacePublicIndex() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
                     <Input
+                      data-testid="marketplace-search"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search apps..."

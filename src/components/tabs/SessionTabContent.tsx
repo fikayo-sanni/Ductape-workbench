@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyRound, Clock, Tag, FileJson, Code, Activity, Server, ArrowRight, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
 import { cn } from '@/lib/utils';
 import sessionUsersService from '@/services/sessionUsersService';
+import payloadGenerationService from '@/services/payloadGenerationService';
 
 interface SessionTabContentProps {
   session: any;
@@ -78,7 +79,11 @@ function SessionEnvMetrics({ productTag, sessionTag, env }: { productTag: string
 
 export default function SessionTabContent({ session }: SessionTabContentProps) {
   const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+  const [generatedPayloadsByEnv, setGeneratedPayloadsByEnv] = useState<
+    Record<string, Record<string, Record<string, unknown>>>
+  >({});
   const { openTab } = useWorkbenchStore();
+  const { user, currentWorkspaceId } = useAuth();
 
   // Show error if session data is incomplete and can't be fetched
   if (!session?.name && !session?.tag) {
@@ -178,6 +183,75 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
     }
   };
 
+  useEffect(() => {
+    const loadPayloadTemplates = async () => {
+      if (!showCodeSidebar) return;
+      if (!session?.productTag || !session?.tag) return;
+      if (!currentWorkspaceId || !user?._id || !user?.public_key) return;
+
+      const envs = (session.productEnvironments || []).map((e: any) => e.slug);
+      if (!envs.length) return;
+
+      const methods = ['start', 'verify', 'refresh'];
+      const nextState: Record<string, Record<string, Record<string, unknown>>> = {};
+
+      await Promise.all(
+        envs.map(async (envSlug: string) => {
+          nextState[envSlug] = {};
+          await Promise.all(
+            methods.map(async (method) => {
+              try {
+                const result = await payloadGenerationService.generateExecutablePayload({
+                  workspace_id: currentWorkspaceId,
+                  user_id: user._id,
+                  public_key: user.public_key,
+                  product_tag: session.productTag,
+                  env_slug: envSlug,
+                  operation_family: 'session',
+                  method,
+                  targets: {
+                    session_tag: session.tag,
+                  },
+                  schema_mode: 'best_effort',
+                });
+                nextState[envSlug][method] = result.payload || {};
+              } catch {
+                nextState[envSlug][method] = {};
+              }
+            }),
+          );
+        }),
+      );
+
+      setGeneratedPayloadsByEnv(nextState);
+    };
+
+    loadPayloadTemplates();
+  }, [showCodeSidebar, session?.productTag, session?.tag, session?.productEnvironments, currentWorkspaceId, user?._id, user?.public_key]);
+
+  const buildDynamicSessionCode = (
+    language: string,
+    sdkMethod: string,
+    payloadTemplate: Record<string, unknown> | undefined,
+  ): string | null => {
+    if (!payloadTemplate || !Object.keys(payloadTemplate).length) return null;
+    const inputPayload = (payloadTemplate.input as Record<string, unknown>) || {};
+    const inputJson = JSON.stringify(inputPayload, null, 2);
+
+    if (language === 'typescript' || language === 'javascript') {
+      return `const result = await ductape.sessions.${sdkMethod}(${inputJson});
+
+console.log('Result:', result);`;
+    }
+
+    if (language === 'python') {
+      return `result = ductape.sessions.${sdkMethod}(${inputJson.replace(/"([^"]+)":/g, "'$1':")})
+print('Result:', result)`;
+    }
+
+    return null;
+  };
+
   // Generate SDK code examples for session management
   const generateCodeSections = (language: string, env: string = 'production') => {
     if (!session) return [];
@@ -199,6 +273,7 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
     }
 
     const sections: Array<{ title: string; code: string }> = [];
+    const dynamicTemplates = generatedPayloadsByEnv[env] || {};
 
     if (language === 'typescript') {
       sections.push({
@@ -218,7 +293,7 @@ await ductape.product.init('${productTag}');`,
 
       sections.push({
         title: 'Create Session',
-        code: `// Create a new session for a user
+        code: buildDynamicSessionCode(language, 'start', dynamicTemplates.start) || `// Create a new session for a user
 const sessionData = ${JSON.stringify(schemaSample, null, 2)};
 
 const result = await ductape.sessions.create({
@@ -234,7 +309,7 @@ console.log('Session created:', result);
 
       sections.push({
         title: 'Validate Session',
-        code: `// Validate and decrypt session data using token
+        code: buildDynamicSessionCode(language, 'verify', dynamicTemplates.verify) || `// Validate and decrypt session data using token
 const sessionData = await ductape.sessions.get({
   product: '${productTag}',
   env: '${env}',
@@ -247,7 +322,7 @@ console.log('Session data:', sessionData);`,
 
       sections.push({
         title: 'Refresh Session',
-        code: `// Refresh an expired session using refresh token
+        code: buildDynamicSessionCode(language, 'refresh', dynamicTemplates.refresh) || `// Refresh an expired session using refresh token
 const refreshedSession = await ductape.sessions.refresh({
   product: '${productTag}',
   env: '${env}',

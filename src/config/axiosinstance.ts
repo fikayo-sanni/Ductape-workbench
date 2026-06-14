@@ -1,8 +1,18 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
-import { showLoginModal } from "@/stores/login-modal-store";
+import { isUsingViteApiProxy, resolveApiBaseUrl } from "@/config/apiBaseUrl";
+
+const apiBaseUrl = resolveApiBaseUrl();
+if (import.meta.env.DEV) {
+  console.info("[Workbench API]", {
+    baseURL: apiBaseUrl || "(same-origin via Vite proxy)",
+    viteProxy: isUsingViteApiProxy(),
+    gatewayTarget: import.meta.env.VITE_API_GATEWAY_TARGET || "http://localhost:4311",
+    directApi: import.meta.env.VITE_API_BASE_URL || "(not set)",
+  });
+}
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },
@@ -34,8 +44,11 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("user");
       localStorage.removeItem("currentWorkspaceId");
 
-      // Show login modal
-      showLoginModal();
+      // Redirect to login page
+      if (!window.location.pathname.startsWith('/login')) {
+        const returnPath = window.location.pathname + window.location.search;
+        window.location.href = `/login?from=${encodeURIComponent(returnPath)}`;
+      }
     }
     return Promise.reject(error);
   }

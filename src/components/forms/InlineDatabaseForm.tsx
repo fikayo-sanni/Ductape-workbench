@@ -11,6 +11,8 @@ import { useDatabaseProxy } from '@/services/databaseProxy';
 import { useGraphProxy } from '@/services/graphProxy';
 import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
+import CloudLinkPanel from '@/components/cloud/CloudLinkPanel';
+import { isSecretRef, shouldHideManualCloudCredentials, mergeDatabaseEnvFromDraft, mergeGraphEnvFromDraft, mergeVectorEnvFromDraft } from '@/utils/cloudDraftMerge';
 
 interface InlineDatabaseFormProps {
   product: {
@@ -42,6 +44,20 @@ interface EnvConnection {
   apiKey?: string;
   index?: string;
   namespace?: string;
+  /** RDS instance when linking via cloud */
+  instance?: string;
+  cloud?: string;
+  linkedFromCloud?: boolean;
+  /** Required for AWS RDS / Neptune provision — tags registered on the cloud connection */
+  securityGroups?: string[];
+  /** True when Ductape-managed or VPC connector groups apply without manual tag selection */
+  securityGroupsAuto?: boolean;
+  /** Linking an existing cloud database (requires masterPassword) */
+  importExisting?: boolean;
+  /** Master password for existing RDS / Cloud SQL import (create input only) */
+  masterPassword?: string;
+  /** Password already in workspace secrets from a prior Ductape link */
+  credentialsStored?: boolean;
 }
 
 export default function InlineDatabaseForm({ product, databaseType, onCancel, onSuccess }: InlineDatabaseFormProps) {
@@ -61,8 +77,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
   // Initialize Database Proxy (for regular databases)
   const databaseProxy = useDatabaseProxy(databaseType === 'database' ? proxyConfig : null);
 
-  // Initialize SDK Proxy (for vectors)
-  const sdkProxy = useSDKProxy(databaseType === 'vector' ? proxyConfig : null);
+  const sdkProxy = useSDKProxy(proxyConfig);
 
   // Initialize Graph Proxy (for graph databases - not yet in SDK proxy)
   const graphProxy = useGraphProxy(databaseType === 'graph' ? proxyConfig : null);
@@ -162,7 +177,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       { value: 'postgresql', label: 'PostgreSQL' },
       { value: 'mysql', label: 'MySQL' },
       { value: 'mongodb', label: 'MongoDB' },
-      { value: 'redis', label: 'Redis' },
+      { value: 'dynamodb', label: 'DynamoDB' },
     ];
   };
 
@@ -221,7 +236,8 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
         });
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
+      toast.dismiss('cloud-db-provision');
       // Invalidate queries based on database type
       if (databaseType === 'graph') {
         queryClient.invalidateQueries({ queryKey: ['graphs'] });
@@ -233,10 +249,18 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
       queryClient.invalidateQueries({ queryKey: ['product', product._id] });
 
-      toast.success(`${getTypeTitle()} created successfully`);
+      const cloudProvisioning = (variables.envs as Array<{ cloud?: string; linkedFromCloud?: boolean; importExisting?: boolean }>).some(
+        (env) => (env.cloud || (env as any).linkedFromCloud) && !(env as any).importExisting,
+      );
+      toast.success(
+        cloudProvisioning
+          ? `${getTypeTitle()} saved — cloud instances are provisioning (typically 10–15 min)`
+          : `${getTypeTitle()} created successfully`,
+      );
       onSuccess();
     },
     onError: (error: any) => {
+      toast.dismiss('cloud-db-provision');
       toast.error(error.message || `Failed to create ${getTypeTitle().toLowerCase()}`);
     },
   });
@@ -261,17 +285,41 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     }
 
     // Validate at least one environment is configured
-    const hasConfiguredEnv = databaseType === 'vector'
-      ? envConnections.some(env => env.endpoint?.trim())
-      : envConnections.some(env => env.connection_url.trim());
+    const isEnvConfigured = (env: EnvConnection) => {
+      if (env.cloud?.trim() || env.linkedFromCloud) {
+        return true;
+      }
+      if (databaseType === 'vector') {
+        return Boolean(env.endpoint?.trim()) || isSecretRef(env.endpoint);
+      }
+      return Boolean(env.connection_url.trim()) || isSecretRef(env.connection_url);
+    };
+
+    const hasConfiguredEnv = envConnections.some(isEnvConfigured);
 
     if (!hasConfiguredEnv) {
       toast.error('Please configure at least one environment connection');
       return;
     }
 
-    // Validate connection URLs or endpoints
     for (const env of envConnections) {
+      if (
+        databaseType === 'database' &&
+        env.importExisting &&
+        env.cloud?.trim() &&
+        !env.credentialsStored &&
+        !env.masterPassword?.trim()
+      ) {
+        toast.error(`Enter the master password for existing database in ${env.env_name}`);
+        return;
+      }
+    }
+
+    // Cloud-linked envs without URL are provisioned on save (RDS / Azure PostgreSQL)
+    for (const env of envConnections) {
+      if (env.cloud?.trim() && !env.connection_url.trim() && !isSecretRef(env.connection_url)) {
+        continue;
+      }
       if (databaseType === 'vector' && env.endpoint?.trim()) {
         try {
           new URL(env.endpoint);
@@ -290,6 +338,24 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     }
 
     try {
+      const importingExisting =
+        databaseType === 'database' &&
+        envConnections.some((env) => env.importExisting && env.cloud?.trim());
+      const provisioningNew =
+        databaseType === 'database' &&
+        envConnections.some((env) => (env.cloud?.trim() || env.linkedFromCloud) && !env.importExisting);
+      if (importingExisting) {
+        toast.loading('Linking existing cloud database…', {
+          id: 'cloud-db-provision',
+          duration: Infinity,
+        });
+      } else if (provisioningNew) {
+        toast.loading('Saving database and starting cloud provisioning…', {
+          id: 'cloud-db-provision',
+          duration: Infinity,
+        });
+      }
+
       await createDatabase({
         name: formData.name,
         tag: formData.tag,
@@ -299,7 +365,18 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
           metric: formData.metric,
         }),
         envs: envConnections
-          .filter(env => databaseType === 'vector' ? env.endpoint?.trim() : env.connection_url.trim())
+          .filter((env) => {
+            if (env.cloud?.trim() || env.linkedFromCloud) {
+              return true;
+            }
+            if (databaseType === 'vector') {
+              return Boolean(env.endpoint?.trim()) || isSecretRef(env.endpoint);
+            }
+            return (
+              Boolean(env.connection_url.trim()) ||
+              isSecretRef(env.connection_url)
+            );
+          })
           .map(env => {
             const envConfig: any = {
               slug: env.slug,
@@ -307,6 +384,11 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
 
             // Vector database fields
             if (databaseType === 'vector') {
+              if (env.cloud) {
+                envConfig.cloud = env.cloud;
+                envConfig.linkedFromCloud = env.linkedFromCloud ?? true;
+                if (env.instance?.trim()) envConfig.instance = env.instance.trim();
+              }
               if (env.endpoint && env.endpoint.trim()) envConfig.endpoint = env.endpoint;
               if (env.apiKey && env.apiKey.trim()) envConfig.apiKey = env.apiKey;
               if (env.index && env.index.trim()) envConfig.index = env.index;
@@ -315,16 +397,44 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
             }
             // Graph database fields
             else if (databaseType === 'graph') {
+              if (env.cloud) {
+                envConfig.cloud = env.cloud;
+                envConfig.linkedFromCloud = env.linkedFromCloud ?? true;
+                if (env.instance?.trim()) envConfig.instance = env.instance.trim();
+              }
               envConfig.connection_url = env.connection_url;
               if (env.username && env.username.trim()) envConfig.username = env.username;
               if (env.password && env.password.trim()) envConfig.password = env.password;
               if (env.database && env.database.trim()) envConfig.database = env.database;
               if (env.region && env.region.trim()) envConfig.region = env.region;
               if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
+              if (env.securityGroups?.length) {
+                envConfig.securityGroups = env.securityGroups;
+              }
             }
             // Regular database fields
             else {
-              envConfig.connection_url = env.connection_url;
+              if (env.cloud) {
+                envConfig.cloud = env.cloud;
+                envConfig.linkedFromCloud = env.linkedFromCloud ?? true;
+                if (env.instance?.trim()) {
+                  envConfig.instance = env.instance.trim();
+                }
+                if (env.region?.trim()) envConfig.region = env.region.trim();
+                if (env.securityGroups?.length) {
+                  envConfig.securityGroups = env.securityGroups;
+                }
+                if (env.importExisting) {
+                  envConfig.importExisting = true;
+                  if (env.credentialsStored) {
+                    envConfig.credentialsStored = true;
+                  } else if (env.masterPassword?.trim()) {
+                    envConfig.masterPassword = env.masterPassword.trim();
+                  }
+                }
+              } else {
+                envConfig.connection_url = env.connection_url;
+              }
             }
 
             return envConfig;
@@ -349,7 +459,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     setShowEnvs(true);
   };
 
-  const updateEnvConnection = (index: number, field: string, value: string | boolean) => {
+  const updateEnvConnection = (index: number, field: string, value: string | boolean | string[]) => {
     const updated = [...envConnections];
     updated[index] = { ...updated[index], [field]: value };
     setEnvConnections(updated);
@@ -511,15 +621,86 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 </div>
               )}
 
-              {envConnections.map((env, index) => (
+              {envConnections.map((env, index) => {
+                const showCloudLink =
+                  Boolean(sdkProxy && formData.tag) &&
+                  ((databaseType === 'database' && formData.type === 'postgresql') ||
+                    databaseType === 'graph' ||
+                    databaseType === 'vector');
+                const hideManualCredentials = shouldHideManualCloudCredentials(env, showCloudLink);
+
+                return (
                 <div key={env.slug} className="p-4 bg-grey-100 rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-grey">{env.env_name}</h4>
                     <span className="text-xs text-grey-600">{env.slug}</span>
                   </div>
 
+                  {showCloudLink && (
+                      <CloudLinkPanel
+                        sdkProxy={sdkProxy}
+                        productTag={product.tag}
+                        componentTag={formData.tag}
+                        componentType={
+                          databaseType === 'vector'
+                            ? 'vectors'
+                            : databaseType === 'graph'
+                              ? 'graphs'
+                              : 'databases'
+                        }
+                        envSlug={env.slug}
+                        onDraftApplied={(draft) => {
+                          const updated = [...envConnections];
+                          const merge =
+                            databaseType === 'vector'
+                              ? mergeVectorEnvFromDraft
+                              : databaseType === 'graph'
+                                ? mergeGraphEnvFromDraft
+                                : mergeDatabaseEnvFromDraft;
+                          updated[index] = {
+                            ...updated[index],
+                            ...(merge(
+                              updated[index] as unknown as Record<string, unknown>,
+                              draft as Record<string, unknown>,
+                            ) as Partial<EnvConnection>),
+                          };
+                          setEnvConnections(updated);
+                          if (draft.region && databaseType === 'graph') {
+                            setFormData((prev) => ({ ...prev, type: 'neptune' }));
+                          }
+                        }}
+                      />
+                    )}
+
+                  {hideManualCredentials && (env.cloud || env.linkedFromCloud) && (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 space-y-1">
+                      <p className="text-sm font-medium text-grey flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        Cloud account linked —{' '}
+                        {env.importExisting
+                          ? 'existing database will be linked on save'
+                          : 'new resource will be provisioned on save'}
+                      </p>
+                      {env.cloud && (
+                        <p className="text-xs text-grey-600 pl-6">Cloud: {env.cloud}</p>
+                      )}
+                      {env.instance && (
+                        <p className="text-xs text-grey-600 pl-6">Instance: {env.instance}</p>
+                      )}
+                      {env.securityGroups?.length ? (
+                        <p className="text-xs text-grey-600 pl-6">
+                          Security groups: {env.securityGroups.join(', ')}
+                        </p>
+                      ) : env.securityGroupsAuto ? (
+                        <p className="text-xs text-grey-600 pl-6">
+                          Security groups: applied automatically from cloud connection Private access
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+
                   {/* Vector database fields */}
-                  {databaseType === 'vector' ? (
+                  {databaseType === 'vector' && !hideManualCredentials ? (
                     <>
                       {/* Endpoint URL */}
                       <div>
@@ -587,7 +768,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                         </div>
                       )}
                     </>
-                  ) : (
+                  ) : !hideManualCredentials ? (
                     /* Connection URL for databases and graphs */
                     <div>
                       <Label htmlFor={`connection-${index}`}>Connection URL</Label>
@@ -609,10 +790,10 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                         </button>
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Neo4j specific fields */}
-                  {formData.type === 'neo4j' && (
+                  {!hideManualCredentials && formData.type === 'neo4j' && (
                     <>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -651,7 +832,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   )}
 
                   {/* Memgraph specific fields */}
-                  {formData.type === 'memgraph' && (
+                  {!hideManualCredentials && formData.type === 'memgraph' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor={`username-${index}`}>Username</Label>
@@ -678,7 +859,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   )}
 
                   {/* Neptune specific fields */}
-                  {formData.type === 'neptune' && (
+                  {!hideManualCredentials && formData.type === 'neptune' && (
                     <>
                       <div>
                         <Label htmlFor={`region-${index}`}>AWS Region</Label>
@@ -705,7 +886,8 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                     </>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">
