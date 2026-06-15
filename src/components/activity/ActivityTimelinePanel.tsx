@@ -103,8 +103,8 @@ export function ActivityTimelinePanel({
               />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={40} />
               <Tooltip
-                formatter={(value: number, name: string) => [
-                  value.toLocaleString(),
+                formatter={(value, name) => [
+                  typeof value === 'number' ? value.toLocaleString() : String(value ?? '—'),
                   name === 'successful' ? 'Successful' : 'Failed',
                 ]}
                 labelFormatter={(label) => label}
@@ -334,7 +334,10 @@ export function ActivityTimelinePanel({
                   tickFormatter={(v) => `${v}`}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`${Math.round(value)} ms`, 'Avg latency']}
+                  formatter={(value) => [
+                    typeof value === 'number' ? `${Math.round(value)} ms` : String(value ?? '—'),
+                    'Avg latency',
+                  ]}
                   labelFormatter={(label) => label}
                 />
                 <Line
@@ -370,7 +373,10 @@ export function ActivityTimelinePanel({
               />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={40} />
               <Tooltip
-                formatter={(value: number) => [value.toLocaleString(), countLabel]}
+                formatter={(value) => [
+                  typeof value === 'number' ? value.toLocaleString() : String(value ?? '—'),
+                  countLabel,
+                ]}
                 labelFormatter={(label) => label}
               />
               <Bar
