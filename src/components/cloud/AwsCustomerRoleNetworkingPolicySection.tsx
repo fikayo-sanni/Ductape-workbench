@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { Ref } from 'react';
 import CloudCopySnippet from '@/components/cloud/CloudCopySnippet';
 import {
   buildCustomerRoleManagedNetworkingPolicy,
@@ -10,7 +10,7 @@ export interface AwsCustomerRoleNetworkingPolicySectionProps {
   /** setup = full guidance during connection setup; allowlist = IP allowlist panel only */
   variant?: 'setup' | 'allowlist';
   highlight?: boolean;
-  innerRef?: RefObject<HTMLDivElement | null>;
+  innerRef?: Ref<HTMLDivElement>;
   className?: string;
 }
 

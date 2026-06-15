@@ -17,7 +17,12 @@ export function shouldHideManualCloudCredentials(
 }
 
 /** Bucket/container name for validation and display (handles GCP field naming). */
-export function getStorageBucketName(env: Record<string, unknown>): string {
+export function getStorageBucketName(env: {
+  type?: string;
+  bucketName?: string;
+  gcpBucketName?: string;
+  containerName?: string;
+}): string {
   const type = String(env.type || '').toLowerCase();
   if (type === 'gcp') {
     return String(env.gcpBucketName || env.bucketName || '');

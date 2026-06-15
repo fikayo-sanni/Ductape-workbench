@@ -636,7 +636,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                     <span className="text-xs text-grey-600">{env.slug}</span>
                   </div>
 
-                  {showCloudLink && (
+                  {showCloudLink && sdkProxy ? (
                       <CloudLinkPanel
                         sdkProxy={sdkProxy}
                         productTag={product.tag}
@@ -670,7 +670,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                           }
                         }}
                       />
-                    )}
+                    ) : null}
 
                   {hideManualCredentials && (env.cloud || env.linkedFromCloud) && (
                     <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 space-y-1">

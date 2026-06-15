@@ -89,6 +89,7 @@ export function EventSampleSidebar({
   event,
   onClose,
   onAddEvents,
+  onDeleteEvent,
 }: EventSampleSidebarProps) {
   const fullTag = getFullEventTag(webhookTag, event);
   const sampleText = getEventSampleText(event);
