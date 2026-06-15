@@ -568,7 +568,7 @@ export default function InlineMessageBrokerForm({
                     </div>
                   )}
 
-                  {showBrokerCloudLink && (
+                  {showBrokerCloudLink && sdkProxy ? (
                     <CloudLinkPanel
                       sdkProxy={sdkProxy}
                       productTag={product.tag}
@@ -587,7 +587,7 @@ export default function InlineMessageBrokerForm({
                         setEnvConfigs(updated);
                       }}
                     />
-                  )}
+                  ) : null}
 
                   {hideManualCredentials && (env.cloud || env.linkedFromCloud) && (
                     <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 space-y-1">

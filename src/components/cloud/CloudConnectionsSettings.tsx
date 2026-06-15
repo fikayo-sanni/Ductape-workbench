@@ -577,7 +577,7 @@ export default function CloudConnectionsSettings({
                       ?.metadata ?? liveConnection.metadata,
                 }}
                 sdkProxy={sdkProxy}
-                workspaceId={currentWorkspaceId}
+                workspaceId={currentWorkspaceId ?? undefined}
               />
             ) : isManagedDatabaseProvider(liveConnection.provider) &&
               isCloudConnectionActive(liveConnection.status) &&

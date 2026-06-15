@@ -666,7 +666,7 @@ export default function CloudLinkPanel({
             size="sm"
             className="gap-1"
             disabled={!resourceId || importMutation.isPending}
-            onClick={() => importMutation.mutate()}
+            onClick={() => importMutation.mutate(undefined)}
           >
             {importMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
