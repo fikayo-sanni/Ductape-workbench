@@ -23,6 +23,7 @@ import {
   syncCloudConnectionAfterMutation,
   type CloudConnectionQueryRecord,
 } from '@/components/cloud/cloudConnection.constants';
+import { useAuth } from '@/store/useAuth';
 
 const EMPTY_ROW = (): AwsRegisteredSecurityGroup => ({
   tag: '',
@@ -48,6 +49,7 @@ export default function AwsSecurityGroupsPanel({
   sdkProxy,
 }: AwsSecurityGroupsPanelProps) {
   const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useAuth();
   const cloudRef = cloudConnectionRef(connection);
   const isActive = isCloudConnectionActive(connection.status);
   const managedGroup = getCloudManagedNetworking(connection.metadata).managed_security_group;
@@ -100,7 +102,7 @@ export default function AwsSecurityGroupsPanel({
       });
     },
     onSuccess: (updated: CloudConnectionQueryRecord) => {
-      syncCloudConnectionAfterMutation(queryClient, connection, updated);
+      syncCloudConnectionAfterMutation(queryClient, currentWorkspaceId, connection, updated);
       toast.success('Security groups saved');
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to save security groups'),

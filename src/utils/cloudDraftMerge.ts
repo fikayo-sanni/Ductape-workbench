@@ -4,16 +4,12 @@ export function isSecretRef(value: unknown): boolean {
   return typeof value === 'string' && value.startsWith('$Secret{');
 }
 
-/** Hide manual credential / file-upload fields when using cloud account linking. */
-export function shouldHideManualCloudCredentials(
-  env: { cloud?: string; linkedFromCloud?: boolean },
-  cloudLinkPanelVisible = false,
-): boolean {
-  return (
-    cloudLinkPanelVisible ||
-    Boolean(env.cloud?.trim()) ||
-    Boolean(env.linkedFromCloud)
-  );
+/** Hide manual credential fields once a cloud connection has been chosen. */
+export function shouldHideManualCloudCredentials(env: {
+  cloud?: string;
+  linkedFromCloud?: boolean;
+}): boolean {
+  return Boolean(env.cloud?.trim()) || Boolean(env.linkedFromCloud);
 }
 
 /** Bucket/container name for validation and display (handles GCP field naming). */

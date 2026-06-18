@@ -18,6 +18,7 @@ import { useAuth } from '@/store/useAuth';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import productServices from '@/services/productServices';
 import workspaceServices from '@/services/workspaceServices';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 
 interface NewProductTabContentProps {
   tabId: string;
@@ -204,6 +205,7 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <OverageLimitBanner assetType="product" />
         {/* Header */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">

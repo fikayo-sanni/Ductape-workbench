@@ -19,6 +19,8 @@ import {
   extractCloudDraftEnv,
   storageResourceShellDraft,
 } from '@/utils/cloudDraftMerge';
+import { useAuth } from '@/store/useAuth';
+import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
 
 export type CloudComponentKind = 'storage' | 'messageBrokers' | 'databases' | 'graphs' | 'vectors';
 
@@ -32,11 +34,30 @@ interface CloudLinkPanelProps {
   onDraftApplied: (draftEnv: Record<string, unknown>) => void;
 }
 
-const SERVICE_BY_KIND: Record<CloudComponentKind, { aws: string[]; gcp: string[]; azure: string[] }> = {
+const SERVICE_BY_KIND: Record<
+  CloudComponentKind,
+  {
+    aws: string[];
+    gcp: string[];
+    azure: string[];
+    mongodb_atlas?: string[];
+    neo4j_aura?: string[];
+  }
+> = {
   storage: { aws: ['s3'], gcp: ['gcs'], azure: ['blob'] },
   messageBrokers: { aws: ['sqs'], gcp: ['pubsub'], azure: ['servicebus'] },
-  databases: { aws: ['rds'], gcp: ['cloudsql'], azure: ['postgresql'] },
-  graphs: { aws: ['neptune'], gcp: ['spanner-graph'], azure: ['cosmos-gremlin'] },
+  databases: {
+    aws: ['rds'],
+    gcp: ['cloudsql'],
+    azure: ['postgresql'],
+    mongodb_atlas: ['atlas-cluster'],
+  },
+  graphs: {
+    aws: ['neptune'],
+    gcp: ['spanner-graph'],
+    azure: ['cosmos-gremlin'],
+    neo4j_aura: ['aura-instance'],
+  },
   vectors: { aws: ['opensearch'], gcp: ['vertex-vector-search'], azure: ['azure-search'] },
 };
 
@@ -110,6 +131,8 @@ function servicesForProvider(
   if (provider === 'aws') return map.aws;
   if (provider === 'gcp') return map.gcp;
   if (provider === 'azure') return map.azure;
+  if (provider === 'mongodb_atlas') return map.mongodb_atlas ?? [];
+  if (provider === 'neo4j_aura') return map.neo4j_aura ?? [];
   return [];
 }
 
@@ -122,6 +145,7 @@ export default function CloudLinkPanel({
   storageProvider,
   onDraftApplied,
 }: CloudLinkPanelProps) {
+  const { currentWorkspaceId } = useAuth();
   const [connectionId, setConnectionId] = useState('');
   const [service, setService] = useState('');
   const [resourceId, setResourceId] = useState('');
@@ -135,11 +159,13 @@ export default function CloudLinkPanel({
   const awsVpcResourceType = service === 'neptune' ? 'neptune' : 'rds';
 
   const { data: connections = [], isLoading: loadingConnections } = useQuery({
-    queryKey: ['cloud-connections'],
+    queryKey: cloudConnectionsQueryKey(currentWorkspaceId),
     queryFn: async () => {
       const res = await sdkProxy.cloud.connections.list();
       return Array.isArray(res) ? res : (res as any)?.data || [];
     },
+    enabled: Boolean(currentWorkspaceId),
+    staleTime: 0,
   });
 
   const matchingConnections = useMemo(
@@ -173,6 +199,12 @@ export default function CloudLinkPanel({
   const availableServices = selectedConnection
     ? servicesForProvider(componentType, selectedConnection.provider, storageProvider)
     : [];
+
+  useEffect(() => {
+    setConnectionId('');
+    setService('');
+    setResourceId('');
+  }, [currentWorkspaceId]);
 
   useEffect(() => {
     if (connectionId && !matchingConnections.some((c: any) => c.id === connectionId)) {

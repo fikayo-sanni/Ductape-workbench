@@ -73,17 +73,21 @@ export function syncCloudConnectionAfterMutation(
     invalidateQueries: (filters: { queryKey: unknown[] }) => void;
     refetchQueries: (filters: { queryKey: unknown[]; exact?: boolean }) => Promise<unknown>;
   },
+  workspaceId: string | null | undefined,
   connection: { id?: string; tag?: string },
   updated: CloudConnectionQueryRecord,
 ) {
   const cloudRef = cloudConnectionRef(connection);
   const resolvedId = connection.id;
   if (cloudRef && resolvedId) {
-    queryClient.setQueryData(['cloud-connection', cloudRef, resolvedId], updated);
+    queryClient.setQueryData(
+      ['cloud-connection', workspaceId ?? '', cloudRef, resolvedId],
+      updated,
+    );
   }
 
   queryClient.setQueriesData(
-    { queryKey: ['cloud-connection'], exact: false },
+    { queryKey: ['cloud-connection', workspaceId ?? ''], exact: false },
     (cached) => {
       if (!cached || typeof cached !== 'object') return cached;
       const id = String(cached.id || '');
@@ -96,8 +100,8 @@ export function syncCloudConnectionAfterMutation(
     },
   );
 
-  queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
-  void queryClient.refetchQueries({ queryKey: ['cloud-connection'] });
+  queryClient.invalidateQueries({ queryKey: ['cloud-connections', workspaceId ?? ''] });
+  void queryClient.refetchQueries({ queryKey: ['cloud-connection', workspaceId ?? ''] });
 }
 
 /** True when the connection still needs provider credentials / validation */

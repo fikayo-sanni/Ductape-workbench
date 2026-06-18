@@ -67,7 +67,8 @@ import CreateConstantModal from '@/components/modals/CreateConstantModal';
 import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableModal';
 import CreateFolderModal from '@/components/modals/CreateFolderModal';
 import PublishAppModal from '@/components/modals/PublishAppModal';
-import {useQuery, useQueryClient} from '@tanstack/react-query';
+import DeleteAppModal from '@/components/modals/DeleteAppModal';
+import {useQuery, useQueryClient, useMutation} from '@tanstack/react-query';
 import {useAppDashboard} from '@/hooks/useAnalytics';
 import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
@@ -112,7 +113,7 @@ export default function AppTabContent({
   appId,
   isMarketplace,
 }: AppTabContentProps) {
-  const {openTab, tabs} = useWorkbenchStore();
+  const {openTab, tabs, closeTab} = useWorkbenchStore();
   const {currentWorkspaceId, user} = useAuth();
   const queryClient = useQueryClient();
 
@@ -154,6 +155,7 @@ export default function AppTabContent({
     useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showDeleteAppModal, setShowDeleteAppModal] = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(
     null,
   );
@@ -492,6 +494,34 @@ export default function AppTabContent({
   const isVersionUnpublished =
     selectedVersion?.status === 'draft' ||
     selectedVersion?.status === 'private';
+
+  const hasPublicVersion = (currentApp?.versions || []).some(
+    (v) => v.status === 'public',
+  );
+  const canDeleteApp = isInternalApp && !isProductView && !hasPublicVersion;
+
+  const deleteAppMutation = useMutation({
+    mutationFn: () =>
+      appServices.deleteApp({
+        app_id: String(currentApp?._id),
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+      queryClient.invalidateQueries({ queryKey: ['app', effectiveAppId] });
+      queryClient.invalidateQueries({
+        queryKey: ['workspace-apps', currentWorkspaceId],
+      });
+      toast.success('App deleted');
+      setShowDeleteAppModal(false);
+      if (tabId) closeTab(tabId);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete app');
+    },
+  });
 
   // Publish requires every environment to be set as active
   const appEnvs = selectedVersion?.envs || [];
@@ -1367,7 +1397,7 @@ export default function AppTabContent({
       suffix?: string,
       isLoading?: boolean,
     ) => (
-      <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-5">
+      <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-5">
         <div className="flex items-start justify-between mb-3">
           <div
             className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center`}
@@ -1429,7 +1459,7 @@ export default function AppTabContent({
       >
         <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
           {/* Dashboard Header */}
-          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
@@ -1542,11 +1572,13 @@ export default function AppTabContent({
                     onClick={() => setShowPublishModal(true)}
                     size="sm"
                     className="w-36"
-                    disabled={!allEnvironmentsActive}
+                    disabled={!allEnvironmentsActive || actionsCount === 0}
                     title={
-                      !allEnvironmentsActive
-                        ? 'Set all environments as active to publish'
-                        : undefined
+                      actionsCount === 0
+                        ? 'Add at least one action before publishing'
+                        : !allEnvironmentsActive
+                          ? 'Set all environments as active to publish'
+                          : undefined
                     }
                   >
                     <Rocket className="h-4 w-4 mr-1" />
@@ -1663,12 +1695,12 @@ export default function AppTabContent({
             env={selectedVersion?.envs?.find((e: { active?: boolean }) => e.active)?.slug}
             countLabel="requests"
             enabled={!!effectiveAppId || !!(currentApp as { tag?: string })?.tag}
-            className="bg-grey-50 dark:bg-background border-grey-300 dark:border-grey-400"
+            className="bg-white dark:bg-background border-grey-300 dark:border-grey-400"
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Requests by Method */}
-            <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-grey">
                   Requests by Method
@@ -1740,7 +1772,7 @@ export default function AppTabContent({
             </div>
 
             {/* Top Endpoints */}
-            <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-grey">
                   Top Endpoints
@@ -1823,7 +1855,7 @@ export default function AppTabContent({
           </div>
 
           {/* Environment Status */}
-          <div className="bg-grey-50 dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
             <h2 className="text-lg font-semibold text-grey mb-4">
               {isProductView ? 'Product environments' : 'Environment Status'}
             </h2>
@@ -1832,7 +1864,7 @@ export default function AppTabContent({
                 <div
                   key={env.slug}
                   className={cn(
-                    'p-4 bg-grey-100 dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg transition-colors',
+                    'p-4 bg-white dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg transition-colors',
                     !isProductView && 'hover:border-primary/50 cursor-pointer',
                   )}
                   onClick={() => {
@@ -1910,6 +1942,32 @@ export default function AppTabContent({
               </div>
             </div>
           </div>
+
+          {isInternalApp && !isProductView && (
+            <div className="bg-white rounded-lg border border-red-200 p-4 sm:p-6 shadow-sm">
+              <h2 className="text-base sm:text-lg font-semibold text-red-600 mb-2">
+                Danger zone
+              </h2>
+              <p className="text-xs sm:text-sm text-grey-600 mb-4">
+                Permanently delete this app and all of its versions, actions, and webhooks.
+                This cannot be undone.
+              </p>
+              {hasPublicVersion && (
+                <p className="text-xs sm:text-sm text-amber-700 mb-4">
+                  Public apps cannot be deleted. Unpublish or remove all public versions first.
+                </p>
+              )}
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 gap-2"
+                disabled={!canDeleteApp}
+                onClick={() => setShowDeleteAppModal(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete app
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2444,6 +2502,23 @@ export default function AppTabContent({
             queryClient.invalidateQueries({queryKey: ['app', effectiveAppId]});
             queryClient.invalidateQueries({queryKey: ['apps']});
           }}
+        />
+      )}
+
+      {currentApp && (
+        <DeleteAppModal
+          open={showDeleteAppModal}
+          onOpenChange={setShowDeleteAppModal}
+          appName={currentApp.app_name || currentApp.tag}
+          appTag={currentApp.tag}
+          isDeleting={deleteAppMutation.isPending}
+          disabled={!canDeleteApp}
+          disabledReason={
+            hasPublicVersion
+              ? 'This app has a public version and cannot be deleted.'
+              : undefined
+          }
+          onConfirm={() => deleteAppMutation.mutate()}
         />
       )}
     </div>

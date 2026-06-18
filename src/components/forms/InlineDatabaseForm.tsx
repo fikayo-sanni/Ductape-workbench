@@ -12,6 +12,7 @@ import { useGraphProxy } from '@/services/graphProxy';
 import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
 import CloudLinkPanel from '@/components/cloud/CloudLinkPanel';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 import { isSecretRef, shouldHideManualCloudCredentials, mergeDatabaseEnvFromDraft, mergeGraphEnvFromDraft, mergeVectorEnvFromDraft } from '@/utils/cloudDraftMerge';
 
 interface InlineDatabaseFormProps {
@@ -315,9 +316,12 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       }
     }
 
-    // Cloud-linked envs without URL are provisioned on save (RDS / Azure PostgreSQL)
+    // Cloud-linked envs and workspace secret refs are resolved on save — skip URL format checks.
     for (const env of envConnections) {
-      if (env.cloud?.trim() && !env.connection_url.trim() && !isSecretRef(env.connection_url)) {
+      if (env.cloud?.trim() || env.linkedFromCloud) {
+        continue;
+      }
+      if (isSecretRef(env.connection_url) || isSecretRef(env.endpoint)) {
         continue;
       }
       if (databaseType === 'vector' && env.endpoint?.trim()) {
@@ -468,6 +472,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6 pb-24">
+        <OverageLimitBanner assetType={databaseType} />
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -624,10 +629,11 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
               {envConnections.map((env, index) => {
                 const showCloudLink =
                   Boolean(sdkProxy && formData.tag) &&
-                  ((databaseType === 'database' && formData.type === 'postgresql') ||
+                  ((databaseType === 'database' &&
+                    (formData.type === 'postgresql' || formData.type === 'mongodb')) ||
                     databaseType === 'graph' ||
                     databaseType === 'vector');
-                const hideManualCredentials = shouldHideManualCloudCredentials(env, showCloudLink);
+                const hideManualCredentials = shouldHideManualCloudCredentials(env);
 
                 return (
                 <div key={env.slug} className="p-4 bg-grey-100 rounded-lg space-y-3">

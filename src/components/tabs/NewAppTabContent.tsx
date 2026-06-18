@@ -20,6 +20,7 @@ import appServices from '@/services/appServices';
 import AppCreatedModal from '@/components/modals/AppCreatedModal';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import { SDKProxyService } from '@/services/sdkProxy';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 
 interface NewAppTabContentProps {
   tabId: string;
@@ -468,6 +469,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        <OverageLimitBanner assetType="app" />
         {/* Product Context Header */}
         {product && (
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">

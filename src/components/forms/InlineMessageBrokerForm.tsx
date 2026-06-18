@@ -27,6 +27,7 @@ import { useAuth } from "@/store/useAuth";
 import { useSDKProxy } from "@/services/sdkProxy";
 import { MessageBrokerTypes } from "@ductape/sdk/dist/types";
 import CloudLinkPanel from "@/components/cloud/CloudLinkPanel";
+import OverageLimitBanner from "@/components/billing/OverageLimitBanner";
 import { isSecretRef, shouldHideManualCloudCredentials, mergeBrokerEnvFromDraft } from "@/utils/cloudDraftMerge";
 
 interface InlineMessageBrokerFormProps {
@@ -287,7 +288,6 @@ export default function InlineMessageBrokerForm({
         return {
           projectId: env.gcpProjectId,
           credentials: {
-            type: env.gcpConfigType,
             project_id: env.gcpProjectId,
             private_key_id: env.gcpPrivateKeyId,
             private_key: env.gcpPrivateKey,
@@ -378,6 +378,7 @@ export default function InlineMessageBrokerForm({
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <OverageLimitBanner assetType="message-broker" />
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3">
@@ -463,7 +464,7 @@ export default function InlineMessageBrokerForm({
                 const showBrokerCloudLink =
                   Boolean(sdkProxy && formData.tag) &&
                   (env.type === "AWS_SQS" || env.type === "GOOGLE_PUBSUB");
-                const hideManualCredentials = shouldHideManualCloudCredentials(env, showBrokerCloudLink);
+                const hideManualCredentials = shouldHideManualCloudCredentials(env);
 
                 return (
                 <div key={env.slug} className="border border-grey-400 rounded-lg p-6 space-y-4 bg-grey-50">

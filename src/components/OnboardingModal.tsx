@@ -26,6 +26,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import workspaceServices from '@/services/workspaceServices';
 import productServices from '@/services/productServices';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
 interface OnboardingStep {
@@ -295,6 +296,7 @@ function ProductStep({ onNext, onBack, workspace, onComplete }: { onNext: (data:
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <OverageLimitBanner assetType="product" />
         <div>
           <Label htmlFor="product_name" className="required">
             Product Name

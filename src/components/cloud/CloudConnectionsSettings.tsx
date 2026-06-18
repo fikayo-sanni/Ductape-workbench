@@ -31,6 +31,10 @@ import {
   isCloudConnectionActive,
   isManagedDatabaseProvider,
 } from '@/components/cloud/cloudConnection.constants';
+import {
+  cloudConnectionQueryKey,
+  cloudConnectionsQueryKey,
+} from '@/utils/cloudConnectionQueryKeys';
 import AwsCloudNetworkingPanel from '@/components/cloud/AwsCloudNetworkingPanel';
 import ManagedDatabaseNetworkingPanel from '@/components/cloud/ManagedDatabaseNetworkingPanel';
 import DuctapeApiProxyIpsPanel from '@/components/cloud/DuctapeApiProxyIpsPanel';
@@ -195,7 +199,7 @@ export default function CloudConnectionsSettings({
   );
 
   const { data: fetchedConnection, isLoading: loadingConnection, isError: fetchError } = useQuery({
-    queryKey: ['cloud-connection', cloudRef, resolvedId],
+    queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, resolvedId),
     queryFn: async () => {
       if (!sdkProxy) return null;
       if (cloudRef) {
@@ -217,7 +221,8 @@ export default function CloudConnectionsSettings({
       }
       return null;
     },
-    enabled: shouldFetchConnection,
+    enabled: shouldFetchConnection && Boolean(currentWorkspaceId),
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -378,8 +383,10 @@ export default function CloudConnectionsSettings({
             const msg = validation.message || 'Validation failed';
             setValidationError(msg);
             toast.error(msg);
-            queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
-            queryClient.invalidateQueries({ queryKey: ['cloud-connection', id] });
+            queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
+            queryClient.invalidateQueries({
+              queryKey: cloudConnectionQueryKey(currentWorkspaceId, id, id),
+            });
             return;
           }
           setValidationError('');
@@ -390,17 +397,21 @@ export default function CloudConnectionsSettings({
           const msg = e instanceof Error ? e.message : 'Validation failed after setup';
           setValidationError(msg);
           toast.error(msg);
-          queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
+          queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
           return;
         }
       }
       logCloud('Complete connection — flow finished');
       toast.success('Cloud connection active');
       setValidationError('');
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
       if (id) {
-        queryClient.invalidateQueries({ queryKey: ['cloud-connection', cloudRef] });
-        queryClient.invalidateQueries({ queryKey: ['cloud-connection', id] });
+        queryClient.invalidateQueries({
+          queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, cloudRef),
+        });
+        queryClient.invalidateQueries({
+          queryKey: cloudConnectionQueryKey(currentWorkspaceId, id, id),
+        });
       }
       closeCloudConnectionTab();
     },
@@ -417,8 +428,10 @@ export default function CloudConnectionsSettings({
     },
     onSuccess: () => {
       toast.success('Connection validated');
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
-      queryClient.invalidateQueries({ queryKey: ['cloud-connection', cloudRef] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
+      queryClient.invalidateQueries({
+        queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, cloudRef),
+      });
     },
     onError: (e: Error) => toast.error(e.message || 'Validation failed'),
   });
@@ -430,7 +443,7 @@ export default function CloudConnectionsSettings({
     },
     onSuccess: () => {
       toast.success('Connection removed');
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
       if (resolvedId) {
         closeTab(`cloud-${resolvedId}`);
       }

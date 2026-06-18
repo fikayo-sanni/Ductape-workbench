@@ -413,11 +413,20 @@ export default function WorkbenchHeader() {
     });
   };
 
-  const handleWorkspaceCreated = (workspace: any) => {
-    // Switch to the newly created workspace
-    setCurrentWorkspaceId(workspace.workspace_id);
-    toast.success(`Switched to ${workspace.workspace_name}`);
+  const handleWorkspaceCreated = async (workspace: {
+    workspace_id?: string;
+    _id?: string;
+    workspace_name?: string;
+  }) => {
+    const nextWorkspaceId = workspace.workspace_id || workspace._id;
+    if (!nextWorkspaceId) return;
+
+    setCurrentWorkspaceId(nextWorkspaceId);
+    clearAllTabs();
+    await queryClient.clear();
+    toast.success(`Switched to ${workspace.workspace_name || 'workspace'}`);
     setShowCreateWorkspaceModal(false);
+    window.location.reload();
   };
 
   // Mobile workspace selector component

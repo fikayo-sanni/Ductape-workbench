@@ -198,16 +198,19 @@ export default function HealthcheckExplorerTab({
 
   const handleViewHealthcheck = (healthcheck: IHealthCheck) => {
     openTab({
-      id: `healthcheck-flow-${healthcheck.tag}`,
-      type: 'resilience-flow',
+      id: `healthcheck-${healthcheck.tag}`,
+      type: 'healthcheck',
       title: healthcheck.name,
       itemId: healthcheck.tag,
       data: {
-        kind: 'healthcheck',
-        component: healthcheck,
-        productTag: product.tag,
+        ...healthcheck,
+        name: healthcheck.name,
+        tag: healthcheck.tag,
+        componentType: 'healthcheck',
         productName: product.name,
-        productEnvs: product.envs || [],
+        productTag: product.tag,
+        productLogo: product.logo,
+        productEnvironments: product.envs || [],
       },
     });
   };

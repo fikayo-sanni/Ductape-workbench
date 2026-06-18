@@ -27,21 +27,122 @@ export interface FlowStepNodeData extends Record<string, unknown> {
   meta?: Record<string, string>;
 }
 
-const NODE_WIDTH = 220;
-const NODE_GAP_Y = 100;
-const NODE_GAP_X = 280;
+const NODE_GAP_Y = 150;
+const NODE_GAP_X = 300;
+const LAYOUT_ORIGIN_X = 80;
+const LAYOUT_ORIGIN_Y = 60;
+const ENV_NODES_PER_ROW = 3;
 
-function linearLayout(
-  items: Array<{ id: string; data: FlowStepNodeData }>,
-  startX = 120,
-  startY = 80,
+type FlowNodeItem = { id: string; data: FlowStepNodeData };
+
+function assignLayers(nodeIds: string[], edges: Edge[], startId: string): Map<string, number> {
+  const layer = new Map<string, number>();
+  layer.set(startId, 0);
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    edges.forEach((edge) => {
+      const sourceLayer = layer.get(edge.source);
+      if (sourceLayer === undefined) return;
+      const nextLayer = sourceLayer + 1;
+      const previous = layer.get(edge.target) ?? -1;
+      if (nextLayer > previous) {
+        layer.set(edge.target, nextLayer);
+        changed = true;
+      }
+    });
+  }
+
+  nodeIds.forEach((id) => {
+    if (!layer.has(id)) layer.set(id, 1);
+  });
+
+  return layer;
+}
+
+/** Layer nodes top-to-bottom; spread siblings horizontally and center each row. */
+function layoutHierarchicalNodes(
+  items: FlowNodeItem[],
+  edges: Edge[],
+  startId = 'start',
 ): Node<FlowStepNodeData>[] {
-  return items.map((item, index) => ({
-    id: item.id,
-    type: 'flowStep',
-    position: { x: startX, y: startY + index * NODE_GAP_Y },
-    data: item.data,
-  }));
+  const nodeIds = items.map((item) => item.id);
+  const nodeById = new Map(items.map((item) => [item.id, item]));
+  const layers = assignLayers(nodeIds, edges, startId);
+
+  const byLayer = new Map<number, string[]>();
+  nodeIds.forEach((id) => {
+    const layer = layers.get(id) ?? 0;
+    if (!byLayer.has(layer)) byLayer.set(layer, []);
+    byLayer.get(layer)!.push(id);
+  });
+
+  const sortedLayers = [...byLayer.keys()].sort((a, b) => a - b);
+  const maxRowWidth = Math.max(
+    ...sortedLayers.map((layer) => (byLayer.get(layer)?.length ?? 1) - 1),
+    0,
+  );
+  const canvasWidth = maxRowWidth * NODE_GAP_X;
+
+  return sortedLayers.flatMap((layer) => {
+    const ids = byLayer.get(layer) ?? [];
+    const rowWidth = Math.max(ids.length - 1, 0) * NODE_GAP_X;
+    const rowOffsetX = (canvasWidth - rowWidth) / 2;
+
+    return ids.map((id, index) => ({
+      id,
+      type: 'flowStep' as const,
+      position: {
+        x: LAYOUT_ORIGIN_X + rowOffsetX + index * NODE_GAP_X,
+        y: LAYOUT_ORIGIN_Y + layer * NODE_GAP_Y,
+      },
+      data: nodeById.get(id)!.data,
+    }));
+  });
+}
+
+/** Request → router → fan-out providers → response (fallback / quota). */
+function layoutRouterFanOut(config: {
+  start: FlowNodeItem;
+  router: FlowNodeItem;
+  providers: FlowNodeItem[];
+  end: FlowNodeItem;
+}): Node<FlowStepNodeData>[] {
+  const providerCount = config.providers.length;
+  const rowWidth = Math.max(providerCount - 1, 0) * NODE_GAP_X;
+  const centerX = LAYOUT_ORIGIN_X + rowWidth / 2;
+  const yStart = LAYOUT_ORIGIN_Y;
+  const yRouter = yStart + NODE_GAP_Y;
+  const yProviders = yRouter + NODE_GAP_Y;
+  const yEnd = yProviders + NODE_GAP_Y;
+
+  return [
+    {
+      id: config.start.id,
+      type: 'flowStep',
+      position: { x: centerX, y: yStart },
+      data: config.start.data,
+    },
+    {
+      id: config.router.id,
+      type: 'flowStep',
+      position: { x: centerX, y: yRouter },
+      data: config.router.data,
+    },
+    ...config.providers.map((provider, index) => ({
+      id: provider.id,
+      type: 'flowStep' as const,
+      position: { x: LAYOUT_ORIGIN_X + index * NODE_GAP_X, y: yProviders },
+      data: provider.data,
+    })),
+    {
+      id: config.end.id,
+      type: 'flowStep',
+      position: { x: centerX, y: yEnd },
+      data: config.end.data,
+    },
+  ];
 }
 
 function chainEdges(ids: string[]): Edge[] {
@@ -101,11 +202,11 @@ export function workflowStepsToFlow(steps: Array<Record<string, unknown>> = []) 
     };
   });
 
-  const nodes = linearLayout([
+  const allNodeItems: FlowNodeItem[] = [
     { id: startId, data: { label: 'Start', kind: 'start' } },
     ...stepNodes,
     { id: endId, data: { label: 'Complete', kind: 'end' } },
-  ]);
+  ];
 
   const stepTags = stepNodes.map((n) => n.id);
   const hasExplicitDeps = steps.some(
@@ -114,7 +215,9 @@ export function workflowStepsToFlow(steps: Array<Record<string, unknown>> = []) 
 
   if (!hasExplicitDeps) {
     const edgeIds = [startId, ...stepTags, endId];
-    return { nodes, edges: chainEdges(edgeIds) };
+    const edges = chainEdges(edgeIds);
+    const nodes = layoutHierarchicalNodes(allNodeItems, edges, startId);
+    return { nodes, edges };
   }
 
   const edges: Edge[] = [];
@@ -156,6 +259,7 @@ export function workflowStepsToFlow(steps: Array<Record<string, unknown>> = []) 
     }
   });
 
+  const nodes = layoutHierarchicalNodes(allNodeItems, edges, startId);
   return { nodes, edges };
 }
 
@@ -163,17 +267,42 @@ export function healthcheckToFlow(healthcheck: Record<string, unknown>) {
   const tag = String(healthcheck.tag || 'healthcheck');
   const envs = Array.isArray(healthcheck.envs) ? healthcheck.envs : [];
   const probeId = 'probe';
+  const envItems: FlowNodeItem[] = envs.map((env: Record<string, unknown>, index: number) => {
+    const slug = String(env.slug || `env-${index}`);
+    return {
+      id: `env-${slug}`,
+      data: {
+        label: slug,
+        subtitle: String(env.status || 'unknown'),
+        kind: (env.status === 'healthy' ? 'action' : 'condition') as FlowNodeKind,
+        meta: {
+          latency: String(env.averageLatency || env.lastLatency || '—'),
+          lastChecked: env.lastChecked ? String(env.lastChecked) : '—',
+        },
+      },
+    };
+  });
+
+  const envsInWidestRow = envItems.length
+    ? Math.min(envItems.length, ENV_NODES_PER_ROW)
+    : 1;
+  const envRowWidth = Math.max(envsInWidestRow - 1, 0) * NODE_GAP_X;
+  const centerX = LAYOUT_ORIGIN_X + envRowWidth / 2;
+  const yInput = LAYOUT_ORIGIN_Y;
+  const yProbe = yInput + NODE_GAP_Y;
+  const yEnvs = yProbe + NODE_GAP_Y;
+
   const nodes: Node<FlowStepNodeData>[] = [
     {
       id: 'input',
       type: 'flowStep',
-      position: { x: 120, y: 60 },
+      position: { x: centerX, y: yInput },
       data: { label: 'Input', subtitle: 'Probe payload', kind: 'start' },
     },
     {
       id: probeId,
       type: 'flowStep',
-      position: { x: 120, y: 180 },
+      position: { x: centerX, y: yProbe },
       data: {
         label: String(healthcheck.name || tag),
         subtitle: 'Health probe',
@@ -186,30 +315,33 @@ export function healthcheckToFlow(healthcheck: Record<string, unknown>) {
     },
   ];
 
-  envs.forEach((env: Record<string, unknown>, index: number) => {
-    const slug = String(env.slug || `env-${index}`);
-    nodes.push({
-      id: `env-${slug}`,
-      type: 'flowStep',
-      position: { x: 120 + (index % 2) * NODE_GAP_X, y: 320 + Math.floor(index / 2) * NODE_GAP_Y },
-      data: {
-        label: slug,
-        subtitle: String(env.status || 'unknown'),
-        kind: env.status === 'healthy' ? 'action' : 'condition',
-        meta: {
-          latency: String(env.averageLatency || env.lastLatency || '—'),
-          lastChecked: env.lastChecked ? String(env.lastChecked) : '—',
-        },
-      },
-    });
-  });
-
-  if (envs.length === 0) {
+  if (envItems.length === 0) {
     nodes.push({
       id: 'envs',
       type: 'flowStep',
-      position: { x: 120, y: 320 },
+      position: { x: centerX, y: yEnvs },
       data: { label: 'Environments', subtitle: 'No env status yet', kind: 'router' },
+    });
+  } else {
+    envItems.forEach((item, index) => {
+      const row = Math.floor(index / ENV_NODES_PER_ROW);
+      const col = index % ENV_NODES_PER_ROW;
+      const itemsInRow = Math.min(
+        ENV_NODES_PER_ROW,
+        envItems.length - row * ENV_NODES_PER_ROW,
+      );
+      const rowWidth = Math.max(itemsInRow - 1, 0) * NODE_GAP_X;
+      const rowOffsetX = (envRowWidth - rowWidth) / 2;
+
+      nodes.push({
+        id: item.id,
+        type: 'flowStep',
+        position: {
+          x: LAYOUT_ORIGIN_X + rowOffsetX + col * NODE_GAP_X,
+          y: yEnvs + row * NODE_GAP_Y,
+        },
+        data: item.data,
+      });
     });
   }
 
@@ -254,36 +386,25 @@ export function fallbackToFlow(fallback: Record<string, unknown>) {
     };
   });
 
-  const nodes: Node<FlowStepNodeData>[] = [
-    {
+  const nodes = layoutRouterFanOut({
+    start: {
       id: startId,
-      type: 'flowStep',
-      position: { x: 200, y: 60 },
       data: { label: 'Request', subtitle: String(fallback.tag || 'fallback'), kind: 'start' },
     },
-    {
+    router: {
       id: routerId,
-      type: 'flowStep',
-      position: { x: 200, y: 180 },
       data: {
         label: String(fallback.name || 'Fallback chain'),
         subtitle: `${options.length} provider(s)`,
         kind: 'router',
       },
     },
-    ...providerNodes.map((node, index) => ({
-      id: node.id,
-      type: 'flowStep' as const,
-      position: { x: 80 + index * NODE_GAP_X, y: 320 },
-      data: node.data,
-    })),
-    {
+    providers: providerNodes.map((node) => ({ id: node.id, data: node.data })),
+    end: {
       id: endId,
-      type: 'flowStep',
-      position: { x: 200, y: 460 },
       data: { label: 'Response', subtitle: 'Uniform output', kind: 'end' },
     },
-  ];
+  });
 
   const edges: Edge[] = [
     { id: 'e-req-router', source: startId, target: routerId, animated: true },
@@ -330,39 +451,25 @@ export function quotaToFlow(quota: Record<string, unknown>) {
     };
   });
 
-  const spread = Math.max(providerNodes.length - 1, 0) * NODE_GAP_X;
-  const centerX = 120 + spread / 2;
-
-  const nodes: Node<FlowStepNodeData>[] = [
-    {
+  const nodes = layoutRouterFanOut({
+    start: {
       id: startId,
-      type: 'flowStep',
-      position: { x: centerX, y: 60 },
       data: { label: 'Request', subtitle: String(quota.tag || 'quota'), kind: 'start' },
     },
-    {
+    router: {
       id: routerId,
-      type: 'flowStep',
-      position: { x: centerX, y: 180 },
       data: {
         label: String(quota.name || 'Quota router'),
         subtitle: 'Weighted distribution',
         kind: 'router',
       },
     },
-    ...providerNodes.map((node, index) => ({
-      id: node.id,
-      type: 'flowStep' as const,
-      position: { x: 80 + index * NODE_GAP_X, y: 320 },
-      data: node.data,
-    })),
-    {
+    providers: providerNodes.map((node) => ({ id: node.id, data: node.data })),
+    end: {
       id: endId,
-      type: 'flowStep',
-      position: { x: centerX, y: 460 },
       data: { label: 'Response', subtitle: 'Mapped output', kind: 'end' },
     },
-  ];
+  });
 
   const edges: Edge[] = [
     { id: 'e-req-router', source: startId, target: routerId, animated: true },

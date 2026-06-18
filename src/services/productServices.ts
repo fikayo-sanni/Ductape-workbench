@@ -79,11 +79,24 @@ const fetchProductApps = async (data: {
   return response.data;
 };
 
+const deleteProduct = async (data: {
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+  product_id: string;
+}): Promise<void> => {
+  const { workspace_id, user_id, product_id, public_key } = data;
+  await apiClient.delete(`/integrations/v1/${product_id}`, {
+    params: { public_key, user_id, workspace_id },
+  });
+};
+
 const productServices = {
   fetchProducts,
   fetchProduct,
   createProduct,
   fetchProductApps,
+  deleteProduct,
 };
 
 export default productServices;

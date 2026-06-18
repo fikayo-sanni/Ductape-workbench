@@ -138,16 +138,19 @@ export default function FallbackExplorerTab({
 
   const handleViewFallback = (fallback: ProductFallback) => {
     openTab({
-      id: `fallback-flow-${fallback.tag}`,
-      type: 'resilience-flow',
+      id: `fallback-${fallback.tag}`,
+      type: 'fallback',
       title: fallback.name,
       itemId: fallback.tag,
       data: {
-        kind: 'fallback',
-        component: fallback,
-        productTag: product.tag,
+        ...fallback,
+        name: fallback.name,
+        tag: fallback.tag,
+        componentType: 'fallback',
         productName: product.name,
-        productEnvs: product.envs || [],
+        productTag: product.tag,
+        productLogo: product.logo,
+        productEnvironments: product.envs || [],
       },
     });
   };

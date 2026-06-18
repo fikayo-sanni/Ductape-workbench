@@ -21,6 +21,7 @@ import {
   syncCloudConnectionAfterMutation,
   type CloudConnectionQueryRecord,
 } from '@/components/cloud/cloudConnection.constants';
+import { useAuth } from '@/store/useAuth';
 
 type CustomRow = { cidr: string; label: string };
 
@@ -52,6 +53,7 @@ export default function ManagedDatabaseNetworkingPanel({
   if (!isManagedDatabaseProvider(provider)) return null;
 
   const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useAuth();
   const cloudRef = cloudConnectionRef(connection);
   const isActive = isCloudConnectionActive(connection.status);
   const guide = CLOUD_PROVIDER_GUIDES[provider as CloudProvider];
@@ -112,7 +114,7 @@ export default function ManagedDatabaseNetworkingPanel({
       return sdkProxy.cloud.connections.updateManagedNetworking(cloudRef, buildPayload());
     },
     onSuccess: (updated: CloudConnectionQueryRecord) => {
-      syncCloudConnectionAfterMutation(queryClient, connection, updated);
+      syncCloudConnectionAfterMutation(queryClient, currentWorkspaceId, connection, updated);
       const meta = updated.metadata?.networking as { synced_ips?: string[] } | undefined;
       const added = meta?.synced_ips?.length ?? 0;
       if (provider === 'mongodb_atlas') {

@@ -221,6 +221,10 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   // Tab Actions
   openTab: (tab) =>
     set((state) => {
+      const tabType = tab.type as string;
+      if (tabType === 'workflow-builder' || tabType === 'resilience-flow') {
+        return state;
+      }
       // Check if tab already exists by:
       // 1. Static ID (for singleton tabs like 'partnership-search')
       // 2. itemId and type (for content tabs with data)

@@ -26,6 +26,11 @@ import {
 } from '@/components/ui/table';
 import type { SDKProxyService } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/store/useAuth';
+import {
+  cloudConnectionResourcesQueryKey,
+  cloudConnectionsQueryKey,
+} from '@/utils/cloudConnectionQueryKeys';
 import {
   SERVICES_BY_PROVIDER,
   type CloudProvider,
@@ -123,6 +128,7 @@ export default function CloudConnectionResourcesPanel({
   connection,
   variant = 'card',
 }: CloudConnectionResourcesPanelProps) {
+  const { currentWorkspaceId } = useAuth();
   const provider = (connection.provider || 'aws') as CloudProvider;
   const cloudRef = cloudConnectionRef(connection);
   const isActive = isCloudConnectionActive(connection.status);
@@ -155,7 +161,7 @@ export default function CloudConnectionResourcesPanel({
     availableServices.find((s) => s.service === activeService)?.label || activeService;
 
   const { data, isFetching, refetch, isError, error, isSuccess } = useQuery({
-    queryKey: ['cloud-connection-resources', cloudRef, activeService, region],
+    queryKey: cloudConnectionResourcesQueryKey(currentWorkspaceId, cloudRef, activeService, region),
     queryFn: async () => {
       const res = await sdkProxy.cloud.resources.list({
         cloud: cloudRef,

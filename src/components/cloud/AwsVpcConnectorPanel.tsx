@@ -18,6 +18,7 @@ import { buildCustomerRoleVpcConnectorPolicy } from '@/components/cloud/awsIamUs
 import { getVpcConnectorConfig } from '@/components/cloud/awsVpcConnector';
 import type { SDKProxyService } from '@/services/sdkProxy';
 import { cloudConnectionRef, isCloudConnectionActive } from '@/components/cloud/cloudConnection.constants';
+import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
 import { resolveWorkbenchApiHostname } from '@/utils/cloudApiHost';
 
 export interface AwsVpcConnectorPanelProps {
@@ -119,7 +120,7 @@ export default function AwsVpcConnectorPanel({
       const token = result?.vpc_connector?.enrollment_token;
       if (token) setEnrollmentToken(token);
       toast.success('VPC connector ready — deploy the agent below');
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(workspaceId) });
       void refetchStatus();
     },
     onError: (error: Error) => toast.error(error.message || 'Failed to save VPC connector'),

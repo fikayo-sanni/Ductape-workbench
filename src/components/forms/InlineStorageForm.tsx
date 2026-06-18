@@ -11,6 +11,7 @@ import { useAuth } from '@/store/useAuth';
 import { useSDKProxy } from '@/services/sdkProxy';
 import { cn } from '@/lib/utils';
 import CloudLinkPanel from '@/components/cloud/CloudLinkPanel';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 import { isSecretRef, getStorageBucketName, mergeStorageEnvFromDraft, shouldHideManualCloudCredentials } from '@/utils/cloudDraftMerge';
 
 interface InlineStorageFormProps {
@@ -373,6 +374,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6 pb-24">
+        <OverageLimitBanner assetType="storage" />
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -465,7 +467,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
               {envConfigs.map((env, index) => {
                 const useCloudLink = showCloudLinkPanel(sdkProxy, formData.tag, env.type);
                 const cloudLinked = isStorageEnvCloudLinked(env);
-                const hideManualCredentials = shouldHideManualCloudCredentials(env, useCloudLink);
+                const hideManualCredentials = shouldHideManualCloudCredentials(env);
 
                 return (
                 <div key={env.slug} className="p-4 bg-grey-100 rounded-lg space-y-4">

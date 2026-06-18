@@ -2,10 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/ductape-icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%ductape-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ductape</title>
-    <link rel="stylesheet" href="/boot-loader.css" />
+    <style>
+      html.light {
+        --primary: 8, 70, 166;
+        --background-tertiary: 245, 245, 245;
+        --border: 212, 212, 212;
+        --text-secondary: 143, 146, 161;
+        --radius: 0.5rem;
+      }
+
+      html.dark {
+        --primary: 59, 130, 246;
+        --background-tertiary: 24, 30, 42;
+        --border: 55, 65, 81;
+        --text-secondary: 156, 163, 175;
+        --radius: 0.5rem;
+      }
+
+      body.boot-loading {
+        overflow: hidden;
+      }
+
+      body.boot-loading #root {
+        visibility: hidden;
+      }
+
+      .boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        background: rgb(var(--background-tertiary));
+        transition: opacity 0.45s ease, visibility 0.45s ease;
+      }
+
+      .boot-loader--out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .boot-loader-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .boot-loader-brand img,
+      .boot-loader-brand svg {
+        width: 2rem;
+        height: 2rem;
+        flex-shrink: 0;
+      }
+
+      .boot-loader-wordmark {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: rgb(var(--primary));
+        line-height: 1;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .boot-loader-beta {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.15rem 0.45rem;
+        border-radius: var(--radius, 0.375rem);
+        background: rgba(var(--primary), 0.1);
+        color: rgb(var(--primary));
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .boot-loader-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: rgb(var(--text-secondary));
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .boot-spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgb(var(--border));
+        border-top-color: rgb(var(--primary));
+        border-radius: 50%;
+        animation: boot-spin 0.7s linear infinite;
+      }
+
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
     <script>
       (function () {
         var theme = 'light';
@@ -33,7 +133,7 @@
       aria-busy="true"
     >
       <div class="boot-loader-brand">
-        <img src="/ductape-icon.svg" alt="" width="32" height="32" />
+        <img src="%BASE_URL%ductape-icon.svg" alt="" width="32" height="32" />
         <span class="boot-loader-wordmark">Ductape</span>
         <span class="boot-loader-beta">Beta</span>
       </div>
@@ -43,7 +143,49 @@
       </div>
     </div>
     <div id="root"></div>
-    <script src="/boot-loader.js"></script>
+    <script>
+      (function () {
+        var MIN_MS = 2000;
+        var MAX_MS = 4000;
+        var delay = MIN_MS + Math.random() * (MAX_MS - MIN_MS);
+        var started = Date.now();
+        var loader = document.getElementById('boot-loader');
+        var body = document.body;
+
+        var messages = [
+          'Loading workbench…',
+          'Preparing workspace…',
+          'Wiring environments…',
+        ];
+        var msgEl = document.getElementById('boot-loader-text');
+        if (msgEl) {
+          msgEl.textContent = messages[Math.floor(Math.random() * messages.length)];
+        }
+
+        function dismiss() {
+          if (!loader || !body) return;
+          loader.classList.add('boot-loader--out');
+          body.classList.remove('boot-loading');
+          window.setTimeout(function () {
+            if (loader.parentNode) loader.parentNode.removeChild(loader);
+          }, 500);
+        }
+
+        function scheduleDismiss() {
+          var elapsed = Date.now() - started;
+          var wait = Math.max(0, delay - elapsed);
+          window.setTimeout(dismiss, wait);
+        }
+
+        if (document.readyState === 'complete') {
+          scheduleDismiss();
+        } else {
+          window.addEventListener('load', scheduleDismiss);
+        }
+
+        window.__ductapeDismissBootLoader = dismiss;
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

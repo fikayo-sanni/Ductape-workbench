@@ -19,6 +19,7 @@ import {
   syncCloudConnectionAfterMutation,
   type CloudConnectionQueryRecord,
 } from '@/components/cloud/cloudConnection.constants';
+import { useAuth } from '@/store/useAuth';
 import {
   isLocalDevApiHost,
   resolveApiHostAddresses,
@@ -52,6 +53,7 @@ export default function AwsManagedNetworkingPanel({
   sdkProxy,
 }: AwsManagedNetworkingPanelProps) {
   const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useAuth();
   const cloudRef = cloudConnectionRef(connection);
   const isActive = isCloudConnectionActive(connection.status);
   const apiHostname = useMemo(() => resolveWorkbenchApiHostname(), []);
@@ -129,7 +131,7 @@ export default function AwsManagedNetworkingPanel({
       return sdkProxy.cloud.connections.updateManagedNetworking(cloudRef, buildPayload());
     },
     onSuccess: (updated: CloudConnectionQueryRecord) => {
-      syncCloudConnectionAfterMutation(queryClient, connection, updated);
+      syncCloudConnectionAfterMutation(queryClient, currentWorkspaceId, connection, updated);
       toast.success(
         getCloudManagedNetworking(updated.metadata).managed_security_group?.groupId
           ? 'IP allowlist updated'

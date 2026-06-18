@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Cloud, Loader2, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ import {
 } from '@/components/cloud/cloudConnection.constants';
 import type { CloudProvider } from '@/components/cloud/cloudConnection.constants';
 import NewCloudConnectionModal from './modals/NewCloudConnectionModal';
+import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
 
 const PROVIDER_LABELS: Record<string, string> = {
   aws: 'AWS',
@@ -60,14 +61,20 @@ export default function CloudSidebar() {
   const sdkProxy = useSDKProxy(proxyConfig);
 
   const { data: connections = [], isLoading } = useQuery({
-    queryKey: ['cloud-connections', currentWorkspaceId],
+    queryKey: cloudConnectionsQueryKey(currentWorkspaceId),
     queryFn: async () => {
       if (!sdkProxy) return [];
       const res = await sdkProxy.cloud.connections.list();
       return Array.isArray(res) ? res : [];
     },
-    enabled: Boolean(sdkProxy),
+    enabled: Boolean(sdkProxy && currentWorkspaceId),
+    staleTime: 0,
   });
+
+  useEffect(() => {
+    setSelectedConnectionId(null);
+    setSearchQuery('');
+  }, [currentWorkspaceId]);
 
   const filtered = connections.filter(
     (c: { display_name?: string; provider?: string; tag?: string }) => {

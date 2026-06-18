@@ -33,6 +33,7 @@ import {
   Activity,
   Home,
   FileText,
+  Trash2,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {useWorkbenchStore} from '@/stores/workbench-store';
@@ -52,13 +53,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {useQuery, useMutation} from '@tanstack/react-query';
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import {MarkdownViewer} from '@/components/ui/markdown-editor';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
+import DeleteProductModal from '@/components/modals/DeleteProductModal';
 import appServicesReal from '@/services/appServicesReal';
 import toast from 'react-hot-toast';
 import InlineDatabaseForm from '@/components/forms/InlineDatabaseForm';
@@ -212,8 +214,9 @@ export default function ProductTabContent({
   product: initialProduct,
   productId,
 }: ProductTabContentProps) {
-  const {openTab, updateTab} = useWorkbenchStore();
+  const {openTab, updateTab, closeTab} = useWorkbenchStore();
   const {user, currentWorkspaceId} = useAuth();
+  const queryClient = useQueryClient();
   const hasRestoredStateRef = useRef(false);
 
   // Load persisted state from tab state manager
@@ -233,6 +236,7 @@ export default function ProductTabContent({
   const persistedState = getPersistedState();
 
   const [showAddAppModal, setShowAddAppModal] = useState(false);
+  const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
   const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
   const [selectedEnvironment, setSelectedEnvironment] = useState<any>(null);
@@ -406,6 +410,26 @@ export default function ProductTabContent({
       ),
     }));
   }, [productAppsRes?.data, product?.apps]);
+
+  const deleteProductMutation = useMutation({
+    mutationFn: () =>
+      productServices.deleteProduct({
+        workspace_id: currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+        product_id: String(product?._id),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products', currentWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      toast.success('Product deleted');
+      setShowDeleteProductModal(false);
+      closeTab(tabId);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete product');
+    },
+  });
 
   // Update tab with fetched data (use tabId — inactive tabs stay mounted)
   useEffect(() => {
@@ -653,37 +677,60 @@ export default function ProductTabContent({
   };
 
   const handleOpenComponent = (component: any, type: string) => {
-    // Workflows: card click opens flow diagram / builder (env chips open explorer)
+    const defaultEnv = product?.envs?.[0] ?? { slug: 'prd', name: 'Production' };
+
+    // Workflows: card click opens explorer (env chips open scoped explorer)
     if (type === 'workflow') {
       openTab({
-        id: `workflow-builder-${component.tag}`,
-        type: 'workflow-builder',
-        title: component.name || component.tag || 'Workflow',
-        itemId: component.tag,
+        id: `workflow-explorer-${component.tag}-${defaultEnv.slug}`,
+        type: 'workflow',
+        title: `${component.name || component.tag} (${defaultEnv.slug})`,
+        itemId: `${component.tag}-${defaultEnv.slug}`,
         data: {
-          workflow: component,
-          productTag: product?.tag,
-          productName: product?.name,
-          productId: product?._id,
-          productEnvs: product?.envs || [],
+          product: {
+            tag: product?.tag,
+            name: product?.name,
+            logo: product?.logo,
+            envs: product?.envs || [],
+          },
+          workflow: {
+            ...component,
+            name: component.name,
+            tag: component.tag,
+            productTag: product?.tag,
+            env: { slug: defaultEnv.slug },
+          },
+          isExplorer: true,
         },
       });
       return;
     }
 
-    // Resilience: card click opens flow diagram (env chips open scoped activity explorer)
+    // Resilience: card click opens scoped explorer (env chips open activity explorer)
     if (type === 'healthcheck' || type === 'fallback' || type === 'quota') {
+      const explorerType =
+        type === 'healthcheck'
+          ? 'healthcheck-explorer'
+          : type === 'fallback'
+            ? 'fallback-explorer'
+            : 'quota-explorer';
       openTab({
-        id: `${type}-flow-${component.tag}`,
-        type: 'resilience-flow',
-        title: component.name || component.tag,
-        itemId: component.tag,
+        id: `${type}-explorer-${component.tag}-${defaultEnv.slug}`,
+        type: explorerType,
+        title: `${component.name || component.tag} (${defaultEnv.slug})`,
+        itemId: `${component.tag}-${defaultEnv.slug}`,
         data: {
-          kind: type,
-          component,
-          productTag: product?.tag,
-          productName: product?.name,
-          productEnvs: product?.envs || [],
+          product: {
+            tag: product?.tag,
+            name: product?.name,
+            logo: product?.logo,
+            envs: product?.envs || [],
+          },
+          [type]: component,
+          env: defaultEnv,
+          selectedEnv: defaultEnv,
+          scopedToComponent: true,
+          isExplorer: true,
         },
       });
       return;
@@ -2443,6 +2490,22 @@ export default function ProductTabContent({
               </div>
             </div>
           </div>
+
+          {/* Danger zone */}
+          <div className="bg-white rounded-lg border border-red-200 p-4 sm:p-6 shadow-sm">
+            <h2 className="text-base sm:text-lg font-semibold text-red-600 mb-2">Danger zone</h2>
+            <p className="text-xs sm:text-sm text-grey-600 mb-4">
+              Permanently delete this product and all of its resources. This cannot be undone.
+            </p>
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 gap-2"
+              onClick={() => setShowDeleteProductModal(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete product
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -2938,6 +3001,14 @@ export default function ProductTabContent({
         onSuccess={() => {
           setSelectedEnvironment(null);
         }}
+      />
+      <DeleteProductModal
+        open={showDeleteProductModal}
+        onOpenChange={setShowDeleteProductModal}
+        productName={product?.name || ''}
+        productTag={product?.tag}
+        isDeleting={deleteProductMutation.isPending}
+        onConfirm={() => deleteProductMutation.mutate()}
       />
       {/* Database Type Selection Dialog */}
       {/* Database Type Selection Dialog - Responsive */}

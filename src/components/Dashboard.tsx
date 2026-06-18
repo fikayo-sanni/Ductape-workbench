@@ -205,7 +205,7 @@ export default function Dashboard() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="bg-grey-100 p-4 sm:p-6 w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-grey-100 p-4 sm:p-6 w-full">
         <div className="max-w-7xl mx-auto flex items-center justify-center py-16">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
@@ -221,7 +221,7 @@ export default function Dashboard() {
   // Show error state
   if (error || !dashboardData) {
     return (
-      <div className="bg-grey-100 p-4 sm:p-6 w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-grey-100 p-4 sm:p-6 w-full">
         <div className="max-w-7xl mx-auto flex items-center justify-center py-16">
           <div className="text-center">
             <AlertTriangle className="h-8 w-8 mx-auto text-red mb-4" />
@@ -238,7 +238,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="bg-grey-100 w-full p-3 sm:p-4 md:p-6 pb-10">
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-grey-100 w-full p-3 sm:p-4 md:p-6 pb-10">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">

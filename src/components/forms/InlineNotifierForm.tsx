@@ -21,6 +21,7 @@ import { useAuth } from '@/store/useAuth';
 import { cn } from '@/lib/utils';
 import { Notifiers } from '@ductape/sdk/dist/types/enums';
 import { z } from 'zod';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 
 interface InlineNotifierFormProps {
   product: {
@@ -394,6 +395,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <OverageLimitBanner assetType="notifier" />
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3">

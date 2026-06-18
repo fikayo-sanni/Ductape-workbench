@@ -136,16 +136,19 @@ export default function QuotaExplorerTab({
 
   const handleViewQuota = (quota: ProductQuota) => {
     openTab({
-      id: `quota-flow-${quota.tag}`,
-      type: 'resilience-flow',
+      id: `quota-${quota.tag}`,
+      type: 'quota',
       title: quota.name,
       itemId: quota.tag,
       data: {
-        kind: 'quota',
-        component: quota,
-        productTag: product.tag,
+        ...quota,
+        name: quota.name,
+        tag: quota.tag,
+        componentType: 'quota',
         productName: product.name,
-        productEnvs: product.envs || [],
+        productTag: product.tag,
+        productLogo: product.logo,
+        productEnvironments: product.envs || [],
       },
     });
   };

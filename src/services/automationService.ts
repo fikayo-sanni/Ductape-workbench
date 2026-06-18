@@ -466,18 +466,6 @@ export class AutomationService {
         availableActions: ['runWorkflow', 'configureWorkflow'],
         formIds: ['workflow-form'],
       },
-      'workflow-builder': {
-        canInspectForms: true,
-        canFillForms: true,
-        canTriggerActions: true,
-        availableActions: ['configureWorkflow'],
-        formIds: ['workflow-builder'],
-      },
-      'resilience-flow': {
-        canInspectForms: false,
-        canFillForms: false,
-        canTriggerActions: false,
-      },
       'workflow-run': {
         canInspectForms: false,
         canFillForms: false,
@@ -897,8 +885,6 @@ export class AutomationService {
       'session-user': 'Session User',
       'healthcheck-explorer': 'Health Check Explorer',
       workflow: 'Workflow',
-      'workflow-builder': 'Workflow Builder',
-      'resilience-flow': 'Resilience Flow',
       'workflow-run': 'Workflow Run',
       agent: 'Agent',
       'agent-run': 'Agent Run',

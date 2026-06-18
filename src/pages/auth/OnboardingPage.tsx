@@ -239,15 +239,16 @@ function OnboardingFlow() {
     }) => workspaceServices.createWorkspace(data),
     onSuccess: (response) => {
       const created = response?.data;
-      if (!created?._id) {
+      if (!created?._id && !created?.workspace_id) {
         toast.error('Failed to create workspace');
         return;
       }
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['onboarding-workspace'] });
       markOnboardingWorkspaceLocked();
-      setWorkspaceId(created._id);
-      setCurrentWorkspaceId(created._id);
+      const newWorkspaceId = created.workspace_id || created._id;
+      setWorkspaceId(newWorkspaceId);
+      setCurrentWorkspaceId(newWorkspaceId);
       toast.success('Workspace created!');
       setStep('plan');
     },

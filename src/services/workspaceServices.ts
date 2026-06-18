@@ -4,6 +4,7 @@ import {
   WorkspaceMembersResponse,
   ActionResponse
 } from '@/types/workspace';
+import type { AssetLimitsResponse } from '@/types/asset-limits';
 
 export interface Workspace {
   _id: string;
@@ -330,6 +331,19 @@ const respondToInvite = async (data: {
   return body;
 };
 
+const fetchAssetLimits = async (data: {
+  user_id: string;
+  public_key: string;
+  workspace_id: string;
+}): Promise<AssetLimitsResponse> => {
+  const { user_id, public_key, workspace_id } = data;
+  const response = await apiClient.get<AssetLimitsResponse>(
+    `/workspaces/v1/billing/asset-limits/${workspace_id}`,
+    { params: { user_id, public_key } },
+  );
+  return response.data;
+};
+
 const workspaceServices = {
   fetchWorkspaces,
   fetchWorkspaceById,
@@ -344,6 +358,7 @@ const workspaceServices = {
   updateWorkspaceEnvs,
   fetchDashboardData,
   respondToInvite,
+  fetchAssetLimits,
 };
 
 export default workspaceServices;

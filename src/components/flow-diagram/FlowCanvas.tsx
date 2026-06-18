@@ -90,10 +90,11 @@ function FlowCanvasInner({
         nodesDraggable={editable}
         nodesConnectable={editable}
         elementsSelectable={editable}
+        defaultEdgeOptions={{ type: 'smoothstep' }}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.35, minZoom: 0.5, maxZoom: 1 }}
         proOptions={proOptions}
-        minZoom={0.4}
+        minZoom={0.35}
         maxZoom={1.5}
       >
         <Background gap={16} size={1} color="#e5e7eb" />

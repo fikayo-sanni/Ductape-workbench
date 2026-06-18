@@ -27,6 +27,7 @@ import { CLOUD_PROVIDER_GUIDES, type CloudProvider } from '@/components/cloud/cl
 import { defaultScopesForProvider } from '@/components/cloud/cloudConnection.constants';
 import { cloudTabTitle } from '@/components/cloud/CloudConnectionTagBadge';
 import { tagFromDisplayName } from '@/utils/cloudConnectionTag';
+import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
 
 type Provider = CloudProvider;
 
@@ -99,7 +100,7 @@ export default function NewCloudConnectionModal({
         toast.error('Connection created but no id returned');
         return;
       }
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
       onOpenChange(false);
       openTab({
         id: `cloud-${conn.id}`,

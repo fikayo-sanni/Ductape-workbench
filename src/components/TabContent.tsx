@@ -26,9 +26,7 @@ import NewGraphTabContent from './tabs/NewGraphTabContent';
 import VectorTabContent from './tabs/VectorTabContent';
 import VectorExplorerTab from './tabs/VectorExplorerTab';
 import WorkflowExplorerTab from './tabs/WorkflowExplorerTab';
-import WorkflowBuilderTab from './tabs/WorkflowBuilderTab';
 import WorkflowRunTab from './tabs/WorkflowRunTab';
-import ResilienceFlowTab from './tabs/ResilienceFlowTab';
 import AgentExplorerTab from './tabs/AgentExplorerTab';
 import AgentRunTab from './tabs/AgentRunTab';
 import CacheTabContent from './tabs/CacheTabContent';
@@ -173,6 +171,23 @@ function FeatureTabContent({tab}: {tab: Tab}) {
   );
 }
 
+function UnavailableFeaturePanel({
+  title,
+  message,
+}: {
+  title: string;
+  message: string;
+}) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-grey-50/50 p-8">
+      <div className="text-center max-w-md">
+        <h2 className="text-lg font-semibold text-grey">{title}</h2>
+        <p className="text-sm text-grey-500 mt-2">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function TabContent() {
   const {tabs, activeTabId, activeView} = useWorkbenchStore();
 
@@ -193,6 +208,26 @@ export default function TabContent() {
 
   // Render content for a given tab (keeps all tabs mounted; we hide inactive ones to avoid remount/refetch on switch)
   const renderTabContent = (tab: Tab) => {
+    const legacyTabType = tab.type as string;
+    if (legacyTabType === 'workflow-builder') {
+      return (
+        <UnavailableFeaturePanel
+          key={tab.id}
+          title="Workflow flow builder unavailable"
+          message="The drag-and-drop workflow diagram has been removed. Use the workflow explorer to view runs and configuration."
+        />
+      );
+    }
+    if (legacyTabType === 'resilience-flow') {
+      return (
+        <UnavailableFeaturePanel
+          key={tab.id}
+          title="Resilience flow diagram unavailable"
+          message="The drag-and-drop resilience flow diagram has been removed. Use the quota, fallback, or healthcheck explorer instead."
+        />
+      );
+    }
+
     switch (tab.type) {
       case 'request':
         // Check if this is a new request creation tab (with or without full data after refresh)
@@ -376,31 +411,6 @@ export default function TabContent() {
           return <VectorExplorerTab key={tab.id} vector={tab.data.vector} />;
         }
         return <VectorTabContent key={tab.id} vector={tab.data} />;
-
-      case 'workflow-builder':
-        return (
-          <WorkflowBuilderTab
-            key={tab.id}
-            tabId={tab.id}
-            workflow={tab.data?.workflow || tab.data || {}}
-            productTag={tab.data?.productTag}
-            productName={tab.data?.productName}
-            productId={tab.data?.productId}
-            productEnvs={tab.data?.productEnvs || []}
-          />
-        );
-
-      case 'resilience-flow':
-        return (
-          <ResilienceFlowTab
-            key={tab.id}
-            kind={tab.data?.kind || 'healthcheck'}
-            component={tab.data?.component || {}}
-            productTag={tab.data?.productTag}
-            productName={tab.data?.productName}
-            productEnvs={tab.data?.productEnvs || []}
-          />
-        );
 
       case 'workflow':
         // Check if this is a workflow explorer tab (from ProductTabContent: product + workflow)

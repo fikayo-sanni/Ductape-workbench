@@ -103,6 +103,18 @@ const updateApp = async <T extends Record<string, any>>(data: {
   return response.data;
 };
 
+const deleteApp = async (data: {
+  app_id: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<void> => {
+  const { app_id, workspace_id, user_id, public_key } = data;
+  await apiClient.delete(`/apps/v1/${app_id}`, {
+    params: { workspace_id, user_id, public_key },
+  });
+};
+
 const fetchAppComponents = async (data: {
   app_id: string;
   component_type: string;
@@ -181,6 +193,7 @@ const appServices = {
   fetchWorkspaceApps,
   createApp,
   updateApp,
+  deleteApp,
   fetchAppComponents,
   listReviewFeedback,
   postReviewFeedback,

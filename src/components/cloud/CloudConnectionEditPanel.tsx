@@ -6,10 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { CLOUD_PROVIDER_GUIDES, type CloudProvider } from '@/components/cloud/cloudSetupGuide';
 import type { SDKProxyService } from '@/services/sdkProxy';
 import { cloudConnectionRef } from '@/components/cloud/cloudConnection.constants';
+import {
+  cloudConnectionQueryKey,
+  cloudConnectionsQueryKey,
+} from '@/utils/cloudConnectionQueryKeys';
 
 export interface CloudConnectionEditPanelProps {
   connection: {
@@ -32,6 +37,7 @@ export default function CloudConnectionEditPanel({
   tabId,
 }: CloudConnectionEditPanelProps) {
   const queryClient = useQueryClient();
+  const { currentWorkspaceId } = useAuth();
   const { closeTab } = useWorkbenchStore();
   const cloudRef = cloudConnectionRef(connection);
   const provider = (connection.provider || 'aws') as CloudProvider;
@@ -105,10 +111,14 @@ export default function CloudConnectionEditPanel({
     },
     onSuccess: () => {
       toast.success('Connection updated');
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
-      queryClient.invalidateQueries({ queryKey: ['cloud-connection', cloudRef] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
+      queryClient.invalidateQueries({
+        queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, cloudRef),
+      });
       if (connection.id) {
-        queryClient.invalidateQueries({ queryKey: ['cloud-connection', connection.id] });
+        queryClient.invalidateQueries({
+          queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, connection.id),
+        });
       }
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to update connection'),
@@ -158,10 +168,14 @@ export default function CloudConnectionEditPanel({
           if (targetTabId) closeTab(targetTabId);
         }
       }
-      queryClient.invalidateQueries({ queryKey: ['cloud-connections'] });
-      queryClient.invalidateQueries({ queryKey: ['cloud-connection', cloudRef] });
+      queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
+      queryClient.invalidateQueries({
+        queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, cloudRef),
+      });
       if (connection.id) {
-        queryClient.invalidateQueries({ queryKey: ['cloud-connection', connection.id] });
+        queryClient.invalidateQueries({
+          queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, connection.id),
+        });
       }
       setAzureClientSecret('');
       setServiceAccountJson('');

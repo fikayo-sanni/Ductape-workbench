@@ -10,6 +10,7 @@ import { KeyRound, Save, CheckCircle, Loader2, XCircle, Check, ArrowLeft } from 
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useSDKProxy } from '@/services/sdkProxy';
+import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 import { TokenPeriods } from '@/types';
 
 interface InlineSessionFormProps {
@@ -201,6 +202,7 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <OverageLimitBanner assetType="session" />
         {/* Header with Back Button */}
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3">
