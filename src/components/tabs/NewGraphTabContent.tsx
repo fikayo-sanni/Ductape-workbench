@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import { Share2, Save, ChevronRight, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
@@ -505,11 +506,11 @@ export default function NewGraphTabContent({ tabId, data }: NewGraphTabContentPr
                       {formData.type === 'neptune' && (
                         <div>
                           <Label htmlFor={`region-${index}`} className="text-xs">AWS Region</Label>
-                          <Input
+                          <CloudRegionSelect
+                            provider="aws"
                             id={`region-${index}`}
-                            placeholder="e.g., us-east-1"
                             value={env.region || ''}
-                            onChange={(e) => updateEnvConnection(index, 'region', e.target.value)}
+                            onChange={(value) => updateEnvConnection(index, 'region', value)}
                             className="bg-white mt-1"
                           />
                         </div>

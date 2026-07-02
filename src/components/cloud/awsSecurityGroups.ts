@@ -47,6 +47,7 @@ export function securityGroupsForResourceType(
   return groups.filter((g) => g.resourceTypes.includes(resourceType));
 }
 
+/** RDS covers both engines on one registered security group — list both ports. */
 export function awsVpcInboundPort(service: AwsSecurityGroupResourceType): string {
-  return service === 'neptune' ? '8182' : '5432';
+  return service === 'neptune' ? '8182' : '5432/3306';
 }

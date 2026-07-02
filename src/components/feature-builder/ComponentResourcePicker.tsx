@@ -40,7 +40,6 @@ export function ComponentResourcePicker({
     const list: ResilienceComponentCategory[] = [];
     if (connectedApps.length > 0) list.push('action');
     if (product.databases?.length) list.push('database');
-    if (product.features?.length) list.push('feature');
     if (product.notifications?.length) list.push('notification');
     if (product.storages?.length) list.push('storage');
     if (product.graphs?.length) list.push('graph');
@@ -160,38 +159,6 @@ export function ComponentResourcePicker({
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {category === 'feature' && product.features && (
-        <div>
-          <Label>Select Feature</Label>
-          <Select
-            onValueChange={(id) => {
-              const feature = product.features?.find((f) => f._id === id);
-              if (feature) {
-                emit({
-                  type: 'feature',
-                  name: feature.name,
-                  tag: feature.tag,
-                  event: feature.tag,
-                  retries: 1,
-                  quota: showQuotaField ? 1 : undefined,
-                });
-              }
-            }}
-          >
-            <SelectTrigger className="mt-2">
-              <SelectValue placeholder="Choose a feature..." />
-            </SelectTrigger>
-            <SelectContent>
-              {product.features.map((f) => (
-                <SelectItem key={f._id} value={f._id}>
-                  {f.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       )}
 

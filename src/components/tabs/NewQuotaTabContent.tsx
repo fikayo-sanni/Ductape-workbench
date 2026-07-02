@@ -14,12 +14,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Timer, Save, CheckCircle, Plus, Trash2, Edit2, Database, Zap, Bell, Box, LayoutList } from 'lucide-react';
+import { Timer, Save, CheckCircle, Plus, Trash2, Edit2, Database, Zap, Bell, Box } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
-import { FeatureEventTypes } from '@ductape/sdk/dist/types';
-import { IFeatureInput } from '@ductape/sdk/dist/types';
+import { StepEventTypes } from '@ductape/sdk/dist/types';
+import { IStepInput } from '@ductape/sdk/dist/types';
 import appServicesReal from '@/services/appServicesReal';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 
@@ -30,7 +30,7 @@ interface NewQuotaTabContentProps {
 
 interface QuotaOption {
   id: string;
-  type: FeatureEventTypes;
+  type: StepEventTypes;
   app?: string;
   event: string;
   quota: number;
@@ -52,7 +52,7 @@ interface QuotaBuilderState {
   tag: string;
 
   // Step 2: Quota Inputs
-  quotaInputs: Record<string, IFeatureInput>;
+  quotaInputs: Record<string, IStepInput>;
 
   // Step 3: Shared Output Schema (same for all options)
   sharedOutputSchema: Record<string, string>;
@@ -92,7 +92,6 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     envs: data.productEnvs || [],
     workspace_id: data.workspaceId || currentWorkspaceId,
     apps: data.productApps || [],
-    features: data.productFeatures || [],
     databases: data.productDatabases || [],
     caches: data.productCaches || [],
     storages: data.productStorages || [],
@@ -192,7 +191,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
       return;
     }
 
-    const newInput: IFeatureInput = {
+    const newInput: IStepInput = {
       type: newInputType as any,
       minlength: newInputMinLength,
       maxlength: newInputMaxLength,
@@ -265,7 +264,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
   };
 
   // Add Option
-  const handleAddOption = (type: FeatureEventTypes, selectedItem?: any) => {
+  const handleAddOption = (type: StepEventTypes, selectedItem?: any) => {
     const newOption: QuotaOption = {
       id: `option_${Date.now()}`,
       type,
@@ -279,13 +278,11 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
       category: selectedComponentType,
     };
 
-    if (type === FeatureEventTypes.ACTION && selectedItem) {
+    if (type === StepEventTypes.ACTION && selectedItem) {
       newOption.app = selectedItem.app;
       newOption.action = selectedItem;
-    } else if (type === FeatureEventTypes.DB_ACTION && selectedItem) {
+    } else if (type === StepEventTypes.DB_ACTION && selectedItem) {
       newOption.database = selectedItem._id;
-    } else if (type === FeatureEventTypes.FEATURE && selectedItem) {
-      newOption.event = selectedItem.tag;
     }
 
     setState(prev => ({
@@ -493,7 +490,6 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
     switch (type) {
       case 'action': return <Zap className="h-4 w-4" />;
       case 'database': return <Database className="h-4 w-4" />;
-      case 'feature': return <LayoutList className="h-4 w-4" />;
       case 'notification': return <Bell className="h-4 w-4" />;
       case 'storage': return <Box className="h-4 w-4" />;
       default: return <Zap className="h-4 w-4" />;
@@ -863,16 +859,6 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                     <span className="text-xs">Actions</span>
                   </Button>
                 )}
-                {product?.features && product.features.length > 0 && (
-                  <Button
-                    variant={selectedComponentType === 'feature' ? 'default' : 'outline'}
-                    onClick={() => setSelectedComponentType('feature')}
-                    className="flex flex-col h-auto py-3 gap-1"
-                  >
-                    <LayoutList className="h-5 w-5" />
-                    <span className="text-xs">Features</span>
-                  </Button>
-                )}
                 {product?.databases && product.databases.length > 0 && (
                   <Button
                     variant={selectedComponentType === 'database' ? 'default' : 'outline'}
@@ -965,7 +951,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                                   key={action._id}
                                   className="p-3 hover:bg-grey-100 cursor-pointer border-b last:border-b-0"
                                   onClick={() => {
-                                    handleAddOption(FeatureEventTypes.ACTION, {
+                                    handleAddOption(StepEventTypes.ACTION, {
                                       name: action.name,
                                       tag: action.tag,
                                       app: selectedApp.app_tag || selectedApp.tag,
@@ -1023,7 +1009,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                         value={databaseActionType}
                         onValueChange={(value) => {
                           setDatabaseActionType(value);
-                          handleAddOption(FeatureEventTypes.DB_ACTION, {
+                          handleAddOption(StepEventTypes.DB_ACTION, {
                             name: `${selectedDatabase.name} - ${value}`,
                             tag: `${selectedDatabase.tag}:${value}`,
                             _id: selectedDatabase._id,
@@ -1050,30 +1036,6 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                 </div>
               )}
 
-              {/* Feature Selection */}
-              {selectedComponentType === 'feature' && product?.features && (
-                <div className="space-y-2">
-                  <Label>Select Feature</Label>
-                  <Select onValueChange={(value) => {
-                    const feature = product.features.find((f: any) => f._id === value);
-                    if (feature) {
-                      handleAddOption(FeatureEventTypes.FEATURE, feature);
-                    }
-                  }}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Choose a feature..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {product.features.map((feature: any) => (
-                        <SelectItem key={feature._id} value={feature._id}>
-                          {feature.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               {/* Notification, Storage options - simplified for now */}
               {selectedComponentType === 'notification' && product?.notifications && (
                 <div className="space-y-2">
@@ -1081,7 +1043,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                   <Select onValueChange={(value) => {
                     const notification = product.notifications.find((n: any) => n._id === value);
                     if (notification) {
-                      handleAddOption(FeatureEventTypes.NOTIFICATION, notification);
+                      handleAddOption(StepEventTypes.NOTIFICATION, notification);
                     }
                   }}>
                     <SelectTrigger className="mt-2">
@@ -1104,7 +1066,7 @@ export default function NewQuotaTabContent({ tabId, data }: NewQuotaTabContentPr
                   <Select onValueChange={(value) => {
                     const storage = product.storages.find((s: any) => s._id === value);
                     if (storage) {
-                      handleAddOption(FeatureEventTypes.STORAGE, storage);
+                      handleAddOption(StepEventTypes.STORAGE, storage);
                     }
                   }}>
                     <SelectTrigger className="mt-2">

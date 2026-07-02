@@ -3,7 +3,7 @@
  * Unified frontend service that proxies ALL SDK operations through the secure backend endpoint
  *
  * This provides a single interface for all SDK module operations:
- * - product, app, sessions, features, notifications, storage, caches, jobs, etc.
+ * - product, app, sessions, notifications, storage, caches, jobs, etc.
  *
  * All requests are encrypted using the product's public_key before transmission.
  * This ensures SDK operations are not visible in browser network logs.
@@ -54,7 +54,6 @@ export type SDKModule =
   | 'sessions'
   | 'quotas'
   | 'actions'
-  | 'features'
   | 'jobs'
   | 'logs'
   | 'resilience'
@@ -561,23 +560,6 @@ export class SDKProxyService {
       this.execute<T>('jobs', 'getHistory', jobId, options),
     getStats: <T = any>(options?: any) => this.execute<T>('jobs', 'getStats', options),
     setWebhook: <T = any>(config: any) => this.execute<T>('jobs', 'setWebhook', config),
-  };
-
-  // ==================== FEATURES MODULE ====================
-  features = {
-    create: <T = any>(product: string, data: any) =>
-      this.execute<T>('features', 'create', product, data),
-    list: <T = any>(product: string) => this.execute<T>('features', 'list', product),
-    fetch: <T = any>(product: string, tag: string) =>
-      this.execute<T>('features', 'fetch', product, tag),
-    update: <T = any>(product: string, tag: string, data: any) =>
-      this.execute<T>('features', 'update', product, tag, data),
-    delete: <T = any>(product: string, tag: string) =>
-      this.execute<T>('features', 'delete', product, tag),
-
-    isEnabled: (data: any) => this.execute<boolean>('features', 'isEnabled', data),
-    dispatch: <T = any>(data: any) => this.execute<T>('features', 'dispatch', data),
-    run: <T = any>(data: any) => this.execute<T>('features', 'run', data),
   };
 
   // ==================== ACTIONS MODULE ====================

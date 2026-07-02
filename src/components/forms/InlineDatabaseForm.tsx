@@ -630,7 +630,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 const showCloudLink =
                   Boolean(sdkProxy && formData.tag) &&
                   ((databaseType === 'database' &&
-                    (formData.type === 'postgresql' || formData.type === 'mongodb')) ||
+                    (formData.type === 'postgresql' ||
+                      formData.type === 'mysql' ||
+                      formData.type === 'mongodb')) ||
                     databaseType === 'graph' ||
                     databaseType === 'vector');
                 const hideManualCredentials = shouldHideManualCloudCredentials(env);
@@ -653,6 +655,11 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                             : databaseType === 'graph'
                               ? 'graphs'
                               : 'databases'
+                        }
+                        databaseEngine={
+                          databaseType === 'database'
+                            ? (formData.type as 'postgresql' | 'mysql' | 'mongodb')
+                            : undefined
                         }
                         envSlug={env.slug}
                         onDraftApplied={(draft) => {

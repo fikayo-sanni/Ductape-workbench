@@ -8,8 +8,10 @@ import { Cloud, Loader2, Link2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { SDKProxyService } from '@/services/sdkProxy';
 import AwsProvisionNetworkingSection from '@/components/cloud/AwsProvisionNetworkingSection';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import { resolveAwsProvisionNetworkingUi } from '@/components/cloud/awsProvisionNetworking';
 import { isCloudConnectionActive } from '@/components/cloud/cloudConnection.constants';
+import { getCloudRegionOptions, type CloudRegionProvider } from '@/utils/cloudRegions';
 import {
   mergeBrokerEnvFromDraft,
   mergeDatabaseEnvFromDraft,
@@ -31,6 +33,8 @@ interface CloudLinkPanelProps {
   componentType: CloudComponentKind;
   envSlug: string;
   storageProvider?: 'aws' | 'azure' | 'gcp';
+  /** Narrows cloud connections for `componentType: 'databases'` — mongodb_atlas only supports 'mongodb'. */
+  databaseEngine?: 'postgresql' | 'mongodb' | 'mysql';
   onDraftApplied: (draftEnv: Record<string, unknown>) => void;
 }
 
@@ -49,7 +53,7 @@ const SERVICE_BY_KIND: Record<
   databases: {
     aws: ['rds'],
     gcp: ['cloudsql'],
-    azure: ['postgresql'],
+    azure: ['postgresql', 'mysql'],
     mongodb_atlas: ['atlas-cluster'],
   },
   graphs: {
@@ -91,6 +95,7 @@ const PROVISIONABLE_SERVICES = new Set([
   'blob',
   'servicebus',
   'postgresql',
+  'mysql',
   'cosmos-gremlin',
   'azure-search',
   'rds',
@@ -116,10 +121,18 @@ function mergeDraftForComponent(
   return draftEnv;
 }
 
+/** AWS/GCP region codes and Azure location names are mutually invalid — never default one to the other. */
+function regionProviderFor(provider?: string): CloudRegionProvider {
+  if (provider === 'gcp') return 'gcp';
+  if (provider === 'azure') return 'azure';
+  return 'aws';
+}
+
 function servicesForProvider(
   kind: CloudComponentKind,
   provider: string,
   storageProvider?: string,
+  databaseEngine?: string,
 ): string[] {
   const map = SERVICE_BY_KIND[kind];
   if (kind === 'storage' && storageProvider) {
@@ -127,6 +140,11 @@ function servicesForProvider(
     if (storageProvider === 'gcp') return map.gcp;
     if (storageProvider === 'azure') return map.azure;
     return [];
+  }
+  // Azure has separate service values per database engine (postgresql vs mysql),
+  // unlike AWS RDS/GCP Cloud SQL which use one engine-agnostic service value.
+  if (kind === 'databases' && provider === 'azure' && databaseEngine) {
+    return map.azure.filter((s) => (databaseEngine === 'mysql' ? s === 'mysql' : s === 'postgresql'));
   }
   if (provider === 'aws') return map.aws;
   if (provider === 'gcp') return map.gcp;
@@ -143,6 +161,7 @@ export default function CloudLinkPanel({
   componentType,
   envSlug,
   storageProvider,
+  databaseEngine,
   onDraftApplied,
 }: CloudLinkPanelProps) {
   const { currentWorkspaceId } = useAuth();
@@ -173,14 +192,20 @@ export default function CloudLinkPanel({
       connections.filter((c: any) => {
         if (!isCloudConnectionActive(c.status)) return false;
         if (storageProvider && c.provider !== storageProvider) return false;
-        const services = servicesForProvider(componentType, c.provider, storageProvider);
+        if (componentType === 'databases' && databaseEngine) {
+          const isMongo = c.provider === 'mongodb_atlas';
+          if (databaseEngine === 'mongodb' && !isMongo) return false;
+          if (databaseEngine !== 'mongodb' && isMongo) return false;
+        }
+        const services = servicesForProvider(componentType, c.provider, storageProvider, databaseEngine);
         if (services.length === 0) return false;
         return true;
       }),
-    [connections, storageProvider, componentType],
+    [connections, storageProvider, componentType, databaseEngine],
   );
 
   const selectedConnection = matchingConnections.find((c: any) => c.id === connectionId);
+  const regionProvider = regionProviderFor(selectedConnection?.provider);
   const awsNetworkingUi = useMemo(
     () =>
       awsVpcService && selectedConnection
@@ -197,7 +222,7 @@ export default function CloudLinkPanel({
         : { securityGroupsAuto: false }),
   });
   const availableServices = selectedConnection
-    ? servicesForProvider(componentType, selectedConnection.provider, storageProvider)
+    ? servicesForProvider(componentType, selectedConnection.provider, storageProvider, databaseEngine)
     : [];
 
   useEffect(() => {
@@ -220,12 +245,20 @@ export default function CloudLinkPanel({
       return;
     }
     setService((prev) => (availableServices.includes(prev) ? prev : availableServices[0]));
-  }, [connectionId, storageProvider, componentType, selectedConnection?.provider]);
+  }, [connectionId, storageProvider, componentType, selectedConnection?.provider, databaseEngine]);
 
   useEffect(() => {
     setSelectedSecurityGroups([]);
     setExistingDbPassword('');
   }, [connectionId, service]);
+
+  // AWS/GCP region codes ('us-east-1') are invalid Azure locations ('eastus') and vice versa —
+  // reset to a sane default for the newly selected connection's provider rather than leaving
+  // a stale value from another provider in place.
+  useEffect(() => {
+    if (!selectedConnection) return;
+    setRegion(getCloudRegionOptions(regionProviderFor(selectedConnection.provider))[0]?.value || 'us-east-1');
+  }, [selectedConnection?.provider]);
 
   const { data: resources = [], isFetching: loadingResources, refetch: refetchResources } = useQuery({
     queryKey: ['cloud-resources', connectionId, service, region],
@@ -241,16 +274,37 @@ export default function CloudLinkPanel({
     enabled: Boolean(connectionId && service),
   });
 
+  // For AWS RDS / GCP Cloud SQL, a single service value ('rds'/'cloudsql') covers both
+  // Postgres and MySQL instances — filter by the database's chosen engine so e.g. a MySQL
+  // database doesn't show Postgres (or Neptune/DocumentDB, already excluded server-side) instances.
+  const engineFilteredResources = useMemo(() => {
+    if (componentType !== 'databases' || !databaseEngine) return resources;
+    if (service !== 'rds' && service !== 'cloudsql') return resources;
+    return resources.filter((r: { metadata?: { engine?: string } }) => {
+      const engine = (r.metadata?.engine || '').toLowerCase();
+      if (!engine) return true;
+      return databaseEngine === 'mysql'
+        ? engine.includes('mysql') || engine.includes('mariadb')
+        : engine.includes('postgres');
+    });
+  }, [resources, componentType, service, databaseEngine]);
+
+  useEffect(() => {
+    if (resourceId && !engineFilteredResources.some((r: { id?: string }) => r.id === resourceId)) {
+      setResourceId('');
+    }
+  }, [resourceId, engineFilteredResources]);
+
   const selectedResourceHasStoredCredentials = useMemo(() => {
     if (!resourceId) return false;
-    const match = resources.find((r: { id?: string }) => r.id === resourceId);
+    const match = engineFilteredResources.find((r: { id?: string }) => r.id === resourceId);
     return Boolean((match as { metadata?: { hasStoredCredentials?: boolean } })?.metadata?.hasStoredCredentials);
-  }, [resources, resourceId]);
+  }, [engineFilteredResources, resourceId]);
 
   const needsExistingDbPassword =
     componentType === 'databases' &&
     Boolean(resourceId) &&
-    (service === 'rds' || service === 'cloudsql' || service === 'postgresql') &&
+    (service === 'rds' || service === 'cloudsql' || service === 'postgresql' || service === 'mysql') &&
     !selectedResourceHasStoredCredentials;
 
   const applyStorageDraft = (draftEnv: Record<string, unknown>) => {
@@ -312,6 +366,18 @@ export default function CloudLinkPanel({
     });
   };
 
+  // Re-sync once `selectedResourceHasStoredCredentials` actually reflects the selected
+  // resource. `notifyDatabaseCloudSelection` is also called synchronously right after
+  // `setResourceId`, which reads this memo from the *previous* render (stale) — without
+  // this effect, a freshly-selected instance with stored credentials would incorrectly
+  // persist `credentialsStored: false` into the parent form even though the UI already
+  // shows the "no password needed" message.
+  useEffect(() => {
+    if (componentType !== 'databases' || !resourceId) return;
+    notifyDatabaseCloudSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [componentType, resourceId, selectedResourceHasStoredCredentials]);
+
   const notifyBrokerCloudSelection = (overrides?: { queueName?: string; region?: string }) => {
     if (componentType !== 'messageBrokers' || !selectedConnection) return;
     const queueName = overrides?.queueName || resourceId || provisionName || '';
@@ -350,7 +416,7 @@ export default function CloudLinkPanel({
     },
     onSuccess: (result: any, selectedResourceId?: string) => {
       const id = selectedResourceId || resourceId;
-      const resource = resources.find((r: { id: string }) => r.id === id);
+      const resource = engineFilteredResources.find((r: { id: string }) => r.id === id);
       const draftEnv =
         extractCloudDraftEnv(result, envSlug) ??
         (componentType === 'storage' && storageProvider
@@ -379,7 +445,7 @@ export default function CloudLinkPanel({
         component: componentTag,
         env: envSlug,
       };
-      if (['s3', 'sqs', 'rds', 'neptune', 'opensearch'].includes(service)) {
+      if (['s3', 'sqs', 'rds', 'neptune', 'opensearch', 'postgresql', 'mysql'].includes(service)) {
         provisionInput.region = region;
       }
       if (service === 'gcs') {
@@ -400,7 +466,7 @@ export default function CloudLinkPanel({
       }
       if (service === 'rds') {
         provisionInput.instance = provisionName || undefined;
-        provisionInput.engine = 'postgres';
+        provisionInput.engine = databaseEngine === 'mysql' ? 'mysql' : 'postgres';
         provisionInput.dbName = 'ductape';
       }
       if (service === 'neptune') {
@@ -408,7 +474,7 @@ export default function CloudLinkPanel({
       }
       if (service === 'cloudsql') {
         provisionInput.instance = provisionName || undefined;
-        provisionInput.engine = 'postgres';
+        provisionInput.engine = databaseEngine === 'mysql' ? 'mysql' : 'postgres';
         provisionInput.dbName = 'ductape';
         provisionInput.region = region;
       }
@@ -478,12 +544,17 @@ export default function CloudLinkPanel({
             setConnectionId(value);
             const conn = matchingConnections.find((c: { id: string }) => c.id === value);
             if (!conn) return;
+            // Compute the default region inline (rather than reading `region` state) so the
+            // very first draft for a newly selected connection already matches its provider —
+            // the provider-change effect that resets `region` hasn't run yet on this render.
+            const defaultRegion = getCloudRegionOptions(regionProviderFor(conn.provider))[0]?.value || region;
+            setRegion(defaultRegion);
             if (componentType === 'storage') {
               applyStorageDraft({
                 cloud: conn.tag,
                 type: storageProvider,
                 linkedFromCloud: true,
-                region,
+                region: defaultRegion,
                 location: gcsLocation,
               });
             } else if (componentType === 'databases') {
@@ -491,7 +562,7 @@ export default function CloudLinkPanel({
               applyStorageDraft({
                 cloud: conn.tag,
                 linkedFromCloud: true,
-                region,
+                region: defaultRegion,
                 instance: resourceId || provisionName || '',
                 ...(connUi.autoGroups.length ? { securityGroupsAuto: true } : { securityGroupsAuto: false }),
               });
@@ -502,7 +573,7 @@ export default function CloudLinkPanel({
                 config: {
                   cloud: conn.tag,
                   queueName: resourceId || provisionName || '',
-                  region,
+                  region: defaultRegion,
                 },
               });
             } else if (componentType === 'graphs' || componentType === 'vectors') {
@@ -513,7 +584,7 @@ export default function CloudLinkPanel({
               applyStorageDraft({
                 cloud: conn.tag,
                 linkedFromCloud: true,
-                region,
+                region: defaultRegion,
                 ...(graphUi?.autoGroups.length ? { securityGroupsAuto: true } : { securityGroupsAuto: false }),
               });
             }
@@ -564,23 +635,23 @@ export default function CloudLinkPanel({
         )}
       </div>
 
-      {service && ['s3', 'sqs', 'rds', 'cloudsql', 'neptune', 'opensearch', 'spanner-graph', 'vertex-vector-search'].includes(service) && (
+      {service && ['s3', 'sqs', 'rds', 'cloudsql', 'neptune', 'opensearch', 'spanner-graph', 'vertex-vector-search', 'postgresql', 'mysql'].includes(service) && (
         <div>
-          <Label>{service === 'cloudsql' ? 'Region (GCP)' : 'Region'}</Label>
-          <Input
+          <Label>{service === 'cloudsql' ? 'Region (GCP)' : regionProvider === 'azure' ? 'Location (Azure)' : 'Region'}</Label>
+          <CloudRegionSelect
+            provider={regionProvider}
             className="mt-1.5 bg-white"
             value={region}
-            onChange={(e) => {
-              setRegion(e.target.value);
+            onChange={(value) => {
+              setRegion(value);
               if (componentType === 'storage') {
-                notifyStorageCloudSelection({ region: e.target.value });
+                notifyStorageCloudSelection({ region: value });
               } else if (componentType === 'databases') {
-                notifyDatabaseCloudSelection({ region: e.target.value });
+                notifyDatabaseCloudSelection({ region: value });
               } else if (componentType === 'messageBrokers') {
-                notifyBrokerCloudSelection({ region: e.target.value });
+                notifyBrokerCloudSelection({ region: value });
               }
             }}
-            placeholder={service === 'cloudsql' ? 'us-central1' : 'us-east-1'}
           />
         </div>
       )}
@@ -673,7 +744,7 @@ export default function CloudLinkPanel({
                 />
               </SelectTrigger>
               <SelectContent>
-                {resources.map((r: any) => (
+                {engineFilteredResources.map((r: any) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name || r.id}
                   </SelectItem>

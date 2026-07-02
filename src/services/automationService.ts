@@ -270,13 +270,6 @@ export class AutomationService {
         availableActions: ['sendRequest', 'saveRequest'],
         formIds: ['request-form'],
       },
-      feature: {
-        canInspectForms: true,
-        canFillForms: true,
-        canTriggerActions: true,
-        availableActions: ['addComponent', 'configureMapping'],
-        formIds: ['feature-form', 'component-form'],
-      },
       notification: {
         canInspectForms: true,
         canFillForms: true,
@@ -848,7 +841,6 @@ export class AutomationService {
       product: 'Product',
       app: 'App',
       request: 'Request',
-      feature: 'Feature',
       storage: 'Storage',
       session: 'Session',
       'session-activity': 'Session Activity',

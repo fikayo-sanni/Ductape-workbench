@@ -272,6 +272,17 @@ const formSchema = z.object({
 
 const CARD_TYPES = ['Visa', 'Mastercard', 'Verve', 'AmericanExpress'] as const;
 
+/** Payment autofill (cc-*) only works over HTTPS; HTTP dev shows a browser warning. */
+function getCardAutocomplete() {
+  const https =
+    typeof window !== 'undefined' && window.location.protocol === 'https:';
+  return {
+    number: https ? 'cc-number' : 'off',
+    exp: https ? 'cc-exp' : 'off',
+    csc: https ? 'cc-csc' : 'off',
+  } as const;
+}
+
 const paymentSchema = z.object({
   cardNumber: z.string().refine(
     (val) => /^\d{13,19}$/.test(val.replace(/\s/g, '')),
@@ -443,6 +454,8 @@ export default function BillingsInfo({
     if (!usdNgnRate?.rate || !selectedPlan?.monthlyPrice) return null;
     return Math.ceil(selectedPlan.monthlyPrice * usdNgnRate.rate);
   }, [usdNgnRate?.rate, selectedPlan?.monthlyPrice]);
+
+  const cardAutocomplete = useMemo(() => getCardAutocomplete(), []);
 
   const formatCardNumber = (value: string) => {
     const digits = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -907,6 +920,7 @@ export default function BillingsInfo({
                 <form
                   onSubmit={paymentForm.handleSubmit(onPaymentSubmit)}
                   className="space-y-4"
+                  autoComplete={cardAutocomplete.number === 'off' ? 'off' : 'on'}
                 >
                   <FormField
                     control={paymentForm.control}
@@ -943,7 +957,7 @@ export default function BillingsInfo({
                           <Input
                             {...field}
                             inputMode="numeric"
-                            autoComplete="cc-number"
+                            autoComplete={cardAutocomplete.number}
                             placeholder="1234 5678 9012 3456"
                             className="border border-grey-500 rounded w-full h-9"
                             onChange={(e) =>
@@ -969,7 +983,7 @@ export default function BillingsInfo({
                             <Input
                               {...field}
                               inputMode="numeric"
-                              autoComplete="cc-exp"
+                              autoComplete={cardAutocomplete.exp}
                               placeholder="MM/YY"
                               className="border border-grey-500 rounded w-full h-9"
                               onChange={(e) =>
@@ -991,7 +1005,7 @@ export default function BillingsInfo({
                             <Input
                               {...field}
                               inputMode="numeric"
-                              autoComplete="cc-csc"
+                              autoComplete={cardAutocomplete.csc}
                               placeholder="123"
                               className="border border-grey-500 rounded w-full h-9"
                               maxLength={4}

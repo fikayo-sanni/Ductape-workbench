@@ -10,6 +10,7 @@
 
 import apiClient from '@/config/axiosinstance';
 import { encryptProxyPayload } from '@/utils/proxyEncryption';
+import { extractSdkProxyErrorMessage } from '@/utils/sdkProxyError';
 
 /** Match backend/proxy db-proxy.types.ts METHOD_TIMEOUTS for long operations. */
 const DB_PROXY_METHOD_TIMEOUTS: Record<string, number> = {
@@ -116,22 +117,30 @@ export class DatabaseProxyService {
       public_key: this.config.public_key,
     });
 
-    const response = await apiClient.post<DBProxyResponse<T>>(
-      '/proxy/v1/db-proxy/execute',
-      {
-        encrypted_payload: encryptedPayload,
-        workspace_id: this.config.workspace_id,
-        user_id: this.config.user_id,
-        public_key: this.config.public_key,
-        database_context: this.databaseContext, // Also send unencrypted for quick access
-      },
-      {
-        headers: {
-          'x-access-token': this.config.token,
+    let response;
+    try {
+      response = await apiClient.post<DBProxyResponse<T>>(
+        '/proxy/v1/db-proxy/execute',
+        {
+          encrypted_payload: encryptedPayload,
+          workspace_id: this.config.workspace_id,
+          user_id: this.config.user_id,
+          public_key: this.config.public_key,
+          database_context: this.databaseContext, // Also send unencrypted for quick access
         },
-        timeout: getDbProxyMethodTimeout(method),
-      }
-    );
+        {
+          headers: {
+            'x-access-token': this.config.token,
+          },
+          timeout: getDbProxyMethodTimeout(method),
+        }
+      );
+    } catch (err) {
+      // A non-2xx response (e.g. 500) makes axios throw before reaching the status check
+      // below — without this, callers only ever see "Request failed with status code 500"
+      // instead of the real upstream error (e.g. a cloud provider validation failure).
+      throw new Error(extractSdkProxyErrorMessage(err, 'Database operation failed'));
+    }
 
     console.log('[DB-Proxy] Response status:', response.data.status);
     console.log('[DB-Proxy] Response:', JSON.stringify(response.data, null, 2));

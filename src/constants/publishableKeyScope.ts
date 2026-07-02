@@ -106,10 +106,6 @@ const SCOPE_ALLOWED_METHODS = new Set([
   // Actions
   'dispatch',
   'run',
-  // Features
-  'isEnabled',
-  'dispatch',
-  'run',
   // Jobs
   'cancel',
   'cancelMany',
@@ -156,7 +152,6 @@ export const PUBLISHABLE_SCOPE_MODULES = [
   'sessions',
   'quotas',
   'actions',
-  'features',
   'jobs',
   'logs',
   'resilience',
@@ -182,7 +177,6 @@ export const PUBLISHABLE_SCOPE_METHODS: Record<string, readonly string[]> = {
   sessions: ['create', 'update', 'list', 'fetch', 'delete', 'users', 'start', 'verify', 'refresh', 'revoke', 'listActive', 'revokeAll', 'updateData', 'extendSession', 'fetchUsers', 'fetchUserDetails', 'fetchDashboard', 'fetchUserDashboard'],
   quotas: ['create', 'list', 'fetch', 'update', 'delete', 'check', 'consume', 'reset', 'getUsage'],
   actions: ['create', 'list', 'fetch', 'update', 'delete', 'dispatch', 'run', 'import'],
-  features: ['create', 'list', 'fetch', 'update', 'delete', 'isEnabled', 'dispatch', 'run'],
   jobs: ['create', 'list', 'fetch', 'update', 'delete', 'get', 'listJobs', 'cancel', 'cancelMany', 'pause', 'pauseMany', 'resume', 'resumeMany', 'retry', 'retryMany', 'reschedule', 'getHistory', 'getStats', 'setWebhook', 'getService'],
   logs: ['query', 'fetch', 'list', 'stream'],
   resilience: ['quotas.create', 'quotas.list', 'quotas.fetch', 'quotas.update', 'quotas.delete', 'quotas.check', 'quotas.consume', 'quotas.reset', 'fallbacks.create', 'fallbacks.list', 'fallbacks.fetch', 'fallbacks.update', 'fallbacks.delete', 'fallbacks.execute'],

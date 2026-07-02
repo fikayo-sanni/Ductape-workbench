@@ -160,11 +160,13 @@ function OnboardingFlow() {
       setWorkspaceId(resolvedWorkspace);
     }
 
-    if (step === 'workspace') {
+    // Don't advance to 'plan' when the user already has a subscription —
+    // the subscription effect above will skip straight to 'complete'.
+    if (step === 'workspace' && !hasSubscription) {
       const saved = sessionStorage.getItem('onboardingStep') as OnboardingStep | null;
       setStep(saved && saved !== 'workspace' ? saved : 'plan');
     }
-  }, [workspacesFetched, existingWorkspaceId, workspaceId, step]);
+  }, [workspacesFetched, existingWorkspaceId, workspaceId, step, hasSubscription]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -267,7 +269,7 @@ function OnboardingFlow() {
             Set up your workbench
           </h1>
           <p className="text-grey-600 text-base max-w-2xl">
-            Workspace, plan, billing — then you&apos;re in.
+            Workspace, plan, billing - then you&apos;re in.
           </p>
         </div>
 

@@ -183,15 +183,15 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
         title: 'AWS security groups',
         feature: 'RDS · Neptune',
         summary:
-          'Required for RDS and Neptune. Allow inbound from your app servers and the Ductape proxy on TCP 5432 (RDS) and 8182 (Neptune). Ductape never calls ec2:AuthorizeSecurityGroupIngress — no EC2 write IAM on your role.',
+          'Required for RDS and Neptune. Allow inbound from your app servers and the Ductape proxy on TCP 5432/3306 (RDS — PostgreSQL/MySQL) and 8182 (Neptune). Ductape never calls ec2:AuthorizeSecurityGroupIngress — no EC2 write IAM on your role.',
         steps: [
           {
             title: 'Direct connections (SDK + proxy)',
             body: 'Your app servers and the Ductape proxy both connect directly to RDS/Neptune endpoints. Security groups must allow inbound from both — not just your office IP.',
           },
           {
-            title: 'RDS — TCP 5432',
-            body: 'EC2 → Security Groups → inbound TCP 5432 from your app security group (same VPC) or egress IP, plus your Ductape proxy source. RDS is publicly accessible by default.',
+            title: 'RDS — TCP 5432 (PostgreSQL) or 3306 (MySQL)',
+            body: 'EC2 → Security Groups → inbound TCP 5432 for PostgreSQL or TCP 3306 for MySQL — match the engine of the instance you provisioned — from your app security group (same VPC) or egress IP, plus your Ductape proxy source. RDS is publicly accessible by default.',
           },
           {
             title: 'Neptune — TCP 8182',
@@ -390,6 +390,10 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
       {
         title: 'Assign RBAC roles on your subscription',
         body: 'Subscription → Access control (IAM) → Add role assignment. Grant the roles listed below for each Ductape feature you use (storage, queues, databases, graphs, vectors).',
+      },
+      {
+        title: 'Register required resource providers',
+        body: 'Subscription → Resource providers. Search and Register the providers for each Ductape feature you use: Microsoft.DBforPostgreSQL and Microsoft.DBforMySQL (databases), Microsoft.DocumentDB (graphs), Microsoft.Search (vectors), Microsoft.ServiceBus (messaging), Microsoft.Storage (storage). This is per-subscription and one-time — without it, provisioning fails with “The subscription is not registered to use namespace …”. Registration can take a few minutes.',
       },
       {
         title: 'Enter credentials in Ductape',

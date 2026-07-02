@@ -168,13 +168,6 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
       })) || [];
     }
 
-    if (selectedType === 'FEATURE' as JobEventTypes) {
-      return product.features?.map((feature: any) => ({
-        label: feature.name || feature.tag,
-        value: feature.tag,
-      })) || [];
-    }
-
     return [];
   }, [selectedType, product, connectedApps]);
 
@@ -233,18 +226,6 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
       })) || [];
     }
 
-    if (selectedType === 'FEATURE' as JobEventTypes) {
-      // For features, the parent IS the event - return the selected feature
-      const selectedFeature = product.features?.find((feature: any) => feature.tag === selectedParent);
-      if (selectedFeature) {
-        return [{
-          label: selectedFeature.name || selectedFeature.tag,
-          value: selectedFeature.tag,
-        }];
-      }
-      return [];
-    }
-
     return [];
   }, [selectedType, selectedParent, product, connectedApps, selectedApp]);
 
@@ -277,11 +258,6 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
     // STORAGE - check if there are storage components
     if (product.storage && product.storage.length > 0) {
       types.push(JobEventTypes.STORAGE);
-    }
-
-    // FEATURE - check if there are features
-    if (product.features && product.features.length > 0) {
-      types.push('FEATURE' as JobEventTypes);
     }
 
     return types;
@@ -480,7 +456,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
                     ))
                   ) : (
                     <div className="p-3 text-sm text-grey-600 text-center">
-                      No event types available. Add apps, databases, features, or other components to this product first.
+                      No event types available. Add apps, databases, or other components to this product first.
                     </div>
                   )}
                 </SelectContent>

@@ -1,4 +1,4 @@
-import { Database, Zap, Bell, Box, LayoutList, Share2, Layers, Send } from 'lucide-react';
+import { Database, Zap, Bell, Box, Share2, Layers, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ResilienceComponentCategory } from './types';
 import { RESILIENCE_CATEGORIES } from './componentIoRegistry';
@@ -6,7 +6,6 @@ import { RESILIENCE_CATEGORIES } from './componentIoRegistry';
 const CATEGORY_ICONS: Record<ResilienceComponentCategory, typeof Zap> = {
   action: Zap,
   database: Database,
-  feature: LayoutList,
   notification: Bell,
   storage: Box,
   graph: Share2,

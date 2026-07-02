@@ -25,8 +25,8 @@ import GraphExplorerTab from './tabs/GraphExplorerTab';
 import NewGraphTabContent from './tabs/NewGraphTabContent';
 import VectorTabContent from './tabs/VectorTabContent';
 import VectorExplorerTab from './tabs/VectorExplorerTab';
-import WorkflowExplorerTab from './tabs/WorkflowExplorerTab';
-import WorkflowRunTab from './tabs/WorkflowRunTab';
+import FeatureExplorerTab from './tabs/FeatureExplorerTab';
+import FeatureRunTab from './tabs/FeatureRunTab';
 import AgentExplorerTab from './tabs/AgentExplorerTab';
 import AgentRunTab from './tabs/AgentRunTab';
 import CacheTabContent from './tabs/CacheTabContent';
@@ -54,7 +54,6 @@ import NewMessageBrokerTopicContent from './tabs/NewMessageBrokerTopicContent';
 import RequestBuilder from './tabs/RequestBuilder';
 import NewProductTabContent from './tabs/NewProductTabContent';
 import NewAppTabContent from './tabs/NewAppTabContent';
-import NewFeatureTabContent from './tabs/NewFeatureTabContent';
 import NewQuotaTabContent from './tabs/NewQuotaTabContent';
 import NewFallbackTabContent from './tabs/NewFallbackTabContent';
 import NewDatabaseTabContent from './tabs/NewDatabaseTabContent';
@@ -209,12 +208,12 @@ export default function TabContent() {
   // Render content for a given tab (keeps all tabs mounted; we hide inactive ones to avoid remount/refetch on switch)
   const renderTabContent = (tab: Tab) => {
     const legacyTabType = tab.type as string;
-    if (legacyTabType === 'workflow-builder') {
+    if (legacyTabType === 'feature-builder' || legacyTabType === 'workflow-builder') {
       return (
         <UnavailableFeaturePanel
           key={tab.id}
-          title="Workflow flow builder unavailable"
-          message="The drag-and-drop workflow diagram has been removed. Use the workflow explorer to view runs and configuration."
+          title="Feature flow builder unavailable"
+          message="The drag-and-drop feature diagram has been removed. Use the feature explorer to view runs and configuration."
         />
       );
     }
@@ -412,11 +411,11 @@ export default function TabContent() {
         }
         return <VectorTabContent key={tab.id} vector={tab.data} />;
 
-      case 'workflow':
-        // Check if this is a workflow explorer tab (from ProductTabContent: product + workflow)
+      case 'feature':
+        // Check if this is a feature explorer tab (from ProductTabContent: product + feature)
         if (tab.data?.isExplorer) {
           return (
-            <WorkflowExplorerTab
+            <FeatureExplorerTab
               key={tab.id}
               tabId={tab.id}
               workflow={tab.data.workflow}
@@ -424,16 +423,16 @@ export default function TabContent() {
             />
           );
         }
-        // Default workflow view (can be extended later for workflow creation/editing)
+        // Default feature view (can be extended later for feature creation/editing)
         return (
-          <WorkflowExplorerTab
+          <FeatureExplorerTab
             key={tab.id}
             tabId={tab.id}
             workflow={tab.data}
           />
         );
 
-      case 'workflow-run':
+      case 'feature-run':
         // Check if we have the run data (may be missing after page reload)
         if (!tab.data?.run) {
           return (
@@ -446,20 +445,20 @@ export default function TabContent() {
                   Run data not available
                 </p>
                 <p className="text-xs sm:text-sm">
-                  The workflow run data has expired. Please open the run again
-                  from the workflow explorer.
+                  The feature run data has expired. Please open the run again
+                  from the feature explorer.
                 </p>
               </div>
             </div>
           );
         }
         return (
-          <WorkflowRunTab
+          <FeatureRunTab
             key={tab.id}
             tabId={tab.id}
             run={tab.data.run}
-            workflowName={tab.data.workflowName}
-            workflowTag={tab.data.workflowTag}
+            featureName={tab.data.featureName}
+            featureTag={tab.data.featureTag}
             workspaceId={tab.data.workspaceId}
           />
         );
@@ -659,20 +658,6 @@ export default function TabContent() {
             data={tab.data}
           />
         );
-
-      case 'feature':
-        // Check if this is a new feature creation tab
-        if (tab.isDirty && tab.data?.isNew) {
-          return (
-            <NewFeatureTabContent
-              key={tab.id}
-              tabId={tab.id}
-              type={tab.type}
-              data={tab.data}
-            />
-          );
-        }
-        return <FeatureTabContent key={tab.id} tab={tab} />;
 
       case 'quota':
         // Check if this is a new quota creation tab

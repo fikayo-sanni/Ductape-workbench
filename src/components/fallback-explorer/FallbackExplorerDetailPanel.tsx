@@ -1,4 +1,4 @@
-import { Shield, Code, Eye, Trash2, Zap, Database, LayoutList, Activity } from 'lucide-react';
+import { Shield, Code, Eye, Trash2, Zap, Database, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -10,8 +10,6 @@ function optionIcon(type: string) {
       return <Zap className="h-3.5 w-3.5" />;
     case 'db_action':
       return <Database className="h-3.5 w-3.5" />;
-    case 'feature':
-      return <LayoutList className="h-3.5 w-3.5" />;
     default:
       return <Activity className="h-3.5 w-3.5" />;
   }

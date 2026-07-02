@@ -105,10 +105,6 @@ export default function ProductsSidebar() {
       product.notifications?.forEach((notification: any) => {
         components.push({ type: 'notification', name: notification.name || notification.tag, productName: product.name, data: { ...notification, name: notification.name, tag: notification.tag, componentType: 'notification', productName: product.name, productTag: product.tag, productLogo: product.logo } });
       });
-      // Features
-      product.features?.forEach((feature: any) => {
-        components.push({ type: 'feature', name: feature.name || feature.tag, productName: product.name, data: { ...feature, name: feature.name, tag: feature.tag, componentType: 'feature', productName: product.name, productTag: product.tag, productLogo: product.logo } });
-      });
       // Fallbacks
       product.fallback?.forEach((fallback: any) => {
         components.push({ type: 'fallback', name: fallback.name || fallback.tag, productName: product.name, data: { ...fallback, name: fallback.name, tag: fallback.tag, componentType: 'fallback', productName: product.name, productTag: product.tag, productLogo: product.logo } });

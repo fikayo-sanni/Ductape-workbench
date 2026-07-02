@@ -16,7 +16,6 @@ import {
   Check,
   Terminal,
   Database,
-  Server,
   HardDrive,
   MessageSquare,
   Zap,
@@ -88,7 +87,6 @@ const componentTypes = [
   { id: 'email', name: 'Email', icon: Mail },
   { id: 'sms', name: 'SMS', icon: MessageCircle },
   { id: 'callbacks', name: 'Callbacks', icon: Link2 },
-  { id: 'feature', name: 'Feature', icon: Server },
   { id: 'functions', name: 'Functions', icon: Code },
   { id: 'webhook', name: 'Webhook', icon: Webhook },
   { id: 'frontend', name: 'Frontend', icon: Activity },
@@ -249,7 +247,7 @@ function LogEntry({ log, isExpanded, onToggle }: {
   const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
-    : log.feature_tag || log.parent_tag || '-';
+    : log.parent_tag || '-';
 
   return (
     <div className={cn(
@@ -369,16 +367,22 @@ function LogEntry({ log, isExpanded, onToggle }: {
                 </code>
               </div>
             )}
-            {log.feature_tag && (
-              <div className="flex items-center gap-1.5 text-xs text-grey-600">
-                <span className="font-medium">Feature:</span>
-                <code className="font-mono bg-grey-400/20 px-1.5 py-0.5 rounded">{log.feature_tag}</code>
-              </div>
-            )}
             {log.product_tag && (
               <div className="flex items-center gap-1.5 text-xs text-grey-600">
                 <span className="font-medium">Product:</span>
                 <code className="font-mono bg-grey-400/20 px-1.5 py-0.5 rounded">{log.product_tag}</code>
+              </div>
+            )}
+            {log.ip_address && (
+              <div className="flex items-center gap-1.5 text-xs text-grey-600">
+                <span className="font-medium">IP Address:</span>
+                <code className="font-mono bg-grey-400/20 px-1.5 py-0.5 rounded">{log.ip_address}</code>
+              </div>
+            )}
+            {log.language && (
+              <div className="flex items-center gap-1.5 text-xs text-grey-600">
+                <span className="font-medium">Language:</span>
+                <code className="font-mono bg-grey-400/20 px-1.5 py-0.5 rounded">{log.language}</code>
               </div>
             )}
           </div>
@@ -397,7 +401,7 @@ function LogCard({ log }: { log: ProcessLog }) {
   const ComponentIcon = getComponentIcon(componentType);
   const operationTag = log.child_tag
     ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
-    : log.feature_tag || log.parent_tag || '-';
+    : log.parent_tag || '-';
 
   return (
     <div className={cn(
@@ -460,9 +464,23 @@ function LogCard({ log }: { log: ProcessLog }) {
               </code>
             </pre>
           </div>
-          <div className="mt-3 text-xs text-grey-600">
-            <span className="font-medium">ID:</span>{' '}
-            <code className="font-mono">{log.process_id}</code>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-grey-600">
+            <div>
+              <span className="font-medium">ID:</span>{' '}
+              <code className="font-mono">{log.process_id}</code>
+            </div>
+            {log.ip_address && (
+              <div>
+                <span className="font-medium">IP Address:</span>{' '}
+                <code className="font-mono">{log.ip_address}</code>
+              </div>
+            )}
+            {log.language && (
+              <div>
+                <span className="font-medium">Language:</span>{' '}
+                <code className="font-mono">{log.language}</code>
+              </div>
+            )}
           </div>
         </div>
       )}

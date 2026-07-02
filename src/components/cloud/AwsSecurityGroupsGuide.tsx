@@ -38,7 +38,7 @@ export default function AwsSecurityGroupsGuide({ variant = 'panel' }: AwsSecurit
             </thead>
             <tbody className="text-grey-600">
               <tr className="border-b border-grey-300">
-                <td className="px-3 py-2 font-medium text-grey">RDS (PostgreSQL)</td>
+                <td className="px-3 py-2 font-medium text-grey">RDS (PostgreSQL / MySQL)</td>
                 <td className="px-3 py-2 font-mono">{awsVpcInboundPort('rds')}</td>
                 <td className="px-3 py-2">TCP</td>
               </tr>

@@ -24,7 +24,7 @@ import { Shield, Save, CheckCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
-import { FeatureEventTypes, DataTypes } from '@ductape/sdk/dist/types';
+import { StepEventTypes, DataTypes } from '@ductape/sdk/dist/types';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import productServices from '@/services/productServices';
 import {
@@ -105,7 +105,6 @@ export default function NewFallbackTabContent({ tabId, data }: NewFallbackTabCon
     return {
       ...productMeta,
       apps: productAppsRes?.data || [],
-      features: details?.features || data?.productFeatures || [],
       databases: details?.databases || data?.productDatabases || [],
       storages: details?.storage || data?.productStorages || [],
       notifications: details?.notifications || data?.productNotifications || [],
@@ -176,7 +175,7 @@ export default function NewFallbackTabContent({ tabId, data }: NewFallbackTabCon
   const handleAddComponent = (partial: Partial<ResilienceOptionDraft>) => {
     const newComponent: ResilienceOptionDraft = {
       id: `component_${Date.now()}`,
-      type: partial.type || FeatureEventTypes.ACTION,
+      type: partial.type || StepEventTypes.ACTION,
       name: partial.name || 'New option',
       tag: partial.tag || '',
       event: partial.event || partial.tag || '',

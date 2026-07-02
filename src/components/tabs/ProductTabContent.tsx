@@ -2331,23 +2331,6 @@ export default function ProductTabContent({
                     </div>
                   )}
 
-                  {(product?.features?.length || 0) > 0 && (
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-pink-500/10 flex items-center justify-center flex-shrink-0">
-                        <Workflow className="h-3 w-3 sm:h-4 sm:w-4 text-pink-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-grey">
-                          {product?.features?.length} feature
-                          {(product?.features?.length || 0) !== 1 ? 's' : ''}{' '}
-                          defined
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-grey-500">
-                          Business logic configured
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -2391,7 +2374,7 @@ export default function ProductTabContent({
                     variant="outline"
                     className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
                     size="sm"
-                    onClick={() => handleAddComponent('feature')}
+                    onClick={() => handleAddComponent('workflow')}
                   >
                     <Workflow className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Create Workflow</span>

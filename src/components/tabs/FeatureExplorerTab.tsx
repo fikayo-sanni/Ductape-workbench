@@ -334,6 +334,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     [apiRuns]
   );
 
+
   useEffect(() => {
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);

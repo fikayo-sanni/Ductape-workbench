@@ -28,13 +28,6 @@ export const COMPONENT_IO_REGISTRY: Record<ResilienceComponentCategory, Componen
     inputHints: ['$Input{field}', '$Step{tag}{data}'],
     outputHints: ['records', 'count', 'id'],
   },
-  feature: {
-    category: 'feature',
-    label: 'Feature',
-    eventField: 'tag',
-    inputHints: ['$Input{field}'],
-    outputHints: ['Feature output fields'],
-  },
   notification: {
     category: 'notification',
     label: 'Notification',
@@ -84,7 +77,6 @@ export const COMPONENT_IO_REGISTRY: Record<ResilienceComponentCategory, Componen
 export const RESILIENCE_CATEGORIES: ResilienceComponentCategory[] = [
   'action',
   'database',
-  'feature',
   'notification',
   'storage',
   'graph',

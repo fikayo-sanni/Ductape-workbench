@@ -22,10 +22,10 @@ function messageFromPayload(payload: unknown): string | undefined {
 }
 
 /**
- * Best user-facing message from an SDK proxy HTTP error response.
- * Prefers upstream provider errors (e.g. GCP billing) over generic proxy/axios text.
+ * Best user-facing message from a proxy HTTP error response (sdk-proxy or db-proxy).
+ * Prefers upstream provider errors (e.g. GCP billing, Azure validation) over generic proxy/axios text.
  */
-export function extractSdkProxyErrorMessage(err: unknown): string {
+export function extractSdkProxyErrorMessage(err: unknown, fallbackMessage = 'SDK operation failed'): string {
   const axiosErr = err as {
     response?: { data?: Record<string, unknown> };
     message?: string;
@@ -42,7 +42,7 @@ export function extractSdkProxyErrorMessage(err: unknown): string {
 
     const fromMessage =
       typeof data.message === 'string' &&
-      data.message !== 'SDK operation failed' &&
+      data.message !== fallbackMessage &&
       !isGenericHttpError(data.message)
         ? data.message.trim()
         : undefined;
@@ -52,5 +52,5 @@ export function extractSdkProxyErrorMessage(err: unknown): string {
   const fallback = axiosErr?.message?.trim();
   if (fallback && !isGenericHttpError(fallback)) return fallback;
 
-  return 'SDK operation failed';
+  return fallbackMessage;
 }

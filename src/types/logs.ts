@@ -3,7 +3,6 @@ export interface LogEntry {
   integration_id: string;
   env: string;
   type: string;
-  feature_id: string;
   process_id: string;
   name?: string;
   data: string;
@@ -13,6 +12,10 @@ export interface LogEntry {
   end?: number;
   /** Latency/duration in milliseconds */
   latency?: number;
+  /** Source IP of the request that produced this log entry */
+  ip_address?: string;
+  /** SDK/client that emitted this log entry, e.g. typescript, go, java, dotnet */
+  language?: string;
   __v: number;
 }
 
@@ -20,19 +23,12 @@ export interface ILog {
   metrics: {
     totalApps: number;
     totalDatabases: number;
-    totalFeatures: number;
     totalActions: number;
     totalEnvironments: number;
     totalAuthorizations: number;
   };
   weeklyMetrics: {
     totalProductsConnected: {
-      current: number;
-      previous: number;
-      difference: number;
-      trend: string;
-    };
-    totalFeaturesUsingAction: {
       current: number;
       previous: number;
       difference: number;
@@ -93,7 +89,6 @@ export interface ILog {
       child_tag: string;
       successful_execution: boolean;
       failed_execution: boolean;
-      feature_tag: string;
       env: string;
       /** Log/event type (e.g. app, database). For processor logs may be same as component. */
       type: string;
@@ -109,6 +104,10 @@ export interface ILog {
       end?: number;
       /** Latency/duration in milliseconds */
       latency?: number;
+      /** Source IP of the request that produced this log entry */
+      ip_address?: string;
+      /** SDK/client that emitted this log entry, e.g. typescript, go, java, dotnet */
+      language?: string;
       __v: number;
     }[];
   };
@@ -142,7 +141,6 @@ export interface FetchLogsOptions {
   component?: string;
   product_id?: string;
   type?: string;
-  feature_tag?: string;
   product_tag?: string;
   parent_tag?: string;
   child_tag?: string;

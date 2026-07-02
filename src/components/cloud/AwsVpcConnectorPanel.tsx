@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ChevronDown, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -171,11 +172,11 @@ export default function AwsVpcConnectorPanel({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="vpc-connector-region">Region</Label>
-          <Input
+          <CloudRegionSelect
+            provider="aws"
             id="vpc-connector-region"
             value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="us-east-1"
+            onChange={setRegion}
           />
         </div>
         <div className="space-y-2">

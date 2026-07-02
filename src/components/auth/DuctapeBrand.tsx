@@ -8,40 +8,24 @@ interface DuctapeBrandProps {
   linkTo?: string;
 }
 
-export function DuctapeLogo({ className }: { className?: string }) {
+export function DuctapeLogo({
+  className,
+  size = 28,
+}: {
+  className?: string;
+  size?: number;
+}) {
+  const logoSrc = `${import.meta.env.BASE_URL}favicon.svg`;
+
   return (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn('flex-shrink-0', className)}
+    <img
+      src={logoSrc}
+      alt=""
+      width={size}
+      height={size}
+      className={cn('flex-shrink-0 object-contain', className)}
       aria-hidden
-    >
-      <path
-        d="M14 10C10 10 8 14 8 18V22C8 24 6 26 6 26C6 26 8 28 8 30V34C8 38 10 42 14 42"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-        className="text-primary"
-      />
-      <path
-        d="M34 10C38 10 40 14 40 18V22C40 24 42 26 42 26C42 26 40 28 40 30V34C40 38 38 42 34 42"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-        className="text-primary"
-      />
-      <path d="M16 20H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-      <path d="M16 26H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-      <path d="M16 32H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-primary" />
-      <circle cx="16" cy="20" r="2" fill="currentColor" className="text-primary" />
-      <circle cx="32" cy="26" r="2" fill="currentColor" className="text-primary" />
-      <circle cx="16" cy="32" r="2" fill="currentColor" className="text-primary" />
-    </svg>
+    />
   );
 }
 

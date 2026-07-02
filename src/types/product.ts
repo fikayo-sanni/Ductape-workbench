@@ -28,7 +28,6 @@ export interface IProduct {
   public_key?: string;
   apps: any[];
   caches: Cache[];
-  features: any[];
   quota: any[];
   fallback: any[];
   storage: any[];

@@ -198,7 +198,6 @@ export default function JobTabContent({ job }: JobTabContentProps) {
         return { Icon: Layers, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10' };
       case 'fallback':
       case 'quota':
-      case 'feature':
         return { Icon: GitBranch, color: 'text-yellow-600', bgColor: 'bg-yellow-600/10' };
       default:
         return { Icon: Webhook, color: 'text-grey', bgColor: 'bg-grey/10' };
@@ -216,7 +215,6 @@ export default function JobTabContent({ job }: JobTabContentProps) {
       'message-broker': 'Messaging',
       'fallback': 'Fallback',
       'quota': 'Quota',
-      'feature': 'Feature',
     };
     return nameMap[type?.toLowerCase()] || 'Component';
   };

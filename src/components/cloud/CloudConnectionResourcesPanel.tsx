@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import {
   Table,
   TableBody,
@@ -256,13 +257,13 @@ export default function CloudConnectionResourcesPanel({
 
           <div className="flex flex-wrap items-center gap-2">
             {needsRegion && (
-              <Input
+              <CloudRegionSelect
+                provider={provider === 'gcp' || provider === 'azure' ? provider : 'aws'}
                 id="resource-region"
                 className="h-8 w-36 font-mono text-xs"
                 value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                placeholder="us-east-1"
-                aria-label="AWS region"
+                onChange={setRegion}
+                aria-label="Region"
               />
             )}
             {isSuccess && count > 0 && (

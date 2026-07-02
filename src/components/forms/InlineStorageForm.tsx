@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import { Textarea } from '@/components/ui/textarea';
 import { HardDrive, Save, ChevronRight, Loader2, CheckCircle, Upload, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -555,11 +556,11 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                         </div>
                         <div>
                           <Label htmlFor={`region-${index}`}>Region</Label>
-                          <Input
+                          <CloudRegionSelect
+                            provider="aws"
                             id={`region-${index}`}
-                            placeholder="us-east-1"
                             value={env.region}
-                            onChange={(e) => updateEnvConfig(index, 'region', e.target.value)}
+                            onChange={(value) => updateEnvConfig(index, 'region', value)}
                             className="mt-2 bg-white"
                           />
                         </div>

@@ -58,7 +58,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       selectedApp: '',
       selectedDatabase: '',
       selectedMessageBroker: '',
-      selectedFeature: '',
       selectedWorkflow: '',
     }
   );
@@ -91,7 +90,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
     enabled: !!user?._id && !!user?.public_key && !!currentWorkspaceId && !!product?._id,
   });
 
-  // Fetch full product details for databases, message_brokers, features
+  // Fetch full product details for databases, message_brokers
   const { data: productDetailsRes } = useQuery({
     queryKey: ['product-details', product?._id],
     queryFn: () =>
@@ -108,7 +107,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   const productDetails = productDetailsRes?.data;
   const databases = productDetails?.databases || [];
   const messageBrokers = productDetails?.messageBrokers || [];
-  const features = productDetails?.features || [];
   const workflows = productDetails?.workflows || [];
 
   // Initialize Ductape SDK for product
@@ -284,9 +282,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       } else if (formData.type === 'message_broker') {
         if (!formData.selectedMessageBroker) throw new Error('Please select a message broker');
         payload.message_broker = formData.selectedMessageBroker;
-      } else if (formData.type === 'feature') {
-        if (!formData.selectedFeature) throw new Error('Please select a feature');
-        payload.feature = formData.selectedFeature;
       } else if (formData.type === 'workflow') {
         if (!formData.selectedWorkflow) throw new Error('Please select a workflow');
         payload.workflow = formData.selectedWorkflow;
@@ -346,11 +341,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
         toast.error('Please select a message broker');
         return;
       }
-    } else if (formData.type === 'feature') {
-      if (!formData.selectedFeature) {
-        toast.error('Please select a feature');
-        return;
-      }
     } else if (formData.type === 'workflow') {
       if (!formData.selectedWorkflow) {
         toast.error('Please select a workflow');
@@ -376,8 +366,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       return formData.selectedDatabase !== '';
     } else if (formData.type === 'message_broker') {
       return formData.selectedMessageBroker !== '';
-    } else if (formData.type === 'feature') {
-      return formData.selectedFeature !== '';
     } else if (formData.type === 'workflow') {
       return formData.selectedWorkflow !== '';
     }
@@ -605,7 +593,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                     <SelectItem value="app">App</SelectItem>
                      <SelectItem value="database">Database</SelectItem>
                      <SelectItem value="message_broker">Messaging</SelectItem>
-                     <SelectItem value="feature">Feature</SelectItem>
                      <SelectItem value="workflow">Workflow</SelectItem>
                   </SelectContent>
                 </Select>
@@ -866,33 +853,6 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </Select>
                   <p className="text-xs text-grey-600 mt-1">
                     Select the messaging to monitor with this health check
-                  </p>
-                </div>
-              )}
-
-              {/* Feature Selection (for type: feature) */}
-              {formData.type === 'feature' && (
-                <div>
-                  <Label htmlFor="feature" className="required">
-                    Feature
-                  </Label>
-                  <Select
-                    value={formData.selectedFeature}
-                    onValueChange={(value) => setFormData({ ...formData, selectedFeature: value })}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select a feature" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {features.map((feature: any) => (
-                        <SelectItem key={feature._id || feature.tag} value={feature.tag}>
-                          {feature.name || feature.tag}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-grey-600 mt-1">
-                    Select the feature to monitor with this health check
                   </p>
                 </div>
               )}

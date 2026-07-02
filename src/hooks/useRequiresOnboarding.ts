@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useFetchWorkspaces } from '@/hooks/useWorkspaceQueries';
@@ -7,7 +7,7 @@ import {
   filterPendingWorkspaceRows,
 } from '@/services/workspaceServices';
 import pricingServices from '@/services/pricingServices';
-import { hasCompletedOnboarding } from '@/utils/onboarding';
+import { hasCompletedOnboarding, markOnboardingCompleted } from '@/utils/onboarding';
 export function useRequiresOnboarding() {
   const { user, currentWorkspaceId } = useAuth();
   const isAuthenticated = Boolean(user?._id && user?.public_key);
@@ -57,6 +57,15 @@ export function useRequiresOnboarding() {
 
   const hasSubscription = Boolean(billingReport?.data && billingReport.status);
 
+  // Auto-mark onboarding complete when the API confirms an active subscription.
+  // Without this, returning users on a new browser/device (no localStorage flag)
+  // get re-routed to the onboarding flow even though they're already subscribed.
+  useEffect(() => {
+    if (hasSubscription && !hasCompletedOnboarding()) {
+      markOnboardingCompleted();
+    }
+  }, [hasSubscription]);
+
   if (!isAuthenticated) {
     return {
       isLoading: false,
@@ -85,8 +94,7 @@ export function useRequiresOnboarding() {
     workspacesFetched &&
     !needsPendingInvitesScreen &&
     (acceptedWorkspaces.length === 0 ||
-      (Boolean(workspaceId) && (billingError || !hasSubscription)) ||
-      (hasSubscription && !hasCompletedOnboarding()));
+      (Boolean(workspaceId) && !billingError && !hasSubscription));
 
   return {
     isLoading,

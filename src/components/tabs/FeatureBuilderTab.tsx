@@ -153,7 +153,6 @@ export default function WorkflowBuilderTab({
       vectors: details?.vectors || [],
       messageBrokers: details?.messageBrokers || [],
       workflows: details?.workflows || [],
-      features: details?.features || [],
     };
   }, [productAppsRes, productDetailsRes, productId, productTag, productName, productEnvs]);
 

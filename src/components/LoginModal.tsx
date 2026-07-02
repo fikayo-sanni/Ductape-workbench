@@ -29,6 +29,7 @@ import { Loader, Eye, EyeOff, Mail } from "lucide-react";
 import CreateAccountModal from "./CreateAccountModal";
 import { triggerOnboardingForNewUser } from "@/utils/onboarding";
 import ResetPassword from "./resetPassword";
+import { cn } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -188,7 +189,14 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <>
+    <div
+      className={cn(
+        "fixed inset-0 z-40 flex items-center justify-center p-4",
+        resetPasswordModal && "pointer-events-none",
+      )}
+      aria-hidden={resetPasswordModal || undefined}
+    >
       {/* Backdrop with blur */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
 
@@ -404,17 +412,15 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
 
       <Dialog
         open={resetPasswordModal}
         onOpenChange={setResetPasswordModal}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md z-[60]">
+          <ResetPassword open={resetPasswordModal} />
 
-
-          <ResetPassword />
-
-          {/* Add a close button */}
           <DialogFooter>
             <Button
               variant="outline"
@@ -425,6 +431,6 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

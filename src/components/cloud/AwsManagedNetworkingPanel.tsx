@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CloudRegionSelect from '@/components/cloud/CloudRegionSelect';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import toast from 'react-hot-toast';
@@ -231,7 +232,7 @@ export default function AwsManagedNetworkingPanel({
               </dl>
               {savedAllowlistSummary.length ? (
                 <div>
-                  <p className="text-xs text-grey-600 mb-1">Allowed inbound on TCP 5432 and 8182</p>
+                  <p className="text-xs text-grey-600 mb-1">Allowed inbound on TCP 3306, 5432, and 8182</p>
                   <ul className="text-xs font-mono text-grey space-y-1">
                     {savedAllowlistSummary.map((item) => (
                       <li key={item.cidr}>
@@ -252,7 +253,7 @@ export default function AwsManagedNetworkingPanel({
                   {hasManagedGroup ? 'Update allowlist' : 'Allow this workbench'}
                 </p>
                 <p className="text-xs text-grey-600 mt-1">
-                  Opens TCP 5432 (RDS) and 8182 (Neptune) for{' '}
+                  Opens TCP 3306/5432 (RDS) and 8182 (Neptune) for{' '}
                   <span className="font-mono">{apiHostname}</span>
                 </p>
               </div>
@@ -387,19 +388,19 @@ export default function AwsManagedNetworkingPanel({
 
           <div className="space-y-2">
             <Label htmlFor="managed-sg-region">AWS region</Label>
-            <Input
+            <CloudRegionSelect
+              provider="aws"
               id="managed-sg-region"
               className="font-mono text-sm max-w-xs"
               value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              placeholder="us-east-1"
+              onChange={setRegion}
             />
             <p className="text-xs text-grey-600">Match the region where you provision RDS or Neptune.</p>
           </div>
 
           {previewCidrs.length > 0 ? (
             <p className="text-xs text-grey-600">
-              {previewCidrs.length} source(s) will be allowed on ports 5432 and 8182.
+              {previewCidrs.length} source(s) will be allowed on ports 3306, 5432, and 8182.
             </p>
           ) : null}
 

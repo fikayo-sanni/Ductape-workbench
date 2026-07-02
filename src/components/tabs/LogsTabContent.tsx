@@ -207,7 +207,7 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
                   <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
                     {log.child_tag
                       ? `${log.parent_tag ? `${log.parent_tag}:` : ''}${log.child_tag}`
-                      : log.feature_tag || log.parent_tag}
+                      : log.parent_tag}
                   </span>
 
                   {/* Name */}
