@@ -64,7 +64,7 @@ const responseStatuses = [
   { id: 'success', name: 'Success', icon: CheckCircle, color: 'text-green' },
 ];
 
-// Component types mapped to LogEventTypes enum from backend (workflow_step displayed as "Step")
+// Component types mapped to LogEventTypes enum from backend (feature_step displayed as "Step")
 const componentTypes = [
   { id: 'actions', name: 'Actions', icon: Box },
   { id: 'database_actions', name: 'Database Actions', icon: Database },
@@ -78,8 +78,8 @@ const componentTypes = [
   { id: 'consumer', name: 'Consumer', icon: Headphones },
   { id: 'jobs', name: 'Jobs', icon: Terminal },
   { id: 'session', name: 'Session', icon: UserCheck },
-  { id: 'workflow', name: 'Workflow', icon: GitBranch },
-  { id: 'workflow_step', name: 'Step', icon: Layers },
+  { id: 'feature', name: 'Feature', icon: GitBranch },
+  { id: 'feature_step', name: 'Step', icon: Layers },
   { id: 'secret', name: 'Secret', icon: Lock },
   { id: 'tokens', name: 'Tokens', icon: Lock },
   { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -178,14 +178,14 @@ const getStatusConfig = (log: ProcessLog) => {
   };
 };
 
-// Get component icon (normalizes type; workflow_step -> Layers, workflow -> GitBranch, secret/tokens -> Lock)
+// Get component icon (normalizes type; feature_step -> Layers, feature -> GitBranch, secret/tokens -> Lock)
 const getComponentIcon = (type: string) => {
   const id = normalizeLogType(type);
   const component = componentTypes.find(c => c.id === id);
   if (component?.icon) return component.icon;
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-    workflow: GitBranch,
-    workflow_step: Layers,
+    feature: GitBranch,
+    feature_step: Layers,
     secret: Lock,
     tokens: Lock,
   };
@@ -283,7 +283,7 @@ function LogEntry({ log, isExpanded, onToggle }: {
           </p>
         </div>
 
-        {/* Component Type (workflow_step -> "Step", secret -> "Secret", etc.) */}
+        {/* Component Type (feature_step -> "Step", secret -> "Secret", etc.) */}
         <div className="flex-shrink-0 w-[100px]">
           <div className="flex items-center gap-1.5">
             <ComponentIcon className="h-4 w-4 text-grey-600" />

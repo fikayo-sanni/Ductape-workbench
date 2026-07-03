@@ -18,8 +18,7 @@ import { Timer, Save, CheckCircle, Plus, Trash2, Edit2, Database, Zap, Bell, Box
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
-import { StepEventTypes } from '@ductape/sdk/dist/types';
-import { IStepInput } from '@ductape/sdk/dist/types';
+import { StepEventTypes, IStepInput } from '@/components/feature-builder/types';
 import appServicesReal from '@/services/appServicesReal';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 

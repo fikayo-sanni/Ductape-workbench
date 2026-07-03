@@ -1,4 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { DataTypes } from '@ductape/sdk/dist/types';
+
+export enum StepEventTypes {
+  ACTION = 'action',
+  FEATURE = 'feature',
+  NOTIFICATION = 'notification',
+  DB_ACTION = 'database_action',
+  JOB = 'job',
+  STORAGE = 'storage',
+  PUBLISH = 'publish',
+  SUBSCRIBE = 'subscribe',
+  QUOTA = 'quota',
+  FALLBACK = 'fallback',
+}
+
+export interface IStepInput {
+  type: DataTypes | string;
+  minlength?: number;
+  maxlength?: number;
+}
 
 export type ResilienceComponentCategory =
   | 'action'
@@ -22,7 +42,7 @@ export interface ProductContext {
   graphs?: any[];
   vectors?: any[];
   messageBrokers?: any[];
-  workflows?: any[];
+  features?: any[];
   healthchecks?: any[];
 }
 
@@ -33,7 +53,7 @@ export interface MappingSource {
   fields: Array<{ key: string; type?: string }>;
 }
 
-export interface WorkflowStepDraft {
+export interface FeatureStepDraft {
   tag: string;
   name?: string;
   type: string;
@@ -46,7 +66,7 @@ export interface WorkflowStepDraft {
   broker?: string;
   quota?: string;
   fallback?: string;
-  workflow?: string;
+  feature?: string;
   event: string;
   input: Record<string, unknown>;
   output?: Record<string, unknown>;

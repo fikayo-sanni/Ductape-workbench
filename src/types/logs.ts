@@ -92,7 +92,7 @@ export interface ILog {
       env: string;
       /** Log/event type (e.g. app, database). For processor logs may be same as component. */
       type: string;
-      /** Component when present (e.g. workflow, workflow_step from processor results). Use for icon/label when set. */
+      /** Component when present (e.g. feature, feature_step from processor results). Use for icon/label when set. */
       component?: string;
       process_id: string;
       name: string;

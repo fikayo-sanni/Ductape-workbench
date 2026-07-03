@@ -9,10 +9,10 @@ export { MappingValueSelect } from './MappingValueSelect';
 export { buildMappingValueOptions } from './mappingOptions';
 export { StepOutputPreview } from './StepOutputPreview';
 export { ConditionEditor } from './ConditionEditor';
-export { WorkflowStepInspector } from './WorkflowStepInspector';
+export { FeatureStepInspector } from './FeatureStepInspector';
 export {
   resolveStepParents,
-  validateWorkflowParentGraph,
+  validateFeatureParentGraph,
   buildParentMappingSources,
   type StepParentInfo,
-} from './workflowGraphParents';
+} from './featureGraphParents';

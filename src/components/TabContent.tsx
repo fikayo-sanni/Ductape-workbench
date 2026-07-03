@@ -418,7 +418,7 @@ export default function TabContent() {
             <FeatureExplorerTab
               key={tab.id}
               tabId={tab.id}
-              workflow={tab.data.workflow}
+              feature={tab.data.feature}
               product={tab.data.product}
             />
           );
@@ -428,7 +428,7 @@ export default function TabContent() {
           <FeatureExplorerTab
             key={tab.id}
             tabId={tab.id}
-            workflow={tab.data}
+            feature={tab.data}
           />
         );
 

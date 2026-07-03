@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { WorkflowStepDraft } from '@/components/workflow-builder/types';
-import { resolveStepParents } from '@/components/workflow-builder/workflowGraphParents';
+import type { FeatureStepDraft } from '@/components/feature-builder/types';
+import { resolveStepParents } from '@/components/feature-builder/featureGraphParents';
 
 export type FlowNodeKind =
   | 'start'
@@ -12,7 +12,7 @@ export type FlowNodeKind =
   | 'database'
   | 'graph'
   | 'vector'
-  | 'workflow'
+  | 'feature'
   | 'quota'
   | 'fallback'
   | 'healthcheck'
@@ -166,7 +166,7 @@ function stepKind(type?: string): FlowNodeKind {
   if (t === 'database' || t === 'database_action') return 'database';
   if (t === 'graph') return 'graph';
   if (t === 'vector') return 'vector';
-  if (t === 'workflow') return 'workflow';
+  if (t === 'feature' || t === 'child_workflow') return 'feature';
   if (t === 'quota') return 'quota';
   if (t === 'fallback') return 'fallback';
   if (t === 'healthcheck') return 'healthcheck';
@@ -174,7 +174,7 @@ function stepKind(type?: string): FlowNodeKind {
   return 'action';
 }
 
-export function workflowStepsToFlow(steps: Array<Record<string, unknown>> = []) {
+export function featureStepsToFlow(steps: Array<Record<string, unknown>> = []) {
   const startId = 'start';
   const endId = 'end';
   const stepNodes = steps.map((step, index) => {
@@ -489,7 +489,7 @@ export function quotaToFlow(quota: Record<string, unknown>) {
   return { nodes, edges };
 }
 
-export const WORKFLOW_PALETTE_ITEMS: Array<{ type: string; label: string; kind: FlowNodeKind }> = [
+export const FEATURE_PALETTE_ITEMS: Array<{ type: string; label: string; kind: FlowNodeKind }> = [
   { type: 'action', label: 'App action', kind: 'action' },
   { type: 'produce', label: 'Publish event', kind: 'produce' },
   { type: 'storage', label: 'Storage', kind: 'storage' },
@@ -498,7 +498,7 @@ export const WORKFLOW_PALETTE_ITEMS: Array<{ type: string; label: string; kind: 
   { type: 'graph', label: 'Graph', kind: 'graph' },
   { type: 'vector', label: 'Vector DB', kind: 'vector' },
   { type: 'condition', label: 'Condition', kind: 'condition' },
-  { type: 'workflow', label: 'Sub-workflow', kind: 'workflow' },
+  { type: 'feature', label: 'Sub-feature', kind: 'feature' },
   { type: 'quota', label: 'Quota', kind: 'quota' },
   { type: 'fallback', label: 'Fallback', kind: 'fallback' },
 ];
@@ -517,7 +517,7 @@ function kindToStepType(kind: FlowNodeKind, subtitle?: string): string {
     database: 'database_action',
     graph: 'graph',
     vector: 'vector',
-    workflow: 'child_workflow',
+    feature: 'child_workflow',
     quota: 'quota',
     fallback: 'fallback',
     healthcheck: 'healthcheck',
@@ -528,13 +528,13 @@ function kindToStepType(kind: FlowNodeKind, subtitle?: string): string {
   return map[kind] || 'action';
 }
 
-/** Serialize React Flow graph into workflow step definitions (supports branching via edge conditions). */
-export function flowGraphToWorkflowSteps(
+/** Serialize React Flow graph into feature step definitions (supports branching via edge conditions). */
+export function flowGraphToFeatureSteps(
   nodes: Node<FlowStepNodeData>[],
   edges: Edge[],
-  existingSteps: WorkflowStepDraft[] = [],
-): WorkflowStepDraft[] {
-  const stepByTag = new Map<string, WorkflowStepDraft>();
+  existingSteps: FeatureStepDraft[] = [],
+): FeatureStepDraft[] {
+  const stepByTag = new Map<string, FeatureStepDraft>();
   existingSteps.forEach((s) => stepByTag.set(s.tag, { ...s }));
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -609,13 +609,13 @@ export function flowGraphToWorkflowSteps(
       broker: existing?.broker || (meta.broker as string | undefined),
       quota: existing?.quota,
       fallback: existing?.fallback,
-      workflow: existing?.workflow,
+      feature: existing?.feature,
       event: existing?.event || String(meta.event || 'run'),
       input: existing?.input || {},
       output: existing?.output,
       depends_on,
       condition: condition || undefined,
       options: existing?.options,
-    } satisfies WorkflowStepDraft;
+    } satisfies FeatureStepDraft;
   });
 }

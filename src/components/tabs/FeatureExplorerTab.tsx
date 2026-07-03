@@ -55,14 +55,14 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { getTabState, saveTabState } from '@/lib/tab-state-manager';
 import { useAuth } from '@/store/useAuth';
 import {
-  fetchWorkflowRuns,
-  mapProcessorResultToWorkflowRun,
+  fetchFeatureRuns,
+  mapProcessorResultToFeatureRun,
   shortProcessId,
-} from '@/services/workflowRunsService';
+} from '@/services/featureRunsService';
 
-interface WorkflowExplorerTabProps {
+interface FeatureExplorerTabProps {
   tabId?: string;
-  workflow?: {
+  feature?: {
     name?: string;
     tag?: string;
     productTag?: string;
@@ -81,7 +81,7 @@ interface WorkflowExplorerTabProps {
 type StepStatus = 'completed' | 'failed' | 'running' | 'pending' | 'skipped' | 'retrying';
 type RunStatus = 'completed' | 'failed' | 'running' | 'pending' | 'cancelled' | 'timeout';
 
-interface WorkflowExplorerFormState {
+interface FeatureExplorerFormState {
   statusFilter: RunStatus | 'all';
   searchQuery: string;
   timeRange: '1h' | '24h' | '7d' | '30d' | 'all';
@@ -91,7 +91,7 @@ interface WorkflowExplorerFormState {
   isSidebarCollapsed?: boolean;
 }
 
-interface WorkflowStep {
+interface FeatureStep {
   id: string;
   name: string;
   type: 'action' | 'condition' | 'parallel' | 'wait' | 'transform' | 'human' | 'webhook' | 'loop';
@@ -112,7 +112,7 @@ interface WorkflowStep {
   };
 }
 
-interface WorkflowRun {
+interface FeatureRun {
   id: string;
   runNumber: number;
   status: RunStatus;
@@ -122,7 +122,7 @@ interface WorkflowRun {
   input: any;
   output: any;
   error?: string;
-  steps: WorkflowStep[];
+  steps: FeatureStep[];
   triggeredBy: 'manual' | 'schedule' | 'webhook' | 'event' | 'api';
   triggeredByUser?: string;
   version: string;
@@ -201,7 +201,7 @@ function getTimeRangeDates(range: '1h' | '24h' | '7d' | '30d' | 'all'): { start_
   return { start_date: start.toISOString(), end_date: end.toISOString() };
 }
 
-const DEFAULT_FORM_STATE: WorkflowExplorerFormState = {
+const DEFAULT_FORM_STATE: FeatureExplorerFormState = {
   statusFilter: 'all',
   searchQuery: '',
   timeRange: '24h',
@@ -210,16 +210,16 @@ const DEFAULT_FORM_STATE: WorkflowExplorerFormState = {
   executeInput: '{\n  "orderId": "ORD-EXAMPLE",\n  "amount": 99.99,\n  "currency": "USD"\n}',
 };
 
-export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: WorkflowExplorerTabProps) {
+export default function FeatureExplorerTab({ tabId, feature = {}, product }: FeatureExplorerTabProps) {
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const hasRestoredRef = useRef(false);
   const skipNextSaveRef = useRef(true); // skip first save on mount so we don't overwrite restored state
 
-  const workflowName = workflow.name || 'Workflow';
-  const workflowTag = workflow.tag || '';
-  const productTag = workflow.productTag || product?.tag || '';
-  const envSlug = workflow.env?.slug || 'production';
+  const featureName = feature.name || 'Feature';
+  const featureTag = feature.tag || '';
+  const productTag = feature.productTag || product?.tag || '';
+  const envSlug = feature.env?.slug || 'production';
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -236,7 +236,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
   useEffect(() => {
     if (!tabId || hasRestoredRef.current) return;
     const saved = getTabState(tabId);
-    const form = saved?.formState as WorkflowExplorerFormState | undefined;
+    const form = saved?.formState as FeatureExplorerFormState | undefined;
     if (form) {
       if (form.statusFilter != null) setStatusFilter(form.statusFilter);
       if (form.searchQuery != null) setSearchQuery(form.searchQuery);
@@ -256,7 +256,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
       skipNextSaveRef.current = false;
       return;
     }
-    const formState: WorkflowExplorerFormState = {
+    const formState: FeatureExplorerFormState = {
       statusFilter,
       searchQuery,
       timeRange,
@@ -267,19 +267,19 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     };
     saveTabState(
       tabId,
-      'workflow-explorer',
-      `${workflowName} (${productTag || 'Workflow'})`,
+      'feature-explorer',
+      `${featureName} (${productTag || 'Feature'})`,
       {},
       formState,
-      workflowTag || undefined
+      featureTag || undefined
     );
-  }, [tabId, workflowName, productTag, workflowTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
+  }, [tabId, featureName, productTag, featureTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
 
   // Save on unmount (e.g. user switches to another tab) so state is never lost
   useEffect(() => {
     if (!tabId) return;
     return () => {
-      const formState: WorkflowExplorerFormState = {
+      const formState: FeatureExplorerFormState = {
         statusFilter,
         searchQuery,
         timeRange,
@@ -290,14 +290,14 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
       };
       saveTabState(
         tabId,
-        'workflow-explorer',
-        `${workflowName} (${productTag || 'Workflow'})`,
+        'feature-explorer',
+        `${featureName} (${productTag || 'Feature'})`,
         {},
         formState,
-        workflowTag || undefined
+        featureTag || undefined
       );
     };
-  }, [tabId, workflowName, productTag, workflowTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
+  }, [tabId, featureName, productTag, featureTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
 
   const timeRangeParams = useMemo(() => getTimeRangeDates(timeRange), [timeRange]);
 
@@ -307,20 +307,20 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     refetch,
   } = useQuery({
     queryKey: [
-      'workflow-runs',
+      'feature-runs',
       currentWorkspaceId,
-      workflowTag,
+      featureTag,
       productTag,
       envSlug,
       timeRangeParams.start_date,
       timeRangeParams.end_date,
     ],
     queryFn: () =>
-      fetchWorkflowRuns({
+      fetchFeatureRuns({
         workspace_id: currentWorkspaceId ?? '',
         user_id: user?._id ?? '',
         public_key: user?.public_key ?? '',
-        workflow_tag: workflowTag || undefined,
+        feature_tag: featureTag || undefined,
         product_tag: productTag || undefined,
         env: envSlug || undefined,
         ...timeRangeParams,
@@ -329,8 +329,8 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key),
   });
 
-  const runs: WorkflowRun[] = useMemo(
-    () => apiRuns.map((item, i) => mapProcessorResultToWorkflowRun(item, i) as WorkflowRun),
+  const runs: FeatureRun[] = useMemo(
+    () => apiRuns.map((item, i) => mapProcessorResultToFeatureRun(item, i) as FeatureRun),
     [apiRuns]
   );
 
@@ -339,16 +339,16 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     setSidebarCollapsed(true);
   }, [setSidebarCollapsed]);
 
-  const handleOpenRun = (run: WorkflowRun) => {
+  const handleOpenRun = (run: FeatureRun) => {
     openTab({
-      id: `workflow-run-${run.id}`,
-      type: 'workflow-run',
+      id: `feature-run-${run.id}`,
+      type: 'feature-run',
       title: `Run ${formatTime(run.startedAt, false)}`,
       itemId: run.id,
       data: {
         run,
-        workflowName,
-        workflowTag,
+        featureName: featureName,
+        featureTag: featureTag,
         workspaceId: currentWorkspaceId ?? undefined,
       },
     });
@@ -469,12 +469,12 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     toast.success('Runs refreshed');
   };
 
-  const handleExecuteWorkflow = async () => {
+  const handleExecuteFeature = async () => {
     setIsExecuting(true);
     try {
       JSON.parse(executeInput);
       await new Promise((r) => setTimeout(r, 1200));
-      toast.success('Workflow triggered successfully');
+      toast.success('Feature triggered successfully');
       setShowExecuteModal(false);
     } catch {
       toast.error('Invalid JSON input');
@@ -497,7 +497,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
     return configs[status] || configs.pending;
   };
 
-  const getTriggerConfig = (trigger: WorkflowRun['triggeredBy']) => {
+  const getTriggerConfig = (trigger: FeatureRun['triggeredBy']) => {
     const configs = {
       manual: { icon: User, label: 'Manual', color: 'text-primary', bg: 'bg-primary/10' },
       schedule: { icon: Clock, label: 'Schedule', color: 'text-primary', bg: 'bg-primary/10' },
@@ -529,14 +529,14 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
                 'flex items-center justify-center rounded-lg bg-primary/10 flex-shrink-0',
                 isSidebarCollapsed ? 'w-8 h-8' : 'w-9 h-9'
               )}
-              title={isSidebarCollapsed ? 'Expand sidebar' : workflowName}
+              title={isSidebarCollapsed ? 'Expand sidebar' : featureName}
             >
               <Activity className="h-5 w-5 text-primary" />
             </button>
             {!isSidebarCollapsed && (
               <>
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-grey text-sm truncate">{workflowName}</h2>
+                  <h2 className="font-semibold text-grey text-sm truncate">{featureName}</h2>
                   <p className="text-xs text-grey-600 truncate">{envSlug}</p>
                 </div>
                 <button
@@ -731,7 +731,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
           )}
         </div>
 
-        {/* Footer - Expand button when collapsed, Run Workflow when expanded */}
+        {/* Footer - Expand button when collapsed, Run Feature when expanded */}
         <div className={cn('flex-shrink-0 border-t border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
           {isSidebarCollapsed ? (
             <button
@@ -747,7 +747,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
               className="w-full bg-primary hover:bg-primary/90 text-white"
             >
               <Play className="h-4 w-4 mr-2" />
-              Run Workflow
+              Run Feature
             </Button>
           )}
         </div>
@@ -764,9 +764,9 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
                   <Activity className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-grey">{workflowName}</h1>
+                  <h1 className="text-xl font-semibold text-grey">{featureName}</h1>
                   <div className="flex items-center gap-2 mt-1">
-                    <code className="text-sm text-grey-200 font-mono">{workflowTag}</code>
+                    <code className="text-sm text-grey-200 font-mono">{featureTag}</code>
                     <span className={cn(
                       'px-2 py-0.5 text-xs font-semibold rounded-full',
                       envSlug === 'production' ? 'bg-red/10 text-red ring-1 ring-red/30' :
@@ -796,7 +796,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
                   className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg shadow-primary/25"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Run Workflow
+                  Run Feature
                 </Button>
               </div>
             </div>
@@ -807,7 +807,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="flex flex-col items-center gap-3 text-grey-600">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">Loading workflow runs…</p>
+              <p className="text-sm font-medium">Loading feature runs…</p>
             </div>
           </div>
         ) : !currentWorkspaceId || !user ? (
@@ -912,11 +912,11 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
 
               <ActivityTimelinePanel
                 title="Activity timeline"
-                kind="workflow"
+                kind="feature"
                 productTag={productTag}
-                componentTag={workflowTag}
+                componentTag={featureTag}
                 countLabel="executions"
-                enabled={!!productTag && !!workflowTag}
+                enabled={!!productTag && !!featureTag}
                 className="mb-6"
               />
 
@@ -1281,9 +1281,9 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
       <Dialog open={showExecuteModal} onOpenChange={setShowExecuteModal}>
         <DialogContent className="max-w-lg bg-white border-border">
           <DialogHeader>
-            <DialogTitle className="text-grey">Run Workflow</DialogTitle>
+            <DialogTitle className="text-grey">Run Feature</DialogTitle>
             <DialogDescription className="text-grey-200">
-              Trigger a new execution of <span className="font-medium text-grey">{workflowName}</span>
+              Trigger a new execution of <span className="font-medium text-grey">{featureName}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -1308,7 +1308,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
               Cancel
             </Button>
             <Button
-              onClick={handleExecuteWorkflow}
+              onClick={handleExecuteFeature}
               disabled={isExecuting}
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white"
             >
@@ -1320,7 +1320,7 @@ export default function WorkflowExplorerTab({ tabId, workflow = {}, product }: W
               ) : (
                 <>
                   <Play className="h-4 w-4 mr-2" />
-                  Run Workflow
+                  Run Feature
                 </>
               )}
             </Button>

@@ -59,7 +59,7 @@ export type SDKModule =
   | 'resilience'
   | 'health'
   | 'fallback'
-  | 'workflow'
+  | 'feature'
   | 'secrets'
   | 'cloud';
 
@@ -884,23 +884,23 @@ export class SDKProxyService {
     },
   };
 
-  // ==================== WORKFLOW MODULE ====================
-  workflow = {
+  // ==================== FEATURE MODULE ====================
+  feature = {
     create: <T = any>(product: string, data: any) =>
-      this.execute<T>('workflow', 'create', product, data),
+      this.execute<T>('feature', 'create', product, data),
     update: <T = any>(tag: string, product: string, data: any) =>
-      this.execute<T>('workflow', 'update', tag, product, data),
+      this.execute<T>('feature', 'update', tag, product, data),
     fetch: <T = any>(tag: string, product?: string) =>
-      this.execute<T>('workflow', 'fetch', tag, product),
+      this.execute<T>('feature', 'fetch', tag, product),
     fetchAll: <T = any>(product?: string) =>
-      this.execute<T>('workflow', 'fetchAll', product),
+      this.execute<T>('feature', 'fetchAll', product),
     delete: <T = any>(tag: string, product: string) =>
-      this.execute<T>('workflow', 'delete', tag, product),
-    execute: <T = any>(data: any) => this.execute<T>('workflow', 'execute', data),
-    dispatch: <T = any>(data: any) => this.execute<T>('workflow', 'dispatch', data),
-    status: <T = any>(data: any) => this.execute<T>('workflow', 'status', data),
-    cancel: <T = any>(data: any) => this.execute<T>('workflow', 'cancel', data),
-    history: <T = any>(data: any) => this.execute<T>('workflow', 'history', data),
+      this.execute<T>('feature', 'delete', tag, product),
+    execute: <T = any>(data: any) => this.execute<T>('feature', 'execute', data),
+    dispatch: <T = any>(data: any) => this.execute<T>('feature', 'dispatch', data),
+    status: <T = any>(data: any) => this.execute<T>('feature', 'status', data),
+    cancel: <T = any>(data: any) => this.execute<T>('feature', 'cancel', data),
+    history: <T = any>(data: any) => this.execute<T>('feature', 'history', data),
   };
 
   // ==================== FALLBACK MODULE ====================

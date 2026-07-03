@@ -54,8 +54,8 @@ const componentTypes = [
   { id: 'broker', name: 'Messaging' },
   { id: 'job', name: 'Job' },
   { id: 'session', name: 'Session' },
-  { id: 'workflow', name: 'Workflow', icon: GitBranch },
-  { id: 'workflow_step', name: 'Step', icon: Layers },
+  { id: 'feature', name: 'Feature', icon: GitBranch },
+  { id: 'feature_step', name: 'Step', icon: Layers },
   { id: 'secret', name: 'Secret', icon: Lock },
   { id: 'tokens', name: 'Tokens', icon: Lock },
   { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -65,17 +65,17 @@ const componentTypes = [
   { id: 'callbacks', name: 'Callbacks', icon: Link2 },
 ];
 
-// Normalize backend type (e.g. "Workflow_step", "Secret") to lowercase id for lookup
+// Normalize backend type (e.g. "Feature_step", "Secret") to lowercase id for lookup
 const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();
 
-// Display label for log type (e.g. workflow_step -> "Step", secret -> "Secret")
+// Display label for log type (e.g. feature_step -> "Step", secret -> "Secret")
 const getLogTypeLabel = (type: string): string => {
   const id = normalizeLogType(type);
   const entry = componentTypes.find((c) => c.id === id);
   return entry?.name ?? (type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : '');
 };
 
-// Icon for each log type (Secret/Tokens: Lock; Workflow: GitBranch; Workflow_step: Step/Layers)
+// Icon for each log type (Secret/Tokens: Lock; Feature: GitBranch; Feature_step: Step/Layers)
 const getLogTypeIcon = (type: string) => {
   const id = normalizeLogType(type);
   const entry = componentTypes.find((c) => c.id === id && 'icon' in c && c.icon);
@@ -90,8 +90,8 @@ const getLogTypeIcon = (type: string) => {
     message_broker: MessageSquare,
     job: Terminal,
     session: UserCheck,
-    workflow: GitBranch,
-    workflow_step: Layers,
+    feature: GitBranch,
+    feature_step: Layers,
     secret: Lock,
     tokens: Lock,
     notifications: Bell,
@@ -146,7 +146,7 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Backend may send component (e.g. workflow, workflow_step) or type; prefer component for processor logs
+  // Backend may send component (e.g. feature, feature_step) or type; prefer component for processor logs
   const getLogComponentType = (log: ProcessLog) => (log.component || log.type || '').trim();
 
   return (
@@ -215,7 +215,7 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
                     {log.name}
                   </span>
 
-                  {/* Type with icon and label (e.g. workflow_step -> "Step", secret -> "Secret") */}
+                  {/* Type with icon and label (e.g. feature_step -> "Step", secret -> "Secret") */}
                   <span className="text-xs text-grey-600 flex items-center gap-1.5 shrink-0">
                     <TypeIcon className="h-3.5 w-3.5 flex-shrink-0 text-grey-500" />
                     <span>{getLogTypeLabel(componentType)}</span>

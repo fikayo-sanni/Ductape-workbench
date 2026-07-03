@@ -21,7 +21,7 @@ import productServices from '@/services/productServices';
 import appServices from '@/services/appServices';
 import { reconstructActionPayload } from '@/utils/payloadReconstruction';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
-import { SearchableActionPicker } from '@/components/workflow-builder';
+import { SearchableActionPicker } from '@/components/feature-builder';
 
 interface NewHealthcheckTabContentProps {
   data?: any;
@@ -58,7 +58,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       selectedApp: '',
       selectedDatabase: '',
       selectedMessageBroker: '',
-      selectedWorkflow: '',
+      selectedFeature: '',
     }
   );
   const [selectedAction, setSelectedAction] = useState(savedTabState?.selectedAction || '');
@@ -107,7 +107,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   const productDetails = productDetailsRes?.data;
   const databases = productDetails?.databases || [];
   const messageBrokers = productDetails?.messageBrokers || [];
-  const workflows = productDetails?.workflows || [];
+  const features = productDetails?.features || [];
 
   // Initialize Ductape SDK for product
   const ductape = useDuctape({
@@ -282,9 +282,9 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       } else if (formData.type === 'message_broker') {
         if (!formData.selectedMessageBroker) throw new Error('Please select a message broker');
         payload.message_broker = formData.selectedMessageBroker;
-      } else if (formData.type === 'workflow') {
-        if (!formData.selectedWorkflow) throw new Error('Please select a workflow');
-        payload.workflow = formData.selectedWorkflow;
+      } else if (formData.type === 'feature') {
+        if (!formData.selectedFeature) throw new Error('Please select a feature');
+        payload.feature = formData.selectedFeature;
       }
 
       const healthcheck = await ductape.apps.health.create(payload);
@@ -341,9 +341,9 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
         toast.error('Please select a message broker');
         return;
       }
-    } else if (formData.type === 'workflow') {
-      if (!formData.selectedWorkflow) {
-        toast.error('Please select a workflow');
+    } else if (formData.type === 'feature') {
+      if (!formData.selectedFeature) {
+        toast.error('Please select a feature');
         return;
       }
     }
@@ -366,8 +366,8 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       return formData.selectedDatabase !== '';
     } else if (formData.type === 'message_broker') {
       return formData.selectedMessageBroker !== '';
-    } else if (formData.type === 'workflow') {
-      return formData.selectedWorkflow !== '';
+    } else if (formData.type === 'feature') {
+      return formData.selectedFeature !== '';
     }
 
     return false;
@@ -593,7 +593,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                     <SelectItem value="app">App</SelectItem>
                      <SelectItem value="database">Database</SelectItem>
                      <SelectItem value="message_broker">Messaging</SelectItem>
-                     <SelectItem value="workflow">Workflow</SelectItem>
+                     <SelectItem value="feature">Feature</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-grey-600 mt-1">
@@ -857,25 +857,25 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                 </div>
               )}
 
-              {formData.type === 'workflow' && (
+              {formData.type === 'feature' && (
                 <div>
-                  <Label htmlFor="workflow" className="required">
-                    Workflow probe
+                  <Label htmlFor="feature" className="required">
+                    Feature probe
                   </Label>
                   <Select
-                    value={formData.selectedWorkflow}
-                    onValueChange={(value) => setFormData({ ...formData, selectedWorkflow: value })}
+                    value={formData.selectedFeature}
+                    onValueChange={(value) => setFormData({ ...formData, selectedFeature: value })}
                   >
                     <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select a workflow" />
+                      <SelectValue placeholder="Select a feature" />
                     </SelectTrigger>
                     <SelectContent>
-                      {workflows.length === 0 ? (
+                      {features.length === 0 ? (
                         <SelectItem value="__none__" disabled>
-                          No workflows on this product
+                          No features on this product
                         </SelectItem>
                       ) : (
-                        workflows.map((wf: any) => (
+                        features.map((wf: any) => (
                           <SelectItem key={wf.tag} value={wf.tag}>
                             {wf.name || wf.tag}
                           </SelectItem>
@@ -884,7 +884,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-grey-600 mt-1">
-                    Executes the workflow on each interval and checks completion status
+                    Executes the feature on each interval and checks completion status
                   </p>
                 </div>
               )}

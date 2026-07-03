@@ -51,7 +51,7 @@ export default function DeleteProductModal({
           </DialogTitle>
           <DialogDescription className="text-sm text-grey-600 pt-1">
             <strong className="text-red-600">Warning:</strong> This permanently deletes the
-            product and all of its resources (databases, storage, workflows, apps, and more).
+            product and all of its resources (databases, storage, features, apps, and more).
             This action cannot be undone.
           </DialogDescription>
         </DialogHeader>

@@ -89,7 +89,7 @@ type ResourceCategory =
   | 'caches'
   | 'messageBrokers'
   | 'jobs'
-  | 'workflows'
+  | 'features'
   | 'intelligence'
   | 'resilience'
   | 'notifications'
@@ -181,13 +181,13 @@ const resourceCategories: ResourceCategoryConfig[] = [
     componentType: 'job',
   },
   {
-    id: 'workflows',
-    label: 'Workflows',
+    id: 'features',
+    label: 'Features',
     icon: GitBranch,
     color: 'text-violet-600',
     bgColor: 'bg-violet-600/10',
-    dataKey: 'workflows',
-    componentType: 'workflow',
+    dataKey: 'features',
+    componentType: 'feature',
   },
   {
     id: 'intelligence',
@@ -249,8 +249,8 @@ export default function ProductTabContent({
   const [showResilienceTypeDialog, setShowResilienceTypeDialog] =
     useState(false);
   const [showJobsCodeDialog, setShowJobsCodeDialog] = useState(false);
-  const [showWorkflowsCodeDialog, setShowWorkflowsCodeDialog] = useState(false);
-  const [selectedWorkflowFn, setSelectedWorkflowFn] =
+  const [showFeaturesCodeDialog, setShowFeaturesCodeDialog] = useState(false);
+  const [selectedFeatureFn, setSelectedFeatureFn] =
     useState<string>('define');
   const [selectedJobType, setSelectedJobType] = useState<string>('app-action');
 
@@ -526,9 +526,9 @@ export default function ProductTabContent({
     if (category.id === 'jobs') {
       return (product as any)?.jobs || [];
     }
-    // Workflows
-    if (category.id === 'workflows') {
-      return (product as any)?.workflows || [];
+    // Features
+    if (category.id === 'features') {
+      return (product as any)?.features || [];
     }
     // Notifications
     if (category.id === 'notifications') {
@@ -679,11 +679,11 @@ export default function ProductTabContent({
   const handleOpenComponent = (component: any, type: string) => {
     const defaultEnv = product?.envs?.[0] ?? { slug: 'prd', name: 'Production' };
 
-    // Workflows: card click opens explorer (env chips open scoped explorer)
-    if (type === 'workflow') {
+    // Features: card click opens explorer (env chips open scoped explorer)
+    if (type === 'feature') {
       openTab({
-        id: `workflow-explorer-${component.tag}-${defaultEnv.slug}`,
-        type: 'workflow',
+        id: `feature-explorer-${component.tag}-${defaultEnv.slug}`,
+        type: 'feature',
         title: `${component.name || component.tag} (${defaultEnv.slug})`,
         itemId: `${component.tag}-${defaultEnv.slug}`,
         data: {
@@ -693,7 +693,7 @@ export default function ProductTabContent({
             logo: product?.logo,
             envs: product?.envs || [],
           },
-          workflow: {
+          feature: {
             ...component,
             name: component.name,
             tag: component.tag,
@@ -834,9 +834,9 @@ export default function ProductTabContent({
       setShowJobsCodeDialog(true);
       return;
     }
-    // Workflows: "Add" opens code sample sidebar (Defining & Executing Workflows)
-    if (type === 'workflow') {
-      setShowWorkflowsCodeDialog(true);
+    // Features: "Add" opens code sample sidebar (Defining & Executing Features)
+    if (type === 'feature') {
+      setShowFeaturesCodeDialog(true);
       return;
     }
 
@@ -989,7 +989,7 @@ export default function ProductTabContent({
       'message-broker': 'message-broker-events', // Opens directly to broker events
       session: 'session-activity', // Opens SessionActivityTab
       job: 'job-explorer', // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
-      workflow: 'workflow', // Opens WorkflowExplorerTab
+      feature: 'feature', // Opens FeatureExplorerTab
       agent: 'agent', // Opens AgentExplorerTab
       fallback: 'fallback-explorer', // Opens FallbackExplorerTab
       quota: 'quota-explorer', // Opens QuotaExplorerTab
@@ -1074,8 +1074,8 @@ export default function ProductTabContent({
         productTag: product?.tag,
         productName: product?.name,
       };
-    } else if (resourceType === 'workflow') {
-      // WorkflowExplorerTab expects product object with tag, name, and envs
+    } else if (resourceType === 'feature') {
+      // FeatureExplorerTab expects product object with tag, name, and envs
       data = {
         product: {
           tag: product?.tag,
@@ -1083,7 +1083,7 @@ export default function ProductTabContent({
           logo: product?.logo,
           envs: product?.envs || [],
         },
-        workflow: {
+        feature: {
           ...resource,
           name: resource.name,
           tag: resource.tag,
@@ -1236,7 +1236,7 @@ export default function ProductTabContent({
       (category.id === 'caches' ||
         category.id === 'sessions' ||
         category.id === 'jobs' ||
-        category.id === 'workflows' ||
+        category.id === 'features' ||
         category.id === 'resilience') &&
       product?.envs?.length;
     const itemEnvs =
@@ -1604,7 +1604,7 @@ export default function ProductTabContent({
       if (category.id === 'jobs' && item.schedule) {
         return item.schedule;
       }
-      if (category.id === 'workflows' && item.steps?.length) {
+      if (category.id === 'features' && item.steps?.length) {
         return `${item.steps.length} steps`;
       }
       // Resilience category - show type
@@ -1948,7 +1948,7 @@ export default function ProductTabContent({
       messageBrokers:
         'Set up message queues for asynchronous communication between services.',
       jobs: 'Schedule background tasks and automated workflows.',
-      workflows: 'Design multi-step processes and business logic flows.',
+      features: 'Design multi-step processes and business logic flows.',
       intelligence:
         'Configure AI agents and models for intelligent automation and predictions.',
       resilience:
@@ -2374,10 +2374,10 @@ export default function ProductTabContent({
                     variant="outline"
                     className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
                     size="sm"
-                    onClick={() => handleAddComponent('workflow')}
+                    onClick={() => handleAddComponent('feature')}
                   >
                     <Workflow className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Create Workflow</span>
+                    <span>Create Feature</span>
                   </Button>
                 </div>
               </div>
@@ -3528,23 +3528,23 @@ const job = await ductape.notifications.dispatch({
           }}
         />
       )}
-      {/* Workflows Code Sidebar */}
-      {showWorkflowsCodeDialog && (
+      {/* Features Code Sidebar */}
+      {showFeaturesCodeDialog && (
         <CodeSidebar
-          title="Workflow API"
-          subtitle="Define, execute, and manage workflows with ductape.workflow.*. Select a function below for sample code."
+          title="Feature API"
+          subtitle="Define, execute, and manage features with ductape.feature.*. Select a function below for sample code."
           tag={product?.tag}
-          onClose={() => setShowWorkflowsCodeDialog(false)}
+          onClose={() => setShowFeaturesCodeDialog(false)}
           environments={product?.envs || []}
           additionalControls={
             <div className="space-y-3 sm:space-y-4">
               <div>
                 <Label className="text-xs sm:text-sm font-semibold text-grey-700 mb-1.5 sm:mb-2 block">
-                  Workflow function
+                  Feature function
                 </Label>
                 <Select
-                  value={selectedWorkflowFn}
-                  onValueChange={setSelectedWorkflowFn}
+                  value={selectedFeatureFn}
+                  onValueChange={setSelectedFeatureFn}
                 >
                   <SelectTrigger className="w-full text-xs sm:text-sm h-8 sm:h-9 md:h-10">
                     <SelectValue />
@@ -3578,32 +3578,32 @@ const job = await ductape.notifications.dispatch({
                 </Select>
               </div>
               <a
-                href="https://docs.ductape.app/workflows/overview"
+                href="https://docs.ductape.app/features/overview"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
-                View workflow documentation
+                View feature documentation
               </a>
             </div>
           }
           generateCodeSections={(language, env) => {
             const productTag = product?.tag || 'your-product';
             const envSlug = env || 'prd';
-            const workflowFnSections: Record<
+            const featureFnSections: Record<
               string,
               Array<{title: string; code: string}>
             > = {
               define: [
                 {
-                  title: 'Define a workflow (code-first)',
+                  title: 'Define a feature (code-first)',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.define({
+await ductape.feature.define({
   product: '${productTag}',
-  tag: 'order-processing-workflow',
-  name: 'Order Processing Workflow',
+  tag: 'order-processing-feature',
+  name: 'Order Processing Feature',
   description: 'Validate, pay, and fulfill orders',
   input: {
     orderId: { type: 'string', required: true },
@@ -3627,13 +3627,13 @@ await ductape.workflow.define({
               ],
               execute: [
                 {
-                  title: 'Execute a workflow',
+                  title: 'Execute a feature',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.execute({
+const result = await ductape.feature.execute({
   product: '${productTag}',
   env: '${envSlug}',
-  tag: 'order-processing-workflow',
+  tag: 'order-processing-feature',
   input: {
     orderId: 'ORD-001',
     customerId: 'cust-123',
@@ -3648,36 +3648,36 @@ console.log('Output:', result.output);`,
               ],
               fetchAll: [
                 {
-                  title: 'List all workflows',
+                  title: 'List all features',
                   code: `import ductape from '@ductape/sdk';
 
-const workflows = await ductape.workflow.fetchAll('${productTag}');
+const features = await ductape.feature.fetchAll('${productTag}');
 
-for (const w of workflows || []) {
+for (const w of features || []) {
   console.log(w.tag, '-', w.name);
 }`,
                 },
               ],
               fetch: [
                 {
-                  title: 'Fetch a workflow by tag',
+                  title: 'Fetch a feature by tag',
                   code: `import ductape from '@ductape/sdk';
 
-const workflow = await ductape.workflow.fetch('order-processing-workflow', '${productTag}');
+const feature = await ductape.feature.fetch('order-processing-feature', '${productTag}');
 
-if (workflow) {
-  console.log(workflow.name, workflow.steps?.length, 'steps');
+if (feature) {
+  console.log(feature.name, feature.steps?.length, 'steps');
 }`,
                 },
               ],
               create: [
                 {
-                  title: 'Create workflow from JSON schema',
+                  title: 'Create feature from JSON schema',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.create('${productTag}', {
-  tag: 'manual-workflow',
-  name: 'Manual Workflow',
+await ductape.feature.create('${productTag}', {
+  tag: 'manual-feature',
+  name: 'Manual Feature',
   steps: [
     { tag: 'step-1', type: 'action', event: 'run', input: {} },
     { tag: 'step-2', type: 'action', event: 'run', input: {} },
@@ -3688,10 +3688,10 @@ await ductape.workflow.create('${productTag}', {
               ],
               update: [
                 {
-                  title: 'Update a workflow',
+                  title: 'Update a feature',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.update('order-processing-workflow', '${productTag}', {
+await ductape.feature.update('order-processing-feature', '${productTag}', {
   name: 'Order Processing (v2)',
   description: 'Updated description',
 });`,
@@ -3699,21 +3699,21 @@ await ductape.workflow.update('order-processing-workflow', '${productTag}', {
               ],
               delete: [
                 {
-                  title: 'Delete a workflow',
+                  title: 'Delete a feature',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.delete('old-workflow-tag', '${productTag}');`,
+await ductape.feature.delete('old-feature-tag', '${productTag}');`,
                 },
               ],
               dispatch: [
                 {
-                  title: 'Dispatch workflow as job',
+                  title: 'Dispatch feature as job',
                   code: `import ductape from '@ductape/sdk';
 
-const job = await ductape.workflow.dispatch({
+const job = await ductape.feature.dispatch({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow: 'order-processing-workflow',
+  feature: 'order-processing-feature',
   input: { orderId: 'ORD-1', customerId: 'c1', items: [], total: 0 },
 });
 
@@ -3722,13 +3722,13 @@ console.log('Job ID:', job.job_id);`,
               ],
               signal: [
                 {
-                  title: 'Send signal to a workflow',
+                  title: 'Send signal to a feature',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.signal({
+await ductape.feature.signal({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
   signal: 'approve',
   payload: { comment: 'Approved by admin' },
 });`,
@@ -3736,13 +3736,13 @@ await ductape.workflow.signal({
               ],
               query: [
                 {
-                  title: 'Query workflow (e.g. getStatus)',
+                  title: 'Query feature (e.g. getStatus)',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.query({
+const result = await ductape.feature.query({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
   query: 'getStatus',
 });
 
@@ -3751,13 +3751,13 @@ console.log(result);`,
               ],
               status: [
                 {
-                  title: 'Get workflow run status',
+                  title: 'Get feature run status',
                   code: `import ductape from '@ductape/sdk';
 
-const status = await ductape.workflow.status({
+const status = await ductape.feature.status({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });
 
 console.log(status?.status, status?.completed_steps);`,
@@ -3765,37 +3765,37 @@ console.log(status?.status, status?.completed_steps);`,
               ],
               cancel: [
                 {
-                  title: 'Cancel a workflow run',
+                  title: 'Cancel a feature run',
                   code: `import ductape from '@ductape/sdk';
 
-await ductape.workflow.cancel({
+await ductape.feature.cancel({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });`,
                 },
               ],
               replay: [
                 {
-                  title: 'Replay a workflow',
+                  title: 'Replay a feature',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.replay({
+const result = await ductape.feature.replay({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });`,
                 },
               ],
               restart: [
                 {
-                  title: 'Restart a workflow',
+                  title: 'Restart a feature',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.restart({
+const result = await ductape.feature.restart({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });`,
                 },
               ],
@@ -3804,10 +3804,10 @@ const result = await ductape.workflow.restart({
                   title: 'Resume from checkpoint',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.resume({
+const result = await ductape.feature.resume({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
   from_step: 'checkpoint-1',
   state: { /* saved state */ },
 });`,
@@ -3818,23 +3818,23 @@ const result = await ductape.workflow.resume({
                   title: 'Replay from a specific step',
                   code: `import ductape from '@ductape/sdk';
 
-const result = await ductape.workflow.replayFromStep({
+const result = await ductape.feature.replayFromStep({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
   from_step: 'step-2',
 });`,
                 },
               ],
               history: [
                 {
-                  title: 'Get workflow run history',
+                  title: 'Get feature run history',
                   code: `import ductape from '@ductape/sdk';
 
-const history = await ductape.workflow.history({
+const history = await ductape.feature.history({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });
 
 console.log(history.steps);`,
@@ -3845,10 +3845,10 @@ console.log(history.steps);`,
                   title: 'Get step detail',
                   code: `import ductape from '@ductape/sdk';
 
-const detail = await ductape.workflow.stepDetail({
+const detail = await ductape.feature.stepDetail({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
   step_tag: 'validate-order',
 });`,
                 },
@@ -3858,29 +3858,29 @@ const detail = await ductape.workflow.stepDetail({
                   title: 'Get related executions',
                   code: `import ductape from '@ductape/sdk';
 
-const related = await ductape.workflow.relatedExecutions({
+const related = await ductape.feature.relatedExecutions({
   product: '${productTag}',
   env: '${envSlug}',
-  workflow_id: 'your-workflow-run-id',
+  feature_id: 'your-feature-run-id',
 });`,
                 },
               ],
               compare: [
                 {
-                  title: 'Compare two workflow runs',
+                  title: 'Compare two feature runs',
                   code: `import ductape from '@ductape/sdk';
 
-const comparison = await ductape.workflow.compare({
+const comparison = await ductape.feature.compare({
   product: '${productTag}',
   env: '${envSlug}',
-  workflows: ['workflow-run-id-1', 'workflow-run-id-2'],
+  features: ['feature-run-id-1', 'feature-run-id-2'],
 });`,
                 },
               ],
             };
             return (
-              workflowFnSections[selectedWorkflowFn] ||
-              workflowFnSections['define']
+              featureFnSections[selectedFeatureFn] ||
+              featureFnSections['define']
             );
           }}
         />

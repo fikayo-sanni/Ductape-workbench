@@ -42,7 +42,7 @@ export interface IProduct {
   jobs: any[];
   healthchecks?: any[];
   notifications?: any[];
-  workflows?: any[];
+  features?: any[];
   vectors?: any[];
   agents?: any[];
   models?: any[];

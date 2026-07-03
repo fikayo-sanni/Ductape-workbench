@@ -36,7 +36,7 @@ export type ActivityComponentKind =
   | 'webhook'
   | 'agent'
   | 'job'
-  | 'workflow'
+  | 'feature'
   | 'workspace';
 
 export interface ActivityTimelineQuery {
@@ -304,8 +304,8 @@ function buildLogFilters(query: ActivityTimelineQuery): FetchLogsOptions {
       return { ...base, type: 'webhook', parent_tag: componentTag };
     case 'job':
       return { ...base, parent_tag: componentTag };
-    case 'workflow':
-      return { ...base, type: 'workflow', parent_tag: componentTag };
+    case 'feature':
+      return { ...base, type: 'feature', parent_tag: componentTag };
     case 'agent':
       return { ...base, parent_tag: componentTag };
     case 'workspace':

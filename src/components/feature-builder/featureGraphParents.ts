@@ -1,11 +1,11 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { FlowNodeKind, FlowStepNodeData } from '@/components/flow-diagram/flowModels';
-import type { MappingSource, WorkflowStepDraft } from './types';
+import type { MappingSource, FeatureStepDraft } from './types';
 
 const NON_STEP_KINDS = new Set<FlowNodeKind>(['start', 'end', 'condition', 'router']);
 
 export interface StepParentInfo {
-  /** Connected from Start — maps inputs from workflow $Input{} */
+  /** Connected from Start — maps inputs from feature $Input{} */
   isLayer1: boolean;
   /** Direct or transitive parent step tags (via condition/router nodes) */
   parentTags: string[];
@@ -75,10 +75,10 @@ export function stepHasValidParent(
   return isLayer1 || parentTags.length > 0;
 }
 
-export function validateWorkflowParentGraph(
+export function validateFeatureParentGraph(
   nodes: Node<FlowStepNodeData>[],
   edges: Edge[],
-  stepDrafts: WorkflowStepDraft[],
+  stepDrafts: FeatureStepDraft[],
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -100,16 +100,16 @@ export function validateWorkflowParentGraph(
 /** Build mapping sources from resolved parents. */
 export function buildParentMappingSources(
   parentInfo: StepParentInfo,
-  parentSteps: WorkflowStepDraft[],
-  workflowInputs: Record<string, unknown> = {},
+  parentSteps: FeatureStepDraft[],
+  featureInputs: Record<string, unknown> = {},
 ) {
   const sources: MappingSource[] = [];
 
   if (parentInfo.isLayer1) {
-    const inputKeys = Object.keys(workflowInputs);
+    const inputKeys = Object.keys(featureInputs);
     sources.push({
       id: 'input',
-      label: 'Workflow input (layer 1)',
+      label: 'Feature input (layer 1)',
       prefix: '$Input',
       fields: inputKeys.length
         ? inputKeys.map((k) => ({ key: k }))

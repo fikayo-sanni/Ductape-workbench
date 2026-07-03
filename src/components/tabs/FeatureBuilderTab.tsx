@@ -13,28 +13,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { FlowCanvas } from '@/components/flow-diagram/FlowCanvas';
-import { WorkflowStepPalette } from '@/components/flow-diagram/WorkflowStepPalette';
+import { FeatureStepPalette } from '@/components/flow-diagram/FeatureStepPalette';
 import {
-  WORKFLOW_PALETTE_ITEMS,
-  workflowStepsToFlow,
-  flowGraphToWorkflowSteps,
+  FEATURE_PALETTE_ITEMS,
+  featureStepsToFlow,
+  flowGraphToFeatureSteps,
   type FlowNodeKind,
   type FlowStepNodeData,
 } from '@/components/flow-diagram/flowModels';
 import {
-  WorkflowStepInspector,
+  FeatureStepInspector,
   resolveStepParents,
-  validateWorkflowParentGraph,
-} from '@/components/workflow-builder';
-import type { ProductContext, WorkflowStepDraft } from '@/components/workflow-builder/types';
+  validateFeatureParentGraph,
+} from '@/components/feature-builder';
+import type { ProductContext, FeatureStepDraft } from '@/components/feature-builder/types';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
 import { useAuth } from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import toast from 'react-hot-toast';
 
-interface WorkflowBuilderTabProps {
+interface FeatureBuilderTabProps {
   tabId?: string;
-  workflow: {
+  feature: {
     tag?: string;
     name?: string;
     description?: string;
@@ -56,7 +56,7 @@ function nextStepTag(existing: Node<FlowStepNodeData>[]): string {
   return `step-${next}`;
 }
 
-function stepsToDrafts(steps: Array<Record<string, unknown>> = []): WorkflowStepDraft[] {
+function stepsToDrafts(steps: Array<Record<string, unknown>> = []): FeatureStepDraft[] {
   return steps.map((step, index) => ({
     tag: String(step.tag || `step-${index + 1}`),
     name: step.name ? String(step.name) : undefined,
@@ -70,7 +70,7 @@ function stepsToDrafts(steps: Array<Record<string, unknown>> = []): WorkflowStep
     broker: step.broker ? String(step.broker) : undefined,
     quota: step.quota ? String(step.quota) : undefined,
     fallback: step.fallback ? String(step.fallback) : undefined,
-    workflow: step.workflow ? String(step.workflow) : undefined,
+    feature: step.feature ? String(step.feature) : undefined,
     event: String(step.event || 'run'),
     input: (step.input as Record<string, unknown>) || {},
     output: step.output as Record<string, unknown> | undefined,
@@ -80,25 +80,25 @@ function stepsToDrafts(steps: Array<Record<string, unknown>> = []): WorkflowStep
   }));
 }
 
-export default function WorkflowBuilderTab({
-  workflow,
+export default function FeatureBuilderTab({
+  feature,
   productTag,
   productName,
   productId,
   productEnvs = [],
-}: WorkflowBuilderTabProps) {
+}: FeatureBuilderTabProps) {
   const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
   const proxy = useResilienceProxy();
 
   const [editMode, setEditMode] = useState(false);
-  const [stepDrafts, setStepDrafts] = useState<WorkflowStepDraft[]>(() =>
-    stepsToDrafts(workflow.steps || []),
+  const [stepDrafts, setStepDrafts] = useState<FeatureStepDraft[]>(() =>
+    stepsToDrafts(feature.steps || []),
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-  const baseFlow = useMemo(() => workflowStepsToFlow(stepDrafts as any), [stepDrafts]);
+  const baseFlow = useMemo(() => featureStepsToFlow(stepDrafts as any), [stepDrafts]);
   const [builderNodes, setBuilderNodes] = useState<Node<FlowStepNodeData>[]>(baseFlow.nodes);
   const [builderEdges, setBuilderEdges] = useState<Edge[]>(baseFlow.edges);
 
@@ -108,14 +108,14 @@ export default function WorkflowBuilderTab({
 
   useEffect(() => {
     if (!editMode) {
-      const flow = workflowStepsToFlow(stepDrafts as any);
+      const flow = featureStepsToFlow(stepDrafts as any);
       setBuilderNodes(flow.nodes);
       setBuilderEdges(flow.edges);
     }
   }, [stepDrafts, editMode]);
 
   const { data: productAppsRes } = useQuery({
-    queryKey: ['workflow-product-apps', productId],
+    queryKey: ['feature-product-apps', productId],
     queryFn: () =>
       productServices.fetchProductApps({
         user_id: user?._id || '',
@@ -127,7 +127,7 @@ export default function WorkflowBuilderTab({
   });
 
   const { data: productDetailsRes } = useQuery({
-    queryKey: ['workflow-product-details', productId],
+    queryKey: ['feature-product-details', productId],
     queryFn: () =>
       productServices.fetchProduct({
         user_id: user?._id || '',
@@ -152,7 +152,7 @@ export default function WorkflowBuilderTab({
       graphs: details?.graphs || [],
       vectors: details?.vectors || [],
       messageBrokers: details?.messageBrokers || [],
-      workflows: details?.workflows || [],
+      features: details?.features || [],
     };
   }, [productAppsRes, productDetailsRes, productId, productTag, productName, productEnvs]);
 
@@ -194,7 +194,7 @@ export default function WorkflowBuilderTab({
 
   const syncStepsFromGraph = useCallback(
     (nodes: Node<FlowStepNodeData>[], edges: Edge[]) => {
-      setStepDrafts((prev) => flowGraphToWorkflowSteps(nodes, edges, prev));
+      setStepDrafts((prev) => flowGraphToFeatureSteps(nodes, edges, prev));
     },
     [],
   );
@@ -226,7 +226,7 @@ export default function WorkflowBuilderTab({
             animated: true,
           },
         ]);
-        const draft: WorkflowStepDraft = {
+        const draft: FeatureStepDraft = {
           tag: stepTag,
           type,
           name: label,
@@ -244,10 +244,10 @@ export default function WorkflowBuilderTab({
   const handleCanvasDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const raw = e.dataTransfer.getData('application/ductape-workflow-step');
+      const raw = e.dataTransfer.getData('application/ductape-feature-step');
       if (!raw) return;
       try {
-        const item = JSON.parse(raw) as (typeof WORKFLOW_PALETTE_ITEMS)[number];
+        const item = JSON.parse(raw) as (typeof FEATURE_PALETTE_ITEMS)[number];
         addStepNode(item.type, item.label, item.kind);
       } catch {
         /* ignore */
@@ -256,7 +256,7 @@ export default function WorkflowBuilderTab({
     [addStepNode],
   );
 
-  const handleUpdateStep = useCallback((tag: string, updates: Partial<WorkflowStepDraft>) => {
+  const handleUpdateStep = useCallback((tag: string, updates: Partial<FeatureStepDraft>) => {
     setStepDrafts((steps) =>
       steps.map((s) => (s.tag === tag ? { ...s, ...updates } : s)),
     );
@@ -274,24 +274,24 @@ export default function WorkflowBuilderTab({
     );
   }, []);
 
-  const { mutateAsync: saveWorkflow, isPending: isSaving } = useMutation({
+  const { mutateAsync: saveFeature, isPending: isSaving } = useMutation({
     mutationFn: async () => {
       if (!proxy) throw new Error('SDK proxy not available');
-      if (!productTag || !workflow.tag) throw new Error('Product or workflow tag missing');
+      if (!productTag || !feature.tag) throw new Error('Product or feature tag missing');
 
-      const parentCheck = validateWorkflowParentGraph(builderNodes, builderEdges, stepDrafts);
+      const parentCheck = validateFeatureParentGraph(builderNodes, builderEdges, stepDrafts);
       if (!parentCheck.valid) {
         throw new Error(parentCheck.errors[0] || 'Every step must have a parent');
       }
 
       await proxy.product.init(productTag);
 
-      const serialized = flowGraphToWorkflowSteps(builderNodes, builderEdges, stepDrafts);
+      const serialized = flowGraphToFeatureSteps(builderNodes, builderEdges, stepDrafts);
       const payload = {
-        name: workflow.name,
-        description: workflow.description,
-        tag: workflow.tag,
-        input: workflow.input,
+        name: feature.name,
+        description: feature.description,
+        tag: feature.tag,
+        input: feature.input,
         steps: serialized.map((s) => ({
           ...s,
           input: s.input || {},
@@ -299,29 +299,29 @@ export default function WorkflowBuilderTab({
       };
 
       try {
-        await proxy.workflow.update(workflow.tag, productTag, payload);
+        await proxy.feature.update(feature.tag, productTag, payload);
       } catch {
-        await proxy.workflow.create(productTag, payload);
+        await proxy.feature.create(productTag, payload);
       }
 
       return payload;
     },
     onSuccess: () => {
-      toast.success('Workflow saved');
+      toast.success('Feature saved');
       setEditMode(false);
     },
     onError: (err: any) => {
-      toast.error(err?.message || 'Failed to save workflow');
+      toast.error(err?.message || 'Failed to save feature');
     },
   });
 
   const openEnvExplorer = (envSlug: string) => {
-    if (!workflow.tag || !productTag) return;
+    if (!feature.tag || !productTag) return;
     openTab({
-      id: `workflow-explorer-${workflow.tag}-${envSlug}`,
-      type: 'workflow',
-      title: `${workflow.name || workflow.tag} (${envSlug})`,
-      itemId: `${workflow.tag}-${envSlug}`,
+      id: `feature-explorer-${feature.tag}-${envSlug}`,
+      type: 'feature',
+      title: `${feature.name || feature.tag} (${envSlug})`,
+      itemId: `${feature.tag}-${envSlug}`,
       data: {
         isExplorer: true,
         product: {
@@ -329,9 +329,9 @@ export default function WorkflowBuilderTab({
           name: productName,
           envs: productEnvs,
         },
-        workflow: {
-          ...workflow,
-          tag: workflow.tag,
+        feature: {
+          ...feature,
+          tag: feature.tag,
           productTag,
           env: { slug: envSlug },
         },
@@ -358,7 +358,7 @@ export default function WorkflowBuilderTab({
   return (
     <div className="flex-1 flex min-h-0 w-full overflow-hidden bg-grey-100">
       {editMode ? (
-        <WorkflowStepPalette onAddStep={addStepNode} />
+        <FeatureStepPalette onAddStep={addStepNode} />
       ) : null}
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
@@ -369,9 +369,9 @@ export default function WorkflowBuilderTab({
             </div>
             <div className="min-w-0">
               <h1 className="text-base font-semibold text-grey truncate">
-                {workflow.name || workflow.tag || 'Workflow'}
+                {feature.name || feature.tag || 'Feature'}
               </h1>
-              <p className="text-xs text-grey-600 font-mono truncate">{workflow.tag}</p>
+              <p className="text-xs text-grey-600 font-mono truncate">{feature.tag}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -410,8 +410,8 @@ export default function WorkflowBuilderTab({
               type="button"
               size="sm"
               className="h-8 gap-1"
-              disabled={isSaving || !workflow.tag || !productTag}
-              onClick={() => saveWorkflow()}
+              disabled={isSaving || !feature.tag || !productTag}
+              onClick={() => saveFeature()}
             >
               {isSaving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -423,9 +423,9 @@ export default function WorkflowBuilderTab({
           </div>
         </div>
 
-        {workflow.description ? (
+        {feature.description ? (
           <p className="shrink-0 px-4 py-2 text-sm text-grey-600 bg-white border-b border-grey-200">
-            {workflow.description}
+            {feature.description}
           </p>
         ) : null}
 
@@ -474,7 +474,7 @@ export default function WorkflowBuilderTab({
           </div>
 
           {editMode && (selectedNode || selectedEdge) ? (
-            <WorkflowStepInspector
+            <FeatureStepInspector
               node={selectedNode}
               edge={selectedEdge}
               stepDraft={selectedStepDraft}
@@ -482,7 +482,7 @@ export default function WorkflowBuilderTab({
               connectedApps={connectedApps}
               parentInfo={selectedParentInfo}
               parentSteps={selectedParentSteps}
-              workflowInputs={workflow.input}
+              featureInputs={feature.input}
               onClose={() => {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);
@@ -511,7 +511,7 @@ export default function WorkflowBuilderTab({
               }}
             />
             <span className="text-[11px] text-grey-500">
-              Connect steps from Start (layer 1 → workflow input) or from parent steps (map from $Step output)
+              Connect steps from Start (layer 1 → feature input) or from parent steps (map from $Step output)
             </span>
           </div>
         ) : null}

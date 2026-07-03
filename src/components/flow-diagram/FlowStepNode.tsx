@@ -32,7 +32,7 @@ const KIND_STYLES: Record<
   database: { icon: Database, border: 'border-violet-400', bg: 'bg-violet-50', text: 'text-violet-700' },
   graph: { icon: Share2, border: 'border-purple-400', bg: 'bg-purple-50', text: 'text-purple-700' },
   vector: { icon: Share2, border: 'border-fuchsia-400', bg: 'bg-fuchsia-50', text: 'text-fuchsia-700' },
-  workflow: { icon: Workflow, border: 'border-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700' },
+  feature: { icon: Workflow, border: 'border-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700' },
   quota: { icon: Timer, border: 'border-orange-400', bg: 'bg-orange-50', text: 'text-orange-700' },
   fallback: { icon: Shield, border: 'border-rose-400', bg: 'bg-rose-50', text: 'text-rose-700' },
   healthcheck: { icon: Heart, border: 'border-rose-400', bg: 'bg-rose-50', text: 'text-rose-700' },

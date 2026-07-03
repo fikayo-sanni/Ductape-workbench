@@ -38,10 +38,10 @@ import { useAuth } from '@/store/useAuth';
 import { getTabState, saveTabState } from '@/lib/tab-state-manager';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
-  fetchWorkflowStepResults,
+  fetchFeatureStepResults,
   shortProcessId,
   type ProcessorResultApiItem,
-} from '@/services/workflowRunsService';
+} from '@/services/featureRunsService';
 
 type StepStatus = 'completed' | 'failed' | 'running' | 'pending' | 'skipped' | 'retrying';
 type RunStatus = 'completed' | 'failed' | 'running' | 'pending' | 'cancelled' | 'timeout';
@@ -69,7 +69,7 @@ function formatListFieldForPre(value: string | object | null | undefined): strin
   return JSON.stringify(value, null, 2);
 }
 
-interface WorkflowRun {
+interface FeatureRun {
   id: string;
   runNumber: number;
   status: RunStatus;
@@ -86,16 +86,16 @@ interface WorkflowRun {
   tags?: string[];
 }
 
-interface WorkflowRunTabProps {
+interface FeatureRunTabProps {
   tabId?: string;
-  run: WorkflowRun;
-  workflowName?: string;
-  workflowTag?: string;
+  run: FeatureRun;
+  featureName?: string;
+  featureTag?: string;
   /** Workspace id when run was opened (fallback when store has none) */
   workspaceId?: string | null;
 }
 
-interface WorkflowRunFormState {
+interface FeatureRunFormState {
   expandedStepIds: string[];
   activeStepTab: 'output' | 'logs' | 'metadata';
 }
@@ -114,7 +114,7 @@ const formatTime = (dateStr: string) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, workspaceId: tabWorkspaceId }: WorkflowRunTabProps) {
+export default function FeatureRunTab({ tabId, run, featureName, featureTag, workspaceId: tabWorkspaceId }: FeatureRunTabProps) {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [activeStepTab, setActiveStepTab] = useState<'output' | 'logs' | 'metadata'>('output');
   const hasRestoredRef = useRef(false);
@@ -122,14 +122,14 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
   const hasAlertedDisabledRef = useRef(false);
   const { user, currentWorkspaceId: authWorkspaceId } = useAuth();
   const workbenchWorkspaceId = useWorkbenchStore((s) => s.currentWorkspaceId);
-  // Same source as WorkflowExplorerTab (auth); then workbench; then workspace saved when run tab was opened
+  // Same source as FeatureExplorerTab (auth); then workbench; then workspace saved when run tab was opened
   const currentWorkspaceId = authWorkspaceId ?? workbenchWorkspaceId ?? tabWorkspaceId ?? undefined;
 
   // Restore state from tab state on mount (page refresh / tab switch back)
   useEffect(() => {
     if (!tabId || hasRestoredRef.current) return;
     const saved = getTabState(tabId);
-    const form = saved?.formState as WorkflowRunFormState | undefined;
+    const form = saved?.formState as FeatureRunFormState | undefined;
     if (form) {
       if (Array.isArray(form.expandedStepIds)) setExpandedSteps(new Set(form.expandedStepIds));
       if (form.activeStepTab != null) setActiveStepTab(form.activeStepTab);
@@ -144,44 +144,44 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
       skipNextSaveRef.current = false;
       return;
     }
-    const formState: WorkflowRunFormState = {
+    const formState: FeatureRunFormState = {
       expandedStepIds: Array.from(expandedSteps),
       activeStepTab,
     };
     saveTabState(
       tabId,
-      'workflow-run',
-      `${workflowName ?? 'Run'} – ${run.id.slice(0, 8)}`,
+      'feature-run',
+      `${featureName ?? 'Run'} – ${run.id.slice(0, 8)}`,
       {},
       formState,
       run.id
     );
-  }, [tabId, workflowName, run.id, expandedSteps, activeStepTab]);
+  }, [tabId, featureName, run.id, expandedSteps, activeStepTab]);
 
   // Save on unmount (e.g. user switches to another tab) so state is never lost
   useEffect(() => {
     if (!tabId) return;
     return () => {
-      const formState: WorkflowRunFormState = {
+      const formState: FeatureRunFormState = {
         expandedStepIds: Array.from(expandedSteps),
         activeStepTab,
       };
       saveTabState(
         tabId,
-        'workflow-run',
-        `${workflowName ?? 'Run'} – ${run.id.slice(0, 8)}`,
+        'feature-run',
+        `${featureName ?? 'Run'} – ${run.id.slice(0, 8)}`,
         {},
         formState,
         run.id
       );
     };
-  }, [tabId, workflowName, run.id, expandedSteps, activeStepTab]);
+  }, [tabId, featureName, run.id, expandedSteps, activeStepTab]);
 
-  // Run id is the workflow execution id (process_id of the run); step results are stored with workflow_id = this id
-  const workflowExecutionId = run.id || (run as { process_id?: string }).process_id || '';
+  // Run id is the feature execution id (process_id of the run); step results are stored with feature_id = this id
+  const featureExecutionId = run.id || (run as { process_id?: string }).process_id || '';
 
   const canFetchSteps =
-    Boolean(workflowExecutionId) &&
+    Boolean(featureExecutionId) &&
     Boolean(currentWorkspaceId) &&
     Boolean(user?._id) &&
     Boolean(user?.public_key);
@@ -191,15 +191,15 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
 
   // Troubleshooting: log why steps fetch may not run
   useEffect(() => {
-    console.log('[WorkflowRunTab] Steps fetch state', {
-      workflowExecutionId: workflowExecutionId || '(empty)',
+    console.log('[FeatureRunTab] Steps fetch state', {
+      featureExecutionId: featureExecutionId || '(empty)',
       currentWorkspaceId: currentWorkspaceId ?? '(null)',
       userId: user?._id ?? '(null)',
       hasPublicKey: Boolean(user?.public_key),
       canFetchSteps,
       queryEnabled,
     });
-    if (!queryEnabled && workflowExecutionId) {
+    if (!queryEnabled && featureExecutionId) {
       const reason = !currentWorkspaceId
         ? 'No workspace selected'
         : !user?._id
@@ -207,7 +207,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
           : !user?.public_key
             ? 'No public key'
             : 'Unknown';
-      console.warn('[WorkflowRunTab] Steps fetch DISABLED:', reason);
+      console.warn('[FeatureRunTab] Steps fetch DISABLED:', reason);
       if (!hasAlertedDisabledRef.current) {
         hasAlertedDisabledRef.current = true;
         //alert(`Steps fetch is disabled: ${reason}. Check console for details.`);
@@ -215,7 +215,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
     } else if (queryEnabled) {
       hasAlertedDisabledRef.current = false;
     }
-  }, [workflowExecutionId, currentWorkspaceId, user?._id, user?.public_key, canFetchSteps, queryEnabled]);
+  }, [featureExecutionId, currentWorkspaceId, user?._id, user?.public_key, canFetchSteps, queryEnabled]);
 
   const {
     data: stepResults = [],
@@ -223,17 +223,17 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
     isError: stepsError,
     refetch: refetchSteps,
   } = useQuery({
-    queryKey: ['workflow-run-steps', workflowExecutionId, currentWorkspaceId, user?._id],
+    queryKey: ['feature-run-steps', featureExecutionId, currentWorkspaceId, user?._id],
     queryFn: async () => {
-      const results = await fetchWorkflowStepResults({
-        workflow_id: workflowExecutionId,
+      const results = await fetchFeatureStepResults({
+        feature_id: featureExecutionId,
         workspace_id: currentWorkspaceId ?? '',
         user_id: user?._id ?? '',
         public_key: user?.public_key ?? '',
-        component: 'workflow_step',
+        component: 'feature_step',
         limit: 200,
       });
-      console.log('[WorkflowRunTab] fetchWorkflowStepResults RESULT', { count: results?.length ?? 0, results });
+      console.log('[FeatureRunTab] fetchFeatureStepResults RESULT', { count: results?.length ?? 0, results });
       return results;
     },
     enabled: queryEnabled,
@@ -242,7 +242,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
 
   // Troubleshooting: log step results when they change
   useEffect(() => {
-    console.log('[WorkflowRunTab] stepResults updated', {
+    console.log('[FeatureRunTab] stepResults updated', {
       count: stepResults?.length ?? 0,
       isLoading: stepsLoading,
       isError: stepsError,
@@ -278,7 +278,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
     return configs[status] || configs.pending;
   };
 
-  const getTriggerConfig = (trigger: WorkflowRun['triggeredBy']) => {
+  const getTriggerConfig = (trigger: FeatureRun['triggeredBy']) => {
     const configs = {
       manual: { icon: User, label: 'Manual', color: 'text-primary', bg: 'bg-primary/10' },
       schedule: { icon: Clock, label: 'Schedule', color: 'text-primary', bg: 'bg-primary/10' },
@@ -353,7 +353,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
           {/* Top row: Icon, title, status, actions */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              {/* Workflow Icon */}
+              {/* Feature Icon */}
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Activity className="h-6 w-6 text-primary" />
               </div>
@@ -379,10 +379,10 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
                   </button>
                 </div>
                 <div className="flex items-center gap-4 mt-1.5">
-                  {workflowName && (
+                  {featureName && (
                     <div className="flex items-center gap-1.5 text-sm text-grey-600">
-                      <span className="font-medium text-grey">{workflowName}</span>
-                      {workflowTag && <code className="text-xs text-grey-400 font-mono">{workflowTag}</code>}
+                      <span className="font-medium text-grey">{featureName}</span>
+                      {featureTag && <code className="text-xs text-grey-400 font-mono">{featureTag}</code>}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-grey-600">
@@ -537,7 +537,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
             </div>
           )}
 
-          {/* Workflow visualization: linear flow of steps */}
+          {/* Feature visualization: linear flow of steps */}
           <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
             <div className="px-5 py-4 border-b border-border">
               <div className="flex items-center gap-3">
@@ -545,7 +545,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
                   <GitBranch className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-grey">Workflow</h3>
+                  <h3 className="font-semibold text-grey">Feature</h3>
                   <p className="text-xs text-grey-500">
                     {stepsLoading ? 'Loading…' : `${steps.length} step${steps.length === 1 ? '' : 's'} in execution order`}
                   </p>
@@ -949,7 +949,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h4 className="font-medium text-grey text-sm">Workflow Input</h4>
+                <h4 className="font-medium text-grey text-sm">Feature Input</h4>
                 <button
                   onClick={() => copyToClipboard(JSON.stringify(run.input, null, 2), 'Input')}
                   className="text-grey-700 hover:text-grey-200 transition-colors"
@@ -964,7 +964,7 @@ export default function WorkflowRunTab({ tabId, run, workflowName, workflowTag, 
 
             <div className="bg-white rounded-xl border border-border overflow-hidden shadow-sm">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h4 className="font-medium text-grey text-sm">Workflow Output</h4>
+                <h4 className="font-medium text-grey text-sm">Feature Output</h4>
                 {run.output && (
                   <button
                     onClick={() => copyToClipboard(JSON.stringify(run.output, null, 2), 'Output')}

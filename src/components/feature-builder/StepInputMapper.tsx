@@ -138,7 +138,7 @@ export function StepInputMapper({
       <p className="text-xs text-grey-600">
         {parentHint || (
           <>
-            Map asset parameters from workflow input, parent step output, or a literal.
+            Map asset parameters from feature input, parent step output, or a literal.
           </>
         )}
       </p>
@@ -247,7 +247,7 @@ export function StepInputMapper({
           </div>
 
           <div>
-            <Label className="text-[10px] text-grey-600 mb-1 block">Source (workflow input or parent output)</Label>
+            <Label className="text-[10px] text-grey-600 mb-1 block">Source (feature input or parent output)</Label>
             <MappingValueSelect
               value={customValueKey}
               sources={sources}

@@ -18,23 +18,23 @@ import { SearchableActionPicker } from './SearchableActionPicker';
 import { StepInputMapper } from './StepInputMapper';
 import { StepOutputPreview } from './StepOutputPreview';
 import { ConditionEditor } from './ConditionEditor';
-import type { ProductContext, WorkflowStepDraft } from './types';
+import type { ProductContext, FeatureStepDraft } from './types';
 import {
   buildParentMappingSources,
   type StepParentInfo,
-} from './workflowGraphParents';
+} from './featureGraphParents';
 
-interface WorkflowStepInspectorProps {
+interface FeatureStepInspectorProps {
   node: Node<FlowStepNodeData> | null;
   edge: Edge | null;
-  stepDraft: WorkflowStepDraft | null;
+  stepDraft: FeatureStepDraft | null;
   product: ProductContext;
   connectedApps: any[];
   parentInfo: StepParentInfo;
-  parentSteps: WorkflowStepDraft[];
-  workflowInputs?: Record<string, unknown>;
+  parentSteps: FeatureStepDraft[];
+  featureInputs?: Record<string, unknown>;
   onClose: () => void;
-  onUpdateStep: (tag: string, updates: Partial<WorkflowStepDraft>) => void;
+  onUpdateStep: (tag: string, updates: Partial<FeatureStepDraft>) => void;
   onUpdateNode: (nodeId: string, data: Partial<FlowStepNodeData>) => void;
   onUpdateEdge: (edgeId: string, updates: Partial<Edge>) => void;
 }
@@ -49,7 +49,7 @@ function stepTypeFromKind(kind: string): string {
     storage: 'storage',
     notification: 'notification',
     graph: 'graph',
-    workflow: 'child_workflow',
+    feature: 'child_workflow',
     quota: 'quota',
     fallback: 'fallback',
     healthcheck: 'healthcheck',
@@ -57,7 +57,7 @@ function stepTypeFromKind(kind: string): string {
   return map[kind] || kind;
 }
 
-export function WorkflowStepInspector({
+export function FeatureStepInspector({
   node,
   edge,
   stepDraft,
@@ -65,15 +65,15 @@ export function WorkflowStepInspector({
   connectedApps,
   parentInfo,
   parentSteps,
-  workflowInputs = {},
+  featureInputs = {},
   onClose,
   onUpdateStep,
   onUpdateNode,
   onUpdateEdge,
-}: WorkflowStepInspectorProps) {
+}: FeatureStepInspectorProps) {
   const mappingSources = useMemo(
-    () => buildParentMappingSources(parentInfo, parentSteps, workflowInputs),
-    [parentInfo, parentSteps, workflowInputs],
+    () => buildParentMappingSources(parentInfo, parentSteps, featureInputs),
+    [parentInfo, parentSteps, featureInputs],
   );
 
   const hasValidParent = parentInfo.isLayer1 || parentInfo.parentTags.length > 0;
@@ -193,7 +193,7 @@ export function WorkflowStepInspector({
         >
           <p className="font-semibold mb-1">Parents</p>
           {!hasValidParent ? (
-            <p>Connect this step from <strong>Start</strong> (layer 1, uses workflow input) or from one or more parent steps.</p>
+            <p>Connect this step from <strong>Start</strong> (layer 1, uses feature input) or from one or more parent steps.</p>
           ) : parentInfo.isLayer1 ? (
             <p>Layer 1 — parent is <code className="font-mono">$Input{'{field}'}</code></p>
           ) : (
@@ -389,21 +389,21 @@ export function WorkflowStepInspector({
           </>
         )}
 
-        {kind === 'workflow' && product.workflows && (
+        {kind === 'feature' && product.features && (
           <>
-            <Label>Sub-workflow</Label>
+            <Label>Sub-feature</Label>
             <Select
-              value={stepDraft.workflow || ''}
+              value={stepDraft.feature || ''}
               onValueChange={(tag) => {
-                onUpdateStep(stepDraft.tag, { workflow: tag, event: tag, type: 'child_workflow' });
-                onUpdateNode(node.id, { meta: { ...node.data.meta, workflow: tag } });
+                onUpdateStep(stepDraft.tag, { feature: tag, event: tag, type: 'child_workflow' });
+                onUpdateNode(node.id, { meta: { ...node.data.meta, feature: tag } });
               }}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select workflow" />
+                <SelectValue placeholder="Select feature" />
               </SelectTrigger>
               <SelectContent>
-                {product.workflows.map((w) => (
+                {product.features.map((w) => (
                   <SelectItem key={w.tag} value={w.tag}>
                     {w.name || w.tag}
                   </SelectItem>
@@ -436,7 +436,7 @@ export function WorkflowStepInspector({
         <StepInputMapper
           title={
             parentInfo.isLayer1
-              ? 'Input mapping (from workflow input)'
+              ? 'Input mapping (from feature input)'
               : 'Input mapping (from parent output)'
           }
           action={selectedActionData}
@@ -445,7 +445,7 @@ export function WorkflowStepInspector({
           sources={mappingSources}
           parentHint={
             parentInfo.isLayer1
-              ? 'Layer 1 steps map from $Input{field}'
+              ? 'Layer 1 steps map from $Input{field} (feature input)'
               : parentSteps.length
                 ? `Map from parent output: ${parentInfo.parentTags.join(', ')}`
                 : 'Connect a parent step to enable output mapping'

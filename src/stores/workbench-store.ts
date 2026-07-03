@@ -222,7 +222,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   openTab: (tab) =>
     set((state) => {
       const tabType = tab.type as string;
-      if (tabType === 'workflow-builder' || tabType === 'resilience-flow') {
+      if (tabType === 'feature-builder' || tabType === 'resilience-flow') {
         return state;
       }
       // Check if tab already exists by:
@@ -707,14 +707,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
               event: (tab.data as any).job.event,
               schedule: (tab.data as any).job.schedule,
             } : undefined,
-            // Workflow explorer - workflow + product so tab restores after refresh
-            workflow: (tab.data as any).workflow ? {
-              name: (tab.data as any).workflow.name,
-              tag: (tab.data as any).workflow.tag,
-              productTag: (tab.data as any).workflow.productTag,
-              env: (tab.data as any).workflow.env ? { slug: (tab.data as any).workflow.env.slug } : undefined,
+            // Feature explorer - feature + product so tab restores after refresh
+            feature: (tab.data as any).feature ? {
+              name: (tab.data as any).feature.name,
+              tag: (tab.data as any).feature.tag,
+              productTag: (tab.data as any).feature.productTag,
+              env: (tab.data as any).feature.env ? { slug: (tab.data as any).feature.env.slug } : undefined,
             } : undefined,
-            // Workflow run tab - minimal run + workflow context for restore (include completed_steps/step_outputs for step fallback)
+            // Feature run tab - minimal run + feature context for restore (include completed_steps/step_outputs for step fallback)
             run: (tab.data as any).run ? {
               id: (tab.data as any).run.id,
               runNumber: (tab.data as any).run.runNumber,
@@ -732,8 +732,8 @@ export const useWorkbenchStore = create<WorkbenchState>()(
               step_outputs: (tab.data as any).run.step_outputs,
               failed_step: (tab.data as any).run.failed_step,
             } : undefined,
-            workflowName: (tab.data as any).workflowName,
-            workflowTag: (tab.data as any).workflowTag,
+            featureName: (tab.data as any).featureName,
+            featureTag: (tab.data as any).featureTag,
             // Exclude large fields like full app object, versions, actions, webhooks, etc.
           } : undefined,
         })),

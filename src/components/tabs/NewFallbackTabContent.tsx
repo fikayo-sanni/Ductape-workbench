@@ -24,15 +24,16 @@ import { Shield, Save, CheckCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
-import { StepEventTypes, DataTypes } from '@ductape/sdk/dist/types';
+import { DataTypes } from '@ductape/sdk/dist/types';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import productServices from '@/services/productServices';
 import {
   ComponentResourcePicker,
   StepInputMapper,
   StepOutputPreview,
-} from '@/components/workflow-builder';
-import type { ProductContext, ResilienceOptionDraft } from '@/components/workflow-builder/types';
+} from '@/components/feature-builder';
+import type { ProductContext, ResilienceOptionDraft } from '@/components/feature-builder/types';
+import { StepEventTypes } from '@/components/feature-builder/types';
 
 interface NewFallbackTabContentProps {
   tabId: string;

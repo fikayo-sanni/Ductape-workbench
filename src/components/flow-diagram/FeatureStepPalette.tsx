@@ -1,11 +1,11 @@
-import { WORKFLOW_PALETTE_ITEMS, type FlowNodeKind } from './flowModels';
+import { FEATURE_PALETTE_ITEMS, type FlowNodeKind } from './flowModels';
 import { cn } from '@/lib/utils';
 
-interface WorkflowStepPaletteProps {
+interface FeatureStepPaletteProps {
   onAddStep: (type: string, label: string, kind: FlowNodeKind) => void;
 }
 
-export function WorkflowStepPalette({ onAddStep }: WorkflowStepPaletteProps) {
+export function FeatureStepPalette({ onAddStep }: FeatureStepPaletteProps) {
   return (
     <div className="w-56 shrink-0 border-r border-grey-300 bg-white flex flex-col">
       <div className="px-4 py-3 border-b border-grey-300">
@@ -13,13 +13,13 @@ export function WorkflowStepPalette({ onAddStep }: WorkflowStepPaletteProps) {
         <p className="text-[11px] text-grey-500 mt-0.5">Drag or click to add to canvas</p>
       </div>
       <div className="flex-1 overflow-auto p-3 space-y-2">
-        {WORKFLOW_PALETTE_ITEMS.map((item) => (
+        {FEATURE_PALETTE_ITEMS.map((item) => (
           <button
             key={item.type}
             type="button"
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.setData('application/ductape-workflow-step', JSON.stringify(item));
+              e.dataTransfer.setData('application/ductape-feature-step', JSON.stringify(item));
               e.dataTransfer.effectAllowed = 'move';
             }}
             onClick={() => onAddStep(item.type, item.label, item.kind)}

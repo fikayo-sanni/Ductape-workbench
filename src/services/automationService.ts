@@ -452,14 +452,14 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
-      workflow: {
+      feature: {
         canInspectForms: true,
         canFillForms: true,
         canTriggerActions: true,
-        availableActions: ['runWorkflow', 'configureWorkflow'],
-        formIds: ['workflow-form'],
+        availableActions: ['runFeature', 'configureFeature'],
+        formIds: ['feature-form'],
       },
-      'workflow-run': {
+      'feature-run': {
         canInspectForms: false,
         canFillForms: false,
         canTriggerActions: false,
@@ -876,8 +876,8 @@ export class AutomationService {
       pricing: 'Pricing',
       'session-user': 'Session User',
       'healthcheck-explorer': 'Health Check Explorer',
-      workflow: 'Workflow',
-      'workflow-run': 'Workflow Run',
+      feature: 'Feature',
+      'feature-run': 'Feature Run',
       agent: 'Agent',
       'agent-run': 'Agent Run',
       'notification-explorer': 'Notification Explorer',

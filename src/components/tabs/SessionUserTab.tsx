@@ -107,8 +107,8 @@ const componentTypes = [
   { id: 'consumer', name: 'Consumer', icon: Headphones },
   { id: 'jobs', name: 'Jobs', icon: Terminal },
   { id: 'session', name: 'Session', icon: UserCheck },
-  { id: 'workflow', name: 'Workflow', icon: GitBranch },
-  { id: 'workflow_step', name: 'Step', icon: Layers },
+  { id: 'feature', name: 'Feature', icon: GitBranch },
+  { id: 'feature_step', name: 'Step', icon: Layers },
   { id: 'secret', name: 'Secret', icon: Lock },
   { id: 'tokens', name: 'Tokens', icon: Lock },
   { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -133,8 +133,8 @@ const getComponentIcon = (type: string): typeof Activity => {
   const component = componentTypes.find((c) => c.id === id);
   if (component?.icon) return component.icon;
   const iconMap: Record<string, typeof Activity> = {
-    workflow: GitBranch,
-    workflow_step: Layers,
+    feature: GitBranch,
+    feature_step: Layers,
     secret: Lock,
     tokens: Lock,
   };

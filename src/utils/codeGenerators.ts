@@ -1,13 +1,13 @@
 /**
  * Code generation utilities for Ductape SDK
- * Generates code snippets for workflows, jobs, quota, fallback, healthcheck, and intelligence
+ * Generates code snippets for features, jobs, quota, fallback, healthcheck, and intelligence
  */
 
 export type SdkLanguage = 'typescript' | 'python' | 'go' | 'java';
 
-// ==================== WORKFLOW CODE GENERATORS ====================
+// ==================== FEATURE CODE GENERATORS ====================
 
-export interface WorkflowCodeGenOptions {
+export interface FeatureCodeGenOptions {
   product: string;
   tag: string;
   name: string;
@@ -21,22 +21,22 @@ export interface WorkflowCodeGenOptions {
   env?: string;
 }
 
-export function generateWorkflowCode(options: WorkflowCodeGenOptions, language: SdkLanguage = 'typescript'): string {
+export function generateFeatureCode(options: FeatureCodeGenOptions, language: SdkLanguage = 'typescript'): string {
   switch (language) {
     case 'typescript':
-      return generateWorkflowTypeScript(options);
+      return generateFeatureTypeScript(options);
     case 'python':
-      return generateWorkflowPython(options);
+      return generateFeaturePython(options);
     case 'go':
-      return generateWorkflowGo(options);
+      return generateFeatureGo(options);
     case 'java':
-      return generateWorkflowJava(options);
+      return generateFeatureJava(options);
     default:
       return '';
   }
 }
 
-function generateWorkflowTypeScript(options: WorkflowCodeGenOptions): string {
+function generateFeatureTypeScript(options: FeatureCodeGenOptions): string {
   const { product, tag, name, steps, env = 'production' } = options;
 
   let code = `import Ductape from '@ductape/sdk';\n\n`;
@@ -46,10 +46,10 @@ function generateWorkflowTypeScript(options: WorkflowCodeGenOptions): string {
   code += `  env_type: 'production'\n`;
   code += `});\n\n`;
 
-  code += `async function execute${name.replace(/[^a-zA-Z0-9]/g, '')}Workflow() {\n`;
+  code += `async function execute${name.replace(/[^a-zA-Z0-9]/g, '')}Feature() {\n`;
   code += `  try {\n`;
-  code += `    // Execute workflow\n`;
-  code += `    const result = await ductape.workflow.run({\n`;
+  code += `    // Execute feature\n`;
+  code += `    const result = await ductape.feature.run({\n`;
   code += `      product: '${product}',\n`;
   code += `      env: '${env}',\n`;
   code += `      tag: '${tag}',\n`;
@@ -57,20 +57,20 @@ function generateWorkflowTypeScript(options: WorkflowCodeGenOptions): string {
   code += `        // Add your input data here\n`;
   code += `      }\n`;
   code += `    });\n\n`;
-  code += `    console.log('Workflow execution result:', result);\n`;
+  code += `    console.log('Feature execution result:', result);\n`;
   code += `    return result;\n`;
   code += `  } catch (error) {\n`;
-  code += `    console.error('Workflow execution failed:', error);\n`;
+  code += `    console.error('Feature execution failed:', error);\n`;
   code += `    throw error;\n`;
   code += `  }\n`;
   code += `}\n\n`;
-  code += `// Execute the workflow\n`;
-  code += `execute${name.replace(/[^a-zA-Z0-9]/g, '')}Workflow();`;
+  code += `// Execute the feature\n`;
+  code += `execute${name.replace(/[^a-zA-Z0-9]/g, '')}Feature();`;
 
   return code;
 }
 
-function generateWorkflowPython(options: WorkflowCodeGenOptions): string {
+function generateFeaturePython(options: FeatureCodeGenOptions): string {
   const { product, tag, name, env = 'production' } = options;
 
   let code = `from ductape import Ductape\nimport os\n\n`;
@@ -80,10 +80,10 @@ function generateWorkflowPython(options: WorkflowCodeGenOptions): string {
   code += `    env_type='production'\n`;
   code += `)\n\n`;
 
-  code += `def execute_${name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_workflow():\n`;
+  code += `def execute_${name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_feature():\n`;
   code += `    try:\n`;
-  code += `        # Execute workflow\n`;
-  code += `        result = ductape.workflow.run(\n`;
+  code += `        # Execute feature\n`;
+  code += `        result = ductape.feature.run(\n`;
   code += `            product='${product}',\n`;
   code += `            env='${env}',\n`;
   code += `            tag='${tag}',\n`;
@@ -91,19 +91,19 @@ function generateWorkflowPython(options: WorkflowCodeGenOptions): string {
   code += `                # Add your input data here\n`;
   code += `            }\n`;
   code += `        )\n\n`;
-  code += `        print('Workflow execution result:', result)\n`;
+  code += `        print('Feature execution result:', result)\n`;
   code += `        return result\n`;
   code += `    except Exception as error:\n`;
-  code += `        print('Workflow execution failed:', error)\n`;
+  code += `        print('Feature execution failed:', error)\n`;
   code += `        raise\n\n`;
-  code += `# Execute the workflow\n`;
-  code += `execute_${name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_workflow()`;
+  code += `# Execute the feature\n`;
+  code += `execute_${name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_feature()`;
 
   return code;
 }
 
-function generateWorkflowGo(options: WorkflowCodeGenOptions): string {
-  const { product, tag, name, env = 'production' } = options;
+function generateFeatureGo(options: FeatureCodeGenOptions): string {
+  const { product, tag, name: _name, env = 'production' } = options;
 
   let code = `package main\n\n`;
   code += `import (\n`;
@@ -114,8 +114,8 @@ function generateWorkflowGo(options: WorkflowCodeGenOptions): string {
   code += `func main() {\n`;
   code += `    // Initialize Ductape SDK\n`;
   code += `    client := ductape.NewClient(os.Getenv("DUCTAPE_ACCESS_KEY"))\n\n`;
-  code += `    // Execute workflow\n`;
-  code += `    result, err := client.Workflow.Run(ductape.WorkflowRunOptions{\n`;
+  code += `    // Execute feature\n`;
+  code += `    result, err := client.Feature.Run(ductape.FeatureRunOptions{\n`;
   code += `        Product: "${product}",\n`;
   code += `        Env: "${env}",\n`;
   code += `        Tag: "${tag}",\n`;
@@ -124,35 +124,35 @@ function generateWorkflowGo(options: WorkflowCodeGenOptions): string {
   code += `        },\n`;
   code += `    })\n\n`;
   code += `    if err != nil {\n`;
-  code += `        fmt.Println("Workflow execution failed:", err)\n`;
+  code += `        fmt.Println("Feature execution failed:", err)\n`;
   code += `        return\n`;
   code += `    }\n\n`;
-  code += `    fmt.Println("Workflow execution result:", result)\n`;
+  code += `    fmt.Println("Feature execution result:", result)\n`;
   code += `}`;
 
   return code;
 }
 
-function generateWorkflowJava(options: WorkflowCodeGenOptions): string {
+function generateFeatureJava(options: FeatureCodeGenOptions): string {
   const { product, tag, env = 'production' } = options;
 
   let code = `import com.ductape.Ductape;\n`;
-  code += `import com.ductape.workflow.WorkflowService;\n`;
+  code += `import com.ductape.feature.FeatureService;\n`;
   code += `import java.util.HashMap;\n`;
   code += `import java.util.Map;\n\n`;
-  code += `public class WorkflowExecutor {\n`;
+  code += `public class FeatureExecutor {\n`;
   code += `    public static void main(String[] args) {\n`;
   code += `        // Initialize Ductape SDK\n`;
   code += `        Ductape ductape = new Ductape(System.getenv("DUCTAPE_ACCESS_KEY"));\n`;
-  code += `        WorkflowService workflow = ductape.getWorkflow();\n\n`;
+  code += `        FeatureService feature = ductape.getFeature();\n\n`;
   code += `        try {\n`;
-  code += `            // Execute workflow\n`;
+  code += `            // Execute feature\n`;
   code += `            Map<String, Object> input = new HashMap<>();\n`;
   code += `            // Add your input data here\n\n`;
-  code += `            Object result = workflow.run("${product}", "${env}", "${tag}", input);\n`;
-  code += `            System.out.println("Workflow execution result: " + result);\n`;
+  code += `            Object result = feature.run("${product}", "${env}", "${tag}", input);\n`;
+  code += `            System.out.println("Feature execution result: " + result);\n`;
   code += `        } catch (Exception e) {\n`;
-  code += `            System.err.println("Workflow execution failed: " + e.getMessage());\n`;
+  code += `            System.err.println("Feature execution failed: " + e.getMessage());\n`;
   code += `            e.printStackTrace();\n`;
   code += `        }\n`;
   code += `    }\n`;

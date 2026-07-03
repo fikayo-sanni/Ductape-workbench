@@ -1,6 +1,6 @@
 /**
- * Fetches workflow runs (processor results with component=workflow) from the backend.
- * Used by WorkflowExplorerTab.
+ * Fetches feature runs (processor results with component=feature) from the backend.
+ * Used by FeatureExplorerTab.
  */
 
 import apiClient from '@/config/axiosinstance';
@@ -16,25 +16,25 @@ export interface ProcessorResultApiItem {
   result: string | object;
   /** JSON string or parsed object (backend may return either) */
   input: string | object;
-  workflow_id?: string;
-  workflow_tag?: string;
+  feature_id?: string;
+  feature_tag?: string;
   product_tag?: string;
   workspace_id?: string;
   component?: string;
-  /** Step-level fields when component is workflow_step */
+  /** Step-level fields when component is feature_step */
   step_tag?: string;
   step_type?: string;
   step_error?: string;
   step_duration_ms?: number;
 }
 
-export interface WorkflowRunsQueryParams {
+export interface FeatureRunsQueryParams {
   workspace_id: string;
   user_id: string;
   public_key: string;
-  workflow_tag?: string;
-  workflow_id?: string;
-  component?: 'workflow' | 'workflow_step';
+  feature_tag?: string;
+  feature_id?: string;
+  component?: 'feature' | 'feature_step';
   product_tag?: string;
   env?: string;
   status?: string;
@@ -43,11 +43,11 @@ export interface WorkflowRunsQueryParams {
   limit?: number;
 }
 
-/** Run/step types used by WorkflowExplorerTab and WorkflowRunTab */
+/** Run/step types used by FeatureExplorerTab and FeatureRunTab */
 export type StepStatus = 'completed' | 'failed' | 'running' | 'pending' | 'skipped' | 'retrying';
 export type RunStatus = 'completed' | 'failed' | 'running' | 'pending' | 'cancelled' | 'timeout';
 
-export interface WorkflowStepUi {
+export interface FeatureStepUi {
   id: string;
   name: string;
   type: 'action' | 'condition' | 'parallel' | 'wait' | 'transform' | 'human' | 'webhook' | 'loop';
@@ -64,7 +64,7 @@ export interface WorkflowStepUi {
   metadata?: { app?: string; action?: string; integration?: string };
 }
 
-export interface WorkflowRunUi {
+export interface FeatureRunUi {
   id: string;
   runNumber: number;
   status: RunStatus;
@@ -74,12 +74,12 @@ export interface WorkflowRunUi {
   input: unknown;
   output: unknown;
   error?: string;
-  steps: WorkflowStepUi[];
+  steps: FeatureStepUi[];
   triggeredBy: 'manual' | 'schedule' | 'webhook' | 'event' | 'api';
   triggeredByUser?: string;
   version: string;
   tags?: string[];
-  /** From workflow result; used to derive steps when step-level processor results are empty */
+  /** From feature result; used to derive steps when step-level processor results are empty */
   completed_steps?: string[];
   step_outputs?: Record<string, unknown>;
   failed_step?: string;
@@ -126,11 +126,11 @@ function stepDisplayOutput(output: unknown): unknown {
   return obj;
 }
 
-/** Map backend processor result (component=workflow) to UI WorkflowRun. Steps come from processor list with workflow_id + component=workflow_step. */
-export function mapProcessorResultToWorkflowRun(
+/** Map backend processor result (component=feature) to UI FeatureRun. Steps come from processor list with feature_id + component=feature_step. */
+export function mapProcessorResultToFeatureRun(
   item: ProcessorResultApiItem,
   index: number
-): WorkflowRunUi {
+): FeatureRunUi {
   const start = item.start ?? 0;
   const end = item.end ?? 0;
   const duration = start && end ? end - start : null;
@@ -167,7 +167,7 @@ export function mapProcessorResultToWorkflowRun(
     input: inputPayload,
     output: resultData.output ?? null,
     error: resultData.error,
-    steps: [], // Steps are fetched from processor results (workflow_step) in WorkflowRunTab, or derived below when empty
+    steps: [], // Steps are fetched from processor results (feature_step) in FeatureRunTab, or derived below when empty
     triggeredBy: 'api',
     version: '1.0.0',
     completed_steps: resultData.completed_steps,
@@ -180,7 +180,7 @@ export function mapProcessorResultToWorkflowRun(
  * Build steps from a run's embedded result (completed_steps, step_outputs).
  * Used when the step-level processor list returns empty (e.g. older runs or step persistence not used).
  */
-export function stepsFromRunResult(run: WorkflowRunUi): WorkflowStepUi[] {
+export function stepsFromRunResult(run: FeatureRunUi): FeatureStepUi[] {
   const completed = run.completed_steps;
   const outputs = run.step_outputs ?? {};
   const failedStep = run.failed_step;
@@ -212,7 +212,7 @@ export function stepsFromRunResult(run: WorkflowRunUi): WorkflowStepUi[] {
  * Same as stepsFromRunResult but returns ProcessorResultApiItem[] so the run tab can use
  * the same raw-step UI (process_id, step_tag, result, etc.) when the step list API returns empty.
  */
-export function rawStepsFromRunResult(run: WorkflowRunUi): ProcessorResultApiItem[] {
+export function rawStepsFromRunResult(run: FeatureRunUi): ProcessorResultApiItem[] {
   const completed = run.completed_steps;
   const outputs = run.step_outputs ?? {};
   const failedStep = run.failed_step;
@@ -239,10 +239,10 @@ export function rawStepsFromRunResult(run: WorkflowRunUi): ProcessorResultApiIte
 }
 
 /**
- * Fetch workflow runs from GET /integrations/v1/processor/list.
+ * Fetch feature runs from GET /integrations/v1/processor/list.
  */
-export const fetchWorkflowRuns = async (
-  params: WorkflowRunsQueryParams
+export const fetchFeatureRuns = async (
+  params: FeatureRunsQueryParams
 ): Promise<ProcessorResultApiItem[]> => {
   const query: Record<string, string | number | undefined> = {
     workspace_id: params.workspace_id,
@@ -250,8 +250,8 @@ export const fetchWorkflowRuns = async (
     public_key: params.public_key,
     limit: params.limit ?? 100,
   };
-  if (params.workflow_tag) query.workflow_tag = params.workflow_tag;
-  if (params.workflow_id) query.workflow_id = params.workflow_id;
+  if (params.feature_tag) query.feature_tag = params.feature_tag;
+  if (params.feature_id) query.feature_id = params.feature_id;
   if (params.component) query.component = params.component;
   if (params.product_tag) query.product_tag = params.product_tag;
   if (params.env) query.env = params.env;
@@ -275,22 +275,22 @@ export const fetchWorkflowRuns = async (
 };
 
 /**
- * Fetch step-level processor results for a workflow run (workflow_id).
- * Used by WorkflowRunTab to show steps from ProcessorResults.
+ * Fetch step-level processor results for a feature run (feature_id).
+ * Used by FeatureRunTab to show steps from ProcessorResults.
  */
-export const fetchWorkflowStepResults = async (
-  params: WorkflowRunsQueryParams & { workflow_id: string }
+export const fetchFeatureStepResults = async (
+  params: FeatureRunsQueryParams & { feature_id: string }
 ): Promise<ProcessorResultApiItem[]> => {
-  return fetchWorkflowRuns({
+  return fetchFeatureRuns({
     ...params,
-    workflow_id: params.workflow_id,
-    component: 'workflow_step',
+    feature_id: params.feature_id,
+    component: 'feature_step',
     limit: params.limit ?? 200,
   });
 };
 
-/** Map backend step_type (e.g. action, produce, notification) to WorkflowStepUi.type */
-const STEP_TYPE_UI_MAP: Record<string, WorkflowStepUi['type']> = {
+/** Map backend step_type (e.g. action, produce, notification) to FeatureStepUi.type */
+const STEP_TYPE_UI_MAP: Record<string, FeatureStepUi['type']> = {
   action: 'action',
   produce: 'action',
   producer: 'action',
@@ -313,7 +313,7 @@ const STEP_TYPE_UI_MAP: Record<string, WorkflowStepUi['type']> = {
   loop: 'loop',
 };
 
-function mapStepTypeToUi(stepType?: string): WorkflowStepUi['type'] {
+function mapStepTypeToUi(stepType?: string): FeatureStepUi['type'] {
   if (!stepType) return 'action';
   const normalized = stepType.toLowerCase().replace(/-/g, '_');
   return STEP_TYPE_UI_MAP[normalized] ?? 'action';
@@ -324,7 +324,7 @@ function mapStepTypeToUi(stepType?: string): WorkflowStepUi['type'] {
  * result (JSON with process_id, result), step_duration_ms, step_tag, step_type, step_error.
  * API may return input/result as string or object. Same process_id is used in logs for correlation.
  */
-function mapProcessorStepToWorkflowStep(item: ProcessorResultApiItem, index: number): WorkflowStepUi {
+function mapProcessorStepToFeatureStep(item: ProcessorResultApiItem, index: number): FeatureStepUi {
   const start = item.start ?? 0;
   const end = item.end ?? 0;
   const duration = item.step_duration_ms ?? (start && end ? end - start : null);
@@ -367,7 +367,7 @@ function mapProcessorStepToWorkflowStep(item: ProcessorResultApiItem, index: num
   };
 }
 
-/** Map an array of step-level processor results to WorkflowStepUi[] (execution order) */
-export function mapProcessorStepResultsToSteps(items: ProcessorResultApiItem[]): WorkflowStepUi[] {
-  return items.map((item, i) => mapProcessorStepToWorkflowStep(item, i));
+/** Map an array of step-level processor results to FeatureStepUi[] (execution order) */
+export function mapProcessorStepResultsToSteps(items: ProcessorResultApiItem[]): FeatureStepUi[] {
+  return items.map((item, i) => mapProcessorStepToFeatureStep(item, i));
 }

@@ -12,7 +12,7 @@ const AUTH_HERO_COPY: Record<string, { eyebrow: string; title: string; bullets: 
     eyebrow: 'Welcome back',
     title: 'Composable backends. Resilient by default.',
     bullets: [
-      'APIs, databases, queues, workflows — one place',
+      'APIs, databases, queues, features — one place',
       'Configure in the workbench, run from your SDK',
       'Built-in observability and resilience',
     ],
