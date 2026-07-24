@@ -49,11 +49,11 @@ export function extractCloudDraftEnv(
 
   const envs = draft?.envs as Array<Record<string, unknown>> | undefined;
   if (envs?.length) {
-    if (envSlug) {
-      const match = envs.find((e) => String(e.slug || '') === envSlug);
-      if (match) return match;
-    }
-    return envs[0];
+    const draftType = draft?.type as string | undefined;
+    const env = envSlug
+      ? (envs.find((e) => String(e.slug || '') === envSlug) ?? envs[0])
+      : envs[0];
+    return draftType ? { graphType: draftType, ...env } : env;
   }
 
   const resource = root.resource as Record<string, unknown> | undefined;
@@ -190,6 +190,7 @@ export function mergeDatabaseEnvFromDraft(
       connection_url: String(draftEnv.connection_url || env.connection_url || ''),
       region: String(draftEnv.region || env.region || ''),
       instance: String(draftEnv.instance || env.instance || ''),
+      ...(draftEnv.dbName != null ? { dbName: String(draftEnv.dbName) } : {}),
     };
     if (securityGroups?.length) {
       next.securityGroups = securityGroups;
@@ -238,12 +239,21 @@ export function mergeGraphEnvFromDraft(
       region: String(draftEnv.region || env.region || ''),
       instance: String(draftEnv.instance || env.instance || ''),
       iamAuth: draftEnv.iamAuth === true || draftEnv.iamAuth === 'true',
+      ...(draftEnv.database != null ? { database: String(draftEnv.database) } : {}),
     };
     if (securityGroups?.length) {
       next.securityGroups = securityGroups;
       next.securityGroupsAuto = false;
     } else if (typeof draftEnv.securityGroupsAuto === 'boolean') {
       next.securityGroupsAuto = draftEnv.securityGroupsAuto;
+    }
+    if (typeof draftEnv.importExisting === 'boolean') {
+      next.importExisting = draftEnv.importExisting;
+    }
+    if (draftEnv.importExisting && draftEnv.credentialsStored) {
+      next.credentialsStored = true;
+    } else if (draftEnv.importExisting === false) {
+      delete next.credentialsStored;
     }
     return next;
   }

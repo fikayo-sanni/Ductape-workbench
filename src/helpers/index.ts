@@ -5,8 +5,9 @@ export const getEnvironmentType = () => {
 
   const envMap = {
     production: EnvType.PRODUCTION,
-    local: EnvType.LOCAL,
+    local: EnvType.SELF,
+    self: EnvType.SELF,
   } as { [key: string]: EnvType };
 
-  return envMap[env] || EnvType.LOCAL;
+  return envMap[env] || EnvType.PRODUCTION;
 };

@@ -7,7 +7,7 @@ export function isManagedDatabaseProvider(provider?: string): provider is 'mongo
 export function defaultScopesForProvider(provider: CloudProvider): string[] {
   if (provider === 'mongodb_atlas') return ['database'];
   if (provider === 'neo4j_aura') return ['graph'];
-  return ['storage', 'broker', 'database', 'graph', 'vector'];
+  return ['storage', 'broker', 'database', 'graph', 'vector', 'notifications'];
 }
 
 export const SCOPE_LABELS: Record<
@@ -19,6 +19,7 @@ export const SCOPE_LABELS: Record<
   database: { label: 'Databases', description: 'Managed database instances' },
   graph: { label: 'Graphs', description: 'Graph databases' },
   vector: { label: 'Vectors', description: 'Vector / search domains' },
+  notifications: { label: 'Notifications', description: 'Firebase push delivery' },
 };
 
 export const SERVICES_BY_PROVIDER: Record<

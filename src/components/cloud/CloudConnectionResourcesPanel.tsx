@@ -36,6 +36,7 @@ import {
   SERVICES_BY_PROVIDER,
   type CloudProvider,
   cloudConnectionRef,
+  defaultScopesForProvider,
   isCloudConnectionActive,
 } from './cloudConnection.constants';
 
@@ -62,6 +63,7 @@ const SERVICE_ICONS: Record<string, typeof HardDrive> = {
   gcs: HardDrive,
   blob: HardDrive,
   sqs: MessageSquare,
+  pubsub: MessageSquare,
   rds: Database,
   neptune: Share2,
   opensearch: Boxes,
@@ -133,7 +135,9 @@ export default function CloudConnectionResourcesPanel({
   const provider = (connection.provider || 'aws') as CloudProvider;
   const cloudRef = cloudConnectionRef(connection);
   const isActive = isCloudConnectionActive(connection.status);
-  const scopes = connection.scopes || [];
+  const scopes = connection.scopes?.length
+    ? connection.scopes
+    : defaultScopesForProvider(provider);
 
   const availableServices = SERVICES_BY_PROVIDER[provider].filter((s) =>
     scopes.includes(s.scope),

@@ -55,7 +55,7 @@ export function markOnboardingWorkspaceLocked() {
   sessionStorage.setItem('onboardingWorkspaceLocked', 'true');
 }
 
-export type OnboardingStep = 'workspace' | 'plan' | 'billing' | 'complete';
+export type OnboardingStep = 'workspace' | 'plan' | 'billing' | 'complete' | 'license';
 
 export function getInitialOnboardingStep(): OnboardingStep {
   const saved = sessionStorage.getItem('onboardingStep') as OnboardingStep | null;

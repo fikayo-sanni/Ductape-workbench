@@ -27,6 +27,7 @@ import { triggerOnboardingForNewUser } from "@/utils/onboarding";
 import { authServices } from "@/services/authServices";
 import { SignupPayload, User } from "@/types/auth";
 import { useAuth } from "@/store/useAuth";
+import { isSelfHosted } from "@/helpers/env";
 
 const signupSchema = z
   .object({
@@ -447,31 +448,33 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
             </Form>
 
             {/* Social Login Options */}
-            <div className="mt-6">
-              <div className="flex items-center">
-                <hr className="flex-grow border-t border-grey-200" />
-                <span className="px-3 text-grey-500 text-sm font-medium">OR</span>
-                <hr className="flex-grow border-t border-grey-200" />
-              </div>
+            {!isSelfHosted() && (
+              <div className="mt-6">
+                <div className="flex items-center">
+                  <hr className="flex-grow border-t border-grey-200" />
+                  <span className="px-3 text-grey-500 text-sm font-medium">OR</span>
+                  <hr className="flex-grow border-t border-grey-200" />
+                </div>
 
-              <div className="flex gap-4 items-center mt-6">
-                {[
-                  { name: "google", label: "Google" },
-                  { name: "github", label: "GitHub" },
-                ].map((provider) => (
-                  <Button
-                    key={provider.name}
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
-                    }}
-                  >
-                    <span className="capitalize">{provider.label}</span>
-                  </Button>
-                ))}
+                <div className="flex gap-4 items-center mt-6">
+                  {[
+                    { name: "google", label: "Google" },
+                    { name: "github", label: "GitHub" },
+                  ].map((provider) => (
+                    <Button
+                      key={provider.name}
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
+                      }}
+                    >
+                      <span className="capitalize">{provider.label}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </>
         ) : (
           <>

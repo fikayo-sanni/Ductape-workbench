@@ -37,13 +37,10 @@ import {
   type OnboardingStep,
 } from '@/utils/onboarding';
 import { useRequiresOnboarding } from '@/hooks/useRequiresOnboarding';
-
-const STEPS: { id: OnboardingStep; label: string }[] = [
-  { id: 'workspace', label: 'Workspace' },
-  { id: 'plan', label: 'Plan' },
-  { id: 'billing', label: 'Payment' },
-  { id: 'complete', label: 'Keys' },
-];
+import { isSelfHosted } from '@/helpers/env';
+import SelfHostedWorkspaceStep from '@/components/auth/SelfHostedWorkspaceStep';
+import LicenseActivationStep from '@/components/auth/LicenseActivationStep';
+import apiClient from '@/config/axiosinstance';
 
 function OnboardingFlow() {
   const navigate = useNavigate();
@@ -56,7 +53,61 @@ function OnboardingFlow() {
     needsPendingInvitesScreen,
   } = useRequiresOnboarding();
 
-  const [step, setStep] = useState<OnboardingStep>(getInitialOnboardingStep);
+  // Self-hosted: check instance status to decide whether to show license step
+  const [instanceCheckDone, setInstanceCheckDone] = useState(!isSelfHosted());
+  const [showLicenseStep, setShowLicenseStep] = useState(false);
+
+  useEffect(() => {
+    if (!isSelfHosted()) return;
+    apiClient
+      .get<{ data: { activated: boolean; userCount: number } }>('/users/v1/instance-status')
+      .then((res) => {
+        const { activated, userCount } = res.data.data;
+        if (!activated && userCount === 0) {
+          setShowLicenseStep(true);
+        }
+      })
+      .catch(() => {
+        // If the check fails, proceed without the license step
+      })
+      .finally(() => {
+        setInstanceCheckDone(true);
+      });
+  }, []);
+
+  const STEPS = useMemo((): { id: OnboardingStep; label: string }[] => {
+    if (!isSelfHosted()) {
+      return [
+        { id: 'workspace', label: 'Workspace' },
+        { id: 'plan', label: 'Plan' },
+        { id: 'billing', label: 'Payment' },
+        { id: 'complete', label: 'Keys' },
+      ];
+    }
+    if (showLicenseStep) {
+      return [
+        { id: 'license', label: 'License' },
+        { id: 'workspace', label: 'Workspace' },
+        { id: 'complete', label: 'Done' },
+      ];
+    }
+    return [
+      { id: 'workspace', label: 'Workspace' },
+      { id: 'complete', label: 'Done' },
+    ];
+  }, [showLicenseStep]);
+
+  const [step, setStep] = useState<OnboardingStep>(() =>
+    isSelfHosted() ? 'workspace' : getInitialOnboardingStep(),
+  );
+
+  // Once instance check is done and license is needed, switch to license step
+  useEffect(() => {
+    if (instanceCheckDone && showLicenseStep) {
+      setStep('license');
+    }
+  }, [instanceCheckDone, showLicenseStep]);
+
   const [workspaceId, setWorkspaceId] = useState(
     () => sessionStorage.getItem('onboardingWorkspaceId') || existingWorkspaceId || '',
   );
@@ -163,8 +214,12 @@ function OnboardingFlow() {
     // Don't advance to 'plan' when the user already has a subscription —
     // the subscription effect above will skip straight to 'complete'.
     if (step === 'workspace' && !hasSubscription) {
-      const saved = sessionStorage.getItem('onboardingStep') as OnboardingStep | null;
-      setStep(saved && saved !== 'workspace' ? saved : 'plan');
+      if (!isSelfHosted()) {
+        const saved = sessionStorage.getItem('onboardingStep') as OnboardingStep | null;
+        setStep(saved && saved !== 'workspace' ? saved : 'plan');
+      } else {
+        setStep('complete');
+      }
     }
   }, [workspacesFetched, existingWorkspaceId, workspaceId, step, hasSubscription]);
 
@@ -252,10 +307,18 @@ function OnboardingFlow() {
       setWorkspaceId(newWorkspaceId);
       setCurrentWorkspaceId(newWorkspaceId);
       toast.success('Workspace created!');
-      setStep('plan');
+      setStep(isSelfHosted() ? 'complete' : 'plan');
     },
     onError: () => toast.error('Error creating workspace, try again'),
   });
+
+  if (!instanceCheckDone) {
+    return (
+      <div className="flex justify-center py-24">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div data-testid="onboarding-page" className="w-full space-y-8 lg:space-y-10">
@@ -269,7 +332,9 @@ function OnboardingFlow() {
             Set up your workbench
           </h1>
           <p className="text-grey-600 text-base max-w-2xl">
-            Workspace, plan, billing - then you&apos;re in.
+            {isSelfHosted()
+              ? 'Create or join a workspace to get started.'
+              : "Workspace, plan, billing - then you're in."}
           </p>
         </div>
 
@@ -323,90 +388,127 @@ function OnboardingFlow() {
         </div>
       </div>
 
-      {step === 'workspace' && (
-        awaitingWorkspaceCheck ? (
-          <section className="rounded-10px border border-grey-400 bg-white shadow-sm p-16 flex justify-center">
-            <Loader className="h-8 w-8 animate-spin text-primary" />
-          </section>
-        ) : !workspaceLocked ? (
-        <section className="rounded-10px border border-grey-400 bg-white shadow-sm p-6 sm:p-8 lg:p-10">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:gap-12 xl:gap-16 items-start">
-            <div className="space-y-3 lg:pt-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue/10">
-                <Building2 className="h-6 w-6 text-blue" />
-              </div>
-              <h2 className="text-2xl font-bold text-grey">Create your workspace</h2>
-              <p className="text-grey-600 leading-relaxed">
-                Where your products, apps, and integrations live.
-              </p>
-            </div>
+      {step === 'license' && isSelfHosted() && (
+        <LicenseActivationStep
+          onActivated={() => {
+            setShowLicenseStep(false);
+            setStep('workspace');
+          }}
+        />
+      )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
+      {step === 'workspace' && (
+        isSelfHosted() ? (
+          awaitingWorkspaceCheck ? (
+            <section className="rounded-10px border border-grey-400 bg-white shadow-sm p-16 flex justify-center">
+              <Loader className="h-8 w-8 animate-spin text-primary" />
+            </section>
+          ) : !workspaceLocked ? (
+            <SelfHostedWorkspaceStep
+              user={user!}
+              creating={creatingWorkspace === 'pending'}
+              onCreateSubmit={({ name, description }) => {
                 if (!user?._id || !user.public_key) return;
                 createWorkspace({
                   user_id: user._id,
-                  name: workspaceForm.workspace_name,
+                  name,
                   public_key: user.public_key,
-                  description:
-                    workspaceForm.description ||
-                    `Workspace for ${workspaceForm.workspace_name}`,
+                  description: description || `Workspace for ${name}`,
                 });
               }}
-              className="space-y-5"
-            >
-              <div>
-                <Label htmlFor="workspace_name">Workspace name</Label>
-                <Input
-                  id="workspace_name"
-                  className="mt-2 h-11"
-                  placeholder="e.g., Acme Engineering"
-                  value={workspaceForm.workspace_name}
-                  onChange={(e) =>
-                    setWorkspaceForm({ ...workspaceForm, workspace_name: e.target.value })
-                  }
-                  required
-                />
+              onWorkspaceCreated={(id) => {
+                setWorkspaceId(id);
+                setCurrentWorkspaceId(id);
+                setStep('complete');
+              }}
+              onJoinRequested={() => setStep('complete')}
+            />
+          ) : null
+        ) : (
+          awaitingWorkspaceCheck ? (
+            <section className="rounded-10px border border-grey-400 bg-white shadow-sm p-16 flex justify-center">
+              <Loader className="h-8 w-8 animate-spin text-primary" />
+            </section>
+          ) : !workspaceLocked ? (
+          <section className="rounded-10px border border-grey-400 bg-white shadow-sm p-6 sm:p-8 lg:p-10">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:gap-12 xl:gap-16 items-start">
+              <div className="space-y-3 lg:pt-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue/10">
+                  <Building2 className="h-6 w-6 text-blue" />
+                </div>
+                <h2 className="text-2xl font-bold text-grey">Create your workspace</h2>
+                <p className="text-grey-600 leading-relaxed">
+                  Where your products, apps, and integrations live.
+                </p>
               </div>
-              <div>
-                <Label htmlFor="description">Description (optional)</Label>
-                <Textarea
-                  id="description"
-                  className="mt-2 min-h-[120px]"
-                  rows={4}
-                  value={workspaceForm.description}
-                  onChange={(e) =>
-                    setWorkspaceForm({ ...workspaceForm, description: e.target.value })
-                  }
-                />
-              </div>
-              <div className="flex justify-end pt-2">
-                <Button
-                  type="submit"
-                  className="h-11 px-8 font-bold"
-                  disabled={creatingWorkspace === 'pending' || !workspaceForm.workspace_name.trim()}
-                >
-                  {creatingWorkspace === 'pending' ? (
-                    <>
-                      <Loader className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </section>
-        ) : null
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!user?._id || !user.public_key) return;
+                  createWorkspace({
+                    user_id: user._id,
+                    name: workspaceForm.workspace_name,
+                    public_key: user.public_key,
+                    description:
+                      workspaceForm.description ||
+                      `Workspace for ${workspaceForm.workspace_name}`,
+                  });
+                }}
+                className="space-y-5"
+              >
+                <div>
+                  <Label htmlFor="workspace_name">Workspace name</Label>
+                  <Input
+                    id="workspace_name"
+                    className="mt-2 h-11"
+                    placeholder="e.g., Acme Engineering"
+                    value={workspaceForm.workspace_name}
+                    onChange={(e) =>
+                      setWorkspaceForm({ ...workspaceForm, workspace_name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Textarea
+                    id="description"
+                    className="mt-2 min-h-[120px]"
+                    rows={4}
+                    value={workspaceForm.description}
+                    onChange={(e) =>
+                      setWorkspaceForm({ ...workspaceForm, description: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="submit"
+                    className="h-11 px-8 font-bold"
+                    disabled={creatingWorkspace === 'pending' || !workspaceForm.workspace_name.trim()}
+                  >
+                    {creatingWorkspace === 'pending' ? (
+                      <>
+                        <Loader className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        Continue
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </section>
+          ) : null
+        )
       )}
 
-      {step === 'plan' && (
+      {!isSelfHosted() && step === 'plan' && (
         <section className="space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
@@ -457,7 +559,7 @@ function OnboardingFlow() {
         </section>
       )}
 
-      {step === 'billing' && (
+      {!isSelfHosted() && step === 'billing' && (
         <section className="rounded-10px border border-grey-400 bg-white shadow-sm">
           {plansLoading && !resolvedPlan ? (
             <div className="flex justify-center py-16">

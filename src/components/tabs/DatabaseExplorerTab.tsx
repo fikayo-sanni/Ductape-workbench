@@ -34,6 +34,7 @@ import {
   FileText,
   Hash,
   BarChart3,
+  Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -3742,6 +3743,8 @@ const result = await ductape.database.transaction(
 
   // Show connection error state
   if (connectionError) {
+    const errorMsg = connectionError instanceof Error ? connectionError.message : 'Unknown error occurred';
+    const isVpcError = /ETIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH/i.test(errorMsg);
     return (
       <div className="flex-1 flex min-h-0 w-full items-center justify-center bg-gradient-to-br from-grey-50 via-grey-100 to-grey-200">
         <div className="relative">
@@ -3777,10 +3780,27 @@ const result = await ductape.database.transaction(
 
             {/* Error message */}
             <div className="mt-4 p-4 bg-red/5 border border-red/20 rounded-xl">
-              <p className="text-sm text-red font-medium">
-                {connectionError instanceof Error ? connectionError.message : 'Unknown error occurred'}
-              </p>
+              <p className="text-sm text-red font-medium">{errorMsg}</p>
             </div>
+
+            {/* VPC hint */}
+            {isVpcError && (
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left space-y-2">
+                <div className="flex items-center gap-2">
+                  <Network className="h-4 w-4 text-amber-600 shrink-0" />
+                  <p className="text-sm font-medium text-amber-800">Database is in a private VPC</p>
+                </div>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  The proxy cannot reach a private VPC endpoint directly. Set up a VPC connector so Ductape can tunnel through your network:
+                </p>
+                <ol className="text-xs text-amber-700 space-y-1 list-decimal list-inside leading-relaxed">
+                  <li>Open your AWS cloud connection in <strong>Cloud connections</strong></li>
+                  <li>Go to the <strong>Private access</strong> tab</li>
+                  <li>Select <strong>VPC connector</strong> and configure your VPC and subnets</li>
+                  <li>Deploy the agent inside the VPC using the docker command shown</li>
+                </ol>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="mt-6 flex flex-col gap-3">

@@ -1,6 +1,9 @@
 import {useState, useCallback, useEffect, useMemo} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {useAuth} from '@/store/useAuth';
 import {useWorkbenchStore} from '@/stores/workbench-store';
+import {isSelfHosted, appVersion} from '@/helpers/env';
+import {useLicense} from '@/contexts/LicenseContext';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {useFetchWorkspaces} from '@/hooks/useWorkspaceQueries';
 import workspaceServices, {
@@ -21,10 +24,12 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Shield,
   Plus,
   Menu,
   X,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import {Skeleton} from './ui/skeleton';
 import NewItemDropdown from './NewItemDropdown';
@@ -40,8 +45,10 @@ interface ApiError {
 }
 
 export default function WorkbenchHeader() {
+  const navigate = useNavigate();
   const {user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId} =
     useAuth();
+  const { read_only } = useLicense();
   const {openTab, activeView, setActiveView, setActiveIconSidebar, clearAllTabs} =
     useWorkbenchStore();
   const queryClient = useQueryClient();
@@ -547,6 +554,18 @@ export default function WorkbenchHeader() {
                   <Settings className="h-4 w-4" />
                   <span>Settings</span>
                 </button>
+                {isSelfHosted() && (
+                  <button
+                    onClick={() => {
+                      setShowMobileMenu(false);
+                      navigate('/admin');
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 flex items-center gap-2"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Admin</span>
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-grey-100 text-red flex items-center gap-2"
@@ -578,6 +597,11 @@ export default function WorkbenchHeader() {
           <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
             Beta
           </span>
+          {isSelfHosted() && appVersion() && (
+            <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-grey-100 text-grey-500 border border-grey-300">
+              v{appVersion()}
+            </span>
+          )}
           <span className="hidden sm:inline text-sm text-grey-600 font-medium whitespace-nowrap">
             Workbench
           </span>
@@ -673,6 +697,18 @@ export default function WorkbenchHeader() {
                         <Settings className="h-4 w-4" />
                         Settings
                       </button>
+                      {isSelfHosted() && (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            navigate('/admin');
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-grey hover:bg-grey-100 flex items-center gap-2"
+                        >
+                          <Shield className="h-4 w-4" />
+                          Admin
+                        </button>
+                      )}
                     </div>
 
                     <div className="py-1 border-t border-grey-400">
@@ -741,6 +777,16 @@ export default function WorkbenchHeader() {
           )}
         </div>
       </header>
+
+      {/* Read-only mode banner */}
+      {isSelfHosted() && read_only && (
+        <div className="flex items-center justify-center gap-2 bg-red-600 text-white text-sm font-medium px-4 py-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            This instance is in read-only mode — the license has expired or been revoked. All write operations are blocked. Please renew your license via the Admin panel.
+          </span>
+        </div>
+      )}
 
       {/* Mobile Menu */}
       {showMobileMenu && <MobileMenu />}

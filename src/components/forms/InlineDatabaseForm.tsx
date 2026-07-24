@@ -59,6 +59,8 @@ interface EnvConnection {
   masterPassword?: string;
   /** Password already in workspace secrets from a prior Ductape link */
   credentialsStored?: boolean;
+  /** MongoDB Atlas only: database name to inject into the connection string */
+  dbName?: string;
 }
 
 export default function InlineDatabaseForm({ product, databaseType, onCancel, onSuccess }: InlineDatabaseFormProps) {
@@ -316,6 +318,13 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       }
     }
 
+    for (const env of envConnections) {
+      if (databaseType === 'graph' && env.cloud?.trim() && !env.instance?.trim()) {
+        toast.error(`Select a resource for ${env.env_name} before saving`);
+        return;
+      }
+    }
+
     // Cloud-linked envs and workspace secret refs are resolved on save — skip URL format checks.
     for (const env of envConnections) {
       if (env.cloud?.trim() || env.linkedFromCloud) {
@@ -343,10 +352,10 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
 
     try {
       const importingExisting =
-        databaseType === 'database' &&
+        (databaseType === 'database' || databaseType === 'graph') &&
         envConnections.some((env) => env.importExisting && env.cloud?.trim());
       const provisioningNew =
-        databaseType === 'database' &&
+        (databaseType === 'database' || databaseType === 'graph') &&
         envConnections.some((env) => (env.cloud?.trim() || env.linkedFromCloud) && !env.importExisting);
       if (importingExisting) {
         toast.loading('Linking existing cloud database…', {
@@ -405,15 +414,21 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 envConfig.cloud = env.cloud;
                 envConfig.linkedFromCloud = env.linkedFromCloud ?? true;
                 if (env.instance?.trim()) envConfig.instance = env.instance.trim();
-              }
-              envConfig.connection_url = env.connection_url;
-              if (env.username && env.username.trim()) envConfig.username = env.username;
-              if (env.password && env.password.trim()) envConfig.password = env.password;
-              if (env.database && env.database.trim()) envConfig.database = env.database;
-              if (env.region && env.region.trim()) envConfig.region = env.region;
-              if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
-              if (env.securityGroups?.length) {
-                envConfig.securityGroups = env.securityGroups;
+                if (env.region?.trim()) envConfig.region = env.region.trim();
+                if (env.database?.trim()) envConfig.database = env.database.trim();
+                if (env.securityGroups?.length) envConfig.securityGroups = env.securityGroups;
+                if (env.importExisting) {
+                  envConfig.importExisting = true;
+                  if (env.credentialsStored) envConfig.credentialsStored = true;
+                }
+                if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
+              } else {
+                envConfig.connection_url = env.connection_url;
+                if (env.username?.trim()) envConfig.username = env.username;
+                if (env.password?.trim()) envConfig.password = env.password;
+                if (env.database?.trim()) envConfig.database = env.database;
+                if (env.region?.trim()) envConfig.region = env.region;
+                if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
               }
             }
             // Regular database fields
@@ -428,6 +443,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 if (env.securityGroups?.length) {
                   envConfig.securityGroups = env.securityGroups;
                 }
+                if (env.dbName?.trim()) envConfig.dbName = env.dbName.trim();
                 if (env.importExisting) {
                   envConfig.importExisting = true;
                   if (env.credentialsStored) {
@@ -633,7 +649,8 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                     (formData.type === 'postgresql' ||
                       formData.type === 'mysql' ||
                       formData.type === 'mongodb')) ||
-                    databaseType === 'graph' ||
+                    (databaseType === 'graph' &&
+                      (formData.type === 'neo4j' || formData.type === 'neptune')) ||
                     databaseType === 'vector');
                 const hideManualCredentials = shouldHideManualCloudCredentials(env);
 
@@ -661,6 +678,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                             ? (formData.type as 'postgresql' | 'mysql' | 'mongodb')
                             : undefined
                         }
+                        graphType={databaseType === 'graph' ? formData.type : undefined}
                         envSlug={env.slug}
                         onDraftApplied={(draft) => {
                           const updated = [...envConnections];
@@ -678,8 +696,8 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                             ) as Partial<EnvConnection>),
                           };
                           setEnvConnections(updated);
-                          if (draft.region && databaseType === 'graph') {
-                            setFormData((prev) => ({ ...prev, type: 'neptune' }));
+                          if (draft.graphType && databaseType === 'graph') {
+                            setFormData((prev) => ({ ...prev, type: String(draft.graphType) }));
                           }
                         }}
                       />
@@ -699,6 +717,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                       )}
                       {env.instance && (
                         <p className="text-xs text-grey-600 pl-6">Instance: {env.instance}</p>
+                      )}
+                      {env.dbName && (
+                        <p className="text-xs text-grey-600 pl-6">Database: {env.dbName}</p>
                       )}
                       {env.securityGroups?.length ? (
                         <p className="text-xs text-grey-600 pl-6">

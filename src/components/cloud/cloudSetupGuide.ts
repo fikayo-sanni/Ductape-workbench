@@ -284,6 +284,13 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
         scope: 'broker',
       },
       {
+        apiLabel: 'Firebase Cloud Messaging API',
+        serviceId: 'fcm.googleapis.com',
+        feature: 'Notifications',
+        purpose: 'Send Firebase push notifications using the linked service account',
+        scope: 'notifications',
+      },
+      {
         apiLabel: 'Cloud SQL Admin API',
         serviceId: 'sqladmin.googleapis.com',
         feature: 'Databases',
@@ -332,9 +339,9 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
         feature: 'Vectors',
       },
       {
-        roleName: 'Firebase Admin',
-        purpose: 'Manage Firebase projects and related Google Cloud resources',
-        feature: 'Firebase',
+        roleName: 'Firebase Cloud Messaging API Admin',
+        purpose: 'Send push notifications through the Firebase Cloud Messaging API',
+        feature: 'Notifications',
       },
     ],
   },

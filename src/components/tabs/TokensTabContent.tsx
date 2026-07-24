@@ -613,6 +613,7 @@ export default function TokensTabContent() {
   const [publishableKeyLoading, setPublishableKeyLoading] = useState(false);
   const [publishableKeyAction, setPublishableKeyAction] = useState<'idle' | 'regenerate' | 'revoke'>('idle');
   const [copiedPublishableKey, setCopiedPublishableKey] = useState(false);
+  const [copiedWorkspaceId, setCopiedWorkspaceId] = useState(false);
   const [publishableKeySampleTab, setPublishableKeySampleTab] = useState<'react' | 'vanilla' | 'vue' | 'node'>('react');
   const [showScopeEditor, setShowScopeEditor] = useState(false);
   const [scopeDraft, setScopeDraft] = useState<PublishableKeyScopeItem[]>([]);
@@ -929,6 +930,39 @@ export default function TokensTabContent() {
                   </Button>
                 )}
               </div>
+
+              {/* Workspace ID — shown alongside publishable key for MCP/CLI setup */}
+              {currentWorkspaceId && (
+                <div className="mt-5 pt-5 border-t border-grey-200">
+                  <label className="text-xs font-medium text-grey-600 uppercase tracking-wide mb-2 block">
+                    Workspace ID
+                  </label>
+                  <div className="bg-white rounded-lg border border-grey-300 p-4 flex items-center justify-between gap-4">
+                    <code className="text-sm font-mono text-grey break-all flex-1 select-all">
+                      {currentWorkspaceId}
+                    </code>
+                    <div className="flex items-center gap-1 shrink-0 border-l border-grey-200 pl-3">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          navigator.clipboard.writeText(currentWorkspaceId).then(() => {
+                            setCopiedWorkspaceId(true);
+                            toast.success('Workspace ID copied!');
+                            setTimeout(() => setCopiedWorkspaceId(false), 2000);
+                          });
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        {copiedWorkspaceId ? <Check className="h-4 w-4 text-green" /> : <Copy className="h-4 w-4 text-grey-600" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-grey-500">
+                    Set as <code className="bg-grey-100 px-1 rounded">DUCTAPE_WORKSPACE</code> in your MCP server env config to automatically scope CLI operations to this workspace.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Blacklist (disallowed functionality) */}

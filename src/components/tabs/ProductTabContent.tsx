@@ -736,6 +736,26 @@ export default function ProductTabContent({
       return;
     }
 
+    if (type === 'messageBroker') {
+      openTab({
+        id: `message-broker-${component._id}-${Date.now()}`,
+        type: 'message-broker',
+        title: component.name || component.tag || 'Message Broker',
+        itemId: component._id,
+        data: {
+          ...component,
+          name: component.name,
+          tag: component.tag,
+          componentType: 'message-broker',
+          productName: product?.name,
+          productTag: product?.tag,
+          productLogo: product?.logo,
+          productEnvironments: product?.envs || [],
+        },
+      });
+      return;
+    }
+
     // Jobs: open single-job + env explorer (past/future invocations, timeline, metrics)
     if (type === 'job') {
       const env = product?.envs?.[0]
@@ -987,6 +1007,7 @@ export default function ProductTabContent({
       storage: 'storage', // Opens StorageExplorerTab (files view)
       cache: 'cache-values', // Opens directly to cache values
       'message-broker': 'message-broker-events', // Opens directly to broker events
+      messageBroker: 'message-broker-events', // _resourceType set by getCategoryItems
       session: 'session-activity', // Opens SessionActivityTab
       job: 'job-explorer', // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
       feature: 'feature', // Opens FeatureExplorerTab

@@ -11,6 +11,7 @@ import {
   Share2,
   Shield,
   Boxes,
+  Bell,
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const SCOPE_ICONS: Record<string, typeof HardDrive> = {
   database: Database,
   graph: Share2,
   vector: Boxes,
+  notifications: Bell,
 };
 
 export interface CloudConnectionDetailViewProps {

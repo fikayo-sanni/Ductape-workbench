@@ -244,6 +244,16 @@ const fetchWorkspaceById = async (data: {
   }
 };
 
+const fetchAllWorkspaces = async (): Promise<WorkspacesResponse | null> => {
+  try {
+    const response = await apiClient.get<WorkspacesResponse>('/workspaces/v1/all');
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Failed to fetch all workspaces:', error);
+    return null;
+  }
+};
+
 const fetchDashboardData = async (data: {
   workspace_id: string;
   user_id: string;
@@ -346,6 +356,7 @@ const fetchAssetLimits = async (data: {
 
 const workspaceServices = {
   fetchWorkspaces,
+  fetchAllWorkspaces,
   fetchWorkspaceById,
   changeDefaultWorkspace,
   createWorkspace,

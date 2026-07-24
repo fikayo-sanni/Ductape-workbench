@@ -69,10 +69,30 @@ const fetchUserDetails = async (data: {
   return response.data;
 };
 
+export interface InstanceStatusResponse {
+  status: boolean;
+  data: {
+    activated: boolean;
+    userCount: number;
+  };
+}
+
+const fetchInstanceStatus = async (): Promise<InstanceStatusResponse> => {
+  const response = await apiClient.get<InstanceStatusResponse>('/users/v1/instance-status');
+  return response.data;
+};
+
+const activateInstance = async (licenseData: Record<string, unknown>): Promise<ActionResponse> => {
+  const response = await apiClient.post<ActionResponse>('/users/v1/instance-activate', licenseData);
+  return response.data;
+};
+
 const userServices = {
   updateUser,
   changePassword,
   fetchUserDetails,
+  fetchInstanceStatus,
+  activateInstance,
 };
 
 export { userServices };

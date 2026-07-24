@@ -18,10 +18,13 @@ import { Bell, Loader2, CheckCircle, Plus, Upload, Trash2, Eye, EyeOff, Slack } 
 import { toast } from 'react-hot-toast';
 import { useDuctape } from '@/hooks/useDuctape';
 import { useAuth } from '@/store/useAuth';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Notifiers } from '@ductape/sdk/dist/types/enums';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
+import { useSDKProxy, type SDKProxyService } from '@/services/sdkProxy';
+import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
+import { isCloudConnectionActive } from '@/components/cloud/cloudConnection.constants';
 
 interface NewNotificationTabContentProps {
   data?: any;
@@ -133,6 +136,16 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
         type: 'product',
       }
   ) as any;
+  const sdkProxy = useSDKProxy(
+    shouldInitDuctape
+      ? {
+          workspace_id: product.workspace_id,
+          user_id: user._id,
+          token: user.auth_token,
+          public_key: user.public_key,
+        }
+      : null,
+  );
 
   // Auto-generate tag from name
   useEffect(() => {
@@ -210,6 +223,19 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
     const hasSelection = selectedNotifiers.some(n => n.selected);
     if (!hasSelection) {
       toast.error('Please select at least one notifier type');
+      return;
+    }
+    const missingFirebaseCloud = envConfigs.find((config) => {
+      const push = config.push_notifications as any;
+      return (
+        selectedNotifiers.find((notifier) => notifier.id === 'push')?.selected &&
+        push?.type === Notifiers.FIREBASE &&
+        push?.authMode === 'cloud_connection' &&
+        !push?.cloud
+      );
+    });
+    if (missingFirebaseCloud) {
+      toast.error(`Select a GCP cloud connection for ${missingFirebaseCloud.slug}`);
       return;
     }
 
@@ -412,6 +438,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
                     }}
                     previousConfigs={envIndex > 0 ? envConfigs.slice(0, envIndex) : []}
                     envIndex={envIndex}
+                    sdkProxy={sdkProxy}
                   />
                 ))}
               </div>
@@ -460,6 +487,7 @@ function EnvironmentConfigCard({
   onConfigChange,
   previousConfigs,
   envIndex,
+  sdkProxy,
 }: {
   env: any;
   envConfig: EnvConfig;
@@ -467,6 +495,7 @@ function EnvironmentConfigCard({
   onConfigChange: (config: EnvConfig) => void;
   previousConfigs?: EnvConfig[];
   envIndex?: number;
+  sdkProxy: SDKProxyService | null;
 }) {
   const selectedChannels = selectedNotifiers.filter(n => n.selected);
 
@@ -516,7 +545,12 @@ function EnvironmentConfigCard({
               </div>
             </AccordionTrigger>
             <AccordionContent className="py-4">
-              <NotificationTypeConfig envConfig={envConfig} onConfigChange={onConfigChange} envIndex={envIndex} />
+              <NotificationTypeConfig
+                envConfig={envConfig}
+                onConfigChange={onConfigChange}
+                envIndex={envIndex}
+                sdkProxy={sdkProxy}
+              />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -663,8 +697,22 @@ function WebhookUrlConfig({
 }
 
 // Individual configuration components for each notifier type
-function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envConfig: EnvConfig; onConfigChange: (config: EnvConfig) => void; envIndex?: number }) {
+function NotificationTypeConfig({
+  envConfig,
+  onConfigChange,
+  envIndex,
+  sdkProxy,
+}: {
+  envConfig: EnvConfig;
+  onConfigChange: (config: EnvConfig) => void;
+  envIndex?: number;
+  sdkProxy: SDKProxyService | null;
+}) {
+  const { currentWorkspaceId } = useAuth();
   const [notificationType, setNotificationType] = useState<'firebase' | 'expo'>('firebase');
+  const [firebaseAuthMode, setFirebaseAuthMode] =
+    useState<'manual' | 'cloud_connection'>('cloud_connection');
+  const [cloudTag, setCloudTag] = useState('');
 
   const [credentials, setCredentials] = useState({
     type: 'service_account',
@@ -680,26 +728,45 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
   });
   const [databaseUrl, setDatabaseUrl] = useState('');
   const isSyncingRef = useRef(false);
+  const { data: gcpConnections = [], isLoading: loadingGcpConnections } = useQuery({
+    queryKey: cloudConnectionsQueryKey(currentWorkspaceId),
+    queryFn: async () => {
+      if (!sdkProxy) return [];
+      const res = await sdkProxy.cloud.connections.list();
+      const rows = Array.isArray(res) ? res : (res as any)?.data || [];
+      return rows.filter(
+        (connection: any) =>
+          connection.provider === 'gcp' && isCloudConnectionActive(connection.status),
+      );
+    },
+    enabled: Boolean(sdkProxy && currentWorkspaceId),
+    staleTime: 0,
+  });
 
   // Initialize from envConfig.push_notifications when it changes (for Quick Copy)
   useEffect(() => {
     if (envConfig.push_notifications) {
       const pushNotif = envConfig.push_notifications as any;
-      if (pushNotif.type === Notifiers.FIREBASE && pushNotif.credentials) {
+      if (pushNotif.type === Notifiers.FIREBASE) {
         isSyncingRef.current = true;
         setNotificationType('firebase');
-        setCredentials({
-          type: pushNotif.credentials.type || 'service_account',
-          project_id: pushNotif.credentials.project_id || '',
-          private_key_id: pushNotif.credentials.private_key_id || '',
-          private_key: pushNotif.credentials.private_key || '',
-          client_email: pushNotif.credentials.client_email || '',
-          client_id: pushNotif.credentials.client_id || '',
-          auth_uri: pushNotif.credentials.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
-          token_uri: pushNotif.credentials.token_uri || 'https://oauth2.googleapis.com/token',
-          auth_provider_x509_cert_url: pushNotif.credentials.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
-          client_x509_cert_url: pushNotif.credentials.client_x509_cert_url || '',
-        });
+        const usesCloud = pushNotif.authMode === 'cloud_connection' && Boolean(pushNotif.cloud);
+        setFirebaseAuthMode(usesCloud ? 'cloud_connection' : 'manual');
+        setCloudTag(usesCloud ? pushNotif.cloud : '');
+        if (pushNotif.credentials) {
+          setCredentials({
+            type: pushNotif.credentials.type || 'service_account',
+            project_id: pushNotif.credentials.project_id || '',
+            private_key_id: pushNotif.credentials.private_key_id || '',
+            private_key: pushNotif.credentials.private_key || '',
+            client_email: pushNotif.credentials.client_email || '',
+            client_id: pushNotif.credentials.client_id || '',
+            auth_uri: pushNotif.credentials.auth_uri || 'https://accounts.google.com/o/oauth2/auth',
+            token_uri: pushNotif.credentials.token_uri || 'https://oauth2.googleapis.com/token',
+            auth_provider_x509_cert_url: pushNotif.credentials.auth_provider_x509_cert_url || 'https://www.googleapis.com/oauth2/v1/certs',
+            client_x509_cert_url: pushNotif.credentials.client_x509_cert_url || '',
+          });
+        }
         setDatabaseUrl(pushNotif.databaseUrl || '');
         setTimeout(() => {
           isSyncingRef.current = false;
@@ -721,11 +788,19 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
     if (notificationType === 'firebase') {
       onConfigChange({
         ...envConfig,
-        push_notifications: {
-          type: Notifiers.FIREBASE,
-          credentials,
-          databaseUrl,
-        },
+        push_notifications:
+          firebaseAuthMode === 'cloud_connection'
+            ? {
+                type: Notifiers.FIREBASE,
+                authMode: 'cloud_connection',
+                cloud: cloudTag,
+                ...(databaseUrl ? { databaseUrl } : {}),
+              }
+            : {
+                type: Notifiers.FIREBASE,
+                credentials,
+                databaseUrl,
+              },
       });
     } else {
       onConfigChange({
@@ -736,7 +811,7 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationType, credentials, databaseUrl]);
+  }, [notificationType, firebaseAuthMode, cloudTag, credentials, databaseUrl]);
 
   return (
     <div className="space-y-4">
@@ -755,6 +830,70 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
 
       {notificationType === 'firebase' && (
         <div className="space-y-4">
+          <div>
+            <Label>Credentials source</Label>
+            <Select
+              value={firebaseAuthMode}
+              onValueChange={(value: 'manual' | 'cloud_connection') =>
+                setFirebaseAuthMode(value)
+              }
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cloud_connection">GCP cloud connection</SelectItem>
+                <SelectItem value="manual">Upload credentials manually</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {firebaseAuthMode === 'cloud_connection' ? (
+            <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <Label>Google Cloud connection</Label>
+              <Select value={cloudTag} onValueChange={setCloudTag}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue
+                    placeholder={
+                      loadingGcpConnections
+                        ? 'Loading GCP connections…'
+                        : 'Select an active GCP connection'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {gcpConnections.map((connection: any) => (
+                    <SelectItem
+                      key={connection.id || connection.tag}
+                      value={connection.tag || connection.id}
+                    >
+                      {connection.display_name || connection.tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!loadingGcpConnections && gcpConnections.length === 0 && (
+                <p className="text-xs text-amber-700">
+                  No active GCP connection is available. Create and validate one under Cloud
+                  connections first.
+                </p>
+              )}
+              <p className="text-xs text-grey-600">
+                Firebase will use the selected connection&apos;s service account at runtime. Raw
+                credentials are not copied into this notifier.
+              </p>
+              <div>
+                <Label>Database URL (optional)</Label>
+                <Input
+                  value={databaseUrl}
+                  onChange={(e) => setDatabaseUrl(e.target.value)}
+                  className="mt-1 bg-white"
+                  placeholder="https://project.firebaseio.com"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">Firebase Credentials</h4>
             <div className="relative">
@@ -909,6 +1048,8 @@ function NotificationTypeConfig({ envConfig, onConfigChange, envIndex }: { envCo
               />
             </div>
           </div>
+            </>
+          )}
         </div>
       )}
     </div>

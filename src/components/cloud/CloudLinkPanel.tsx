@@ -35,6 +35,8 @@ interface CloudLinkPanelProps {
   storageProvider?: 'aws' | 'azure' | 'gcp';
   /** Narrows cloud connections for `componentType: 'databases'` — mongodb_atlas only supports 'mongodb'. */
   databaseEngine?: 'postgresql' | 'mongodb' | 'mysql';
+  /** Narrows cloud connections for `componentType: 'graphs'` — neo4j only supports neo4j_aura, neptune only supports aws. */
+  graphType?: string;
   onDraftApplied: (draftEnv: Record<string, unknown>) => void;
 }
 
@@ -85,6 +87,15 @@ const GCS_BUCKET_LOCATIONS: { value: string; label: string }[] = [
   { value: 'asia-southeast1', label: 'asia-southeast1 — Singapore' },
   { value: 'australia-southeast1', label: 'australia-southeast1 — Sydney' },
 ];
+
+/**
+ * Maps a graph database type to the cloud provider that natively hosts it.
+ * Types not listed here have no dedicated cloud offering and won't show any connections.
+ */
+const GRAPH_PROVIDER_BY_TYPE: Record<string, string> = {
+  neo4j: 'neo4j_aura',
+  neptune: 'aws',
+};
 
 /** Services that support create-new via provision API */
 const PROVISIONABLE_SERVICES = new Set([
@@ -162,6 +173,7 @@ export default function CloudLinkPanel({
   envSlug,
   storageProvider,
   databaseEngine,
+  graphType,
   onDraftApplied,
 }: CloudLinkPanelProps) {
   const { currentWorkspaceId } = useAuth();
@@ -171,8 +183,11 @@ export default function CloudLinkPanel({
   const [region, setRegion] = useState('us-east-1');
   const [gcsLocation, setGcsLocation] = useState('US');
   const [provisionName, setProvisionName] = useState('');
+  const [provisionDbName, setProvisionDbName] = useState('');
   const [selectedSecurityGroups, setSelectedSecurityGroups] = useState<string[]>([]);
   const [existingDbPassword, setExistingDbPassword] = useState('');
+  const [mongoDbName, setMongoDbName] = useState('');
+  const [graphDatabase, setGraphDatabase] = useState('');
 
   const awsVpcService = service === 'rds' || service === 'neptune';
   const awsVpcResourceType = service === 'neptune' ? 'neptune' : 'rds';
@@ -197,11 +212,15 @@ export default function CloudLinkPanel({
           if (databaseEngine === 'mongodb' && !isMongo) return false;
           if (databaseEngine !== 'mongodb' && isMongo) return false;
         }
+        if (componentType === 'graphs' && graphType) {
+          const expectedProvider = GRAPH_PROVIDER_BY_TYPE[graphType];
+          if (!expectedProvider || c.provider !== expectedProvider) return false;
+        }
         const services = servicesForProvider(componentType, c.provider, storageProvider, databaseEngine);
         if (services.length === 0) return false;
         return true;
       }),
-    [connections, storageProvider, componentType, databaseEngine],
+    [connections, storageProvider, componentType, databaseEngine, graphType],
   );
 
   const selectedConnection = matchingConnections.find((c: any) => c.id === connectionId);
@@ -250,6 +269,7 @@ export default function CloudLinkPanel({
   useEffect(() => {
     setSelectedSecurityGroups([]);
     setExistingDbPassword('');
+    setMongoDbName('');
   }, [connectionId, service]);
 
   // AWS/GCP region codes ('us-east-1') are invalid Azure locations ('eastus') and vice versa —
@@ -345,6 +365,7 @@ export default function CloudLinkPanel({
     masterPassword?: string;
     importExisting?: boolean;
     credentialsStored?: boolean;
+    dbName?: string;
   }) => {
     if (componentType !== 'databases' || !selectedConnection) return;
     const instance = overrides?.instance ?? (resourceId || provisionName || '');
@@ -352,8 +373,9 @@ export default function CloudLinkPanel({
     const linkingExisting = overrides?.importExisting ?? Boolean(resourceId);
     const credentialsStored =
       overrides?.credentialsStored ??
-      (linkingExisting ? selectedResourceHasStoredCredentials : false);
+      (service === 'atlas-cluster' ? true : linkingExisting ? selectedResourceHasStoredCredentials : false);
     const password = overrides?.masterPassword ?? existingDbPassword;
+    const dbName = overrides?.dbName ?? (service === 'atlas-cluster' ? mongoDbName : undefined);
     applyStorageDraft({
       cloud: selectedConnection.tag,
       linkedFromCloud: true,
@@ -363,6 +385,7 @@ export default function CloudLinkPanel({
       credentialsStored: linkingExisting && credentialsStored,
       ...autoSecurityGroupsDraft(tags),
       ...(linkingExisting && password && !credentialsStored ? { masterPassword: password } : {}),
+      ...(dbName ? { dbName } : {}),
     });
   };
 
@@ -375,6 +398,40 @@ export default function CloudLinkPanel({
   useEffect(() => {
     if (componentType !== 'databases' || !resourceId) return;
     notifyDatabaseCloudSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [componentType, resourceId, selectedResourceHasStoredCredentials]);
+
+  const notifyGraphCloudSelection = (overrides?: {
+    instance?: string;
+    region?: string;
+    securityGroups?: string[];
+    importExisting?: boolean;
+    credentialsStored?: boolean;
+    database?: string;
+  }) => {
+    if (componentType !== 'graphs' || !selectedConnection) return;
+    const instance = overrides?.instance ?? (resourceId || provisionName || '');
+    const tags = overrides?.securityGroups ?? selectedSecurityGroups;
+    const linkingExisting = overrides?.importExisting ?? Boolean(resourceId);
+    const credentialsStored =
+      overrides?.credentialsStored ??
+      (service === 'aura-instance' ? true : linkingExisting ? selectedResourceHasStoredCredentials : false);
+    const db = overrides?.database ?? graphDatabase;
+    applyStorageDraft({
+      cloud: selectedConnection.tag,
+      linkedFromCloud: true,
+      instance,
+      region: overrides?.region ?? region,
+      importExisting: linkingExisting,
+      credentialsStored: linkingExisting && credentialsStored,
+      ...(db ? { database: db } : {}),
+      ...autoSecurityGroupsDraft(tags),
+    });
+  };
+
+  useEffect(() => {
+    if (componentType !== 'graphs' || !resourceId) return;
+    notifyGraphCloudSelection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [componentType, resourceId, selectedResourceHasStoredCredentials]);
 
@@ -396,6 +453,7 @@ export default function CloudLinkPanel({
     'storage',
     'databases',
     'messageBrokers',
+    'graphs',
   ]);
 
   const importMutation = useMutation({
@@ -467,7 +525,7 @@ export default function CloudLinkPanel({
       if (service === 'rds') {
         provisionInput.instance = provisionName || undefined;
         provisionInput.engine = databaseEngine === 'mysql' ? 'mysql' : 'postgres';
-        provisionInput.dbName = 'ductape';
+        provisionInput.dbName = provisionDbName.trim() || 'ductape';
       }
       if (service === 'neptune') {
         provisionInput.clusterIdentifier = provisionName || undefined;
@@ -475,7 +533,7 @@ export default function CloudLinkPanel({
       if (service === 'cloudsql') {
         provisionInput.instance = provisionName || undefined;
         provisionInput.engine = databaseEngine === 'mysql' ? 'mysql' : 'postgres';
-        provisionInput.dbName = 'ductape';
+        provisionInput.dbName = provisionDbName.trim() || 'ductape';
         provisionInput.region = region;
       }
       if (awsVpcService) {
@@ -650,6 +708,8 @@ export default function CloudLinkPanel({
                 notifyDatabaseCloudSelection({ region: value });
               } else if (componentType === 'messageBrokers') {
                 notifyBrokerCloudSelection({ region: value });
+              } else if (componentType === 'graphs') {
+                if (resourceId || provisionName) notifyGraphCloudSelection({ region: value });
               }
             }}
           />
@@ -667,13 +727,7 @@ export default function CloudLinkPanel({
             if (componentType === 'databases') {
               notifyDatabaseCloudSelection({ securityGroups: tags });
             } else if (componentType === 'graphs') {
-              applyStorageDraft({
-                cloud: selectedConnection.tag,
-                linkedFromCloud: true,
-                region,
-                instance: resourceId || provisionName || '',
-                ...autoSecurityGroupsDraft(tags),
-              });
+              if (resourceId || provisionName) notifyGraphCloudSelection({ securityGroups: tags });
             }
           }}
         />
@@ -714,6 +768,8 @@ export default function CloudLinkPanel({
                   if (componentType === 'databases') {
                     setExistingDbPassword('');
                     notifyDatabaseCloudSelection({ importExisting: false, masterPassword: '' });
+                  } else if (componentType === 'graphs') {
+                    notifyGraphCloudSelection({ importExisting: false });
                   }
                   return;
                 }
@@ -731,6 +787,11 @@ export default function CloudLinkPanel({
                 }
                 if (componentType === 'messageBrokers') {
                   notifyBrokerCloudSelection({ queueName: value });
+                  return;
+                }
+                if (componentType === 'graphs') {
+                  setProvisionName('');
+                  notifyGraphCloudSelection({ instance: value, importExisting: true });
                   return;
                 }
                 importMutation.mutate(value);
@@ -751,6 +812,24 @@ export default function CloudLinkPanel({
                 ))}
               </SelectContent>
             </Select>
+            {!loadingResources && engineFilteredResources.length === 0 && selectedConnection?.provider === 'neo4j_aura' && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                No Aura instances found. Create one at{' '}
+                <a href="https://console.neo4j.io" target="_blank" rel="noopener noreferrer" className="underline">
+                  console.neo4j.io
+                </a>
+                , then refresh.
+              </p>
+            )}
+            {!loadingResources && engineFilteredResources.length === 0 && selectedConnection?.provider === 'mongodb_atlas' && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                No Atlas clusters found. Create one at{' '}
+                <a href="https://cloud.mongodb.com" target="_blank" rel="noopener noreferrer" className="underline">
+                  cloud.mongodb.com
+                </a>
+                , then refresh.
+              </p>
+            )}
           </div>
           <Button
             type="button"
@@ -763,7 +842,8 @@ export default function CloudLinkPanel({
           </Button>
           {componentType !== 'storage' &&
             componentType !== 'databases' &&
-            componentType !== 'messageBrokers' && (
+            componentType !== 'messageBrokers' &&
+            componentType !== 'graphs' && (
           <Button
             type="button"
             size="sm"
@@ -813,6 +893,38 @@ export default function CloudLinkPanel({
         </p>
       ) : null}
 
+      {service === 'atlas-cluster' && (
+        <div className="space-y-1.5">
+          <Label htmlFor={`atlas-db-name-${envSlug}`}>Database name</Label>
+          <Input
+            id={`atlas-db-name-${envSlug}`}
+            className="mt-0 bg-white"
+            value={mongoDbName}
+            onChange={(e) => {
+              setMongoDbName(e.target.value);
+              notifyDatabaseCloudSelection({ dbName: e.target.value });
+            }}
+            placeholder="e.g. mydb (leave empty to connect without selecting a database)"
+          />
+        </div>
+      )}
+
+      {service === 'aura-instance' && (
+        <div className="space-y-1.5">
+          <Label htmlFor={`neo4j-db-name-${envSlug}`}>Database name</Label>
+          <Input
+            id={`neo4j-db-name-${envSlug}`}
+            className="mt-0 bg-white"
+            value={graphDatabase}
+            onChange={(e) => {
+              setGraphDatabase(e.target.value);
+              notifyGraphCloudSelection({ database: e.target.value });
+            }}
+            placeholder="e.g. neo4j (leave empty for default)"
+          />
+        </div>
+      )}
+
       {canProvision && (
         <div className="flex flex-col gap-2 pt-2 border-t border-grey-300">
           <div className="flex flex-wrap gap-2 items-end">
@@ -838,6 +950,9 @@ export default function CloudLinkPanel({
                     });
                   } else if (componentType === 'messageBrokers') {
                     notifyBrokerCloudSelection({ queueName: e.target.value });
+                  } else if (componentType === 'graphs') {
+                    setResourceId('');
+                    notifyGraphCloudSelection({ instance: e.target.value, importExisting: false });
                   }
                 }}
                 placeholder={
@@ -859,6 +974,17 @@ export default function CloudLinkPanel({
                 }
               />
             </div>
+            {(service === 'rds' || service === 'cloudsql') && (
+              <div className="flex-1 min-w-[160px]">
+                <Label>Database name</Label>
+                <Input
+                  className="mt-1.5 bg-white"
+                  value={provisionDbName}
+                  onChange={(e) => setProvisionDbName(e.target.value)}
+                  placeholder="e.g. myapp (default: ductape)"
+                />
+              </div>
+            )}
             {deferProvisionComponentTypes.has(componentType) ? (
               <p className="text-xs text-grey-600 self-center">
                 New resources are created when you save the component

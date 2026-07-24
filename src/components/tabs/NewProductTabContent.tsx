@@ -12,13 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Save, Upload, Loader2 } from 'lucide-react';
+import { Package, Save, Upload, Loader2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import productServices from '@/services/productServices';
 import workspaceServices from '@/services/workspaceServices';
 import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
+import { useLicense } from '@/contexts/LicenseContext';
+import { isSelfHosted } from '@/helpers/env';
 
 interface NewProductTabContentProps {
   tabId: string;
@@ -31,6 +33,23 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [workspaceName, setWorkspaceName] = useState<string>('workspace');
+
+  const { isAtProductLimit, limits } = useLicense();
+
+  // Fetch product count for limit enforcement (self-hosted only)
+  const { data: productsData } = useQuery({
+    queryKey: ['products', currentWorkspaceId, 'active'],
+    queryFn: () => productServices.fetchProducts({
+      workspace_id: currentWorkspaceId || '',
+      user_id: user?._id || '',
+      public_key: user?.public_key || '',
+      status: 'active',
+    }),
+    enabled: isSelfHosted() && !!currentWorkspaceId && !!user?._id,
+  });
+
+  const productCount = productsData?.data?.length ?? 0;
+  const atProductLimit = isSelfHosted() && isAtProductLimit(productCount);
 
   // Fetch workspace details to get workspace name
   const { data: workspacesData } = useQuery({
@@ -342,11 +361,19 @@ export default function NewProductTabContent({ tabId }: NewProductTabContentProp
           </div>
 
           {/* Actions */}
+          {atProductLimit && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Product limit reached ({limits?.max_products} max on your license). Upgrade your license to create more products.
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
             <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="gap-2">
+            <Button onClick={handleSave} className="gap-2" disabled={atProductLimit}>
               <Save className="h-4 w-4" />
               Create Product
             </Button>

@@ -36,6 +36,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import workspaceServices from '@/services/workspaceServices';
 import { InviteMemberPayload, WorkspaceMember } from '@/types/workspace';
+import { useLicense } from '@/contexts/LicenseContext';
+import { isSelfHosted } from '@/helpers/env';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -50,6 +52,8 @@ export default function TeamsTabContent() {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const { isAtUserLimit, limits } = useLicense();
+  const userLimitReached = isSelfHosted() && isAtUserLimit();
 
   // Fetch workspace members
   const { data: membersRes, status: membersStatus } = useQuery({
@@ -228,14 +232,21 @@ export default function TeamsTabContent() {
               </p>
             </div>
             {canManageMembers ? (
-              <Button
-                onClick={() => setShowInviteDialog(true)}
-                className="gap-2"
-                disabled={!currentWorkspaceId}
-              >
-                <UserPlus className="h-4 w-4" />
-                Invite Member
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  onClick={() => setShowInviteDialog(true)}
+                  className="gap-2"
+                  disabled={!currentWorkspaceId || userLimitReached}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Invite Member
+                </Button>
+                {userLimitReached && (
+                  <p className="text-xs text-amber-600">
+                    User limit reached ({limits?.max_users} max). Upgrade license to invite more.
+                  </p>
+                )}
+              </div>
             ) : null}
           </div>
         </div>
@@ -518,7 +529,7 @@ export default function TeamsTabContent() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={invitingMember === 'pending'}
+                  disabled={invitingMember === 'pending' || userLimitReached}
                   className="flex-1 gap-2"
                 >
                   {invitingMember === 'pending' ? (

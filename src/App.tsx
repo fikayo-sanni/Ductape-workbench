@@ -14,7 +14,10 @@ import MarketplacePublicLayout from './pages/MarketplacePublicLayout';
 import MarketplacePublicIndex from './pages/MarketplacePublicIndex';
 import MarketplacePublicAppPage from './pages/MarketplacePublicAppPage';
 import MarketplacePublicWorkspacePage from './pages/MarketplacePublicWorkspacePage';
+import AdminPage from './pages/AdminPage';
 import { useThemeStore } from './stores/theme-store';
+import { isSelfHosted } from './helpers/env';
+import { LicenseProvider } from './contexts/LicenseContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +47,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        <LicenseProvider>
         <Toaster position="top-right" />
         <Routes>
           <Route element={<AuthLayout />}>
@@ -56,6 +60,10 @@ function App() {
 
           <Route path="/" element={<RootRoute />} />
 
+          {isSelfHosted() && (
+            <Route path="/admin" element={<AdminPage />} />
+          )}
+
           <Route path="/marketplace" element={<MarketplacePublicLayout />}>
             <Route index element={<MarketplacePublicIndex />} />
             <Route path="app/:appTag" element={<MarketplacePublicAppPage />} />
@@ -64,6 +72,7 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </LicenseProvider>
       </Router>
     </QueryClientProvider>
   );

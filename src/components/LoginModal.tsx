@@ -30,6 +30,7 @@ import CreateAccountModal from "./CreateAccountModal";
 import { triggerOnboardingForNewUser } from "@/utils/onboarding";
 import ResetPassword from "./resetPassword";
 import { cn } from "@/lib/utils";
+import { isSelfHosted } from "@/helpers/env";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -284,29 +285,33 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           </form>
         </Form>
 
-        <div className="flex items-center mt-6">
-          <hr className="flex-grow border-t border-grey-400" />
-          <span className="px-3 text-grey-700 text-sm font-semibold">OR</span>
-          <hr className="flex-grow border-t border-grey-400" />
-        </div>
+        {!isSelfHosted() && (
+          <>
+            <div className="flex items-center mt-6">
+              <hr className="flex-grow border-t border-grey-400" />
+              <span className="px-3 text-grey-700 text-sm font-semibold">OR</span>
+              <hr className="flex-grow border-t border-grey-400" />
+            </div>
 
-        <div className="flex gap-4 items-center mt-6">
-          {[
-            { name: "google", label: "Google" },
-            { name: "github", label: "GitHub" },
-          ].map((provider) => (
-            <Button
-              key={provider.name}
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
-              }}
-            >
-              <span className="capitalize">{provider.label}</span>
-            </Button>
-          ))}
-        </div>
+            <div className="flex gap-4 items-center mt-6">
+              {[
+                { name: "google", label: "Google" },
+                { name: "github", label: "GitHub" },
+              ].map((provider) => (
+                <Button
+                  key={provider.name}
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    window.location.href = `${import.meta.env.VITE_API_BASE_URL}users/v1/auth/${provider.name}`;
+                  }}
+                >
+                  <span className="capitalize">{provider.label}</span>
+                </Button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mt-6 text-center">
           <p className="text-sm text-grey-600">
