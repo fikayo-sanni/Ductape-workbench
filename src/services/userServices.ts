@@ -74,6 +74,16 @@ export interface InstanceStatusResponse {
   data: {
     activated: boolean;
     userCount: number;
+    tier?: string | null;
+    limits?: {
+      max_users: number | null;
+      max_workspaces: number | null;
+      max_products: number | null;
+      max_api_requests_month: number | null;
+      log_retention_days: number | null;
+    } | null;
+    expires_at?: string | null;
+    read_only?: boolean;
   };
 }
 
