@@ -17,6 +17,7 @@ export interface ProcessorResultApiItem {
   /** JSON string or parsed object (backend may return either) */
   input: string | object;
   feature_id?: string;
+  trace_id?: string;
   feature_tag?: string;
   product_tag?: string;
   workspace_id?: string;
@@ -26,6 +27,43 @@ export interface ProcessorResultApiItem {
   step_type?: string;
   step_error?: string;
   step_duration_ms?: number;
+  span_id?: string;
+  parent_span_id?: string;
+  feature_run_id?: string;
+  step_run_id?: string;
+  step_attempt?: number;
+  function_namespace?: string;
+  function_operation?: string;
+  function_version?: string;
+  function_invocation_id?: string;
+  parent_process_id?: string;
+  execution_kind?: string;
+}
+
+export interface ExecutionTreeNode {
+  record: ProcessorResultApiItem;
+  children: ExecutionTreeNode[];
+}
+
+/** Normalize flat span records into a deterministic trace tree for MCP/Workbench consumers. */
+export function buildExecutionTree(records: ProcessorResultApiItem[]): ExecutionTreeNode[] {
+  const nodes = new Map<string, ExecutionTreeNode>();
+  for (const record of records) {
+    const key = record.span_id ?? record.process_id;
+    nodes.set(key, { record, children: [] });
+  }
+  const roots: ExecutionTreeNode[] = [];
+  for (const node of nodes.values()) {
+    const parent = node.record.parent_span_id ? nodes.get(node.record.parent_span_id) : undefined;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  const sort = (items: ExecutionTreeNode[]) => {
+    items.sort((a, b) => (a.record.start ?? 0) - (b.record.start ?? 0));
+    items.forEach(item => sort(item.children));
+  };
+  sort(roots);
+  return roots;
 }
 
 export interface FeatureRunsQueryParams {
@@ -34,6 +72,7 @@ export interface FeatureRunsQueryParams {
   public_key: string;
   feature_tag?: string;
   feature_id?: string;
+  trace_id?: string;
   component?: 'feature' | 'feature_step';
   product_tag?: string;
   env?: string;
@@ -252,6 +291,7 @@ export const fetchFeatureRuns = async (
   };
   if (params.feature_tag) query.feature_tag = params.feature_tag;
   if (params.feature_id) query.feature_id = params.feature_id;
+  if (params.trace_id) query.trace_id = params.trace_id;
   if (params.component) query.component = params.component;
   if (params.product_tag) query.product_tag = params.product_tag;
   if (params.env) query.env = params.env;

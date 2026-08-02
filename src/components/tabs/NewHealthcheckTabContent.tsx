@@ -689,16 +689,25 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                         Configure inputs for each environment. Different environments can have different values.
                       </p>
                       <Tabs value={selectedEnv} onValueChange={setSelectedEnv}>
-                        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${product.envs.length}, 1fr)` }}>
-                          {product.envs.map((env: any) => (
-                            <TabsTrigger key={env.slug} value={env.slug}>
-                              {env.env_name || env.slug}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
+                        <div className="border-b border-grey-400">
+                          <TabsList
+                            aria-label="Healthcheck environments"
+                            className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none bg-transparent p-0"
+                          >
+                            {product.envs.map((env: any) => (
+                              <TabsTrigger
+                                key={env.slug}
+                                value={env.slug}
+                                className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-sm text-grey-600 shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-grey data-[state=active]:shadow-none"
+                              >
+                                {env.env_name || env.slug}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </div>
 
                         {product.envs.map((env: any) => (
-                          <TabsContent key={env.slug} value={env.slug} className="mt-4 space-y-4">
+                          <TabsContent key={env.slug} value={env.slug} className="mt-4 space-y-4 focus-visible:ring-0 focus-visible:ring-offset-0">
                             {/* Render fields from params, query, headers, body for this environment */}
                             {['params', 'query', 'headers', 'body'].map((type) => {
                               const fieldData = selectedActionData[type];

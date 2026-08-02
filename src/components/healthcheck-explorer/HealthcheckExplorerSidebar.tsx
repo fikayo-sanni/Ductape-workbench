@@ -6,14 +6,12 @@ import {
   PanelLeft,
   PanelLeftClose,
   Search,
-  Plus,
   CheckCircle,
   XCircle,
   RefreshCw,
   ChevronRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -52,7 +50,6 @@ interface HealthcheckExplorerSidebarProps {
   filteredHealthchecks: IHealthCheck[];
   selectedTag: string | null;
   onSelectHealthcheck: (h: IHealthCheck) => void;
-  onCreate?: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
   hasActiveFilters: boolean;
@@ -81,7 +78,6 @@ export function HealthcheckExplorerSidebar({
   filteredHealthchecks,
   selectedTag,
   onSelectHealthcheck,
-  onCreate,
   isRefreshing,
   onRefresh,
   hasActiveFilters,
@@ -93,11 +89,11 @@ export function HealthcheckExplorerSidebar({
   return (
     <aside
       className={cn(
-        'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-[width] duration-200',
+        'bg-white border-r border-grey-300 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-[width] duration-200',
         isSidebarCollapsed ? 'w-[52px]' : 'w-[280px]'
       )}
     >
-      <div className={cn('flex-shrink-0 border-b border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-4')}>
+      <div className={cn('flex-shrink-0 border-b border-grey-300', isSidebarCollapsed ? 'p-2' : 'p-4')}>
         <div className={cn('flex items-center', isSidebarCollapsed ? 'justify-center' : 'gap-3')}>
           <div
             className={cn(
@@ -157,15 +153,15 @@ export function HealthcheckExplorerSidebar({
             ))}
           </div>
         ) : (
-          <div className="flex p-1 rounded-lg bg-grey-100 border border-grey-200 gap-0.5">
+          <div className="flex p-1 rounded-lg bg-grey-100 gap-0.5">
             {VIEW_ITEMS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => onViewModeChange(id)}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-md text-xs font-medium',
-                  viewMode === id ? 'bg-white shadow-sm border border-grey-200 text-grey' : 'text-grey-600'
+                  'flex-1 flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  viewMode === id ? 'bg-white shadow-sm text-grey' : 'text-grey-600 hover:text-grey'
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -177,7 +173,7 @@ export function HealthcheckExplorerSidebar({
       </div>
 
       {!isSidebarCollapsed && (
-        <div className="flex-shrink-0 px-3 py-2 space-y-2 border-b border-grey-200">
+        <div className="flex-shrink-0 px-3 py-2 space-y-2 border-b border-grey-300">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-semibold text-grey-500 uppercase tracking-wide">Environment</span>
             <button type="button" onClick={onRefresh} disabled={isRefreshing} className="text-grey-500 hover:text-rose-600">
@@ -232,7 +228,7 @@ export function HealthcheckExplorerSidebar({
       )}
 
       {showList && !isSidebarCollapsed && (
-        <div className="flex-1 flex flex-col min-h-0 border-t border-grey-200">
+        <div className="flex-1 flex flex-col min-h-0 border-t border-grey-300">
           <div className="px-3 pt-2 pb-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-500" />
@@ -279,18 +275,13 @@ export function HealthcheckExplorerSidebar({
 
       {!showList && <div className="flex-1 min-h-0" />}
 
-      <div className={cn('flex-shrink-0 border-t border-grey-400', isSidebarCollapsed ? 'p-2' : 'p-3')}>
-        {isSidebarCollapsed ? (
+      {isSidebarCollapsed && (
+        <div className="flex-shrink-0 border-t border-grey-300 p-2">
           <button type="button" onClick={onToggleCollapse} className="w-full flex justify-center p-2">
             <PanelLeft className="h-4 w-4 text-grey-600" />
           </button>
-        ) : onCreate ? (
-          <Button type="button" className="w-full bg-rose-600 hover:bg-rose-700 text-white h-9" onClick={onCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            New healthcheck
-          </Button>
-        ) : null}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }

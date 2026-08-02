@@ -148,7 +148,9 @@ export default function SessionActivityTab({
     }
   }, [tabId, tabState, session, sessionTag, productTag, productName]);
 
-  const envSlug = session?.env?.slug || session?.env || 'production';
+  // A session resource can be opened without a particular environment. In that
+  // case query all environments; defaulting to "production" hid valid snd data.
+  const envSlug: string | undefined = session?.env?.slug || (typeof session?.env === 'string' ? session.env : undefined);
 
   // Fetch session users
   const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({

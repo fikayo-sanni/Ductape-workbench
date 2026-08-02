@@ -26,7 +26,6 @@ import {
   Webhook,
   Zap,
   LayoutDashboard,
-  TrendingDown,
   PanelLeft,
   PanelLeftClose,
 } from 'lucide-react';
@@ -825,10 +824,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Activity className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      18.2%
-                    </div>
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.executions.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Executions (7 days)</div>
@@ -839,10 +834,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
                       <CheckCircle className="h-5 w-5 text-green" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      12.5%
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-green mb-1">{metrics.weeklyStats.successful.toLocaleString()}</div>
@@ -855,10 +846,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                     <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
                       <XCircle className="h-5 w-5 text-red" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-red">
-                      <TrendingDown className="h-3 w-3" />
-                      -8.3%
-                    </div>
                   </div>
                   <div className="text-2xl font-bold text-red mb-1">{metrics.weeklyStats.failed.toLocaleString()}</div>
                   <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
@@ -869,10 +856,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                       <Timer className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingDown className="h-3 w-3" />
-                      -5.2%
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{formatDuration(metrics.weeklyStats.avgDuration7d)}</div>
@@ -885,10 +868,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                     <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                       <BarChart3 className="h-5 w-5 text-purple-600" />
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingDown className="h-3 w-3" />
-                      -3.1%
-                    </div>
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{formatDuration(metrics.weeklyStats.p95_7d)}</div>
                   <div className="text-xs text-grey-600 font-medium">P95 Latency</div>
@@ -899,10 +878,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
                       <Zap className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      9.7%
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.throughput}/hr</div>

@@ -147,6 +147,31 @@ const fetchBillingReport = async (data: {
   return response.data;
 };
 
+type WorkspaceSubscriptionResponse = {
+  success: boolean;
+  data: {
+    workspace: { _id: string; name?: string };
+    subscription?: {
+      _id: string;
+      status: 'active' | 'cancelled' | 'expired' | 'overdue';
+      currentPeriodEnd?: string;
+      plan?: PricingPlan;
+    } | null;
+  };
+};
+
+const fetchWorkspaceSubscription = async (data: {
+  user_id: string;
+  public_key: string;
+  workspace_id: string;
+}): Promise<WorkspaceSubscriptionResponse> => {
+  const response = await apiClient.get<WorkspaceSubscriptionResponse>(
+    `/workspaces/v1/subscription/${data.workspace_id}`,
+    { params: { user_id: data.user_id, public_key: data.public_key } },
+  );
+  return response.data;
+};
+
 const fetchBillingData = async (data: {
   user_id: string;
   public_key: string;
@@ -219,6 +244,7 @@ const pricingServices = {
   deleteBundle,
   editBundles,
   fetchBillingReport,
+  fetchWorkspaceSubscription,
   fetchBillingData,
   changeSubscription,
   createSubscription,

@@ -40,13 +40,13 @@ export function useRequiresOnboarding() {
     null;
 
   const {
-    data: billingReport,
-    isFetched: billingFetched,
-    isError: billingError,
+    data: subscriptionResponse,
+    isFetched: subscriptionFetched,
+    isError: subscriptionError,
   } = useQuery({
-    queryKey: ['onboarding-billing-report', workspaceId, user?._id],
+    queryKey: ['onboarding-workspace-subscription', workspaceId, user?._id],
     queryFn: () =>
-      pricingServices.fetchBillingReport({
+      pricingServices.fetchWorkspaceSubscription({
         user_id: user!._id,
         public_key: user!.public_key,
         workspace_id: workspaceId!,
@@ -55,9 +55,11 @@ export function useRequiresOnboarding() {
     retry: false,
   });
 
-  const hasSubscription = Boolean(billingReport?.data && billingReport.status);
+  // Onboarding checks completed setup, not whether usage billing can currently
+  // generate a report. A reporting outage must not erase a subscription.
+  const hasSubscription = Boolean(subscriptionResponse?.data?.subscription?._id);
 
-  // Auto-mark onboarding complete when the API confirms an active subscription.
+  // Auto-mark onboarding complete when the API confirms subscription setup.
   // Without this, returning users on a new browser/device (no localStorage flag)
   // get re-routed to the onboarding flow even though they're already subscribed.
   useEffect(() => {
@@ -83,7 +85,7 @@ export function useRequiresOnboarding() {
   const isLoading =
     workspacesLoading ||
     !workspacesFetched ||
-    (Boolean(workspaceId) && !billingFetched && !billingError);
+    (Boolean(workspaceId) && !subscriptionFetched && !subscriptionError);
 
   const needsPendingInvitesScreen =
     workspacesFetched &&
@@ -94,7 +96,7 @@ export function useRequiresOnboarding() {
     workspacesFetched &&
     !needsPendingInvitesScreen &&
     (acceptedWorkspaces.length === 0 ||
-      (Boolean(workspaceId) && !billingError && !hasSubscription));
+      (Boolean(workspaceId) && !subscriptionError && !hasSubscription));
 
   return {
     isLoading,

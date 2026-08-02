@@ -312,7 +312,6 @@ export default function HealthcheckExplorerTab({
         filteredHealthchecks={filteredHealthchecks}
         selectedTag={selectedHealthcheck?.tag ?? null}
         onSelectHealthcheck={handleSelectHealthcheck}
-        onCreate={scopedToComponent ? undefined : handleCreateHealthcheck}
         isRefreshing={isRefreshing}
         onRefresh={handleRefresh}
         hasActiveFilters={hasActiveFilters}

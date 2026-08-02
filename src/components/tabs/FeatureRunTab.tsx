@@ -332,7 +332,14 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
   const sumStepDurations = stepDurations.reduce((a, b) => a + b, 0);
   if (totalDuration <= 0 && sumStepDurations > 0) totalDuration = sumStepDurations;
   if (totalDuration <= 0) totalDuration = 1;
-  const useSequentialLayout = sumStepDurations > 0;
+  // Prefer actual timestamps so parallel/nested work overlaps correctly. Sequential
+  // fallback is only for legacy records that have durations but no usable timestamps.
+  const hasAbsoluteTimeline = steps.some((s) => {
+    const start = Number(s.start);
+    const end = Number(s.end);
+    return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end >= start;
+  });
+  const useSequentialLayout = !hasAbsoluteTimeline && sumStepDurations > 0;
   const ganttScaleMs = useSequentialLayout ? sumStepDurations : totalDuration;
   const cumulativeStarts = useSequentialLayout
     ? stepDurations.reduce<number[]>((acc, d, i) => {
