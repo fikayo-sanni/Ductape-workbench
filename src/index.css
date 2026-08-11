@@ -119,3 +119,26 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--grey400)) transparent;
 }
+
+/* Icon sidebar thin vertical scrollbar */
+.icon-sidebar-scroll::-webkit-scrollbar {
+  width: 2px;
+}
+
+.icon-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.icon-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--grey400));
+  border-radius: 1px;
+}
+
+.icon-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--grey700));
+}
+
+.icon-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--grey400)) transparent;
+}

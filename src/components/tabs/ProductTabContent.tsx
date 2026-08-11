@@ -528,7 +528,12 @@ export default function ProductTabContent({
     }
     // Features
     if (category.id === 'features') {
-      return (product as any)?.features || [];
+      // Full product responses include soft-deleted feature tombstones for
+      // administrative compatibility. They are not executable catalogue
+      // entries and must not be presented as active Workbench features.
+      return ((product as any)?.features || []).filter(
+        (feature: any) => feature?.deleted !== true,
+      );
     }
     // Notifications
     if (category.id === 'notifications') {

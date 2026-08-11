@@ -23,7 +23,7 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
         data-testid={`icon-sidebar-${item.id}`}
         onClick={() => navigate(item.id)}
         className={cn(
-          'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative',
+          'w-12 h-12 rounded-md flex items-center justify-center transition-all group relative shrink-0',
           active
             ? 'bg-primary text-white'
             : 'text-grey-600 hover:bg-grey-100 hover:text-grey dark:hover:bg-grey-400/30',
@@ -41,10 +41,10 @@ export default function IconSidebar({ onViewChange }: IconSidebarProps) {
   return (
     <div
       data-testid="icon-sidebar"
-      className="w-16 h-screen bg-white-700 border-r border-grey-400 flex flex-col items-center py-4 gap-2"
+      className="icon-sidebar-scroll w-16 h-screen bg-white-700 border-r border-grey-400 flex flex-col items-center py-4 gap-2 overflow-y-auto overflow-x-hidden shrink-0"
     >
       {primaryItems.map((item) => renderButton(item))}
-      <div className="w-8 h-px bg-grey-400 my-2" />
+      <div className="w-8 h-px bg-grey-400 my-2 shrink-0" />
       {secondaryItems.map((item) => renderButton(item))}
     </div>
   );

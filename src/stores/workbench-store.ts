@@ -46,7 +46,7 @@ interface WorkbenchState {
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
   activeView: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
-  activeIconSidebar: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'chatbot' | 'pricing' | null;
+  activeIconSidebar: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'pricing' | null;
 
   cloudAddConnectionModalOpen: boolean;
 

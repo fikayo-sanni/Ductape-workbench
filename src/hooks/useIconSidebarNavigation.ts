@@ -4,7 +4,6 @@ import {
   Handshake,
   LayoutDashboard,
   Lock,
-  MessageCircle,
   Package,
   Receipt,
   Settings2,
@@ -29,8 +28,7 @@ export type IconSidebarNavId =
   | SidebarView
   | 'logs'
   | 'tokens'
-  | 'teams'
-  | 'chatbot';
+  | 'teams';
 
 export type IconSidebarNavItem = {
   id: IconSidebarNavId;
@@ -51,7 +49,6 @@ export const ICON_SIDEBAR_NAV_ITEMS: IconSidebarNavItem[] = [
   { id: 'tokens', icon: Lock, label: 'Tokens', section: 'secondary' },
   { id: 'teams', icon: Users, label: 'Team Members', section: 'secondary' },
   { id: 'pricing', icon: Receipt, label: 'Pricing & Billing', section: 'secondary' },
-  { id: 'chatbot', icon: MessageCircle, label: 'AI Assistant', section: 'secondary' },
 ];
 
 
@@ -64,16 +61,14 @@ export function useIconSidebarNavigation(onViewChange: (view: SidebarView) => vo
     openMarketplaceTab,
     openPricingTab,
     setBillingView,
-    toggleChatbotSidebar,
     sidebarCollapsed,
     toggleSidebar,
     activeIconSidebar,
-    chatbotSidebarOpen,
     setActiveIconSidebar,
   } = useWorkbenchStore();
 
   const navigate = (id: IconSidebarNavId) => {
-    setActiveIconSidebar(id === 'chatbot' ? 'chatbot' : id);
+    setActiveIconSidebar(id);
 
     if (id === 'dashboard') {
       openDashboardTab();
@@ -113,26 +108,16 @@ export function useIconSidebarNavigation(onViewChange: (view: SidebarView) => vo
       return;
     }
 
-    if (id === 'chatbot') {
-      toggleChatbotSidebar();
-      if (!sidebarCollapsed) toggleSidebar();
-      return;
-    }
-
     if (sidebarCollapsed) toggleSidebar();
     onViewChange(id);
   };
 
-  const isActive = (id: IconSidebarNavId) => {
-    if (id === 'chatbot') return chatbotSidebarOpen;
-    return activeIconSidebar === id;
-  };
+  const isActive = (id: IconSidebarNavId) => activeIconSidebar === id;
 
   return {
     items: ICON_SIDEBAR_NAV_ITEMS,
     navigate,
     isActive,
     activeIconSidebar,
-    chatbotSidebarOpen,
   };
 }

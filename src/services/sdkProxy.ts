@@ -97,7 +97,12 @@ export class SDKProxyService {
    * @param method - The method name (e.g., "create", "apps.connect")
    * @param params - Parameters to pass to the method
    */
-  private async execute<T = any>(module: SDKModule, method: string, ...params: any[]): Promise<T> {
+  /**
+   * Public so callers that only know module/method at runtime (e.g. the
+   * workbench chatbot's generic data tool) can dispatch through the same
+   * path as the typed per-module methods below.
+   */
+  async execute<T = any>(module: SDKModule, method: string, ...params: any[]): Promise<T> {
     const isCloudOp = module === 'cloud';
     const executeStart = isCloudOp ? Date.now() : 0;
 

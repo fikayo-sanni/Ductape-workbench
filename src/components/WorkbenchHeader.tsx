@@ -30,6 +30,7 @@ import {
   X,
   ChevronRight,
   AlertTriangle,
+  Bot,
 } from 'lucide-react';
 import {Skeleton} from './ui/skeleton';
 import NewItemDropdown from './NewItemDropdown';
@@ -49,7 +50,7 @@ export default function WorkbenchHeader() {
   const {user, logout, setUser, setCurrentWorkspaceId, currentWorkspaceId} =
     useAuth();
   const { read_only } = useLicense();
-  const {openTab, activeView, setActiveView, setActiveIconSidebar, clearAllTabs} =
+  const {openTab, activeView, setActiveView, setActiveIconSidebar, clearAllTabs, chatbotSidebarOpen, toggleChatbotSidebar} =
     useWorkbenchStore();
   const queryClient = useQueryClient();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -651,6 +652,15 @@ export default function WorkbenchHeader() {
         <div className="hidden md:flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
           <ThemeToggle />
           <NewItemDropdown onSelect={handleNewItem} />
+          <Button
+            variant={chatbotSidebarOpen ? 'default' : 'outline'}
+            size="icon"
+            onClick={toggleChatbotSidebar}
+            aria-label="AI Assistant"
+            data-testid="header-chatbot-toggle"
+          >
+            <Bot className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* User Section - Desktop */}
@@ -748,6 +758,13 @@ export default function WorkbenchHeader() {
           {user && (
             <>
               <NewItemDropdown onSelect={handleNewItem} />
+              <button
+                onClick={toggleChatbotSidebar}
+                className={`p-2 rounded-lg ${chatbotSidebarOpen ? 'bg-primary text-white' : 'hover:bg-grey-100'}`}
+                aria-label="AI Assistant"
+              >
+                <Bot className="h-5 w-5" />
+              </button>
               <button
                 onClick={() => setShowMobileMenu(true)}
                 className="p-2 hover:bg-grey-100 rounded-lg"
