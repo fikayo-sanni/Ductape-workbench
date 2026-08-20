@@ -22,7 +22,7 @@ import workspaceServices from '@/services/workspaceServices';
 interface CreateWorkspaceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (workspace: any) => void;
+  onSuccess?: (workspace: any) => void | Promise<void>;
 }
 
 export default function CreateWorkspaceModal({
@@ -52,15 +52,18 @@ export default function CreateWorkspaceModal({
       public_key: string;
       description: string;
     }) => workspaceServices.createWorkspace(data),
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       console.log('Workspace creation response:', response);
       if (response?.data && response.data._id) {
-        queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-        toast.success('Workspace created successfully!');
-        onSuccess?.(response.data);
-        onOpenChange(false);
-        // Reset form
-        setFormData({ name: '', description: '' });
+        try {
+          await onSuccess?.(response.data);
+          await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          onOpenChange(false);
+          setFormData({ name: '', description: '' });
+        } catch (error) {
+          console.error('Workspace created but activation failed:', error);
+          toast.error('Workspace created, but switching to it failed. Please select it from the workspace menu.');
+        }
       } else {
         console.error('Invalid workspace response:', response);
         toast.error('Failed to create workspace - invalid response');

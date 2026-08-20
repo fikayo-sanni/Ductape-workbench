@@ -99,7 +99,7 @@ const changeDefaultWorkspace = async (data: {
     return response.data;
   } catch (error: unknown) {
     console.error('Failed to change default workspace:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -119,7 +119,7 @@ const createWorkspace = async (data: {
     return response.data;
   } catch (error: unknown) {
     console.error('Failed to create workspace:', error);
-    return null;
+    throw error;
   }
 };
 

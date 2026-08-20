@@ -103,15 +103,14 @@ export default function WorkbenchHeader() {
     onSuccess: async (data, variables) => {
       if (user && user._id && data?.data) {
         const updatedUser = {...user, workspaces: data.data};
-        setUser(updatedUser as any);
-        // Set the current workspace ID in auth store
-        setCurrentWorkspaceId(variables);
-
-        // Clear all tabs so the new workspace starts with a clean slate
+        // Stop requests carrying the previous workspace before changing the
+        // global ID. Otherwise a late response can repopulate an unscoped
+        // query key with data from the workspace we just left.
+        await queryClient.cancelQueries();
+        queryClient.clear();
         clearAllTabs();
-
-        // Clear all queries to ensure fresh data for the new workspace
-        await queryClient.clear();
+        setUser(updatedUser as any);
+        setCurrentWorkspaceId(variables);
 
         toast.success('Workspace changed successfully');
         // Reload to apply workspace change across app
@@ -163,11 +162,22 @@ export default function WorkbenchHeader() {
   ]);
 
   useEffect(() => {
-    if (selectedWorkspace) return;
+    const currentWorkspace = currentWorkspaceId
+      ? acceptedWorkspaces.find(w => w.workspace_id === currentWorkspaceId)
+      : undefined;
 
-    if (defaultWorkspace) {
-      setSelectedWorkspace(defaultWorkspace.workspace_id);
-      if (!currentWorkspaceId) {
+    // localStorage/current auth state is the workspace all data hooks use. It
+    // must win over a briefly stale server `default` row after creation or a
+    // switch; showing a different workspace in the selector is dangerous.
+    if (currentWorkspace) {
+      if (selectedWorkspace !== currentWorkspace.workspace_id) {
+        setSelectedWorkspace(currentWorkspace.workspace_id);
+      }
+    } else if (defaultWorkspace) {
+      if (selectedWorkspace !== defaultWorkspace.workspace_id) {
+        setSelectedWorkspace(defaultWorkspace.workspace_id);
+      }
+      if (currentWorkspaceId !== defaultWorkspace.workspace_id) {
         setCurrentWorkspaceId(defaultWorkspace.workspace_id);
       }
     } else if (acceptedWorkspaces.length === 1) {
@@ -428,24 +438,41 @@ export default function WorkbenchHeader() {
     const nextWorkspaceId = workspace.workspace_id || workspace._id;
     if (!nextWorkspaceId) return;
 
-    setCurrentWorkspaceId(nextWorkspaceId);
+    if (!user?._id || !user.public_key) return;
+
+    // Creation currently makes the access row default on the backend, but use
+    // the same activation endpoint as a normal switch so this remains atomic
+    // if backend creation semantics change and so we receive canonical rows.
+    const activated = await workspaceServices.changeDefaultWorkspace({
+      user_id: user._id,
+      workspace_id: nextWorkspaceId,
+      public_key: user.public_key,
+    });
+    if (!activated?.data) {
+      throw new Error('Workspace was created but could not be activated');
+    }
+
+    await queryClient.cancelQueries();
+    queryClient.clear();
     clearAllTabs();
-    await queryClient.clear();
+    setSelectedWorkspace(nextWorkspaceId);
+    setCurrentWorkspaceId(nextWorkspaceId);
 
     // The create response is the workspace doc itself (no access_level/accepted/
     // default), and nothing else refreshes the embedded user.workspaces list that
     // EnvironmentsSidebar reads defaultEnvs from — persist a fresh copy to
     // localStorage before reloading, or the new workspace's default environments
     // won't show up until an unrelated refresh happens to sync it later.
-    if (user?._id && user.public_key) {
+    if (user._id && user.public_key) {
       const fresh = await workspaceServices.fetchWorkspaces({
         user_id: user._id,
         public_key: user.public_key,
       });
-      if (fresh?.data) {
+      const workspaceRows = fresh?.data ?? activated.data;
+      if (workspaceRows) {
         setUser({
           ...user,
-          workspaces: fresh.data.map((ws) => ({
+          workspaces: workspaceRows.map((ws) => ({
             workspace_id: ws.workspace_id,
             workspace_name: ws.workspace_name,
             user_id: ws.user_id,
@@ -460,7 +487,7 @@ export default function WorkbenchHeader() {
       }
     }
 
-    toast.success(`Switched to ${workspace.workspace_name || 'workspace'}`);
+    toast.success(`Switched to ${workspace.workspace_name || (workspace as {name?: string}).name || 'workspace'}`);
     setShowCreateWorkspaceModal(false);
     window.location.reload();
   };
