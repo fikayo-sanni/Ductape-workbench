@@ -1121,7 +1121,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       console.log("Full action payload:", actionPayload);
       console.log("Folder ID:", data?.folderId);
 
-      await ductape.api.create(app.tag, actionPayload);
+      await ductape.actions.create(app.tag, actionPayload);
 
       toast.success("Action created successfully");
 

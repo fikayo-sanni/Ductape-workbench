@@ -45,7 +45,7 @@ import apiClient from '@/config/axiosinstance';
 function OnboardingFlow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, setCurrentWorkspaceId } = useAuth();
+  const { user, setUser, setCurrentWorkspaceId } = useAuth();
   const {
     workspaceId: existingWorkspaceId,
     hasSubscription,
@@ -295,7 +295,7 @@ function OnboardingFlow() {
       public_key: string;
       description: string;
     }) => workspaceServices.createWorkspace(data),
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       const created = response?.data;
       if (!created?._id && !created?.workspace_id) {
         toast.error('Failed to create workspace');
@@ -309,6 +309,33 @@ function OnboardingFlow() {
       setCurrentWorkspaceId(newWorkspaceId);
       toast.success('Workspace created!');
       setStep(isSelfHosted() ? 'complete' : 'plan');
+
+      // The create response is the workspace doc itself (no access_level/accepted/
+      // default), and nothing else refreshes the embedded user.workspaces list that
+      // EnvironmentsSidebar reads defaultEnvs from — so without this, a brand-new
+      // workspace's default environments never show up until an unrelated refresh.
+      if (user?._id && user.public_key) {
+        const fresh = await workspaceServices.fetchWorkspaces({
+          user_id: user._id,
+          public_key: user.public_key,
+        });
+        if (fresh?.data) {
+          setUser({
+            ...user,
+            workspaces: fresh.data.map((ws) => ({
+              workspace_id: ws.workspace_id,
+              workspace_name: ws.workspace_name,
+              user_id: ws.user_id,
+              default: ws.default || false,
+              accepted: ws.accepted ?? true,
+              access_level: ws.access_level || '',
+              defaultEnvs: (ws.defaultEnvs || []).map((env) => ({ ...env, active: true })),
+              logo: ws.logo,
+              description: ws.description,
+            })),
+          });
+        }
+      }
     },
     onError: () => toast.error('Error creating workspace, try again'),
   });

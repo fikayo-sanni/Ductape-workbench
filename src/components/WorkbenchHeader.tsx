@@ -431,6 +431,35 @@ export default function WorkbenchHeader() {
     setCurrentWorkspaceId(nextWorkspaceId);
     clearAllTabs();
     await queryClient.clear();
+
+    // The create response is the workspace doc itself (no access_level/accepted/
+    // default), and nothing else refreshes the embedded user.workspaces list that
+    // EnvironmentsSidebar reads defaultEnvs from — persist a fresh copy to
+    // localStorage before reloading, or the new workspace's default environments
+    // won't show up until an unrelated refresh happens to sync it later.
+    if (user?._id && user.public_key) {
+      const fresh = await workspaceServices.fetchWorkspaces({
+        user_id: user._id,
+        public_key: user.public_key,
+      });
+      if (fresh?.data) {
+        setUser({
+          ...user,
+          workspaces: fresh.data.map((ws) => ({
+            workspace_id: ws.workspace_id,
+            workspace_name: ws.workspace_name,
+            user_id: ws.user_id,
+            default: ws.default || false,
+            accepted: ws.accepted ?? true,
+            access_level: ws.access_level || '',
+            defaultEnvs: (ws.defaultEnvs || []).map((env) => ({ ...env, active: true })),
+            logo: ws.logo,
+            description: ws.description,
+          })),
+        });
+      }
+    }
+
     toast.success(`Switched to ${workspace.workspace_name || 'workspace'}`);
     setShowCreateWorkspaceModal(false);
     window.location.reload();
@@ -652,11 +681,14 @@ export default function WorkbenchHeader() {
         <div className="hidden md:flex items-center gap-2 md:gap-3 pr-3 md:pr-6 md:border-r border-grey-400">
           <ThemeToggle />
           <NewItemDropdown onSelect={handleNewItem} />
+          {/* Disabled until the chatbot is ready to ship — keep visible so people know it's coming. */}
           <Button
             variant={chatbotSidebarOpen ? 'default' : 'outline'}
             size="icon"
             onClick={toggleChatbotSidebar}
-            aria-label="AI Assistant"
+            disabled
+            aria-label="AI Assistant (coming soon)"
+            title="AI Assistant — coming soon"
             data-testid="header-chatbot-toggle"
           >
             <Bot className="h-4 w-4" />
@@ -758,10 +790,13 @@ export default function WorkbenchHeader() {
           {user && (
             <>
               <NewItemDropdown onSelect={handleNewItem} />
+              {/* Disabled until the chatbot is ready to ship — keep visible so people know it's coming. */}
               <button
                 onClick={toggleChatbotSidebar}
-                className={`p-2 rounded-lg ${chatbotSidebarOpen ? 'bg-primary text-white' : 'hover:bg-grey-100'}`}
-                aria-label="AI Assistant"
+                disabled
+                className={`p-2 rounded-lg opacity-50 pointer-events-none ${chatbotSidebarOpen ? 'bg-primary text-white' : 'hover:bg-grey-100'}`}
+                aria-label="AI Assistant (coming soon)"
+                title="AI Assistant — coming soon"
               >
                 <Bot className="h-5 w-5" />
               </button>
