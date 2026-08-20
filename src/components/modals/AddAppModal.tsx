@@ -10,11 +10,10 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   FileText,
-  Download,
+  FilePlus,
   Store,
   Plus,
 } from 'lucide-react';
-import ImportDialog from '@/components/ImportDialog';
 import InternalAppSelectionModal from './InternalAppSelectionModal';
 
 interface AddAppModalProps {
@@ -25,7 +24,6 @@ interface AddAppModalProps {
 
 export default function AddAppModal({ open, onOpenChange, product }: AddAppModalProps) {
   const { openTab } = useWorkbenchStore();
-  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showInternalAppModal, setShowInternalAppModal] = useState(false);
 
   const handleAddInternalApp = () => {
@@ -34,8 +32,21 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
     onOpenChange(false);
   };
 
-  const handleImportApp = () => {
-    setShowImportDialog(true);
+  const handleCreateNewApp = () => {
+    openTab({
+      id: `app-new-${Date.now()}`,
+      type: 'app',
+      title: 'New App',
+      data: {
+        isNew: true,
+        productId: product?._id,
+        productName: product?.name,
+        productTag: product?.tag,
+        productLogo: product?.logo,
+        productEnvs: product?.envs || [],
+      },
+      isDirty: true,
+    });
     onOpenChange(false);
   };
 
@@ -44,13 +55,6 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
     const { openMarketplaceTab } = useWorkbenchStore.getState();
     openMarketplaceTab();
     onOpenChange(false);
-  };
-
-  const handleImport = (data: { type: 'postman' | 'openapi'; source: 'file' | 'url'; content: string }) => {
-    // Handle the import logic here
-    console.log('Importing app:', data);
-    setShowImportDialog(false);
-    // You can add more logic here to process the imported data
   };
 
   const handleAppSelected = (app: any) => {
@@ -78,11 +82,11 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
       borderColor: 'border-blue-200',
     },
     {
-      id: 'import',
-      title: 'Import App',
-      description: 'Import an existing app from your local files',
-      icon: Download,
-      onClick: handleImportApp,
+      id: 'create-app',
+      title: 'Create New App',
+      description: 'Build a new app from scratch',
+      icon: FilePlus,
+      onClick: handleCreateNewApp,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
@@ -155,13 +159,6 @@ export default function AddAppModal({ open, onOpenChange, product }: AddAppModal
         </div>
       </DialogContent>
     </Dialog>
-
-    {/* Import Dialog */}
-    <ImportDialog
-      open={showImportDialog}
-      onOpenChange={setShowImportDialog}
-      onImport={handleImport}
-    />
 
     {/* Internal App Selection Modal */}
     <InternalAppSelectionModal
