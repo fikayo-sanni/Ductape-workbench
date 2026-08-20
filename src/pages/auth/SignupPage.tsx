@@ -187,7 +187,7 @@ function SignupForm() {
     <AuthPageShell
       testId="signup-page"
       title="Create your account"
-      subtitle="Free to start. No credit card required."
+      subtitle="Free to start"
       icon={<UserPlus className="h-5 w-5" />}
     >
       <Form {...form}>

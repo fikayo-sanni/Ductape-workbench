@@ -248,6 +248,7 @@ function OnboardingFlow() {
       sessionStorage.removeItem('onboardingPlanId');
       window.history.replaceState({}, document.title, '/onboarding');
       clearOnboardingFromInvites();
+      queryClient.invalidateQueries({ queryKey: ['onboarding-workspace-subscription'] });
       setStep('complete');
       toast.success('Payment successful! Your subscription is active.');
     };
@@ -598,6 +599,7 @@ function OnboardingFlow() {
                   onOnboardingSubscriptionComplete={() => {
                     clearOnboardingFromInvites();
                     queryClient.invalidateQueries({ queryKey: ['onboarding-billing-report'] });
+                    queryClient.invalidateQueries({ queryKey: ['onboarding-workspace-subscription'] });
                     setStep('complete');
                   }}
                 />

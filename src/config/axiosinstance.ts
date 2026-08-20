@@ -1,5 +1,6 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { isUsingViteApiProxy, resolveApiBaseUrl } from "@/config/apiBaseUrl";
+import { useAuth } from "@/store/useAuth";
 
 const apiBaseUrl = resolveApiBaseUrl();
 if (import.meta.env.DEV) {
@@ -39,10 +40,8 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth data
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("currentWorkspaceId");
+      // Clear auth data, and tabs/cached data from whoever was signed in
+      useAuth.getState().logout();
 
       // Redirect to login page
       if (!window.location.pathname.startsWith('/login')) {
