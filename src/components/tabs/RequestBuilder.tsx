@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/useAuth";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useDuctape } from "@/hooks/useDuctape";
 import { useTabState, getInitialTabState } from "@/hooks/useTabState";
 import { deleteTabState } from "@/lib/tab-state-manager";
+import { extractBaseUrlVariables } from "@/utils/baseUrlVariables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,6 +155,9 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
 
   const [fullUrl, setFullUrl] = useState(savedState?.fullUrl || "");
   const [baseUrl, setBaseUrl] = useState(savedState?.baseUrl || "");
+  const [baseUrlVariableValues, setBaseUrlVariableValues] = useState<Record<string, string>>(
+    savedState?.baseUrlVariableValues || {}
+  );
   const [resource, setResource] = useState(savedState?.resource || "");
   const [params, setParams] = useState<KeyValue[]>(savedState?.params || []);
   const [query, setQuery] = useState<KeyValue[]>(savedState?.query || []);
@@ -335,6 +339,13 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     }
   }, [baseUrl]);
 
+  // {{key}} / :key placeholders detected in the current URL (e.g. base_url variables like
+  // https://{{prefix}}-checkout.example.com) that need a value before the request can be sent.
+  const detectedBaseUrlVariables = useMemo(
+    () => extractBaseUrlVariables(fullUrl).filter((key) => !params.some((p) => p.key === key)),
+    [fullUrl, params]
+  );
+
   // Save state to localStorage whenever relevant state changes
   // Persist tab state automatically using centralized tab state manager
   useTabState(
@@ -346,6 +357,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
       formData,
       fullUrl,
       baseUrl,
+      baseUrlVariableValues,
       resource,
       params,
       query,
@@ -773,13 +785,23 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
           requestHeaders[h.key] = h.value;
         });
 
-      // Prepare params (path parameters)
-      const pathParams: Record<string, string> = {};
+      // Prepare params (path parameters + base_url variables like {{prefix}})
+      const pathParams: Record<string, string> = { ...baseUrlVariableValues };
       params
         .filter((p) => p.enabled && p.key)
         .forEach((p) => {
           pathParams[p.key] = p.value;
         });
+
+      if (detectedBaseUrlVariables.some((key) => !baseUrlVariableValues[key]?.trim())) {
+        toast.error(
+          `Please provide values for URL variables: ${detectedBaseUrlVariables
+            .filter((key) => !baseUrlVariableValues[key]?.trim())
+            .join(', ')}`
+        );
+        setIsLoadingRequest(false);
+        return;
+      }
 
       // Parse body based on request type
       let parsedBody: any;
@@ -1356,6 +1378,28 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               </Button>
             )}
           </div>
+
+          {/* URL variables (e.g. {{prefix}} in a parameterized base_url) — need a value to send */}
+          {detectedBaseUrlVariables.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg border border-amber-300 bg-amber-50 space-y-2">
+              <p className="text-xs font-medium text-amber-800">
+                This URL has variables — provide values to send the request
+              </p>
+              {detectedBaseUrlVariables.map((key) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-grey-700 w-28 truncate">{`{{${key}}}`}</span>
+                  <Input
+                    placeholder={`Value for ${key}`}
+                    value={baseUrlVariableValues[key] || ""}
+                    onChange={(e) =>
+                      setBaseUrlVariableValues((prev) => ({ ...prev, [key]: e.target.value }))
+                    }
+                    className="flex-1 h-8 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Resource Path */}
           <div className="mt-3 flex items-center gap-2">

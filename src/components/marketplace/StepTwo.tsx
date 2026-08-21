@@ -17,12 +17,25 @@ import { toast } from 'react-hot-toast';
 
 const variableSchema = z.object({ key: z.string(), value: z.string() });
 
-const mapEnvironmentsSchema = z.object({
-  isSelected: z.boolean().default(false),
-  product_env_slug: z.string(),
-  app_env_slug: z.string(),
-  variables: z.array(variableSchema).optional().default([]),
-});
+const mapEnvironmentsSchema = z
+  .object({
+    isSelected: z.boolean().default(false),
+    product_env_slug: z.string(),
+    app_env_slug: z.string(),
+    variables: z.array(variableSchema).optional().default([]),
+  })
+  .superRefine((env, ctx) => {
+    if (!env.isSelected) return;
+    env.variables?.forEach((v, i) => {
+      if (!v.value.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Required',
+          path: ['variables', i, 'value'],
+        });
+      }
+    });
+  });
 
 const formSchema = z.object({
   environments: z.array(mapEnvironmentsSchema),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { reconstructPayloadFromSample, reconstructActionPayload } from '@/utils/payloadReconstruction';
+import { extractBaseUrlVariables } from '@/utils/baseUrlVariables';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useSDKProxy } from '@/services/sdkProxy';
 
@@ -134,6 +135,9 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
 
   const [fullUrl, setFullUrl] = useState('');
   const [baseUrl, setBaseUrl] = useState(persistedState?.baseUrl || '');
+  const [baseUrlVariableValues, setBaseUrlVariableValues] = useState<Record<string, string>>(
+    persistedState?.baseUrlVariableValues || {}
+  );
   const [resource, setResource] = useState(action?.resource || '');
   const [params, setParams] = useState<KeyValue[]>(persistedState?.params || []);
   const [query, setQuery] = useState<KeyValue[]>(persistedState?.query || []);
@@ -509,6 +513,15 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
+  // {{key}} / :key placeholders in the current URL (e.g. a parameterized base_url like
+  // https://{{prefix}}-checkout.example.com) — only relevant for the raw test-action fallback;
+  // when running through the SDK (product context), values come from the product's app connection.
+  const detectedBaseUrlVariables = useMemo(
+    () => extractBaseUrlVariables(fullUrl).filter((key) => !params.some((p) => p.key === key)),
+    [fullUrl, params]
+  );
+  const usesTestActionFallback = !(productTag && (appTag || action?.appTag) && action?.tag);
+
   const handleTest = async () => {
     // Determine if we should use SDK actions.run or fallback to test endpoint
     const effectiveAppTag = appTag || action?.appTag;
@@ -630,6 +643,16 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
           return;
         }
 
+        const missingBaseUrlVars = detectedBaseUrlVariables.filter(
+          (key) => !baseUrlVariableValues[key]?.trim()
+        );
+        if (missingBaseUrlVars.length > 0) {
+          toast.error(`Please provide values for URL variables: ${missingBaseUrlVars.join(', ')}`);
+          setIsLoadingRequest(false);
+          return;
+        }
+        const fallbackPathParams = { ...baseUrlVariableValues, ...pathParams };
+
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.ductape.app/';
         const proxyUrl = `${apiBaseUrl}apps/v1/test-action`;
 
@@ -646,7 +669,7 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
             method: formData.method,
             headers: requestHeaders,
             query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
-            params: Object.keys(pathParams).length > 0 ? pathParams : undefined,
+            params: Object.keys(fallbackPathParams).length > 0 ? fallbackPathParams : undefined,
             body: parsedBody,
           }),
         });
@@ -1641,6 +1664,30 @@ println!("Action result: {:?}", result);`
               {isLoadingRequest ? 'Sending...' : 'Send'}
             </Button>
           </div>
+
+          {/* URL variables (e.g. {{prefix}} in a parameterized base_url) — only shown when the
+              raw test-action fallback is used, since the SDK path resolves these from the
+              product's app connection instead. */}
+          {usesTestActionFallback && detectedBaseUrlVariables.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg border border-amber-300 bg-amber-50 space-y-2">
+              <p className="text-xs font-medium text-amber-800">
+                This URL has variables — provide values to send the request
+              </p>
+              {detectedBaseUrlVariables.map((key) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-grey-700 w-28 truncate">{`{{${key}}}`}</span>
+                  <Input
+                    placeholder={`Value for ${key}`}
+                    value={baseUrlVariableValues[key] || ''}
+                    onChange={(e) =>
+                      setBaseUrlVariableValues((prev) => ({ ...prev, [key]: e.target.value }))
+                    }
+                    className="flex-1 h-8 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Resource Path */}
           <div className="mt-3 flex items-center gap-2">

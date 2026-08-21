@@ -89,13 +89,25 @@ export function isTestPlan(plan: { name?: string; tag?: string }): boolean {
   return name === 'test plan' || tag === 'test-plan' || tag === 'test';
 }
 
+// Fixed onboarding display order. The plans API has no sort of its own
+// (Mongo returns natural order), so this order must be enforced here.
+const ONBOARDING_PLAN_ORDER = ['free', 'beginner', 'startup', 'pay as you go'];
+
+function onboardingPlanRank(plan: { name?: string }): number {
+  const name = plan.name?.trim().toLowerCase() ?? '';
+  const index = ONBOARDING_PLAN_ORDER.indexOf(name);
+  return index === -1 ? ONBOARDING_PLAN_ORDER.length : index;
+}
+
 export function filterOnboardingPlans<T extends { name?: string; tag?: string }>(
   plans: T[],
   isAdminWorkspace: boolean,
 ): T[] {
-  return plans.filter((plan) => {
-    if (plan.name === 'Enterprise Plan') return false;
-    if (isTestPlan(plan)) return isAdminWorkspace;
-    return true;
-  });
+  return plans
+    .filter((plan) => {
+      if (plan.name === 'Enterprise Plan') return false;
+      if (isTestPlan(plan)) return isAdminWorkspace;
+      return true;
+    })
+    .sort((a, b) => onboardingPlanRank(a) - onboardingPlanRank(b));
 }

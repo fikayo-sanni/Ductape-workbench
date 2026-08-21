@@ -81,6 +81,8 @@ function KeyField({
 export default function OnboardingKeysStep({ workspaceId, onContinue }: OnboardingKeysStepProps) {
   const { user } = useAuth();
 
+  const [copiedWorkspaceId, setCopiedWorkspaceId] = useState(false);
+
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [publishableKeyLoading, setPublishableKeyLoading] = useState(true);
   const [copiedPublishableKey, setCopiedPublishableKey] = useState(false);
@@ -131,6 +133,18 @@ export default function OnboardingKeysStep({ workspaceId, onContinue }: Onboardi
     }, 1000);
     return () => clearInterval(interval);
   }, [secondsLeft, showOtpDialog]);
+
+  const handleCopyWorkspaceId = () => {
+    if (!workspaceId) return;
+    navigator.clipboard.writeText(workspaceId).then(
+      () => {
+        setCopiedWorkspaceId(true);
+        toast.success('Workspace ID copied!');
+        setTimeout(() => setCopiedWorkspaceId(false), 2000);
+      },
+      () => toast.error('Failed to copy workspace ID.'),
+    );
+  };
 
   const handleCopyPublishableKey = () => {
     if (!publishableKey) return;
@@ -264,6 +278,16 @@ export default function OnboardingKeysStep({ workspaceId, onContinue }: Onboardi
         </div>
 
         <div className="mt-8 space-y-5">
+          <KeyField
+            label="Workspace ID"
+            description="Identifies this workspace when calling the Ductape API or SDKs."
+            value={workspaceId}
+            visible={Boolean(workspaceId)}
+            onCopy={handleCopyWorkspaceId}
+            copied={copiedWorkspaceId}
+            masked={false}
+          />
+
           <KeyField
             label="Publishable key"
             description="Safe for frontend apps and browser SDK initialization."
