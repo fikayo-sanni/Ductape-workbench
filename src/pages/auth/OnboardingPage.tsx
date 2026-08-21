@@ -109,7 +109,9 @@ function OnboardingFlow() {
   }, [instanceCheckDone, showLicenseStep]);
 
   const [workspaceId, setWorkspaceId] = useState(
-    () => sessionStorage.getItem('onboardingWorkspaceId') || existingWorkspaceId || '',
+    // The active workspace is authoritative. Saved onboarding state may belong
+    // to a workspace selected during an earlier visit.
+    () => existingWorkspaceId || sessionStorage.getItem('onboardingWorkspaceId') || '',
   );
   const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
   const [workspaceForm, setWorkspaceForm] = useState({ workspace_name: '', description: '' });
@@ -165,6 +167,12 @@ function OnboardingFlow() {
   useEffect(() => {
     sessionStorage.setItem('onboardingStep', step);
   }, [step]);
+
+  useEffect(() => {
+    if (existingWorkspaceId && existingWorkspaceId !== workspaceId) {
+      setWorkspaceId(existingWorkspaceId);
+    }
+  }, [existingWorkspaceId, workspaceId]);
 
   useEffect(() => {
     if (workspaceId) {

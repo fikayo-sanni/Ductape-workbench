@@ -40,6 +40,7 @@ import AppSelectionModal from './modals/AppSelectionModal';
 import CreateAccountModal from './CreateAccountModal';
 import CreateWorkspaceModal from './CreateWorkspaceModal';
 import ThemeToggle from './ThemeToggle';
+import {prepareOnboardingForWorkspace} from '@/utils/onboarding';
 
 interface ApiError {
   message: string;
@@ -111,6 +112,7 @@ export default function WorkbenchHeader() {
         clearAllTabs();
         setUser(updatedUser as any);
         setCurrentWorkspaceId(variables);
+        prepareOnboardingForWorkspace(variables);
 
         toast.success('Workspace changed successfully');
         // Reload to apply workspace change across app
@@ -457,6 +459,7 @@ export default function WorkbenchHeader() {
     clearAllTabs();
     setSelectedWorkspace(nextWorkspaceId);
     setCurrentWorkspaceId(nextWorkspaceId);
+    prepareOnboardingForWorkspace(nextWorkspaceId);
 
     // The create response is the workspace doc itself (no access_level/accepted/
     // default), and nothing else refreshes the embedded user.workspaces list that

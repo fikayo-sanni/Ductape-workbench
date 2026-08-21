@@ -55,6 +55,13 @@ export function markOnboardingWorkspaceLocked() {
   sessionStorage.setItem('onboardingWorkspaceLocked', 'true');
 }
 
+/** Reset cross-workspace onboarding progress and pin the flow to the selected workspace. */
+export function prepareOnboardingForWorkspace(workspaceId: string) {
+  clearOnboardingSession();
+  sessionStorage.setItem('onboardingWorkspaceId', workspaceId);
+  sessionStorage.setItem('onboardingWorkspaceLocked', 'true');
+}
+
 export type OnboardingStep = 'workspace' | 'plan' | 'billing' | 'complete' | 'license';
 
 export function getInitialOnboardingStep(): OnboardingStep {
@@ -92,4 +99,3 @@ export function filterOnboardingPlans<T extends { name?: string; tag?: string }>
     return true;
   });
 }
-
