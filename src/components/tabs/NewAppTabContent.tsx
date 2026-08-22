@@ -200,19 +200,23 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
       return;
     }
 
-    // Check that every {{variable}} in a base_url has a value, otherwise requests will
-    // silently go out with the literal placeholder still in the URL.
-    const envsWithMissingVars = activeEnvs.filter((env: any) =>
-      (env.variables || []).some((v: any) => !String(v.value ?? '').trim())
-    );
-    if (envsWithMissingVars.length > 0) {
-      const missing = envsWithMissingVars
-        .flatMap((env: any) => (env.variables || [])
-          .filter((v: any) => !String(v.value ?? '').trim())
-          .map((v: any) => `${env.env_name || env.slug}.${v.key}`))
-        .join(', ');
-      toast.error(`Please provide values for base URL variables: ${missing}`);
-      return;
+    // Base URL variable values are only needed when this app is about to be auto-connected to
+    // a product (below) — connecting supplies the values for that product's environments.
+    // Creating a standalone app shouldn't require them; they get filled in whenever it's
+    // eventually connected to a product.
+    if (product) {
+      const envsWithMissingVars = activeEnvs.filter((env: any) =>
+        (env.variables || []).some((v: any) => !String(v.value ?? '').trim())
+      );
+      if (envsWithMissingVars.length > 0) {
+        const missing = envsWithMissingVars
+          .flatMap((env: any) => (env.variables || [])
+            .filter((v: any) => !String(v.value ?? '').trim())
+            .map((v: any) => `${env.env_name || env.slug}.${v.key}`))
+          .join(', ');
+        toast.error(`Please provide values for base URL variables: ${missing}`);
+        return;
+      }
     }
 
     try {
