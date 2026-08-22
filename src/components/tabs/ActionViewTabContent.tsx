@@ -225,11 +225,11 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     }
   }, [environments]);
 
-  // Initialize params, query, headers from action data (only if no persisted state)
+  // Initialize params, query, headers from action data. Reconciles rather than skipping when
+  // persisted state exists: a stale persisted tab (from before a key like `paymentPspReference`
+  // was added to the action's schema) would otherwise permanently hide that key, since
+  // persistedState is loaded once on mount and never becomes falsy again.
   useEffect(() => {
-    // Skip initialization if we have persisted state
-    if (persistedState) return;
-
     if (action) {
       // Initialize params (only simple types, arrays/objects are handled via reconstruction)
       if (action.params?.data) {
@@ -241,14 +241,24 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
                  fieldType !== 'json';
         });
 
-        setParams(
-          simpleParams.map((param: any) => ({
+        setParams((prev) => {
+          const existingKeys = new Set(prev.map((p) => p.key));
+          const missing = simpleParams
+            .filter((param: any) => param.key && !existingKeys.has(param.key))
+            .map((param: any) => ({
+              key: param.key || '',
+              value: param.default || param.defaultValue || '',
+              description: param.description || '',
+              enabled: true,
+            }));
+          if (missing.length === 0) return prev.length > 0 ? prev : simpleParams.map((param: any) => ({
             key: param.key || '',
             value: param.default || param.defaultValue || '',
             description: param.description || '',
             enabled: true,
-          }))
-        );
+          }));
+          return [...prev, ...missing];
+        });
       }
 
       // Initialize query (only simple types, arrays/objects are handled via reconstruction)
@@ -261,14 +271,24 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
                  fieldType !== 'json';
         });
 
-        setQuery(
-          simpleQuery.map((param: any) => ({
+        setQuery((prev) => {
+          const existingKeys = new Set(prev.map((q) => q.key));
+          const missing = simpleQuery
+            .filter((param: any) => param.key && !existingKeys.has(param.key))
+            .map((param: any) => ({
+              key: param.key || '',
+              value: param.default || param.defaultValue || '',
+              description: param.description || '',
+              enabled: true,
+            }));
+          if (missing.length === 0) return prev.length > 0 ? prev : simpleQuery.map((param: any) => ({
             key: param.key || '',
             value: param.default || param.defaultValue || '',
             description: param.description || '',
             enabled: true,
-          }))
-        );
+          }));
+          return [...prev, ...missing];
+        });
       }
 
       // Initialize headers (only simple types, arrays/objects are handled via reconstruction)
@@ -281,27 +301,38 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
                  fieldType !== 'json';
         });
 
-        // Check if Content-Type already exists in action headers
-        const hasContentType = simpleHeaders.some(
-          (header: any) => header.key?.toLowerCase() === 'content-type'
-        );
-
-        const mappedHeaders = simpleHeaders.map((header: any) => ({
-          key: header.key || '',
-          value: header.sampleValue || '',
-          description: header.description || '',
-          enabled: true,
-        }));
-
-        // Only add default Content-Type if it's not already in the action headers
-        setHeaders(
-          hasContentType
-            ? mappedHeaders
-            : [{ key: 'Content-Type', value: 'application/json', enabled: true }, ...mappedHeaders]
-        );
+        setHeaders((prev) => {
+          const existingKeys = new Set(prev.map((h) => h.key));
+          const missing = simpleHeaders
+            .filter((header: any) => header.key && !existingKeys.has(header.key))
+            .map((header: any) => ({
+              key: header.key || '',
+              value: header.sampleValue || '',
+              description: header.description || '',
+              enabled: true,
+            }));
+          if (missing.length === 0) {
+            if (prev.length > 0) return prev;
+            const hasContentType = simpleHeaders.some(
+              (header: any) => header.key?.toLowerCase() === 'content-type'
+            );
+            const mappedHeaders = simpleHeaders.map((header: any) => ({
+              key: header.key || '',
+              value: header.sampleValue || '',
+              description: header.description || '',
+              enabled: true,
+            }));
+            return hasContentType
+              ? mappedHeaders
+              : [{ key: 'Content-Type', value: 'application/json', enabled: true }, ...mappedHeaders];
+          }
+          return [...prev, ...missing];
+        });
       }
 
-      // Initialize body with reconstruction from sample data
+      // Initialize body with reconstruction from sample data (only if no persisted state —
+      // body is a raw JSON string, not a keyed list, so reconciling missing keys isn't feasible).
+      if (persistedState) return;
       if (action.body) {
         let bodyContent: any = {};
 

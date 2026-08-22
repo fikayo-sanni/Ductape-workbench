@@ -16,6 +16,8 @@ export function useRequiresOnboarding() {
     data: workspacesData,
     isFetched: workspacesFetched,
     isLoading: workspacesLoading,
+    isError: workspacesError,
+    refetch: refetchWorkspaces,
   } = useFetchWorkspaces({
     user_id: user?._id ?? '',
     public_key: user?.public_key ?? '',
@@ -79,6 +81,8 @@ export function useRequiresOnboarding() {
       hasSubscription: false,
       workspacesFetched: false,
       hasWorkspaceAccess: false,
+      hasLoadError: false,
+      retryLoad: refetchWorkspaces,
     };
   }
 
@@ -89,11 +93,16 @@ export function useRequiresOnboarding() {
 
   const needsPendingInvitesScreen =
     workspacesFetched &&
+    !workspacesError &&
     acceptedWorkspaces.length === 0 &&
     pendingInvites.length > 0;
 
+  // A failed workspaces fetch (network/API outage) must not be read as "user has no
+  // workspaces" — that would wrongly send an existing, already-onboarded user through
+  // onboarding just because their workspace list failed to load.
   const needsOnboarding =
     workspacesFetched &&
+    !workspacesError &&
     !needsPendingInvitesScreen &&
     (acceptedWorkspaces.length === 0 ||
       (Boolean(workspaceId) && !subscriptionError && !hasSubscription));
@@ -108,5 +117,7 @@ export function useRequiresOnboarding() {
     hasSubscription,
     workspacesFetched,
     hasWorkspaceAccess: acceptedWorkspaces.length > 0,
+    hasLoadError: workspacesFetched && workspacesError,
+    retryLoad: refetchWorkspaces,
   };
 }
