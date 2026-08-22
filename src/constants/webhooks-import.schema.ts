@@ -13,7 +13,9 @@ export const WEBHOOKS_IMPORT_EXAMPLE = {
       name: 'Payment Notifications',
       tag: 'payment_notifications',
       description: 'Webhook collection for payment lifecycle events',
-      envs: [{ slug: 'production' }, { slug: 'sandbox' }],
+      // slug must match one of the app's actual environment slugs (e.g. "prd", "snd"),
+      // not the environment's display name.
+      envs: [{ slug: 'prd' }, { slug: 'snd' }],
       events: [
         {
           name: 'Payment Completed',
@@ -77,6 +79,8 @@ Each webhook collection:
 - tag (string) – unique identifier, snake_case
 - description (string)
 - envs (array) – at least one { "slug": "<app_env_slug>" }
+  slug must be the app's actual environment slug (e.g. "prd", "snd"), not its display name
+  (e.g. "Production"). Check the app's Environments tab for the exact slugs.
   Optional per env for API-based registration with the 3rd party:
   - registration_url, method, sample (request template with {{url}} placeholder)
 
@@ -92,8 +96,31 @@ After import, integrators register their consumer URL on Ductape and receive a p
 to configure on the 3rd party dashboard instead.
 `.trim();
 
+/**
+ * Tokenize a dot/bracket path like "notificationItems[0].NotificationRequestItem.eventCode"
+ * into Ductape's native selector format: $Event{key}[index]{key}...
+ *
+ * Array indices must be their own stage (extractStages in sdk/ts resolves "{key}" and
+ * "[N]" separately) — a naive split(".") leaves "notificationItems[0]" as one broken
+ * segment, which never matches the sample's actual "notificationItems" array key.
+ */
 function formatSelectorPath(path: string): string {
-  return `$Event{${path.split('.').join('}{')}}`;
+  const tokens: Array<string | number> = [];
+
+  for (const segment of path.split('.')) {
+    const match = segment.match(/^([^[\]]*)((?:\[\d+\])*)$/);
+    if (!match) {
+      tokens.push(segment);
+      continue;
+    }
+    const [, key, brackets] = match;
+    if (key) tokens.push(key);
+    for (const bracket of brackets.match(/\[(\d+)\]/g) ?? []) {
+      tokens.push(Number(bracket.slice(1, -1)));
+    }
+  }
+
+  return '$Event' + tokens.map((t) => (typeof t === 'number' ? `[${t}]` : `{${t}}`)).join('');
 }
 
 /** Transform import JSON into SDK createWithEvents/importBulk payloads */
