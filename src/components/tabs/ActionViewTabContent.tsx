@@ -513,12 +513,14 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  // {{key}} / :key placeholders in the current URL (e.g. a parameterized base_url like
-  // https://{{prefix}}-checkout.example.com) — only relevant for the raw test-action fallback;
-  // when running through the SDK (product context), values come from the product's app connection.
+  // {{key}} / :key placeholders in the environment's base_url specifically — distinct from path
+  // parameters, which are declared and entered via the Params tab. Only the base_url portion is
+  // scanned, not the full URL, so a resource-path placeholder is left to the existing Params flow.
+  // Only relevant for the raw test-action fallback; when running through the SDK (product
+  // context), values come from the product's app connection.
   const detectedBaseUrlVariables = useMemo(
-    () => extractBaseUrlVariables(fullUrl).filter((key) => !params.some((p) => p.key === key)),
-    [fullUrl, params]
+    () => extractBaseUrlVariables(baseUrl).filter((key) => !params.some((p) => p.key === key)),
+    [baseUrl, params]
   );
   const usesTestActionFallback = !(productTag && (appTag || action?.appTag) && action?.tag);
 
@@ -857,6 +859,12 @@ export default function ActionViewTabContent({ action, productTag, appTag, envSl
       }
     }
 
+    // Note for code samples: base_url variables (e.g. {{prefix}}) are configured once on the
+    // product's app connection — they're not part of the per-call input object.
+    const baseUrlVarNote = detectedBaseUrlVariables.length > 0
+      ? `// Note: this action's base_url uses ${detectedBaseUrlVariables.map(k => `{{${k}}}`).join(', ')} — configured on the app's product connection, not passed in input.\n`
+      : '';
+
     // Helper function to get value with default override
     const getParamValue = (key: string, value: string) => {
       const defaultValue = defaultValues.find(dv => dv.variable === key);
@@ -1028,7 +1036,7 @@ const ductape = new Ductape({
           },
           {
             title: 'Input',
-            code: `const payload = {
+            code: `${baseUrlVarNote}const payload = {
   product: '${productTagPlaceholder}',
   env: '${envSlug}',
   app: '${appTag}',
@@ -1058,7 +1066,7 @@ const ductape = new Ductape({
           },
           {
             title: 'Input',
-            code: `const payload = {
+            code: `${baseUrlVarNote}const payload = {
   product: '${productTagPlaceholder}',
   env: '${envSlug}',
   app: '${appTag}',
@@ -2151,6 +2159,29 @@ println!("Action result: {:?}", result);`
                 <span className="text-xs px-2 py-1 bg-grey-100 text-grey rounded border border-grey-400">
                   {selectedActionForDocs.request_type}
                 </span>
+              </div>
+            )}
+
+            {/* Base URL Variables — distinct from Path Parameters: these come from the
+                environment's base_url (e.g. {{prefix}}) and are configured once on the
+                product's app connection, not supplied per request. */}
+            {detectedBaseUrlVariables.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold text-grey mb-2 block">Base URL Variables</Label>
+                <p className="text-xs text-grey-600 mb-2">
+                  This environment's base_url has variables. They're configured once when the app
+                  is connected to a product, not passed per request.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {detectedBaseUrlVariables.map((key) => (
+                    <code
+                      key={key}
+                      className="text-xs bg-grey-100 text-grey px-2 py-1 rounded border border-grey-400 font-mono"
+                    >
+                      {`{{${key}}}`}
+                    </code>
+                  ))}
+                </div>
               </div>
             )}
 

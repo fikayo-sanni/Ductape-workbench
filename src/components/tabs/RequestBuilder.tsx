@@ -339,11 +339,13 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     }
   }, [baseUrl]);
 
-  // {{key}} / :key placeholders detected in the current URL (e.g. base_url variables like
-  // https://{{prefix}}-checkout.example.com) that need a value before the request can be sent.
+  // {{key}} / :key placeholders in the environment's base_url specifically (e.g.
+  // https://{{prefix}}-checkout.example.com) — distinct from path parameters, which are declared
+  // and entered via the Params tab. Only the base_url portion is scanned, not the full URL,
+  // so a placeholder in the resource path is left to the existing Params flow.
   const detectedBaseUrlVariables = useMemo(
-    () => extractBaseUrlVariables(fullUrl).filter((key) => !params.some((p) => p.key === key)),
-    [fullUrl, params]
+    () => extractBaseUrlVariables(baseUrl).filter((key) => !params.some((p) => p.key === key)),
+    [baseUrl, params]
   );
 
   // Save state to localStorage whenever relevant state changes
