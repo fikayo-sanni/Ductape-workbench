@@ -101,7 +101,7 @@ function invocationTime(value?: string) {
 
 function InvocationList({ items, loading, onViewAll }: { items: any[]; loading: boolean; onViewAll?: () => void }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-grey-300 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
       <div className="flex items-center justify-between px-5 pb-2 pt-4">
         <h2 className="text-sm font-semibold text-grey">Past invocations</h2>
         {onViewAll && items.length > 0 ? <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-primary" onClick={onViewAll}>View all</Button> : null}
@@ -114,7 +114,7 @@ function InvocationList({ items, loading, onViewAll }: { items: any[]; loading: 
             const id = item.process_id || item.execution_id || item._id || item.id || `invocation-${index + 1}`;
             const duration = item.duration_ms ?? item.latency ?? item.duration;
             return (
-              <div key={String(id)} className="grid grid-cols-[1fr_120px_140px_100px] items-center gap-4 px-5 py-3 hover:bg-grey-50">
+              <div key={String(id)} className="grid grid-cols-[1fr_120px_140px_100px] items-center gap-4 px-5 py-3 hover:bg-grey-50 dark:hover:bg-grey-400/20">
                 <div className="flex min-w-0 items-center gap-3"><span className={cn('h-2 w-2 flex-shrink-0 rounded-full', failed ? 'bg-red' : 'bg-green')} /><div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</p><p className="truncate font-mono text-xs text-grey-500">{String(id)}</p></div></div>
                 <span className={cn('text-xs font-medium capitalize', failed ? 'text-red' : 'text-green')}>{state}</span>
                 <span className="text-xs text-grey-500">{item.event || item.action || item.type || '—'}</span>
@@ -225,28 +225,28 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
   };
 
   if (!resource?.tag || !env?.slug || !product?.tag) {
-    return <div className="flex h-full items-center justify-center bg-grey-100 text-sm text-grey-600">This tab is missing component or environment data. Reopen it from the product page.</div>;
+    return <div className="flex h-full items-center justify-center bg-grey-100 text-sm text-grey-600 dark:bg-background">This tab is missing component or environment data. Reopen it from the product page.</div>;
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-grey-100">
-      <aside className={cn('flex min-h-0 flex-shrink-0 flex-col border-r border-grey-400 bg-white transition-[width]', collapsed ? 'w-[52px]' : 'w-[256px]')}>
+    <div className="flex h-full min-h-0 bg-grey-100 dark:bg-background">
+      <aside className={cn('flex min-h-0 flex-shrink-0 flex-col border-r border-grey-400 bg-white transition-[width] dark:bg-background', collapsed ? 'w-[52px]' : 'w-[256px]')}>
         <div className={cn('border-b border-grey-400', collapsed ? 'p-2' : 'p-4')}>
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
             <div className={cn('flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg', meta.tint, meta.accent)}><Icon className="h-5 w-5" /></div>
-            {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-grey">{resource.name || resource.tag}</p><p className="truncate text-xs text-grey-500">{env.name || env.slug}</p></div><button type="button" className="rounded p-1.5 text-grey-500 hover:bg-grey-100" onClick={() => setCollapsed(true)} title="Collapse sidebar"><PanelLeftClose className="h-4 w-4" /></button></>}
+            {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-grey">{resource.name || resource.tag}</p><p className="truncate text-xs text-grey-500">{env.name || env.slug}</p></div><button type="button" className="rounded p-1.5 text-grey-500 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(true)} title="Collapse sidebar"><PanelLeftClose className="h-4 w-4" /></button></>}
           </div>
         </div>
         {!collapsed && <div className="border-b border-grey-300 p-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" /><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search invocations..." className="h-9 pl-9 text-sm" /></div></div>}
         <nav className="flex-1 overflow-y-auto p-2">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <button type="button" title="Overview" onClick={() => { setView('overview'); setCollapsed(false); }} className={cn('flex h-10 w-10 items-center justify-center rounded-lg', view === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey-600 hover:bg-grey-100')}><LayoutDashboard className="h-5 w-5" /></button>
-              {(['all', 'running', 'completed', 'failed'] as InvocationStatus[]).map((value) => { const StatusIcon = value === 'running' ? Loader2 : value === 'completed' ? CheckCircle2 : value === 'failed' ? XCircle : List; return <button key={value} type="button" title={value === 'all' ? 'All invocations' : value} onClick={() => { setStatusFilter(value); setView('invocations'); setCollapsed(false); }} className={cn('flex h-10 w-10 items-center justify-center rounded-lg', view === 'invocations' && statusFilter === value ? 'bg-primary/10 text-primary' : 'text-grey-600 hover:bg-grey-100')}><StatusIcon className={cn('h-5 w-5', value === 'running' && 'animate-spin')} /></button>; })}
+              <button type="button" title="Overview" onClick={() => { setView('overview'); setCollapsed(false); }} className={cn('flex h-10 w-10 items-center justify-center rounded-lg', view === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey-600 hover:bg-grey-100 dark:hover:bg-grey-400/20')}><LayoutDashboard className="h-5 w-5" /></button>
+              {(['all', 'running', 'completed', 'failed'] as InvocationStatus[]).map((value) => { const StatusIcon = value === 'running' ? Loader2 : value === 'completed' ? CheckCircle2 : value === 'failed' ? XCircle : List; return <button key={value} type="button" title={value === 'all' ? 'All invocations' : value} onClick={() => { setStatusFilter(value); setView('invocations'); setCollapsed(false); }} className={cn('flex h-10 w-10 items-center justify-center rounded-lg', view === 'invocations' && statusFilter === value ? 'bg-primary/10 text-primary' : 'text-grey-600 hover:bg-grey-100 dark:hover:bg-grey-400/20')}><StatusIcon className={cn('h-5 w-5', value === 'running' && 'animate-spin')} /></button>; })}
             </div>
           ) : (
             <>
-              <button type="button" onClick={() => setView('overview')} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100')}><LayoutDashboard className="h-4 w-4" /><span className="flex-1 text-left font-medium">Overview</span></button>
+              <button type="button" onClick={() => setView('overview')} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><LayoutDashboard className="h-4 w-4" /><span className="flex-1 text-left font-medium">Overview</span></button>
               <div className="mt-4 flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold uppercase text-grey-600">Status</span><button type="button" title="Refresh invocations" onClick={() => queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] })}><RefreshCw className="h-3.5 w-3.5 text-grey-500" /></button></div>
               <div className="space-y-0.5">
                 {([
@@ -254,17 +254,17 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                   { value: 'running', label: 'Running', icon: Loader2, count: statusCounts.running },
                   { value: 'completed', label: 'Completed', icon: CheckCircle2, count: statusCounts.completed },
                   { value: 'failed', label: 'Failed', icon: XCircle, count: statusCounts.failed },
-                ] as const).map(({ value, label, icon: StatusIcon, count }) => <button key={value} type="button" onClick={() => { setStatusFilter(value); setView('invocations'); }} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'invocations' && statusFilter === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100')}><StatusIcon className={cn('h-4 w-4', value === 'running' && 'animate-spin')} /><span className="flex-1 text-left">{label}</span><span className="min-w-[20px] rounded bg-grey-100 px-1.5 py-0.5 text-center text-xs text-grey-600">{count}</span></button>)}
+                ] as const).map(({ value, label, icon: StatusIcon, count }) => <button key={value} type="button" onClick={() => { setStatusFilter(value); setView('invocations'); }} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'invocations' && statusFilter === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><StatusIcon className={cn('h-4 w-4', value === 'running' && 'animate-spin')} /><span className="flex-1 text-left">{label}</span><span className="min-w-[20px] rounded bg-grey-100 px-1.5 py-0.5 text-center text-xs text-grey-600 dark:bg-grey-400/20">{count}</span></button>)}
               </div>
-              <div className="mt-4 px-2"><p className="mb-2 text-xs font-semibold uppercase text-grey-600">Time Range</p><div className="space-y-0.5">{([{ value: '1h', label: 'Last Hour' }, { value: '24h', label: 'Last 24 Hours' }, { value: '7d', label: 'Last 7 Days' }, { value: '30d', label: 'Last 30 Days' }, { value: 'all', label: 'All Time' }] as const).map(({ value, label }) => <button key={value} type="button" onClick={() => setTimeRange(value)} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', timeRange === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100')}><Calendar className="h-4 w-4" /><span>{label}</span></button>)}</div></div>
+              <div className="mt-4 px-2"><p className="mb-2 text-xs font-semibold uppercase text-grey-600">Time Range</p><div className="space-y-0.5">{([{ value: '1h', label: 'Last Hour' }, { value: '24h', label: 'Last 24 Hours' }, { value: '7d', label: 'Last 7 Days' }, { value: '30d', label: 'Last 30 Days' }, { value: 'all', label: 'All Time' }] as const).map(({ value, label }) => <button key={value} type="button" onClick={() => setTimeRange(value)} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', timeRange === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><Calendar className="h-4 w-4" /><span>{label}</span></button>)}</div></div>
             </>
           )}
         </nav>
-        <div className="border-t border-grey-400 p-2">{collapsed ? <button type="button" className="flex h-9 w-full items-center justify-center rounded text-grey-500 hover:bg-grey-100" onClick={() => setCollapsed(false)} title="Expand sidebar"><PanelLeft className="h-4 w-4" /></button> : null}</div>
+        <div className="border-t border-grey-400 p-2">{collapsed ? <button type="button" className="flex h-9 w-full items-center justify-center rounded text-grey-500 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(false)} title="Expand sidebar"><PanelLeft className="h-4 w-4" /></button> : null}</div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-grey-300 bg-white px-6 py-5">
+        <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-grey-300 bg-white px-6 py-5 dark:border-grey-400 dark:bg-background">
           <div className="flex min-w-0 items-center gap-4"><div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg', meta.tint, meta.accent)}><Icon className="h-6 w-6" /></div><div className="min-w-0"><h1 className="truncate text-xl font-semibold text-grey">{resource.name || resource.tag}</h1><div className="mt-1 flex items-center gap-2"><code className="truncate text-sm text-grey-500">{resource.tag}</code><Badge variant="outline">{env.slug}</Badge></div></div></div>
           <div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={() => setShowCode(true)}><Code2 className="mr-2 h-4 w-4" />View code</Button><Button type="button" variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['activity-timeline', kind] }); queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] }); }}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
         </header>
@@ -274,7 +274,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
             <div className="mx-auto max-w-6xl space-y-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {summary.map((item) => (
-                  <div key={item.label} className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm">
+                  <div key={item.label} className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
                     <div className={cn('mb-3 flex h-10 w-10 items-center justify-center rounded-lg', item.tint, item.color)}>
                       <item.icon className="h-5 w-5" />
                     </div>
@@ -287,7 +287,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               <ActivityTimelinePanel kind={kind} productTag={product.tag} componentTag={resource.tag} env={env.slug} title={`${meta.label} activity`} countLabel={kind === 'healthcheck' ? 'checks' : 'invocations'} />
 
               {kind !== 'healthcheck' && (
-                <section className="rounded-lg border border-grey-300 bg-white shadow-sm">
+                <section className="rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
                   <div className="px-5 pb-2 pt-4">
                     <h2 className="text-sm font-semibold text-grey">Options</h2>
                     <p className="mt-1 text-xs text-grey-500">Ordered execution path and share of recent invocations</p>
@@ -298,10 +298,10 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                         {optionUsage.map(({ option, count, percent }, index) => (
                           <div key={option.id || `${option.event}-${index}`} className="grid grid-cols-[180px_1fr_72px] items-center gap-4">
                             <div className="flex min-w-0 items-center gap-3">
-                              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-grey-100 text-xs font-semibold text-grey-600">{index + 1}</span>
+                              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-grey-100 text-xs font-semibold text-grey-600 dark:bg-grey-400/20">{index + 1}</span>
                               <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><p className="mt-0.5 truncate text-xs capitalize text-grey-500">{optionProvider(option)}</p></div>
                             </div>
-                            <div className="relative h-7 overflow-hidden rounded bg-grey-100">
+                            <div className="relative h-7 overflow-hidden rounded bg-grey-100 dark:bg-grey-400/20">
                               <div className={cn('h-full min-w-[3px] rounded', kind === 'quota' ? 'bg-orange-500' : 'bg-red')} style={{ width: `${percent}%` }} />
                             </div>
                             <div className="text-right"><p className="text-sm font-semibold text-grey">{percent}%</p><p className="text-[10px] text-grey-500">{count} calls</p></div>
@@ -314,7 +314,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               )}
 
               {kind === 'healthcheck' && currentEnv && (
-                <section className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm">
+                <section className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
                   <h2 className="text-sm font-semibold text-grey">Latest probe</h2>
                   <div className="mt-4"><JsonViewer data={currentEnv.response ?? currentEnv.payload ?? { status: status || 'unknown' }} /></div>
                 </section>
