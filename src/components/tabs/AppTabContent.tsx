@@ -2384,6 +2384,10 @@ export default function AppTabContent({
           }}
           onSuccess={() => {
             queryClient.invalidateQueries({queryKey: ['app', currentApp._id]});
+            // The app query is only `enabled` when this tab has no app data yet (see the
+            // useQuery above) — when it was passed in via the tab's initial data, invalidating
+            // alone does nothing since there's no active/enabled query to refetch. Force it.
+            refetch();
           }}
         />
       )}

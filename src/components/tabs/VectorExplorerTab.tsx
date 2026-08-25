@@ -4829,7 +4829,18 @@ await ductape.init();`,
                 <Layers className="h-3 w-3 inline mr-1" />
                 Namespaces
               </button>
-{/* Actions tab hidden for now */}
+              <button
+                onClick={() => setSidebarView('actions')}
+                className={cn(
+                  'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                  sidebarView === 'actions'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-grey-600 hover:text-grey'
+                )}
+              >
+                <Zap className="h-3 w-3 inline mr-1" />
+                Actions
+              </button>
             </div>
           )}
 
