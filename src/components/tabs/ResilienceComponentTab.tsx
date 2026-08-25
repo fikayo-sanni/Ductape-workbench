@@ -70,8 +70,19 @@ function exampleInput(resource: Record<string, any>) {
 }
 
 function optionProvider(option: Record<string, any>): string {
+  const appValue = option.appName || option.app_name || option.app;
+  if (appValue) {
+    const raw = typeof appValue === 'object'
+      ? appValue.name || appValue.tag || appValue.id || ''
+      : String(appValue);
+    const appParts = raw
+      .split(':')
+      .map((part: string) => part.trim())
+      .filter((part: string) => part && part.toLowerCase() !== 'ductape');
+    if (appParts.length > 0) return appParts[0].toLowerCase();
+  }
+
   const value =
-    option.appName || option.app_name || option.app ||
     option.providerName || option.provider ||
     option.databaseName || option.database ||
     option.graphName || option.graph ||
@@ -288,7 +299,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                           <div key={option.id || `${option.event}-${index}`} className="grid grid-cols-[180px_1fr_72px] items-center gap-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-grey-100 text-xs font-semibold text-grey-600">{index + 1}</span>
-                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><Badge variant="outline" className="mt-1 h-5 max-w-full truncate px-1.5 text-[10px] font-medium capitalize">{optionProvider(option)}</Badge></div>
+                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><p className="mt-0.5 truncate text-xs capitalize text-grey-500">{optionProvider(option)}</p></div>
                             </div>
                             <div className="relative h-7 overflow-hidden rounded bg-grey-100">
                               <div className={cn('h-full min-w-[3px] rounded', kind === 'quota' ? 'bg-orange-500' : 'bg-red')} style={{ width: `${percent}%` }} />
