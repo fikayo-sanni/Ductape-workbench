@@ -69,6 +69,20 @@ function exampleInput(resource: Record<string, any>) {
   return Object.fromEntries(Object.entries(properties).map(([key, definition]) => [key, exampleValue(definition)]));
 }
 
+function optionProvider(option: Record<string, any>): string {
+  const value =
+    option.appName || option.app_name || option.app ||
+    option.providerName || option.provider ||
+    option.databaseName || option.database ||
+    option.graphName || option.graph ||
+    option.vectorName || option.vector ||
+    option.cacheName || option.cache ||
+    option.storageName || option.storage ||
+    option.notificationName || option.notification;
+  if (value && typeof value === 'object') return value.name || value.tag || value.id || 'Provider';
+  return value ? String(value) : String(option.type || 'Action').replace(/_/g, ' ');
+}
+
 function invocationTime(value?: string) {
   if (!value) return '—';
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -274,7 +288,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                           <div key={option.id || `${option.event}-${index}`} className="grid grid-cols-[180px_1fr_72px] items-center gap-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-grey-100 text-xs font-semibold text-grey-600">{index + 1}</span>
-                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><p className="truncate text-xs text-grey-500">{option.type || 'action'}</p></div>
+                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><Badge variant="outline" className="mt-1 h-5 max-w-full truncate px-1.5 text-[10px] font-medium capitalize">{optionProvider(option)}</Badge></div>
                             </div>
                             <div className="relative h-7 overflow-hidden rounded bg-grey-100">
                               <div className={cn('h-full min-w-[3px] rounded', kind === 'quota' ? 'bg-orange-500' : 'bg-red')} style={{ width: `${percent}%` }} />
