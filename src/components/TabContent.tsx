@@ -45,9 +45,7 @@ import NotificationTabContent from './tabs/NotificationTabContent';
 import NewNotificationTabContent from './tabs/NewNotificationTabContent';
 import NotificationTemplateTabContent from './tabs/NotificationTemplateTabContent';
 import NotificationExplorerTab from './tabs/NotificationExplorerTab';
-import FallbackExplorerTab from './tabs/FallbackExplorerTab';
-import QuotaExplorerTab from './tabs/QuotaExplorerTab';
-import HealthcheckExplorerTab from './tabs/HealthcheckExplorerTab';
+import ResilienceComponentTab from './tabs/ResilienceComponentTab';
 import NewMessageTabContent from './tabs/NewMessageTabContent';
 import MessageTabContent from './tabs/MessageTabContent';
 import NewMessageBrokerTopicContent from './tabs/NewMessageBrokerTopicContent';
@@ -532,6 +530,9 @@ export default function TabContent() {
         if (tab.isDirty && tab.data?.isNew) {
           return <NewHealthcheckTabContent key={tab.id} data={tab.data} />;
         }
+        if (tab.data?.isExplorer || tab.data?.resource) {
+          return <ResilienceComponentTab key={tab.id} kind="healthcheck" resource={tab.data.resource || tab.data.healthcheck || tab.data} product={tab.data.product || { tag: tab.data.productTag }} env={tab.data.env || tab.data.selectedEnv} />;
+        }
         return <HealthcheckTabContent key={tab.id} data={tab.data} />;
 
       case 'notification':
@@ -571,60 +572,6 @@ export default function TabContent() {
       case 'notification-explorer':
         // Notification explorer: product-only = Product Mode (notifier cards); product+notification+env+isExplorer = Notifier+Env Mode (sidebar + overview/templates)
         return <NotificationExplorerTab key={tab.id} data={tab.data} />;
-
-      case 'fallback-explorer':
-        return (
-          <FallbackExplorerTab
-            key={tab.id}
-            product={
-              tab.data?.product || {
-                tag: tab.data?.productTag || '',
-                name: tab.data?.productName || '',
-                logo: tab.data?.productLogo,
-                envs: [],
-              }
-            }
-            initialFallbackTag={tab.data?.fallback?.tag}
-            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
-            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.fallback?.tag)}
-          />
-        );
-
-      case 'quota-explorer':
-        return (
-          <QuotaExplorerTab
-            key={tab.id}
-            product={
-              tab.data?.product || {
-                tag: tab.data?.productTag || '',
-                name: tab.data?.productName || '',
-                logo: tab.data?.productLogo,
-                envs: [],
-              }
-            }
-            initialQuotaTag={tab.data?.quota?.tag}
-            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
-            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.quota?.tag)}
-          />
-        );
-
-      case 'healthcheck-explorer':
-        return (
-          <HealthcheckExplorerTab
-            key={tab.id}
-            product={
-              tab.data?.product || {
-                tag: tab.data?.productTag || '',
-                name: tab.data?.productName || '',
-                logo: tab.data?.productLogo,
-                envs: [],
-              }
-            }
-            initialHealthcheckTag={tab.data?.healthcheck?.tag}
-            initialEnv={tab.data?.env?.slug || tab.data?.selectedEnv?.slug}
-            scopedToComponent={Boolean(tab.data?.scopedToComponent && tab.data?.healthcheck?.tag)}
-          />
-        );
 
       case 'job-explorer':
         // Single-job explorer: past/future invocations, timeline, metrics
@@ -666,7 +613,7 @@ export default function TabContent() {
             <NewQuotaTabContent key={tab.id} tabId={tab.id} data={tab.data} />
           );
         }
-        return <FeatureTabContent key={tab.id} tab={tab} />;
+        return <ResilienceComponentTab key={tab.id} kind="quota" resource={tab.data?.resource || tab.data?.quota || tab.data} product={tab.data?.product || { tag: tab.data?.productTag }} env={tab.data?.env || tab.data?.selectedEnv} />;
 
       case 'fallback':
         // Check if this is a new fallback creation tab
@@ -679,7 +626,7 @@ export default function TabContent() {
             />
           );
         }
-        return <FeatureTabContent key={tab.id} tab={tab} />;
+        return <ResilienceComponentTab key={tab.id} kind="fallback" resource={tab.data?.resource || tab.data?.fallback || tab.data} product={tab.data?.product || { tag: tab.data?.productTag }} env={tab.data?.env || tab.data?.selectedEnv} />;
 
       case 'job':
         // Check if this is a new job creation tab

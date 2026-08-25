@@ -37,6 +37,9 @@ export type ActivityComponentKind =
   | 'agent'
   | 'job'
   | 'feature'
+  | 'healthcheck'
+  | 'quota'
+  | 'fallback'
   | 'workspace';
 
 export interface ActivityTimelineQuery {
@@ -306,6 +309,12 @@ function buildLogFilters(query: ActivityTimelineQuery): FetchLogsOptions {
       return { ...base, parent_tag: componentTag };
     case 'feature':
       return { ...base, type: 'feature', parent_tag: componentTag };
+    case 'healthcheck':
+      return { ...base, type: 'healthcheck', parent_tag: componentTag };
+    case 'quota':
+      return { ...base, type: 'quota', parent_tag: componentTag };
+    case 'fallback':
+      return { ...base, type: 'fallback', parent_tag: componentTag };
     case 'agent':
       return { ...base, parent_tag: componentTag };
     case 'workspace':

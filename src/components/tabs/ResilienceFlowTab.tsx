@@ -26,25 +26,22 @@ interface ResilienceFlowTabProps {
 
 const KIND_META: Record<
   ResilienceFlowKind,
-  { title: string; icon: typeof Heart; color: string; explorerType: string }
+  { title: string; icon: typeof Heart; color: string }
 > = {
   healthcheck: {
     title: 'Healthcheck',
     icon: Heart,
     color: 'text-rose-600 bg-rose-500/10',
-    explorerType: 'healthcheck-explorer',
   },
   fallback: {
     title: 'Fallback',
     icon: Shield,
     color: 'text-orange-600 bg-orange-500/10',
-    explorerType: 'fallback-explorer',
   },
   quota: {
     title: 'Quota',
     icon: Timer,
     color: 'text-amber-600 bg-amber-500/10',
-    explorerType: 'quota-explorer',
   },
 };
 
@@ -71,21 +68,19 @@ export default function ResilienceFlowTab({
 
   const openEnvExplorer = (envSlug: string) => {
     if (!component.tag || !productTag) return;
-    const resourceKey = kind === 'healthcheck' ? 'healthcheck' : kind;
     openTab({
-      id: `${meta.explorerType}-${String(component.tag)}-${envSlug}`,
-      type: meta.explorerType as 'healthcheck-explorer' | 'fallback-explorer' | 'quota-explorer',
+      id: `${kind}-${String(component.tag)}-${envSlug}`,
+      type: kind,
       title: `${component.name || component.tag} (${envSlug})`,
       itemId: `${String(component.tag)}-${envSlug}`,
       data: {
         isExplorer: true,
-        scopedToComponent: true,
         product: {
           tag: productTag,
           name: productName,
           envs: productEnvs,
         },
-        [resourceKey]: component,
+        resource: component,
         env: { slug: envSlug, name: envSlug },
         selectedEnv: { slug: envSlug },
       },

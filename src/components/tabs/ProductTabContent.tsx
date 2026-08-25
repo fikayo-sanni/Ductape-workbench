@@ -711,17 +711,11 @@ export default function ProductTabContent({
       return;
     }
 
-    // Resilience: card click opens scoped explorer (env chips open activity explorer)
+    // Resilience components open directly in their default environment.
     if (type === 'healthcheck' || type === 'fallback' || type === 'quota') {
-      const explorerType =
-        type === 'healthcheck'
-          ? 'healthcheck-explorer'
-          : type === 'fallback'
-            ? 'fallback-explorer'
-            : 'quota-explorer';
       openTab({
-        id: `${type}-explorer-${component.tag}-${defaultEnv.slug}`,
-        type: explorerType,
+        id: `${type}-${component.tag}-${defaultEnv.slug}`,
+        type,
         title: `${component.name || component.tag} (${defaultEnv.slug})`,
         itemId: `${component.tag}-${defaultEnv.slug}`,
         data: {
@@ -731,10 +725,9 @@ export default function ProductTabContent({
             logo: product?.logo,
             envs: product?.envs || [],
           },
-          [type]: component,
+          resource: component,
           env: defaultEnv,
           selectedEnv: defaultEnv,
-          scopedToComponent: true,
           isExplorer: true,
         },
       });
@@ -1017,9 +1010,9 @@ export default function ProductTabContent({
       job: 'job-explorer', // Opens JobExplorerTab (single job: past/future invocations, timeline, metrics)
       feature: 'feature', // Opens FeatureExplorerTab
       agent: 'agent', // Opens AgentExplorerTab
-      fallback: 'fallback-explorer', // Opens FallbackExplorerTab
-      quota: 'quota-explorer', // Opens QuotaExplorerTab
-      healthcheck: 'healthcheck-explorer', // Opens HealthcheckExplorerTab
+      fallback: 'fallback',
+      quota: 'quota',
+      healthcheck: 'healthcheck',
       notification: 'notification-explorer',
     };
 
@@ -1160,7 +1153,7 @@ export default function ProductTabContent({
         env: env ? {slug: env.slug, name: env.name} : undefined,
         isExplorer: true,
       };
-    } else if (resourceType === 'fallback') {
+    } else if (resourceType === 'fallback' || resourceType === 'quota' || resourceType === 'healthcheck') {
       data = {
         product: {
           tag: product?.tag,
@@ -1168,38 +1161,9 @@ export default function ProductTabContent({
           logo: product?.logo,
           envs: product?.envs || [],
         },
-        fallback: resource,
+        resource,
         env: env ? { slug: env.slug, name: env.name } : undefined,
         selectedEnv: env,
-        scopedToComponent: true,
-        isExplorer: true,
-      };
-    } else if (resourceType === 'quota') {
-      data = {
-        product: {
-          tag: product?.tag,
-          name: product?.name,
-          logo: product?.logo,
-          envs: product?.envs || [],
-        },
-        quota: resource,
-        env: env ? { slug: env.slug, name: env.name } : undefined,
-        selectedEnv: env,
-        scopedToComponent: true,
-        isExplorer: true,
-      };
-    } else if (resourceType === 'healthcheck') {
-      data = {
-        product: {
-          tag: product?.tag,
-          name: product?.name,
-          logo: product?.logo,
-          envs: product?.envs || [],
-        },
-        healthcheck: resource,
-        env: env ? { slug: env.slug, name: env.name } : undefined,
-        selectedEnv: env,
-        scopedToComponent: true,
         isExplorer: true,
       };
     } else if (resourceType === 'job') {

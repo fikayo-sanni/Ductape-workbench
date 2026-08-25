@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { JsonViewer } from '@/components/JsonViewer';
 import { cn } from '@/lib/utils';
 import { CheckEnvStatus, IHealthCheck } from '@/types/healthcheck';
-import { formatAgo, parseLatency } from '@/components/healthcheck-explorer/utils';
+import { formatAgo, parseLatency } from '@/components/resilience/healthcheck-utils';
 
 interface HealthcheckTabContentProps {
   data?: IHealthCheck;

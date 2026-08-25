@@ -447,11 +447,6 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
-      'healthcheck-explorer': {
-        canInspectForms: false,
-        canFillForms: false,
-        canTriggerActions: false,
-      },
       feature: {
         canInspectForms: true,
         canFillForms: true,
@@ -492,21 +487,11 @@ export class AutomationService {
         canFillForms: true,
         canTriggerActions: false,
       },
-      'fallback-explorer': {
-        canInspectForms: false,
-        canFillForms: false,
-        canTriggerActions: false,
-      },
       'new-fallback': {
         canInspectForms: true,
         canFillForms: true,
         canTriggerActions: true,
         formIds: ['new-fallback-form'],
-      },
-      'quota-explorer': {
-        canInspectForms: false,
-        canFillForms: false,
-        canTriggerActions: false,
       },
       'new-quota': {
         canInspectForms: true,
@@ -875,7 +860,6 @@ export class AutomationService {
       'message-broker-events': 'Messaging Events',
       pricing: 'Pricing',
       'session-user': 'Session User',
-      'healthcheck-explorer': 'Health Check Explorer',
       feature: 'Feature',
       'feature-run': 'Feature Run',
       agent: 'Agent',
@@ -883,9 +867,7 @@ export class AutomationService {
       'notification-explorer': 'Notification Explorer',
       'new-notification': 'New Notification',
       'notification-template': 'Notification Template',
-      'fallback-explorer': 'Fallback Explorer',
       'new-fallback': 'New Fallback',
-      'quota-explorer': 'Quota Explorer',
       'new-quota': 'New Quota',
       'job-explorer': 'Job Explorer',
       'job-run': 'Job run',
