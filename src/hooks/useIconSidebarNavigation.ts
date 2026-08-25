@@ -1,7 +1,7 @@
 import {
   Cloud,
   Grid3x3,
-  Handshake,
+  // Handshake, // Partnerships is temporarily hidden from the Workbench sidebar.
   LayoutDashboard,
   Lock,
   Package,
@@ -44,7 +44,7 @@ export const ICON_SIDEBAR_NAV_ITEMS: IconSidebarNavItem[] = [
   { id: 'environments', icon: Settings2, label: 'Environments', section: 'primary' },
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', section: 'primary' },
   { id: 'marketplace', icon: Store, label: 'Marketplace', section: 'primary' },
-  { id: 'partnership', icon: Handshake, label: 'Partnerships', section: 'primary' },
+  // { id: 'partnership', icon: Handshake, label: 'Partnerships', section: 'primary' },
   { id: 'logs', icon: SquareTerminal, label: 'Logs', section: 'secondary' },
   { id: 'tokens', icon: Lock, label: 'Tokens', section: 'secondary' },
   { id: 'teams', icon: Users, label: 'Team Members', section: 'secondary' },
