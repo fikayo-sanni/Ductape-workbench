@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, RefreshCw, Plus } from 'lucide-react';
+import { Heart, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,6 +27,7 @@ import {
   parseLatency,
   getEnvStatusForSlug,
 } from '@/components/healthcheck-explorer/utils';
+import { ResilienceExplorerHeader } from '@/components/resilience-explorer/ResilienceExplorerHeader';
 
 interface HealthcheckExplorerTabProps {
   product: {
@@ -320,27 +321,17 @@ export default function HealthcheckExplorerTab({
       />
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        <div className="flex-shrink-0 h-12 border-b border-grey-300 bg-white px-4 flex items-center justify-between">
-          <p className="text-sm text-grey-600 truncate">{toolbarTitle}</p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            {!scopedToComponent ? (
-              <Button type="button" size="sm" className="h-8 gap-1.5 bg-rose-600 hover:bg-rose-700" onClick={handleCreateHealthcheck}>
-                <Plus className="h-3.5 w-3.5" />
-                New
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <ResilienceExplorerHeader
+          icon={Heart}
+          title={toolbarTitle === 'Overview' ? 'Healthchecks' : toolbarTitle}
+          productTag={product.tag}
+          environment={selectedEnv}
+          accentClassName="bg-rose-500/10 text-rose-600"
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          onCreate={scopedToComponent ? undefined : handleCreateHealthcheck}
+          createLabel="New healthcheck"
+        />
 
         {viewMode === 'overview' && (
           <HealthcheckExplorerOverview

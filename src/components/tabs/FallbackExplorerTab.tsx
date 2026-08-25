@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, RefreshCw, Plus } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { FallbackExplorerSidebar } from '@/components/fallback-explorer/Fallback
 import { FallbackExplorerOverview } from '@/components/fallback-explorer/FallbackExplorerOverview';
 import { FallbackExplorerDetailPanel } from '@/components/fallback-explorer/FallbackExplorerDetailPanel';
 import { ProductFallback } from '@/components/fallback-explorer/types';
+import { ResilienceExplorerHeader } from '@/components/resilience-explorer/ResilienceExplorerHeader';
 
 interface FallbackExplorerTabProps {
   product: {
@@ -256,25 +257,17 @@ export default function FallbackExplorerTab({
       />
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        <div className="flex-shrink-0 h-12 border-b border-grey-300 bg-white px-4 flex items-center justify-between">
-          <p className="text-sm text-grey-600 truncate">{toolbarTitle}</p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button type="button" size="sm" className="h-8 gap-1.5 bg-red hover:bg-red/90" onClick={handleCreateFallback}>
-              <Plus className="h-3.5 w-3.5" />
-              New
-            </Button>
-          </div>
-        </div>
+        <ResilienceExplorerHeader
+          icon={Shield}
+          title={toolbarTitle === 'Overview' ? 'Fallbacks' : toolbarTitle}
+          productTag={product.tag}
+          environment={selectedEnv}
+          accentClassName="bg-red/10 text-red"
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          onCreate={handleCreateFallback}
+          createLabel="New fallback"
+        />
 
         {viewMode === 'overview' ? (
           <FallbackExplorerOverview

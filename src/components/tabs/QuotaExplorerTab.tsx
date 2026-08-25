@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, RefreshCw, Plus } from 'lucide-react';
+import { Loader2, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { QuotaExplorerSidebar } from '@/components/quota-explorer/QuotaExplorerS
 import { QuotaExplorerOverview } from '@/components/quota-explorer/QuotaExplorerOverview';
 import { QuotaExplorerDetailPanel } from '@/components/quota-explorer/QuotaExplorerDetailPanel';
 import { ProductQuota } from '@/components/quota-explorer/types';
+import { ResilienceExplorerHeader } from '@/components/resilience-explorer/ResilienceExplorerHeader';
 
 interface QuotaExplorerTabProps {
   product: {
@@ -258,30 +259,17 @@ export default function QuotaExplorerTab({
       />
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-        <div className="flex-shrink-0 h-12 border-b border-grey-300 bg-white px-4 flex items-center justify-between">
-          <p className="text-sm text-grey-600 truncate">{toolbarTitle}</p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </Button>
-                <Button
-              type="button"
-                  size="sm"
-              className="h-8 gap-1.5 bg-orange-600 hover:bg-orange-700"
-                  onClick={handleCreateQuota}
-                >
-              <Plus className="h-3.5 w-3.5" />
-              New
-                </Button>
-          </div>
-        </div>
+        <ResilienceExplorerHeader
+          icon={Timer}
+          title={toolbarTitle === 'Overview' ? 'Quotas' : toolbarTitle}
+          productTag={product.tag}
+          environment={selectedEnv}
+          accentClassName="bg-orange-500/10 text-orange-600"
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          onCreate={handleCreateQuota}
+          createLabel="New quota"
+        />
 
         {viewMode === 'overview' ? (
           <QuotaExplorerOverview

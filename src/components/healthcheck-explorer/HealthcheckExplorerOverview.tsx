@@ -52,7 +52,7 @@ export function HealthcheckExplorerOverview({
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {statCards.map((card) => (
-            <div key={card.label} className="rounded-xl border border-grey-300 bg-white p-4 shadow-sm">
+            <div key={card.label} className="rounded-lg border border-grey-300 bg-white p-4 shadow-sm">
               <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center mb-2', card.className)}>
                 <card.icon className="h-4 w-4" />
               </div>
@@ -63,7 +63,7 @@ export function HealthcheckExplorerOverview({
         </div>
 
         {Object.keys(metrics.byEnv).length > 0 && (
-          <div className="rounded-xl border border-grey-300 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-lg border border-grey-300 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-grey-200">
               <h3 className="text-sm font-semibold text-grey">By environment</h3>
             </div>
@@ -98,7 +98,7 @@ export function HealthcheckExplorerOverview({
           </div>
         )}
 
-        <div className="rounded-xl border border-grey-300 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-lg border border-grey-300 bg-white shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-grey-200 flex justify-between items-center">
             <h3 className="text-sm font-semibold text-grey">Healthchecks</h3>
             <button type="button" onClick={onViewAll} className="text-xs text-rose-600 font-medium flex items-center gap-0.5 hover:underline">
