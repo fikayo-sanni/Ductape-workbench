@@ -16,6 +16,14 @@ import {
   Zap,
   GitBranch,
   Layers,
+  Database,
+  Share2,
+  Boxes,
+  HardDrive,
+  MessageSquare,
+  Bell,
+  ShieldCheck,
+  Braces,
   AlertCircle,
   Eye,
   Download,
@@ -39,6 +47,7 @@ import { getTabState, saveTabState } from '@/lib/tab-state-manager';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
   fetchFeatureStepResults,
+  fetchFeatureTrace,
   shortProcessId,
   type ProcessorResultApiItem,
 } from '@/services/featureRunsService';
@@ -84,6 +93,7 @@ interface FeatureRun {
   triggeredByUser?: string;
   version: string;
   tags?: string[];
+  traceId?: string;
 }
 
 interface FeatureRunTabProps {
@@ -225,14 +235,15 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
   } = useQuery({
     queryKey: ['feature-run-steps', featureExecutionId, currentWorkspaceId, user?._id],
     queryFn: async () => {
-      const results = await fetchFeatureStepResults({
+      const common = {
         feature_id: featureExecutionId,
         workspace_id: currentWorkspaceId ?? '',
         user_id: user?._id ?? '',
         public_key: user?.public_key ?? '',
-        component: 'feature_step',
-        limit: 200,
-      });
+      };
+      const results = run.traceId
+        ? await fetchFeatureTrace({ ...common, trace_id: run.traceId, limit: 500 })
+        : await fetchFeatureStepResults({ ...common, component: 'feature_step', limit: 200 });
       console.log('[FeatureRunTab] fetchFeatureStepResults RESULT', { count: results?.length ?? 0, results });
       return results;
     },
@@ -252,9 +263,40 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
 
   // Use step list from backend only. Sort by start so Gantt shows execution order.
   const steps: ProcessorResultApiItem[] = useMemo(
-    () => [...stepResults].sort((a, b) => (a.start ?? 0) - (b.start ?? 0)),
+    () => stepResults
+      .filter((item) => item.component === 'feature_step' || item.execution_kind === 'step')
+      .sort((a, b) => (a.start ?? 0) - (b.start ?? 0)),
     [stepResults]
   );
+  const assetsByStepSpan = useMemo(() => {
+    const grouped = new Map<string, ProcessorResultApiItem[]>();
+    const children = new Map<string, ProcessorResultApiItem[]>();
+    const assets = stepResults.filter((item) => item.component === 'asset_invocation' || item.execution_kind === 'asset');
+    assets.forEach((item) => {
+      if (!item.parent_span_id) return;
+      const items = children.get(item.parent_span_id) ?? [];
+      items.push(item);
+      children.set(item.parent_span_id, items);
+    });
+    children.forEach((items) => items.sort((a, b) => (a.start ?? 0) - (b.start ?? 0)));
+    steps.forEach((step) => {
+      if (!step.span_id) return;
+      const descendants: ProcessorResultApiItem[] = [];
+      const visited = new Set<string>();
+      const visit = (parentSpan: string, depth: number) => {
+        for (const child of children.get(parentSpan) ?? []) {
+          const key = child.span_id ?? child.process_id;
+          if (visited.has(key)) continue;
+          visited.add(key);
+          descendants.push({ ...child, asset_depth: depth });
+          if (child.span_id) visit(child.span_id, depth + 1);
+        }
+      };
+      visit(step.span_id, 0);
+      grouped.set(step.span_id, descendants);
+    });
+    return grouped;
+  }, [stepResults, steps]);
 
   const toggleStepExpanded = (stepId: string) => {
     setExpandedSteps(prev => {
@@ -301,6 +343,24 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
       loop: <RotateCcw className="h-3.5 w-3.5" />,
     };
     return icons[type] || icons.action;
+  };
+
+  const getAssetConfig = (type?: string) => {
+    const configs: Record<string, { label: string; icon: JSX.Element; bar: string; text: string; bg: string }> = {
+      app: { label: 'App / API', icon: <Zap className="h-3.5 w-3.5" />, bar: 'bg-blue-500', text: 'text-blue-600', bg: 'bg-blue-500/10' },
+      database: { label: 'Database', icon: <Database className="h-3.5 w-3.5" />, bar: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-500/10' },
+      graph: { label: 'Graph', icon: <Share2 className="h-3.5 w-3.5" />, bar: 'bg-violet-500', text: 'text-violet-600', bg: 'bg-violet-500/10' },
+      vector: { label: 'Vector', icon: <Boxes className="h-3.5 w-3.5" />, bar: 'bg-cyan-500', text: 'text-cyan-600', bg: 'bg-cyan-500/10' },
+      storage: { label: 'Storage', icon: <HardDrive className="h-3.5 w-3.5" />, bar: 'bg-amber-500', text: 'text-amber-600', bg: 'bg-amber-500/10' },
+      message_broker: { label: 'Messaging', icon: <MessageSquare className="h-3.5 w-3.5" />, bar: 'bg-orange-500', text: 'text-orange-600', bg: 'bg-orange-500/10' },
+      notification: { label: 'Notification', icon: <Bell className="h-3.5 w-3.5" />, bar: 'bg-pink-500', text: 'text-pink-600', bg: 'bg-pink-500/10' },
+      function: { label: 'Function', icon: <Braces className="h-3.5 w-3.5" />, bar: 'bg-indigo-500', text: 'text-indigo-600', bg: 'bg-indigo-500/10' },
+      feature: { label: 'Feature', icon: <Activity className="h-3.5 w-3.5" />, bar: 'bg-indigo-500', text: 'text-indigo-600', bg: 'bg-indigo-500/10' },
+      quota: { label: 'Quota', icon: <ShieldCheck className="h-3.5 w-3.5" />, bar: 'bg-grey-500', text: 'text-grey-600', bg: 'bg-grey-500/10' },
+      fallback: { label: 'Fallback', icon: <ShieldCheck className="h-3.5 w-3.5" />, bar: 'bg-grey-500', text: 'text-grey-600', bg: 'bg-grey-500/10' },
+      session: { label: 'Session', icon: <ShieldCheck className="h-3.5 w-3.5" />, bar: 'bg-teal-500', text: 'text-teal-600', bg: 'bg-teal-500/10' },
+    };
+    return configs[type ?? ''] ?? { label: type || 'Asset', icon: <Boxes className="h-3.5 w-3.5" />, bar: 'bg-grey-500', text: 'text-grey-600', bg: 'bg-grey-500/10' };
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -350,7 +410,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
   // Fallback: if no durations, give each step equal width so bars still show
   const equalWidthPercent = steps.length > 0 ? 100 / steps.length : 0;
   const showStepsLoading = stepsLoading && steps.length === 0;
-  const stepsLoadedEmpty = !stepsLoading && !stepsError && stepResults.length === 0 && steps.length === 0;
+  const stepsLoadedEmpty = !stepsLoading && !stepsError && steps.length === 0;
 
   return (
     <div className="h-full flex flex-col bg-background-tertiary">
@@ -711,6 +771,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                 const stepStatus = stepDisplayStatus(step);
                 const isExpanded = expandedSteps.has(step.process_id);
                 const stepConfig = getStatusConfig(stepStatus);
+                const stepAssets = step.span_id ? assetsByStepSpan.get(step.span_id) ?? [] : [];
 
                 // Gantt bar: use step_duration_ms (or end - start) for position and width
                 let barStyle: { left: string; width: string } | Record<string, never> = {};
@@ -812,6 +873,26 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                             style={barStyle}
                           />
                         )}
+                        {stepAssets.map((asset) => {
+                          const assetStart = Number(asset.start);
+                          const assetEnd = Number(asset.end);
+                          if (!Number.isFinite(assetStart) || !Number.isFinite(assetEnd) || ganttScaleMs <= 0) return null;
+                          const left = Math.max(0, ((assetStart - runStart) / ganttScaleMs) * 100);
+                          const width = Math.max(((assetEnd - assetStart) / ganttScaleMs) * 100, 1.2);
+                          const config = getAssetConfig(asset.asset_type);
+                          return (
+                            <div
+                              key={asset.span_id ?? asset.process_id}
+                              className={cn(
+                                'absolute top-1 bottom-1 rounded-sm min-w-[3px] ring-1 ring-white/70 dark:ring-black/40',
+                                config.bar,
+                                asset.status === 'fail' && 'ring-2 ring-red-600'
+                              )}
+                              style={{ left: `${left}%`, width: `${width}%` }}
+                              title={`${config.label}: ${asset.asset_tag ?? 'unknown'} · ${asset.asset_operation ?? 'execute'} · ${formatDuration(asset.asset_duration_ms ?? assetEnd - assetStart)}`}
+                            />
+                          );
+                        })}
                       </div>
 
                       {/* Duration & expand */}
@@ -837,6 +918,29 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                     {isExpanded && (
                       <div className="px-5 pb-4">
                         <div className="ml-10 bg-background-tertiary rounded-xl border border-border overflow-hidden">
+                          {stepAssets.length > 0 && (
+                            <div className="px-4 py-3 border-b border-border bg-white dark:bg-background-secondary">
+                              <p className="text-xs font-medium text-grey-700 mb-2">Assets used in this step</p>
+                              <div className="space-y-1.5">
+                                {stepAssets.map((asset) => {
+                                  const config = getAssetConfig(asset.asset_type);
+                                  return (
+                                    <div
+                                      key={asset.span_id ?? asset.process_id}
+                                      className="flex items-center gap-3 min-w-0 text-xs"
+                                      style={{ paddingLeft: `${Math.min(asset.asset_depth ?? 0, 5) * 20}px` }}
+                                    >
+                                      <span className={cn('w-6 h-6 flex items-center justify-center rounded', config.bg, config.text)}>{config.icon}</span>
+                                      <span className="font-medium text-grey truncate">{asset.asset_tag ?? 'unknown'}</span>
+                                      <span className="text-grey-700 font-mono truncate">{asset.asset_operation ?? 'execute'}</span>
+                                      <span className="ml-auto text-grey-700 font-mono tabular-nums">{formatDuration(asset.asset_duration_ms ?? ((asset.end ?? 0) - (asset.start ?? 0)))}</span>
+                                      {asset.status === 'fail' && <span className="text-red font-medium">Failed</span>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                           {/* Error banner */}
                           {step.step_error && (
                             <div className="px-4 py-3 bg-red/10 border-b border-red/20 flex items-start gap-3">

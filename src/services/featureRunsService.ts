@@ -38,6 +38,14 @@ export interface ProcessorResultApiItem {
   function_invocation_id?: string;
   parent_process_id?: string;
   execution_kind?: string;
+  asset_type?: string;
+  asset_tag?: string;
+  asset_operation?: string;
+  asset_action?: string;
+  asset_duration_ms?: number;
+  asset_error?: string;
+  /** Workbench-only depth assigned while building a nested asset tree. */
+  asset_depth?: number;
 }
 
 export interface ExecutionTreeNode {
@@ -122,6 +130,7 @@ export interface FeatureRunUi {
   completed_steps?: string[];
   step_outputs?: Record<string, unknown>;
   failed_step?: string;
+  traceId?: string;
 }
 
 function parseJson<T>(raw: string, fallback: T): T {
@@ -212,6 +221,7 @@ export function mapProcessorResultToFeatureRun(
     completed_steps: resultData.completed_steps,
     step_outputs: resultData.step_outputs,
     failed_step: resultData.failed_step,
+    traceId: item.trace_id,
   };
 }
 
@@ -327,6 +337,13 @@ export const fetchFeatureStepResults = async (
     component: 'feature_step',
     limit: params.limit ?? 200,
   });
+};
+
+/** Fetch the complete execution trace, including step and nested asset spans. */
+export const fetchFeatureTrace = async (
+  params: FeatureRunsQueryParams & { trace_id: string }
+): Promise<ProcessorResultApiItem[]> => {
+  return fetchFeatureRuns({ ...params, component: undefined, limit: params.limit ?? 500 });
 };
 
 /** Map backend step_type (e.g. action, produce, notification) to FeatureStepUi.type */

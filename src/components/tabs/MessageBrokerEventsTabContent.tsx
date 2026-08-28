@@ -32,6 +32,7 @@ import {
   X,
   Megaphone,
   Headphones,
+  ListTree,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -68,7 +69,7 @@ interface MessageBrokerEventsTabContentProps {
   broker: any;
 }
 
-type ViewMode = 'overview' | 'consumers' | 'producers' | 'consumer-detail' | 'producer-detail' | 'dead-letter' | 'all-events' | 'events';
+type ViewMode = 'overview' | 'topics' | 'consumers' | 'producers' | 'consumer-detail' | 'producer-detail' | 'dead-letter' | 'all-events' | 'events';
 type StatusFilter = 'all' | 'success' | 'failed' | 'pending' | 'duplicate';
 
 // Skeleton component for loading states
@@ -140,18 +141,21 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(tabState.isSidebarCollapsed || false);
   const [selectedConsumer, setSelectedConsumer] = useState<ConsumerInstance | null>(tabState.selectedConsumer || null);
   const [selectedProducer, setSelectedProducer] = useState<ProducerInstance | null>(tabState.selectedProducer || null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(tabState.selectedTopic || null);
   const [showFilters, setShowFilters] = useState(tabState.showFilters || false);
 
   // Calculate active filter count
   const activeFilterCount = [
     statusFilter !== 'all',
     searchQuery,
+    selectedTopic,
   ].filter(Boolean).length;
 
   // Clear all filters
   const clearFilters = () => {
     setStatusFilter('all');
     setSearchQuery('');
+    setSelectedTopic(null);
   };
 
   // Ref for infinite scroll observer
@@ -178,6 +182,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
         isSidebarCollapsed,
         selectedConsumer,
         selectedProducer,
+        selectedTopic,
         showFilters,
       };
 
@@ -203,6 +208,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     isSidebarCollapsed,
     selectedConsumer,
     selectedProducer,
+    selectedTopic,
     showFilters,
     activeTabId,
   ]);
@@ -241,7 +247,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     isFetchingNextPage,
     refetch: refetchMessages,
   } = useInfiniteQuery({
-    queryKey: ['broker-messages', currentWorkspaceId, broker.productTag, brokerEnv, broker.brokerTag || broker.tag, statusFilter, selectedProducer?.tag, selectedConsumer?.tag],
+    queryKey: ['broker-messages', currentWorkspaceId, broker.productTag, brokerEnv, broker.brokerTag || broker.tag, statusFilter, selectedTopic, selectedProducer?.tag, selectedConsumer?.tag],
     queryFn: async ({ pageParam = 1 }) => {
       if (!currentWorkspaceId || !user?._id || !user?.public_key || !broker.productTag) {
         return { messages: [], total: 0, page: 1, limit: 20, hasMore: false };
@@ -256,6 +262,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
           env: brokerEnv,
           broker_tag: broker.brokerTag || broker.tag,
           status: statusFilter !== 'all' ? statusFilter as BrokerMessageStatus : undefined,
+          topic_tag: selectedTopic || undefined,
           producer_tag: selectedProducer?.tag,
           consumer_tag: selectedConsumer?.tag,
           page: pageParam,
@@ -355,6 +362,39 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
   const producerInstances: ProducerInstance[] = producersData?.producers || [];
   const consumerInstances: ConsumerInstance[] = consumersData?.consumers || [];
   const deadLettersList: IBrokerDeadLetter[] = deadLettersData?.deadLetters || [];
+
+  const topicSummaries = useMemo(() => {
+    const configuredTopics = (broker.topics || []).filter((topic: any) => !topic?.deleted);
+    const topicTags = new Set<string>(configuredTopics.map((topic: any) => topic.tag).filter(Boolean));
+    Object.keys(dashboardData?.stats?.messages_by_topic || {}).forEach(tag => topicTags.add(tag));
+    producerInstances.forEach(producer => producer.topic && topicTags.add(producer.topic));
+    consumerInstances.forEach(consumer => consumer.topic && topicTags.add(consumer.topic));
+
+    const totalUsage = Object.values(dashboardData?.stats?.messages_by_topic || {})
+      .reduce((sum, count) => sum + Number(count || 0), 0);
+
+    return Array.from(topicTags).map(tag => {
+      const definition = configuredTopics.find((topic: any) => topic.tag === tag);
+      const messages = Number(dashboardData?.stats?.messages_by_topic?.[tag] || 0);
+      const topicMessages = brokerMessages.filter(message => message.topic_tag === tag);
+      const lastActivity = topicMessages.reduce<Date | null>((latest, message) => {
+        const producedAt = new Date(message.produced_at);
+        return !latest || producedAt > latest ? producedAt : latest;
+      }, null);
+
+      return {
+        tag,
+        name: definition?.name || tag,
+        description: definition?.description || '',
+        messages,
+        usageShare: totalUsage > 0 ? (messages / totalUsage) * 100 : 0,
+        producers: producerInstances.filter(producer => producer.topic === tag).length,
+        consumers: consumerInstances.filter(consumer => consumer.topic === tag).length,
+        lastActivity,
+        configured: Boolean(definition),
+      };
+    }).sort((a, b) => b.messages - a.messages || a.name.localeCompare(b.name));
+  }, [broker.topics, brokerMessages, consumerInstances, dashboardData?.stats?.messages_by_topic, producerInstances]);
 
   // Infinite scroll observer setup
   const lastElementRef = useCallback(
@@ -692,6 +732,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               <button
                 onClick={() => {
                   setViewMode('all-events');
+                  setSelectedTopic(null);
                   setSelectedConsumer(null);
                   setSelectedProducer(null);
                 }}
@@ -727,10 +768,47 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 )}
               </button>
 
+              {/* Topics */}
+              <button
+                onClick={() => {
+                  setViewMode('topics');
+                  setSelectedTopic(null);
+                  setSelectedConsumer(null);
+                  setSelectedProducer(null);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  viewMode === 'topics'
+                    ? 'bg-cyan-600/10 text-cyan-600'
+                    : 'text-grey hover:bg-background-secondary',
+                  isSidebarCollapsed && 'justify-center px-2'
+                )}
+                title={isSidebarCollapsed ? 'Topics' : undefined}
+              >
+                <ListTree className={cn(
+                  'h-4 w-4 flex-shrink-0',
+                  viewMode === 'topics' ? 'text-cyan-600' : 'text-grey-600'
+                )} />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">Topics</span>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
+                      viewMode === 'topics'
+                        ? 'bg-cyan-600/20 text-cyan-600'
+                        : 'bg-background-secondary text-grey-600'
+                    )}>
+                      {dashboardLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : topicSummaries.length}
+                    </span>
+                  </>
+                )}
+              </button>
+
               {/* Consumers */}
               <button
                 onClick={() => {
                   setViewMode('consumers');
+                  setSelectedTopic(null);
                   setSelectedConsumer(null);
                   setSelectedProducer(null);
                 }}
@@ -770,6 +848,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               <button
                 onClick={() => {
                   setViewMode('producers');
+                  setSelectedTopic(null);
                   setSelectedConsumer(null);
                   setSelectedProducer(null);
                 }}
@@ -809,6 +888,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               <button
                 onClick={() => {
                   setViewMode('dead-letter');
+                  setSelectedTopic(null);
                   setSelectedConsumer(null);
                   setSelectedProducer(null);
                 }}
@@ -1265,6 +1345,68 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </div>
               </>
               )}
+            </div>
+          ) : viewMode === 'topics' ? (
+            <div className="flex-1 overflow-auto p-4">
+              <div className="bg-white rounded-lg border border-border min-h-full overflow-hidden">
+                <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-grey">Topics</h2>
+                    <p className="text-xs text-grey-500 mt-1">Configured topics and observed usage in this environment</p>
+                  </div>
+                  <span className="text-xs text-grey-500">{topicSummaries.length} total</span>
+                </div>
+                <div className="grid grid-cols-[minmax(220px,1fr),110px,100px,100px,130px,90px] gap-4 px-6 py-3 bg-background-secondary border-b border-border text-xs font-medium text-grey-600 uppercase tracking-wider">
+                  <div>Topic</div>
+                  <div>Messages</div>
+                  <div>Usage</div>
+                  <div>Producers</div>
+                  <div>Consumers</div>
+                  <div>Status</div>
+                </div>
+                <div className="divide-y divide-border">
+                  {dashboardLoading ? (
+                    [...Array(4)].map((_, index) => (
+                      <div key={index} className="grid grid-cols-[minmax(220px,1fr),110px,100px,100px,130px,90px] gap-4 px-6 py-4 items-center">
+                        {[...Array(6)].map((__, cell) => <Skeleton key={cell} className="h-4 w-3/4" />)}
+                      </div>
+                    ))
+                  ) : topicSummaries.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <ListTree className="h-8 w-8 text-grey-400 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-grey">No topics configured</p>
+                      <p className="text-xs text-grey-500 mt-1">Topics will appear here after they are added to this broker.</p>
+                    </div>
+                  ) : topicSummaries.map(topic => (
+                    <button
+                      key={topic.tag}
+                      onClick={() => {
+                        setSelectedTopic(topic.tag);
+                        setViewMode('all-events');
+                      }}
+                      className="w-full grid grid-cols-[minmax(220px,1fr),110px,100px,100px,130px,90px] gap-4 px-6 py-4 items-center text-left hover:bg-background-secondary transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-grey truncate">{topic.name}</div>
+                        <div className="text-xs text-grey-500 font-mono truncate mt-0.5">{topic.tag}</div>
+                        {topic.description && <div className="text-xs text-grey-500 truncate mt-1">{topic.description}</div>}
+                      </div>
+                      <div className="text-sm tabular-nums text-grey">{topic.messages.toLocaleString()}</div>
+                      <div>
+                        <div className="text-xs tabular-nums text-grey mb-1">{topic.usageShare.toFixed(1)}%</div>
+                        <div className="h-1.5 w-16 bg-grey-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-cyan-600 rounded-full" style={{ width: `${Math.max(topic.usageShare, topic.messages > 0 ? 4 : 0)}%` }} />
+                        </div>
+                      </div>
+                      <div className="text-sm tabular-nums text-grey">{topic.producers}</div>
+                      <div className="text-sm tabular-nums text-grey">{topic.consumers}</div>
+                      <div className={cn('text-xs font-medium', topic.messages > 0 ? 'text-green' : 'text-grey-500')}>
+                        {topic.messages > 0 ? 'Active' : 'Idle'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : viewMode === 'consumers' ? (
             /* Consumers List View */
@@ -2187,6 +2329,15 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                       <Button variant="ghost" size="sm" onClick={clearFilters} className="text-grey-600 hover:text-grey">
                         Clear all
                       </Button>
+                    )}
+                    {selectedTopic && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-600/10 text-cyan-600 text-xs font-medium">
+                        <ListTree className="h-3.5 w-3.5" />
+                        {selectedTopic}
+                        <button onClick={() => setSelectedTopic(null)} className="hover:text-cyan-800" title="Clear topic filter">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
                     )}
                   </div>
                   <p className="text-sm text-grey-600">

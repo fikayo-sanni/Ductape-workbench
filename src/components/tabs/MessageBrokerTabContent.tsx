@@ -91,6 +91,7 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
         productTag: messageBroker?.productTag,
         productName: messageBroker?.productName,
         productId: messageBroker?.productId,
+        topics: displayData.topics || [],
         env: env,
       },
     });
