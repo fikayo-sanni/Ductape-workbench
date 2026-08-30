@@ -15,6 +15,8 @@ import {
   MoreVertical,
   Clock,
   Lock,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +89,10 @@ export default function TokensTabContent() {
   const [showNewTokenDialog, setShowNewTokenDialog] = useState(false);
   const [createdToken, setCreatedToken] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [secretSearch, setSecretSearch] = useState("");
+  const [secretStatus, setSecretStatus] = useState<"all" | "active" | "revoked">("all");
+  const [secretType, setSecretType] = useState("all");
+  const [secretEnv, setSecretEnv] = useState("all");
   const [newToken, setNewToken] = useState({
     name: "",
     description: "",
@@ -758,6 +764,27 @@ export default function TokensTabContent() {
 
   const activeCount = tokens.filter((t) => t.is_active).length;
   const revokedCount = tokens.filter((t) => !t.is_active).length;
+  const secretTypes = useMemo(() => [...new Set(tokens.map(token => token.token_type).filter(Boolean))].sort(), [tokens]);
+  const secretEnvs = useMemo(() => [...new Set(tokens.flatMap(token => token.envs ?? []).filter(Boolean))].sort(), [tokens]);
+  const filteredTokens = useMemo(() => {
+    const query = secretSearch.trim().toLowerCase();
+    return tokens.filter(token => {
+      if (secretStatus === "active" && !token.is_active) return false;
+      if (secretStatus === "revoked" && token.is_active) return false;
+      if (secretType !== "all" && token.token_type !== secretType) return false;
+      if (secretEnv !== "all" && !token.envs.includes(secretEnv)) return false;
+      if (!query) return true;
+      return [token.name, token.description, token.token_type, ...(token.scope ?? []), ...(token.envs ?? [])]
+        .some(value => String(value ?? "").toLowerCase().includes(query));
+    });
+  }, [tokens, secretSearch, secretStatus, secretType, secretEnv]);
+  const hasSecretFilters = Boolean(secretSearch || secretStatus !== "all" || secretType !== "all" || secretEnv !== "all");
+  const clearSecretFilters = () => {
+    setSecretSearch("");
+    setSecretStatus("all");
+    setSecretType("all");
+    setSecretEnv("all");
+  };
 
   const tabBtnClass = (active: boolean) =>
     cn(
@@ -1398,6 +1425,35 @@ const ductape = new Ductape({
           </div>
         ) : (
           <div className="p-6">
+            {!loading && tokens.length > 0 && (
+              <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" />
+                  <Input
+                    value={secretSearch}
+                    onChange={event => setSecretSearch(event.target.value)}
+                    placeholder="Search secrets, scopes, or environments"
+                    className="pl-9"
+                    aria-label="Search secrets"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2 lg:flex">
+                  <Select value={secretStatus} onValueChange={value => setSecretStatus(value as typeof secretStatus)}>
+                    <SelectTrigger className="min-w-0 lg:w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="revoked">Revoked</SelectItem></SelectContent>
+                  </Select>
+                  <Select value={secretType} onValueChange={setSecretType}>
+                    <SelectTrigger className="min-w-0 lg:w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All types</SelectItem>{secretTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={secretEnv} onValueChange={setSecretEnv}>
+                    <SelectTrigger className="min-w-0 lg:w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All environments</SelectItem>{secretEnvs.map(env => <SelectItem key={env} value={env}>{env}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {hasSecretFilters && <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={clearSecretFilters}><X className="h-4 w-4" />Clear</Button>}
+              </div>
+            )}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16 text-grey-600">
                 <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
@@ -1418,6 +1474,13 @@ const ductape = new Ductape({
                   Create secret
                 </Button>
               </div>
+            ) : filteredTokens.length === 0 ? (
+              <div className="flex flex-col items-center rounded-lg border border-dashed border-grey-400 bg-grey-100/50 px-6 py-12 text-center">
+                <Search className="mb-3 h-6 w-6 text-grey-500" />
+                <p className="text-sm font-medium text-grey">No matching secrets</p>
+                <p className="mt-1 text-xs text-grey-600">Try another search or clear the current filters.</p>
+                <Button type="button" variant="outline" size="sm" className="mt-4" onClick={clearSecretFilters}>Clear filters</Button>
+              </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-grey-400">
                 <div className="hidden grid-cols-[1fr_auto_auto] gap-4 border-b border-grey-400 bg-grey-100/80 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-grey-600 sm:grid">
@@ -1426,7 +1489,7 @@ const ductape = new Ductape({
                   <span className="w-24 text-right">Actions</span>
                 </div>
                 <ul className="divide-y divide-grey-400">
-                  {tokens.map((token) => (
+                  {filteredTokens.map((token) => (
                     <li key={token.name} className="px-4 py-4 transition-colors hover:bg-grey-100/40">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 flex-1">

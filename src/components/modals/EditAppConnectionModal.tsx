@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Plug, RotateCcw, Trash2 } from 'lucide-react';
+import { KeyRound, Loader2, Plus, Plug, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -110,6 +110,11 @@ export default function EditAppConnectionModal({
   const [replaceAuth, setReplaceAuth] = useState<Record<string, boolean>>({});
   const [authValues, setAuthValues] = useState<Record<string, Record<string, string>>>({});
   const [sharedCredentials, setSharedCredentials] = useState<Record<string, Array<{ location: Field['location']; key: string; value: string }>>>({});
+  const [secrets, setSecrets] = useState<Array<{ key: string; description?: string }>>([]);
+  const [loadingSecrets, setLoadingSecrets] = useState(false);
+  const [secretTarget, setSecretTarget] = useState<{ env: string; index: number } | null>(null);
+  const [newSecret, setNewSecret] = useState({ key: '', value: '', description: '' });
+  const [creatingSecret, setCreatingSecret] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -143,6 +148,20 @@ export default function EditAppConnectionModal({
     ])));
     setAuthValues({});
   }, [open, productApp, productEnvs, version]);
+
+  useEffect(() => {
+    if (!open || !productBuilder) return;
+    let active = true;
+    setLoadingSecrets(true);
+    Promise.resolve(productBuilder.secrets.list())
+      .then((items: any[]) => {
+        if (!active) return;
+        setSecrets((items ?? []).map(item => ({ key: String(item.key), description: item.description })).filter(item => item.key));
+      })
+      .catch(() => { if (active) toast.error('Failed to load workspace secrets'); })
+      .finally(() => { if (active) setLoadingSecrets(false); });
+    return () => { active = false; };
+  }, [open, productBuilder]);
 
   const updateMapping = (index: number, update: Partial<Mapping>) => {
     setMappings(current => current.map((mapping, i) => i === index ? { ...mapping, ...update } : mapping));
@@ -197,6 +216,38 @@ export default function EditAppConnectionModal({
       toast.error(error instanceof Error ? error.message : 'Failed to update App connection');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const createSecret = async () => {
+    if (!secretTarget || !newSecret.key.trim() || !newSecret.value) {
+      toast.error('Enter a secret key and value');
+      return;
+    }
+    const key = newSecret.key.trim().replace(/[^A-Za-z0-9_]/g, '_');
+    try {
+      setCreatingSecret(true);
+      await productBuilder.secrets.create({
+        key,
+        value: newSecret.value,
+        description: newSecret.description || `Shared credential for ${accessTag}`,
+        token_type: 'credential',
+        scope: [accessTag],
+        envs: [secretTarget.env],
+      });
+      setSecrets(current => current.some(item => item.key === key) ? current : [...current, { key, description: newSecret.description }]);
+      setSharedCredentials(current => ({
+        ...current,
+        [secretTarget.env]: current[secretTarget.env].map((item, index) =>
+          index === secretTarget.index ? { ...item, value: `$Secret{${key}}` } : item),
+      }));
+      setSecretTarget(null);
+      setNewSecret({ key: '', value: '', description: '' });
+      toast.success('Secret created and selected');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create secret');
+    } finally {
+      setCreatingSecret(false);
     }
   };
 
@@ -276,10 +327,30 @@ export default function EditAppConnectionModal({
                           {!sharedCredentialFields.some(field => field.location === credential.location && field.key === credential.key) && credential.key && <SelectItem value={`${credential.location}:${credential.key}`}>{credential.key} ({credential.location})</SelectItem>}
                           {sharedCredentialFields.map(field => <SelectItem key={`${field.location}:${field.key}`} value={`${field.location}:${field.key}`}>{field.key} ({field.location}){field.actions.length ? ` · ${field.actions.length} action${field.actions.length === 1 ? '' : 's'}` : ''}</SelectItem>)}
                         </SelectContent></Select>
-                        <Input type="password" placeholder="Value or $Secret{KEY}" value={credential.value} onChange={event => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, value: event.target.value } : item) }))} />
+                        <div className="flex gap-1.5 min-w-0">
+                          <Select value={credential.value} onValueChange={value => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, value } : item) }))}>
+                            <SelectTrigger className="min-w-0"><SelectValue placeholder={loadingSecrets ? 'Loading secrets...' : 'Select secret'} /></SelectTrigger>
+                            <SelectContent>
+                              {credential.value && !/^\$Secret\{[^}]+\}$/.test(credential.value) && <SelectItem value={credential.value}>Current saved value</SelectItem>}
+                              {secrets.map(secret => <SelectItem key={secret.key} value={`$Secret{${secret.key}}`}>{secret.key}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Button type="button" variant="outline" size="icon" title="Create secret" onClick={() => { setSecretTarget({ env: mapping.product_env_slug, index: credentialIndex }); setNewSecret({ key: '', value: '', description: '' }); }}><KeyRound className="h-4 w-4" /></Button>
+                        </div>
                         <Button type="button" variant="ghost" size="icon" title="Remove credential" onClick={() => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].filter((_, i) => i !== credentialIndex) }))}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     ))}
+                    {secretTarget?.env === mapping.product_env_slug && (
+                      <div className="border border-grey-200 dark:border-grey-500 rounded-md p-3 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-grey"><KeyRound className="h-4 w-4" />Create workspace secret</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="Secret key" value={newSecret.key} onChange={event => setNewSecret(current => ({ ...current, key: event.target.value.replace(/[^A-Za-z0-9_]/g, '_') }))} />
+                          <Input type="password" placeholder="Secret value" value={newSecret.value} onChange={event => setNewSecret(current => ({ ...current, value: event.target.value }))} />
+                        </div>
+                        <Input placeholder="Description (optional)" value={newSecret.description} onChange={event => setNewSecret(current => ({ ...current, description: event.target.value }))} />
+                        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setSecretTarget(null)}>Cancel</Button><Button type="button" size="sm" disabled={creatingSecret || !newSecret.key || !newSecret.value} onClick={createSecret}>{creatingSecret && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}Create &amp; select</Button></div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
