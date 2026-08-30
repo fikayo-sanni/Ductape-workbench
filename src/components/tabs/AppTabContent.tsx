@@ -68,6 +68,7 @@ import CreateSharedVariableModal from '@/components/modals/CreateSharedVariableM
 import CreateFolderModal from '@/components/modals/CreateFolderModal';
 import PublishAppModal from '@/components/modals/PublishAppModal';
 import DeleteAppModal from '@/components/modals/DeleteAppModal';
+import EditAppConnectionModal from '@/components/modals/EditAppConnectionModal';
 import {useQuery, useQueryClient, useMutation} from '@tanstack/react-query';
 import {useAppDashboard} from '@/hooks/useAnalytics';
 import toast from 'react-hot-toast';
@@ -146,6 +147,7 @@ export default function AppTabContent({
   const [editingVariable, setEditingVariable] = useState<any | null>(null);
   const [editingConstant, setEditingConstant] = useState<any | null>(null);
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
+  const [showEditConnectionModal, setShowEditConnectionModal] = useState(false);
   const [showAppCreatedModal, setShowAppCreatedModal] = useState(false);
   const [showCreateEnvModal, setShowCreateEnvModal] = useState(false);
   const [showUpdateEnvModal, setShowUpdateEnvModal] = useState(false);
@@ -380,6 +382,14 @@ export default function AppTabContent({
     accessTag,
     currentApp?.tag,
   ]);
+
+  const connectedProductApp = useMemo(() => {
+    const links = productForAccessResolve?.apps ?? [];
+    return links.find((link: any) =>
+      String(link.access_tag || '').toLowerCase() === String(accessTag || '').toLowerCase()
+      || String(link.app_tag || '').toLowerCase() === String(currentApp?.tag || '').toLowerCase(),
+    );
+  }, [productForAccessResolve?.apps, accessTag, currentApp?.tag]);
 
   const webhookPageMode: WebhookViewMode = isProductView
     ? 'product'
@@ -1856,9 +1866,16 @@ export default function AppTabContent({
 
           {/* Environment Status */}
           <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-            <h2 className="text-lg font-semibold text-grey mb-4">
-              {isProductView ? 'Product environments' : 'Environment Status'}
-            </h2>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-grey">
+                {isProductView ? 'Product environments' : 'Environment Status'}
+              </h2>
+              {isProductView && accessTag && connectedProductApp && (
+                <Button variant="outline" size="sm" onClick={() => setShowEditConnectionModal(true)}>
+                  <Settings2 className="h-4 w-4 mr-2" />Edit connection
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(isProductView ? productEnvs || [] : selectedVersion?.envs || []).map((env: any) => (
                 <div
@@ -2373,6 +2390,21 @@ export default function AppTabContent({
       </div>
 
       {/* Modals */}
+      {isProductView && currentApp && productTag && accessTag && connectedProductApp && (
+        <EditAppConnectionModal
+          open={showEditConnectionModal}
+          onOpenChange={setShowEditConnectionModal}
+          productTag={productTag}
+          accessTag={accessTag}
+          app={currentApp}
+          productApp={connectedProductApp}
+          productEnvs={productEnvs || []}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['product', productIdForAccess] });
+            queryClient.invalidateQueries({ queryKey: ['product-apps', productIdForAccess] });
+          }}
+        />
+      )}
       {currentApp && (
         <WebhookImportModal
           open={isImportingWebhooks}

@@ -44,6 +44,24 @@ const IntegrationContext = createContext<IntegrationContextType | undefined>(und
 
 const STORAGE_KEY = 'integration_state';
 
+function persistentWizardState(state: IntegrationState): IntegrationState {
+  return {
+    productTag: state.productTag,
+    accessTag: state.accessTag,
+    appTag: state.appTag,
+    environmentMappings: state.environmentMappings,
+    variables: Object.fromEntries(
+      Object.entries(state.variables).map(([key, variable]) => [key, {
+        ...variable,
+        value: '',
+        environmentValues: {},
+      }]),
+    ),
+    // Auth values are deliberately memory-only until encrypted backend persistence.
+    authFields: undefined,
+  };
+}
+
 export function IntegrationProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<IntegrationState>(() => {
     // Try to load saved state from localStorage
@@ -63,9 +81,9 @@ export function IntegrationProvider({ children }: { children: React.ReactNode })
     };
   });
 
-  // Save state to localStorage whenever it changes
+  // Keep navigation progress, but never persist credentials in browser storage.
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistentWizardState(state)));
   }, [state]);
 
   const setProductTag = (tag: string) => {
