@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDuctape } from '@/hooks/useDuctape';
+import { connectDuctapeWorkspace } from '@/helpers/ductape';
 import { useAuth } from '@/store/useAuth';
 
 type Mapping = {
@@ -99,6 +100,15 @@ export default function EditAppConnectionModal({
     public_key: user?.public_key || '',
     type: 'product',
   }) as any;
+  const workspaceDuctape = useMemo(() => {
+    if (!currentWorkspaceId || !user?._id || !user?.auth_token || !user?.public_key) return null;
+    return connectDuctapeWorkspace({
+      workspace_id: currentWorkspaceId,
+      user_id: user._id,
+      token: user.auth_token,
+      public_key: user.public_key,
+    });
+  }, [currentWorkspaceId, user?._id, user?.auth_token, user?.public_key]);
   const version = useMemo(
     () => app?.versions?.find((item: any) => item.tag === productApp?.version)
       ?? app?.versions?.find((item: any) => item.latest)
@@ -150,10 +160,10 @@ export default function EditAppConnectionModal({
   }, [open, productApp, productEnvs, version]);
 
   useEffect(() => {
-    if (!open || !productBuilder) return;
+    if (!open || !workspaceDuctape) return;
     let active = true;
     setLoadingSecrets(true);
-    Promise.resolve(productBuilder.secrets.list())
+    Promise.resolve(workspaceDuctape.secrets.list())
       .then((items: any[]) => {
         if (!active) return;
         setSecrets((items ?? []).map(item => ({ key: String(item.key), description: item.description })).filter(item => item.key));
@@ -161,7 +171,7 @@ export default function EditAppConnectionModal({
       .catch(() => { if (active) toast.error('Failed to load workspace secrets'); })
       .finally(() => { if (active) setLoadingSecrets(false); });
     return () => { active = false; };
-  }, [open, productBuilder]);
+  }, [open, workspaceDuctape]);
 
   const updateMapping = (index: number, update: Partial<Mapping>) => {
     setMappings(current => current.map((mapping, i) => i === index ? { ...mapping, ...update } : mapping));
@@ -227,7 +237,8 @@ export default function EditAppConnectionModal({
     const key = newSecret.key.trim().replace(/[^A-Za-z0-9_]/g, '_');
     try {
       setCreatingSecret(true);
-      await productBuilder.secrets.create({
+      if (!workspaceDuctape) throw new Error('Workspace secrets are unavailable');
+      await workspaceDuctape.secrets.create({
         key,
         value: newSecret.value,
         description: newSecret.description || `Shared credential for ${accessTag}`,
