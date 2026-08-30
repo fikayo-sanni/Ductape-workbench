@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plug, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, Plug, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ type Mapping = {
   product_env_slug: string;
   variables?: Array<{ key: string; value: unknown }>;
   auth?: { auth_tag: string; data: unknown; values?: string; expiry?: number };
+  credentials?: Record<string, unknown>;
 };
 
 type Field = { key: string; location: 'headers' | 'query' | 'params' | 'body'; sampleValue?: string };
@@ -80,6 +81,7 @@ export default function EditAppConnectionModal({
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [replaceAuth, setReplaceAuth] = useState<Record<string, boolean>>({});
   const [authValues, setAuthValues] = useState<Record<string, Record<string, string>>>({});
+  const [sharedCredentials, setSharedCredentials] = useState<Record<string, Array<{ location: Field['location']; key: string; value: string }>>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -99,7 +101,18 @@ export default function EditAppConnectionModal({
       };
     });
     setMappings(nextMappings);
-    setReplaceAuth(Object.fromEntries(nextMappings.filter(mapping => !hasSavedCredentials(mapping.auth)).map(mapping => [mapping.product_env_slug, true])));
+    setReplaceAuth({});
+    setSharedCredentials(Object.fromEntries(nextMappings.map(mapping => [
+      mapping.product_env_slug,
+      Object.entries(mapping.credentials ?? {}).map(([compoundKey, value]) => {
+        const separator = compoundKey.indexOf(':');
+        return {
+          location: (separator > 0 ? compoundKey.slice(0, separator) : 'headers') as Field['location'],
+          key: separator > 0 ? compoundKey.slice(separator + 1) : compoundKey,
+          value: String(value ?? ''),
+        };
+      }),
+    ])));
     setAuthValues({});
   }, [open, productApp, productEnvs, version]);
 
@@ -123,16 +136,29 @@ export default function EditAppConnectionModal({
       setSaving(true);
       const envs = mappings.map((mapping) => {
         if (!mapping.app_env_slug) throw new Error(`Choose an App environment for ${mapping.product_env_slug}`);
-        if (!replaceAuth[mapping.product_env_slug]) return mapping;
-        const auth = version?.auths?.find((item: any) => item.tag === mapping.auth?.auth_tag);
-        if (!auth) throw new Error(`Choose authentication for ${mapping.product_env_slug}`);
-        const data: Record<string, Record<string, string>> = { headers: {}, query: {}, params: {}, body: {} };
-        for (const field of fieldsForAuth(auth, version)) {
-          const value = authValues[mapping.product_env_slug]?.[`${field.location}:${field.key}`] ?? '';
-          if (!value) throw new Error(`${field.key} is required for ${mapping.product_env_slug}`);
-          data[field.location][field.key] = value;
+        let next = { ...mapping };
+        if (!replaceAuth[mapping.product_env_slug] && !hasSavedCredentials(mapping.auth)) {
+          delete next.auth;
         }
-        return { ...mapping, auth: { auth_tag: auth.tag, data } };
+        const shared = sharedCredentials[mapping.product_env_slug] ?? [];
+        const credentials: Record<string, string> = {};
+        for (const credential of shared) {
+          if (!credential.key.trim() || !credential.value) throw new Error(`Complete or remove the shared credential in ${mapping.product_env_slug}`);
+          credentials[`${credential.location}:${credential.key.trim()}`] = credential.value;
+        }
+        next.credentials = credentials;
+        if (replaceAuth[mapping.product_env_slug]) {
+          const auth = version?.auths?.find((item: any) => item.tag === mapping.auth?.auth_tag);
+          if (!auth) throw new Error(`Choose authentication for ${mapping.product_env_slug}`);
+          const data: Record<string, Record<string, string>> = { headers: {}, query: {}, params: {}, body: {} };
+          for (const field of fieldsForAuth(auth, version)) {
+            const value = authValues[mapping.product_env_slug]?.[`${field.location}:${field.key}`] ?? '';
+            if (!value) throw new Error(`${field.key} is required for ${mapping.product_env_slug}`);
+            data[field.location][field.key] = value;
+          }
+          next = { ...next, auth: { auth_tag: auth.tag, data } };
+        }
+        return next;
       });
       await productBuilder.init(productTag);
       await productBuilder.apps.update(accessTag, { envs });
@@ -182,28 +208,40 @@ export default function EditAppConnectionModal({
                     <Input id={`${mapping.product_env_slug}-${key}`} value={String(mapping.variables?.find(variable => variable.key === key)?.value ?? '')} onChange={event => updateVariable(index, key, event.target.value)} />
                   </div>
                 ))}
-                {(version?.auths?.length ?? 0) > 0 && (
-                  <div className="space-y-3 border-t border-grey-200 dark:border-grey-500 pt-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-500">{credentialsSaved && !replaceAuth[mapping.product_env_slug] ? 'Encrypted credentials are currently saved.' : 'Enter credentials for this environment.'}</p></div>
-                      <Button type="button" variant={replaceAuth[mapping.product_env_slug] ? 'default' : 'outline'} size="sm" disabled={!credentialsSaved && replaceAuth[mapping.product_env_slug]} onClick={() => setReplaceAuth(current => ({ ...current, [mapping.product_env_slug]: !current[mapping.product_env_slug] }))}>
-                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />{credentialsSaved ? 'Replace credentials' : 'Add credentials'}
+                <div className="space-y-3 border-t border-grey-200 dark:border-grey-500 pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-500">Optional. Leave empty if this environment does not require authentication.</p></div>
+                    {(version?.auths?.length ?? 0) > 0 && (
+                      <Button type="button" variant={replaceAuth[mapping.product_env_slug] ? 'default' : 'outline'} size="sm" onClick={() => setReplaceAuth(current => ({ ...current, [mapping.product_env_slug]: !current[mapping.product_env_slug] }))}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />{credentialsSaved ? 'Replace saved auth' : replaceAuth[mapping.product_env_slug] ? 'Cancel auth setup' : 'Use App authentication'}
                       </Button>
-                    </div>
-                    {replaceAuth[mapping.product_env_slug] && (
-                      <>
-                        <Select value={mapping.auth?.auth_tag || ''} onValueChange={value => updateMapping(index, { auth: { auth_tag: value, data: {} } })}>
-                          <SelectTrigger><SelectValue placeholder="Select authentication" /></SelectTrigger>
-                          <SelectContent>{version.auths.map((auth: any) => <SelectItem key={auth.tag} value={auth.tag}>{auth.name || auth.tag}</SelectItem>)}</SelectContent>
-                        </Select>
-                        {fieldsForAuth(selectedAuth, version).map(field => {
-                          const fieldKey = `${field.location}:${field.key}`;
-                          return <div key={fieldKey} className="space-y-1.5"><Label>{field.key} <span className="text-grey-400">({field.location})</span></Label><Input type="password" placeholder={field.sampleValue || ''} value={authValues[mapping.product_env_slug]?.[fieldKey] || ''} onChange={event => setAuthValues(current => ({ ...current, [mapping.product_env_slug]: { ...(current[mapping.product_env_slug] ?? {}), [fieldKey]: event.target.value } }))} /></div>;
-                        })}
-                      </>
                     )}
                   </div>
-                )}
+                  {credentialsSaved && !replaceAuth[mapping.product_env_slug] && <p className="text-xs text-green">Encrypted App authentication is configured.</p>}
+                  {replaceAuth[mapping.product_env_slug] && (
+                    <>
+                      <Select value={mapping.auth?.auth_tag || ''} onValueChange={value => updateMapping(index, { auth: { auth_tag: value, data: {} } })}>
+                        <SelectTrigger><SelectValue placeholder="Select authentication" /></SelectTrigger>
+                        <SelectContent>{version.auths.map((auth: any) => <SelectItem key={auth.tag} value={auth.tag}>{auth.name || auth.tag}</SelectItem>)}</SelectContent>
+                      </Select>
+                      {fieldsForAuth(selectedAuth, version).map(field => {
+                        const fieldKey = `${field.location}:${field.key}`;
+                        return <div key={fieldKey} className="space-y-1.5"><Label>{field.key} <span className="text-grey-400">({field.location})</span></Label><Input type="password" placeholder={field.sampleValue || ''} value={authValues[mapping.product_env_slug]?.[fieldKey] || ''} onChange={event => setAuthValues(current => ({ ...current, [mapping.product_env_slug]: { ...(current[mapping.product_env_slug] ?? {}), [fieldKey]: event.target.value } }))} /></div>;
+                      })}
+                    </>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between"><Label>Shared credentials</Label><Button type="button" variant="ghost" size="sm" onClick={() => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: [...(current[mapping.product_env_slug] ?? []), { location: 'headers', key: '', value: '' }] }))}><Plus className="h-3.5 w-3.5 mr-1" />Add credential</Button></div>
+                    {(sharedCredentials[mapping.product_env_slug] ?? []).map((credential, credentialIndex) => (
+                      <div key={credentialIndex} className="grid grid-cols-[120px_1fr_1fr_36px] gap-2 items-center">
+                        <Select value={credential.location} onValueChange={value => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, location: value as Field['location'] } : item) }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['headers', 'query', 'params', 'body'].map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}</SelectContent></Select>
+                        <Input placeholder="Key" value={credential.key} onChange={event => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, key: event.target.value } : item) }))} />
+                        <Input type="password" placeholder="Value or $Secret{KEY}" value={credential.value} onChange={event => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, value: event.target.value } : item) }))} />
+                        <Button type="button" variant="ghost" size="icon" title="Remove credential" onClick={() => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].filter((_, i) => i !== credentialIndex) }))}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </section>
             );
           })}
