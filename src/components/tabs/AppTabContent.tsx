@@ -1638,6 +1638,43 @@ export default function AppTabContent({
             </div>
           </div>
 
+          {isProductView && (
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg font-semibold text-grey">Product environments</h2>
+                {accessTag && connectedProductApp && (
+                  <Button variant="outline" size="sm" onClick={() => setShowEditConnectionModal(true)}>
+                    <Settings2 className="h-4 w-4 mr-2" />Edit connection
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {(productEnvs || []).map((env: any) => (
+                  <div key={env.slug} className="p-4 bg-white dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={cn(
+                        'px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide border',
+                        env.slug === 'production'
+                          ? 'bg-green/10 text-green border-green/20'
+                          : env.slug === 'staging'
+                            ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                            : 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+                      )}>{env.env_name || env.slug}</span>
+                      {env.active && <span className="flex items-center gap-1 text-xs text-green font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green" />Active</span>}
+                    </div>
+                    <p className="text-xs text-grey-600 truncate">Environment used by this product integration</p>
+                  </div>
+                ))}
+                {(productEnvs || []).length === 0 && (
+                  <div className="col-span-3 text-center py-8">
+                    <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                    <p className="text-sm text-grey-600">No product environments configured</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {renderMetricCard(
@@ -1864,8 +1901,8 @@ export default function AppTabContent({
             </div>
           </div>
 
-          {/* Environment Status */}
-          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+          {/* Environment Status for workspace-owned App definitions */}
+          {!isProductView && <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold text-grey">
                 {isProductView ? 'Product environments' : 'Environment Status'}
@@ -1939,7 +1976,7 @@ export default function AppTabContent({
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* Quick Actions Info */}
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">

@@ -42,6 +42,17 @@ function fieldsForAuth(auth: any, version: any): Field[] {
   return fields;
 }
 
+function hasSavedCredentials(auth: Mapping['auth']): boolean {
+  if (!auth?.auth_tag) return false;
+  if (typeof auth.values === 'string' && auth.values.trim().length > 0) return true;
+  if (typeof auth.data === 'string' && auth.data.trim().length > 0) return true;
+  if (!auth.data || typeof auth.data !== 'object' || Array.isArray(auth.data)) return false;
+  return ['headers', 'query', 'params', 'body'].some(location => {
+    const values = (auth.data as Record<string, unknown>)[location];
+    return Boolean(values && typeof values === 'object' && Object.values(values as Record<string, unknown>).some(value => value !== '' && value != null));
+  });
+}
+
 export default function EditAppConnectionModal({
   open,
   onOpenChange,
@@ -88,7 +99,7 @@ export default function EditAppConnectionModal({
       };
     });
     setMappings(nextMappings);
-    setReplaceAuth(Object.fromEntries(nextMappings.filter(mapping => !existing.some((saved: Mapping) => saved.product_env_slug === mapping.product_env_slug && saved.auth)).map(mapping => [mapping.product_env_slug, true])));
+    setReplaceAuth(Object.fromEntries(nextMappings.filter(mapping => !hasSavedCredentials(mapping.auth)).map(mapping => [mapping.product_env_slug, true])));
     setAuthValues({});
   }, [open, productApp, productEnvs, version]);
 
@@ -146,6 +157,7 @@ export default function EditAppConnectionModal({
         <div className="space-y-5 py-2">
           {mappings.map((mapping, index) => {
             const selectedAuth = version?.auths?.find((item: any) => item.tag === mapping.auth?.auth_tag);
+            const credentialsSaved = hasSavedCredentials(mapping.auth);
             const variableKeys = new Set<string>([
               ...(version?.variables ?? []).map((variable: any) => variable.key),
               ...(version?.envs?.find((env: any) => env.slug === mapping.app_env_slug)?.base_url_variables ?? []).map((variable: any) => variable.key),
@@ -173,9 +185,9 @@ export default function EditAppConnectionModal({
                 {(version?.auths?.length ?? 0) > 0 && (
                   <div className="space-y-3 border-t border-grey-200 dark:border-grey-500 pt-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-500">{mapping.auth?.data && !replaceAuth[mapping.product_env_slug] ? 'Encrypted credentials are currently saved.' : 'Enter credentials for this environment.'}</p></div>
-                      <Button type="button" variant={replaceAuth[mapping.product_env_slug] ? 'default' : 'outline'} size="sm" onClick={() => setReplaceAuth(current => ({ ...current, [mapping.product_env_slug]: !current[mapping.product_env_slug] }))}>
-                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />Replace credentials
+                      <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-500">{credentialsSaved && !replaceAuth[mapping.product_env_slug] ? 'Encrypted credentials are currently saved.' : 'Enter credentials for this environment.'}</p></div>
+                      <Button type="button" variant={replaceAuth[mapping.product_env_slug] ? 'default' : 'outline'} size="sm" disabled={!credentialsSaved && replaceAuth[mapping.product_env_slug]} onClick={() => setReplaceAuth(current => ({ ...current, [mapping.product_env_slug]: !current[mapping.product_env_slug] }))}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />{credentialsSaved ? 'Replace credentials' : 'Add credentials'}
                       </Button>
                     </div>
                     {replaceAuth[mapping.product_env_slug] && (
