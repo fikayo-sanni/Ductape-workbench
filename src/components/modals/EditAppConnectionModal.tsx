@@ -18,6 +18,7 @@ type Mapping = {
 };
 
 type Field = { key: string; location: 'headers' | 'query' | 'params' | 'body'; sampleValue?: string };
+type SharedField = Field & { actions: string[] };
 
 interface Props {
   open: boolean;
@@ -41,6 +42,32 @@ function fieldsForAuth(auth: any, version: any): Field[] {
     }
   }
   return fields;
+}
+
+function sharedFieldsForActions(version: any): SharedField[] {
+  const fields = new Map<string, SharedField>();
+  for (const action of version?.actions ?? []) {
+    for (const location of ['headers', 'query', 'params', 'body'] as const) {
+      for (const item of action?.[location]?.data ?? []) {
+        const key = String(item?.key ?? '').trim();
+        if (!key) continue;
+        const compoundKey = `${location}:${key}`;
+        const current: SharedField = fields.get(compoundKey) ?? {
+          key,
+          location,
+          sampleValue: item?.sampleValue,
+          actions: [],
+        };
+        const actionTag = String(action?.tag ?? action?.name ?? '').trim();
+        if (actionTag && !current.actions.includes(actionTag)) current.actions.push(actionTag);
+        fields.set(compoundKey, current);
+      }
+    }
+  }
+  return [...fields.values()].sort((left, right) =>
+    right.actions.length - left.actions.length
+    || left.location.localeCompare(right.location)
+    || left.key.localeCompare(right.key));
 }
 
 function hasSavedCredentials(auth: Mapping['auth']): boolean {
@@ -78,6 +105,7 @@ export default function EditAppConnectionModal({
       ?? app?.versions?.[0],
     [app, productApp?.version],
   );
+  const sharedCredentialFields = useMemo(() => sharedFieldsForActions(version), [version]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [replaceAuth, setReplaceAuth] = useState<Record<string, boolean>>({});
   const [authValues, setAuthValues] = useState<Record<string, Record<string, string>>>({});
@@ -231,11 +259,23 @@ export default function EditAppConnectionModal({
                     </>
                   )}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between"><Label>Shared credentials</Label><Button type="button" variant="ghost" size="sm" onClick={() => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: [...(current[mapping.product_env_slug] ?? []), { location: 'headers', key: '', value: '' }] }))}><Plus className="h-3.5 w-3.5 mr-1" />Add credential</Button></div>
+                    <div className="flex items-center justify-between"><Label>Shared credentials</Label><Button type="button" variant="ghost" size="sm" disabled={sharedCredentialFields.length === 0} onClick={() => {
+                      const used = new Set((sharedCredentials[mapping.product_env_slug] ?? []).map(item => `${item.location}:${item.key}`));
+                      const candidate = sharedCredentialFields.find(field => !used.has(`${field.location}:${field.key}`));
+                      if (!candidate) return;
+                      setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: [...(current[mapping.product_env_slug] ?? []), { location: candidate.location, key: candidate.key, value: '' }] }));
+                    }}><Plus className="h-3.5 w-3.5 mr-1" />Add credential</Button></div>
                     {(sharedCredentials[mapping.product_env_slug] ?? []).map((credential, credentialIndex) => (
-                      <div key={credentialIndex} className="grid grid-cols-[120px_1fr_1fr_36px] gap-2 items-center">
-                        <Select value={credential.location} onValueChange={value => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, location: value as Field['location'] } : item) }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['headers', 'query', 'params', 'body'].map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}</SelectContent></Select>
-                        <Input placeholder="Key" value={credential.key} onChange={event => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, key: event.target.value } : item) }))} />
+                      <div key={credentialIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(180px,0.8fr)_36px] gap-2 items-center">
+                        <Select value={`${credential.location}:${credential.key}`} onValueChange={value => {
+                          const separator = value.indexOf(':');
+                          const location = value.slice(0, separator) as Field['location'];
+                          const key = value.slice(separator + 1);
+                          setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, location, key } : item) }));
+                        }}><SelectTrigger><SelectValue placeholder="Select action field" /></SelectTrigger><SelectContent>
+                          {!sharedCredentialFields.some(field => field.location === credential.location && field.key === credential.key) && credential.key && <SelectItem value={`${credential.location}:${credential.key}`}>{credential.key} ({credential.location})</SelectItem>}
+                          {sharedCredentialFields.map(field => <SelectItem key={`${field.location}:${field.key}`} value={`${field.location}:${field.key}`}>{field.key} ({field.location}){field.actions.length ? ` · ${field.actions.length} action${field.actions.length === 1 ? '' : 's'}` : ''}</SelectItem>)}
+                        </SelectContent></Select>
                         <Input type="password" placeholder="Value or $Secret{KEY}" value={credential.value} onChange={event => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, value: event.target.value } : item) }))} />
                         <Button type="button" variant="ghost" size="icon" title="Remove credential" onClick={() => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].filter((_, i) => i !== credentialIndex) }))}><Trash2 className="h-4 w-4" /></Button>
                       </div>
