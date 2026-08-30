@@ -81,6 +81,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeVector } from '@/hooks/useDuctapeVector';
 import { useAuth } from '@/store/useAuth';
 import logsServices, { VectorDashboardMetrics } from '@/services/logsServices';
+import { getExplorerActionParameters } from '@/utils/actionVariables';
 
 interface VectorExplorerTabProps {
   vector: {
@@ -232,6 +233,41 @@ const generateActionTag = (name: string): string => {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+};
+
+const normalizeVectorOperation = (operation: unknown): VectorOperation => {
+  const normalized = String(operation ?? 'query').toLowerCase();
+  const operations: Record<string, VectorOperation> = {
+    findsimilar: 'findSimilar',
+    find_similar: 'findSimilar',
+    upsertone: 'upsertOne',
+    upsert_one: 'upsertOne',
+    fetchone: 'fetchOne',
+    fetch_one: 'fetchOne',
+    deletebyids: 'deleteByIds',
+    delete_by_ids: 'deleteByIds',
+    deletebyfilter: 'deleteByFilter',
+    delete_by_filter: 'deleteByFilter',
+    deleteall: 'deleteAll',
+    delete_all: 'deleteAll',
+    listnamespaces: 'listNamespaces',
+    list_namespaces: 'listNamespaces',
+    getstats: 'getStats',
+    get_stats: 'getStats',
+    describeindex: 'describeIndex',
+    describe_index: 'describeIndex',
+  };
+  return operations[normalized] ?? normalized as VectorOperation;
+};
+
+const parseVectorActionTemplate = (template: any): Record<string, any> => {
+  if (typeof template !== 'string') return template ?? {};
+  try {
+    const parsed = JSON.parse(template);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 };
 
 
@@ -708,19 +744,22 @@ export default function VectorExplorerTab({ vector: vectorProp }: VectorExplorer
     queryFn: async () => {
       if (!vectorService || !vector.productTag) return [];
       try {
-        const result = await vectorService.actions.fetchAll({
+        const result: any = await vectorService.actions.fetchAll({
           product: vector.productTag,
           vector: vector.vector,
         });
-        return result || [];
+        if (Array.isArray(result)) return result;
+        if (Array.isArray(result?.actions)) return result.actions;
+        if (Array.isArray(result?.data)) return result.data;
+        return [];
       } catch (error) {
         console.error('Error fetching vector actions:', error);
         return [];
       }
     },
     enabled: !!vectorService && !!vector.productTag && !!vector.vector,
-    staleTime: 5 * 60 * 1000,
-    refetchOnMount: false,
+    staleTime: 30000,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
 
@@ -728,24 +767,27 @@ export default function VectorExplorerTab({ vector: vectorProp }: VectorExplorer
   useEffect(() => {
     if (savedActionsData && Array.isArray(savedActionsData)) {
       // Convert backend format to local IVectorAction format
-      const actions: IVectorAction[] = savedActionsData.map((action: any) => ({
-        id: action._id || action.tag,
-        vector: action.tag,
-        name: action.name,
-        description: action.description,
-        operation: action.type || action.template?.options?.operation || 'query',
-        query: {
-          operation: action.type || action.template?.options?.operation || 'query',
-          options: action.template?.options || {},
-        },
-        parameters: (action.parameters || []).map((p: any) => ({
-          name: p.name,
-          path: p.path,
-          defaultValue: p.defaultValue,
-          type: p.type || 'string',
-        })),
-        createdAt: action.created_at || new Date().toISOString(),
-      }));
+      const actions: IVectorAction[] = savedActionsData.map((action: any) => {
+        const persistedTemplate = parseVectorActionTemplate(action.template ?? action.query);
+        const operation = normalizeVectorOperation(
+          action.operation ?? action.type ?? persistedTemplate.operation,
+        );
+        const options = persistedTemplate.options && typeof persistedTemplate.options === 'object'
+          ? persistedTemplate.options
+          : persistedTemplate;
+        const query = { operation, options };
+
+        return {
+          id: action.id ?? action._id ?? action.tag,
+          vector: action.tag,
+          name: action.name ?? action.tag,
+          description: action.description,
+          operation,
+          query,
+          parameters: getExplorerActionParameters(action, query),
+          createdAt: String(action.createdAt ?? action.created_at ?? new Date().toISOString()),
+        };
+      });
       setSavedActions(actions);
     }
   }, [savedActionsData]);
@@ -5145,15 +5187,51 @@ await ductape.init();`,
             <div className="space-y-4">
               {selectedAction.parameters.map((param) => (
                 <div key={param.name}>
-                  <Label>{param.name}</Label>
-                  <Input
-                    value={actionParamValues[param.name] ?? param.defaultValue}
-                    onChange={(e) => setActionParamValues({
-                      ...actionParamValues,
-                      [param.name]: e.target.value
-                    })}
-                    className="mt-1"
-                  />
+                  <Label className="flex items-center gap-2">
+                    <span>{param.name}</span>
+                    <span className="text-xs font-normal text-grey-500">({param.type})</span>
+                  </Label>
+                  {param.type === 'boolean' ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Checkbox
+                        checked={Boolean(actionParamValues[param.name] ?? param.defaultValue)}
+                        onCheckedChange={(checked) => setActionParamValues({
+                          ...actionParamValues,
+                          [param.name]: Boolean(checked),
+                        })}
+                      />
+                      <span className="text-sm text-grey">
+                        {Boolean(actionParamValues[param.name] ?? param.defaultValue) ? 'True' : 'False'}
+                      </span>
+                    </div>
+                  ) : param.type === 'array' || param.type === 'object' ? (
+                    <Textarea
+                      value={typeof (actionParamValues[param.name] ?? param.defaultValue) === 'string'
+                        ? (actionParamValues[param.name] ?? param.defaultValue)
+                        : JSON.stringify(actionParamValues[param.name] ?? param.defaultValue, null, 2)}
+                      onChange={(e) => {
+                        let value: any = e.target.value;
+                        try {
+                          value = JSON.parse(e.target.value);
+                        } catch {
+                          // Keep incomplete JSON editable until it becomes valid.
+                        }
+                        setActionParamValues({ ...actionParamValues, [param.name]: value });
+                      }}
+                      className="mt-1 font-mono text-sm"
+                      rows={4}
+                    />
+                  ) : (
+                    <Input
+                      type={param.type === 'number' ? 'number' : 'text'}
+                      value={actionParamValues[param.name] ?? param.defaultValue}
+                      onChange={(e) => setActionParamValues({
+                        ...actionParamValues,
+                        [param.name]: param.type === 'number' ? Number(e.target.value) : e.target.value,
+                      })}
+                      className="mt-1"
+                    />
+                  )}
                   <p className="text-xs text-grey-500 mt-1">Path: {param.path}</p>
                 </div>
               ))}

@@ -11,11 +11,32 @@ export interface ActionVariable {
   [key: string]: unknown;
 }
 
+export interface ExplorerActionParameter {
+  name: string;
+  path: string;
+  defaultValue: unknown;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  description?: string;
+  required?: boolean;
+}
+
 /** Extract mappable input fields from an action or database action definition. */
 export function extractActionVariables(action: any): ActionVariable[] {
   if (!action) return [];
 
   const variables: ActionVariable[] = [];
+
+  if (Array.isArray(action.parameters)) {
+    action.parameters.forEach((parameter: any) => {
+      variables.push({
+        ...parameter,
+        key: parameter.name ?? parameter.key,
+        name: parameter.name ?? parameter.key,
+        category: 'parameters',
+        source: 'parameters',
+      });
+    });
+  }
 
   const pushFromArray = (items: any[], category: string) => {
     if (!Array.isArray(items)) return;
@@ -73,6 +94,70 @@ export function extractActionVariables(action: any): ActionVariable[] {
   }
 
   return variables;
+}
+
+const normalizeParameterType = (
+  declaredType: unknown,
+  value: unknown,
+): ExplorerActionParameter['type'] => {
+  const type = String(declaredType ?? '').toLowerCase();
+  if (type.includes('bool')) return 'boolean';
+  if (/number|integer|int|float|double|decimal/.test(type)) return 'number';
+  if (type.includes('array') || Array.isArray(value)) return 'array';
+  if (type.includes('object') || (value !== null && typeof value === 'object')) return 'object';
+  return 'string';
+};
+
+/** Normalize canonical action parameters and recover placeholders for older actions. */
+export function getExplorerActionParameters(action: any, template?: any): ExplorerActionParameter[] {
+  const parameters = new Map<string, ExplorerActionParameter>();
+
+  extractActionVariables(action)
+    .filter((variable) => variable.source === 'parameters')
+    .forEach((variable) => {
+      const name = String(variable.name ?? variable.key ?? '').trim();
+      if (!name || parameters.has(name)) return;
+      const defaultValue = variable.defaultValue
+        ?? variable.default
+        ?? variable.sampleValue
+        ?? variable.value
+        ?? variable.sample
+        ?? '';
+      parameters.set(name, {
+        name,
+        path: String(variable.path ?? name),
+        defaultValue,
+        type: normalizeParameterType(variable.type, defaultValue),
+        description: typeof variable.description === 'string' ? variable.description : undefined,
+        required: typeof variable.required === 'boolean' ? variable.required : undefined,
+      });
+    });
+
+  const visit = (value: any, path = '') => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(/{{\s*([^{}]+?)\s*}}/g)) {
+        const name = match[1].trim();
+        if (!name || parameters.has(name)) continue;
+        parameters.set(name, {
+          name,
+          path: path || name,
+          defaultValue: '',
+          type: 'string',
+        });
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => visit(item, `${path}[${index}]`));
+      return;
+    }
+    if (value && typeof value === 'object') {
+      Object.entries(value).forEach(([key, item]) => visit(item, path ? `${path}.${key}` : key));
+    }
+  };
+
+  visit(template);
+  return Array.from(parameters.values());
 }
 
 export function filterActionsBySearch(actions: any[], searchTerm: string): any[] {

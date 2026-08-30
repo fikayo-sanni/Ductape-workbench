@@ -84,6 +84,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDuctapeGraph } from '@/hooks/useDuctapeGraph';
 import { useAuth } from '@/store/useAuth';
 import logsServices, { GraphDashboardMetrics } from '@/services/logsServices';
+import { getExplorerActionParameters } from '@/utils/actionVariables';
 
 interface GraphExplorerTabProps {
   graph: {
@@ -171,6 +172,36 @@ const generateActionTag = (name: string): string => {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+};
+
+const parseGraphActionQuery = (query: any): any => {
+  if (typeof query !== 'string') return query ?? {};
+  try {
+    return JSON.parse(query);
+  } catch {
+    return query;
+  }
+};
+
+const formatGraphActionQuery = (query: any): string => {
+  const parsed = parseGraphActionQuery(query);
+  return typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+};
+
+const normalizeGraphAction = (action: any): IGraphAction => {
+  const query = parseGraphActionQuery(action.query ?? action.template ?? {});
+  return {
+    id: action.id ?? action._id ?? action.tag,
+    tag: action.tag,
+    name: action.name ?? action.tag,
+    description: action.description,
+    operation: action.operation ?? action.type ?? 'executeRaw',
+    query,
+    parameters: getExplorerActionParameters(action, query),
+    createdAt: String(action.createdAt ?? action.created_at ?? new Date().toISOString()),
+    updatedAt: action.updatedAt ?? action.updated_at,
+    graphTag: action.graphTag ?? action.graph_tag,
+  } as IGraphAction;
 };
 
 // Empty arrays for when SDK data is not available
@@ -492,20 +523,25 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   });
 
   // Fetch saved actions
-  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery<{ actions: IGraphAction[] } | null>({
+  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery<IGraphAction[]>({
     queryKey: ['graph-actions', graph.productTag, graph.tag],
     queryFn: async () => {
-      if (!graphService || !graph.productTag) return null;
+      if (!graphService || !graph.productTag) return [];
       try {
-        const result = await graphService.action.list(graph.tag);
+        const result: any = await graphService.action.list(graph.tag, graph.productTag);
         console.log('[Graph-Explorer] Actions result:', result);
-        return result as { actions: IGraphAction[] };
+        const rawActions = Array.isArray(result)
+          ? result
+          : Array.isArray(result?.actions)
+            ? result.actions
+            : [];
+        return rawActions.map(normalizeGraphAction);
       } catch (error) {
         console.error('Error fetching actions:', error);
-        return null;
+        return [];
       }
     },
-    enabled: !!graphService && !!graph.productTag && isConnected,
+    enabled: !!graphService && !!graph.productTag && !!graph.tag,
     staleTime: 30000,
   });
 
@@ -541,7 +577,7 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
   const relationshipTypes: IGraphRelationshipType[] = sdkRelationshipTypes?.types || [];
   const indexes: IGraphIndex[] = sdkIndexes?.indexes || [];
   const constraints: IGraphConstraint[] = sdkConstraints?.constraints || [];
-  const actions: IGraphAction[] = sdkActions?.actions || [];
+  const actions: IGraphAction[] = sdkActions || [];
 
   // Derive selected items from SDK data based on stored names/tags
   const selectedLabel = useMemo(() => {
@@ -3675,8 +3711,8 @@ await ductape.init();`,
               {/* Query Template */}
               <div className="bg-white rounded-lg border border-grey-400 p-4">
                 <Label className="text-sm font-semibold text-grey mb-3 block">Query Template</Label>
-                <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey max-h-64 overflow-y-auto">
-                  {JSON.stringify(selectedAction.query, null, 2)}
+                <pre className="m-0 max-h-80 overflow-auto rounded-md border border-grey-400 bg-grey-50 p-4 text-sm font-mono leading-6 text-grey whitespace-pre-wrap break-words">
+                  <code>{formatGraphActionQuery(selectedAction.query)}</code>
                 </pre>
               </div>
             </div>

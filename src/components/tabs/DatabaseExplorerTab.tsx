@@ -77,6 +77,7 @@ import { useDuctapeDatabase } from '@/hooks/useDuctapeDatabase';
 import { useAuth } from '@/store/useAuth';
 import logsServices, { DatabaseDashboardMetrics } from '@/services/logsServices';
 import payloadGenerationService from '@/services/payloadGenerationService';
+import { extractActionVariables } from '@/utils/actionVariables';
 
 // Column type definitions
 type ColumnType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
@@ -177,7 +178,9 @@ interface IDatabaseAction {
   name: string;
   description?: string;
   operation: DatabaseOperation;
-  query: Record<string, any>;
+  query: any;
+  filterQuery?: any;
+  tableName?: string;
   parameters: Array<{
     name: string;
     path: string;
@@ -193,6 +196,73 @@ const generateActionTag = (name: string): string => {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+};
+
+const normalizeActionParameterType = (
+  declaredType: unknown,
+  value: unknown,
+): IDatabaseAction['parameters'][number]['type'] => {
+  const type = String(declaredType ?? '').toLowerCase();
+
+  if (type.includes('bool')) return 'boolean';
+  if (/number|integer|int|float|double|decimal/.test(type)) return 'number';
+  if (type.includes('array') || Array.isArray(value)) return 'array';
+  if (type.includes('object') || (value !== null && typeof value === 'object')) return 'object';
+  return 'string';
+};
+
+const getDatabaseActionParameters = (action: any): IDatabaseAction['parameters'] => {
+  const parameters = new Map<string, IDatabaseAction['parameters'][number]>();
+
+  extractActionVariables(action)
+    .filter((variable) => variable.source === 'data' || variable.source === 'filterData')
+    .forEach((variable) => {
+      const name = String(variable.key ?? variable.name ?? '').trim();
+      if (!name || parameters.has(name)) return;
+
+      const defaultValue = variable.defaultValue
+        ?? variable.default
+        ?? variable.sampleValue
+        ?? variable.value
+        ?? variable.sample
+        ?? '';
+      const parentPath = variable.parent_key ? `.${String(variable.parent_key)}` : '';
+
+      parameters.set(name, {
+        name,
+        path: `${variable.source}${parentPath}.${name}`,
+        defaultValue,
+        type: normalizeActionParameterType(variable.type, defaultValue),
+      });
+    });
+
+  return Array.from(parameters.values());
+};
+
+const parseQueryTemplate = (template: any): any => {
+  if (typeof template !== 'string') return template;
+
+  const trimmed = template.trim();
+  if (!trimmed) return '';
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return template;
+  }
+};
+
+const formatQueryTemplate = (template: any): string => {
+  const parsed = parseQueryTemplate(template);
+  return typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+};
+
+const normalizeDatabaseOperation = (operation: unknown): DatabaseOperation => {
+  const normalized = String(operation ?? 'query').toLowerCase().replace(/[-\s]+/g, '_');
+  if (normalized === 'select' || normalized === 'find') return 'query';
+  if (normalized === 'raw_sql' || normalized === 'rawsql') return 'raw';
+  if (normalized === 'group_by') return 'groupBy';
+  return normalized as DatabaseOperation;
 };
 
 // Database operations configuration for query builder
@@ -2344,6 +2414,95 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     }
   };
 
+  const templateValueToInput = (value: any): string => {
+    if (typeof value === 'string') return value;
+    if (value === undefined) return '';
+    return JSON.stringify(value);
+  };
+
+  const templateToWhereConditions = (template: any) => {
+    const parsed = parseQueryTemplate(template);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+
+    const mongoOperators: Record<string, string> = {
+      $eq: '=',
+      $ne: '!=',
+      $gt: '>',
+      $gte: '>=',
+      $lt: '<',
+      $lte: '<=',
+      $in: 'IN',
+      $nin: 'NOT IN',
+    };
+
+    return Object.entries(parsed).map(([column, rawValue]) => {
+      if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+        const entries = Object.entries(rawValue as Record<string, any>);
+        if (entries.length === 1) {
+          const [rawOperator, value] = entries[0];
+          if (rawOperator === 'isNull') return { column, operator: 'IS NULL', value: '' };
+          if (rawOperator === 'isNotNull') return { column, operator: 'IS NOT NULL', value: '' };
+          return {
+            column,
+            operator: mongoOperators[rawOperator] ?? rawOperator,
+            value: templateValueToInput(value),
+          };
+        }
+      }
+
+      return { column, operator: '=', value: templateValueToInput(rawValue) };
+    });
+  };
+
+  const hydrateQueryBuilderFromAction = (action: IDatabaseAction) => {
+    const parsedTemplate = parseQueryTemplate(action.query);
+    const isBuilderTemplate = parsedTemplate
+      && typeof parsedTemplate === 'object'
+      && !Array.isArray(parsedTemplate)
+      && ('operation' in parsedTemplate || 'options' in parsedTemplate);
+    const operation = normalizeDatabaseOperation(
+      isBuilderTemplate ? parsedTemplate.operation ?? action.operation : action.operation,
+    );
+    const options = isBuilderTemplate
+      ? (parsedTemplate.options && typeof parsedTemplate.options === 'object'
+        ? parsedTemplate.options
+        : parsedTemplate)
+      : {};
+    const dataTemplate = isBuilderTemplate ? options.data : parsedTemplate;
+    const whereTemplate = isBuilderTemplate
+      ? options.where
+      : (action.filterQuery ?? (['query', 'delete', 'count', 'sum', 'avg', 'min', 'max'].includes(operation)
+        ? parsedTemplate
+        : undefined));
+
+    setQueryBuilderOperation(operation);
+    setQueryBuilderTable(String(options.table ?? action.tableName ?? ''));
+    setQueryBuilderColumns(Array.isArray(options.columns) ? options.columns : []);
+    setQueryBuilderWhere(templateToWhereConditions(whereTemplate));
+    setQueryBuilderOrderBy(options.orderBy?.column
+      ? { column: options.orderBy.column, direction: options.orderBy.direction ?? 'ASC' }
+      : null);
+    setQueryBuilderLimit(String(options.limit ?? '25'));
+    setQueryBuilderOffset(String(options.offset ?? '0'));
+    setQueryBuilderData(
+      dataTemplate && typeof dataTemplate === 'object' && !Array.isArray(dataTemplate)
+        ? Object.entries(dataTemplate).map(([column, value]) => ({
+          column,
+          value: templateValueToInput(value),
+        }))
+        : [],
+    );
+    setQueryBuilderAggColumn(String(options.column ?? ''));
+    setQueryBuilderRawSql(operation === 'raw'
+      ? String(options.sql ?? (typeof parsedTemplate === 'string' ? parsedTemplate : ''))
+      : '');
+    setQueryBuilderReturning(Array.isArray(options.returning) ? options.returning : []);
+    setGeneratedQuery(isBuilderTemplate ? parsedTemplate : null);
+    setQueryTestResult(null);
+    setShowQueryBuilder(true);
+    setSelectedAction(null);
+  };
+
   // Load action - show action details (not query builder)
   const handleLoadAction = (action: IDatabaseAction) => {
     setSelectedAction(action);
@@ -2495,9 +2654,11 @@ const ductape = new Ductape({
     tag: a.tag,
     name: a.name,
     description: a.description,
-    operation: a.operation ?? a.type,
+    operation: normalizeDatabaseOperation(a.operation ?? a.type),
     query: a.template,
-    parameters: [],
+    filterQuery: a.filterTemplate,
+    tableName: a.tableName,
+    parameters: getDatabaseActionParameters(a),
     createdAt: a.createdAt || new Date().toISOString(),
   })) : savedActions;
 
@@ -5063,10 +5224,7 @@ const result = await ductape.database.transaction(
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setShowQueryBuilder(true);
-                      setSelectedAction(null);
-                    }}
+                    onClick={() => hydrateQueryBuilderFromAction(selectedAction)}
                     className="gap-2"
                   >
                     <Settings2 className="h-4 w-4" />
@@ -5115,9 +5273,17 @@ const result = await ductape.database.transaction(
                 {/* Query Template */}
                 <div className="bg-white rounded-lg border border-grey-400 p-4">
                   <Label className="text-sm font-semibold text-grey mb-3 block">Query Template</Label>
-                  <pre className="bg-grey-50 rounded-lg p-4 overflow-x-auto text-sm font-mono text-grey max-h-64 overflow-y-auto">
-                    {JSON.stringify(selectedAction.query, null, 2)}
+                  <pre className="m-0 max-h-80 overflow-auto rounded-md border border-grey-400 bg-grey-50 p-4 text-sm font-mono leading-6 text-grey whitespace-pre-wrap break-words">
+                    <code>{formatQueryTemplate(selectedAction.query)}</code>
                   </pre>
+                  {selectedAction.filterQuery !== undefined && selectedAction.filterQuery !== null && (
+                    <div className="mt-4">
+                      <Label className="text-xs font-medium text-grey mb-2 block">Filter Template</Label>
+                      <pre className="m-0 max-h-64 overflow-auto rounded-md border border-grey-400 bg-grey-50 p-4 text-sm font-mono leading-6 text-grey whitespace-pre-wrap break-words">
+                        <code>{formatQueryTemplate(selectedAction.filterQuery)}</code>
+                      </pre>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
