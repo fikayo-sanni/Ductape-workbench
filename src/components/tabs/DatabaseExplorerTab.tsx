@@ -1511,29 +1511,23 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
 
   // ==================== ACTION MUTATIONS ====================
 
-  // SDK Query for fetching database actions
-  // NOTE: Temporarily disabled due to SDK bug where product tags with colons (e.g., "ductape:rematch")
-  // are incorrectly parsed. The SDK splits on ":" which breaks product tags that contain colons.
-  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery<any[] | null>({
+  // Fetch actions from the database definition itself. This keeps product and
+  // database tags as separate arguments, including product tags containing ':'.
+  const { data: sdkActions, isLoading: isLoadingActions, refetch: refetchActions } = useQuery<any[]>({
     queryKey: ['database-actions', database.productTag, database.tag],
-    queryFn: async (): Promise<any[] | null> => {
-      // TODO: Re-enable once SDK parsing is fixed
-      return null;
-      /*
+    queryFn: async (): Promise<any[]> => {
       if (!databaseService || !database.productTag) {
-        return null;
+        return [];
       }
       try {
-        // action.list expects a database tag in format "product:database"
-        const result = await databaseService.action.list(`${database.productTag}:${database.tag}`);
-        return result;
+        const definition = await databaseService.fetch(database.productTag, database.tag);
+        return Array.isArray(definition?.actions) ? definition.actions : [];
       } catch (error) {
         console.error('Error fetching actions:', error);
-        return null;
+        throw error;
       }
-      */
     },
-    enabled: false, // Disabled until SDK bug is fixed
+    enabled: !!databaseService && !!database.productTag,
     staleTime: 30000,
   });
 
@@ -2495,13 +2489,13 @@ const ductape = new Ductape({
     ];
   };
 
-  // Use SDK actions if available, otherwise fall back to local saved actions
+  // Use persisted actions when loaded, otherwise retain actions created locally.
   const allActions = sdkActions ? sdkActions.map((a: any) => ({
     id: a.tag,
     tag: a.tag,
     name: a.name,
     description: a.description,
-    operation: a.operation,
+    operation: a.operation ?? a.type,
     query: a.template,
     parameters: [],
     createdAt: a.createdAt || new Date().toISOString(),
