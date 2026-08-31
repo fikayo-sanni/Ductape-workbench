@@ -334,13 +334,13 @@ export default function EditAppConnectionModal({
                           const location = value.slice(0, separator) as Field['location'];
                           const key = value.slice(separator + 1);
                           setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, location, key } : item) }));
-                        }}><SelectTrigger><SelectValue placeholder="Select action field" /></SelectTrigger><SelectContent>
+                        }}><SelectTrigger className="min-w-0 overflow-hidden [&>span]:block [&>span]:truncate"><SelectValue placeholder="Select action field" /></SelectTrigger><SelectContent>
                           {!sharedCredentialFields.some(field => field.location === credential.location && field.key === credential.key) && credential.key && <SelectItem value={`${credential.location}:${credential.key}`}>{credential.key} ({credential.location})</SelectItem>}
                           {sharedCredentialFields.map(field => <SelectItem key={`${field.location}:${field.key}`} value={`${field.location}:${field.key}`}>{field.key} ({field.location}){field.actions.length ? ` · ${field.actions.length} action${field.actions.length === 1 ? '' : 's'}` : ''}</SelectItem>)}
                         </SelectContent></Select>
                         <div className="flex gap-1.5 min-w-0">
                           <Select value={credential.value} onValueChange={value => setSharedCredentials(current => ({ ...current, [mapping.product_env_slug]: current[mapping.product_env_slug].map((item, i) => i === credentialIndex ? { ...item, value } : item) }))}>
-                            <SelectTrigger className="min-w-0"><SelectValue placeholder={loadingSecrets ? 'Loading secrets...' : 'Select secret'} /></SelectTrigger>
+                            <SelectTrigger className="min-w-0 overflow-hidden [&>span]:block [&>span]:truncate"><SelectValue placeholder={loadingSecrets ? 'Loading secrets...' : 'Select secret'} /></SelectTrigger>
                             <SelectContent>
                               {credential.value && !/^\$Secret\{[^}]+\}$/.test(credential.value) && <SelectItem value={credential.value}>Current saved value</SelectItem>}
                               {secrets.map(secret => <SelectItem key={secret.key} value={`$Secret{${secret.key}}`}>{secret.key}</SelectItem>)}
