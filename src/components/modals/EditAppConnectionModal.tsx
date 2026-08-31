@@ -25,6 +25,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productTag: string;
+  productId?: string;
   accessTag: string;
   app: any;
   productApp: any;
@@ -86,6 +87,7 @@ export default function EditAppConnectionModal({
   open,
   onOpenChange,
   productTag,
+  productId,
   accessTag,
   app,
   productApp,
@@ -217,8 +219,9 @@ export default function EditAppConnectionModal({
         }
         return next;
       });
-      await productBuilder.init(productTag);
-      await productBuilder.apps.update(accessTag, { envs });
+      const productRef = productId || productTag;
+      await productBuilder.init(productRef);
+      await productBuilder.apps.update(productRef, accessTag, { envs });
       toast.success('App connection updated');
       onSuccess?.();
       onOpenChange(false);

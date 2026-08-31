@@ -2432,6 +2432,7 @@ export default function AppTabContent({
           open={showEditConnectionModal}
           onOpenChange={setShowEditConnectionModal}
           productTag={productTag}
+          productId={productIdForAccess}
           accessTag={accessTag}
           app={currentApp}
           productApp={connectedProductApp}
