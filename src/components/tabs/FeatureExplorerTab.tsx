@@ -54,7 +54,7 @@ import { useWorkbenchStore } from '@/stores/workbench-store';
 import { getTabState, saveTabState } from '@/lib/tab-state-manager';
 import { useAuth } from '@/store/useAuth';
 import {
-  fetchFeatureRuns,
+  fetchFeatureRunsPage,
   mapProcessorResultToFeatureRun,
   shortProcessId,
 } from '@/services/featureRunsService';
@@ -299,7 +299,10 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
   }, [tabId, featureName, productTag, featureTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
 
   const {
-    data: apiRuns = [],
+    data: apiRuns = {
+      data: [],
+      metadata: { total: 0, page: 1, limit: 200, totalPages: 0, statusCounts: { all: 0, running: 0, completed: 0, failed: 0 } },
+    },
     isLoading: isLoadingRuns,
     refetch,
   } = useQuery({
@@ -316,7 +319,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
       // component state made manual refreshes reuse an old end_date, excluding runs
       // created after the explorer was first opened.
       const timeRangeParams = getTimeRangeDates(timeRange);
-      return fetchFeatureRuns({
+      return fetchFeatureRunsPage({
         workspace_id: currentWorkspaceId ?? '',
         user_id: user?._id ?? '',
         public_key: user?.public_key ?? '',
@@ -331,9 +334,10 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
   });
 
   const runs: FeatureRun[] = useMemo(
-    () => apiRuns.map((item, i) => mapProcessorResultToFeatureRun(item, i) as FeatureRun),
+    () => apiRuns.data.map((item, i) => mapProcessorResultToFeatureRun(item, i) as FeatureRun),
     [apiRuns]
   );
+  const serverStatusCounts = apiRuns.metadata.statusCounts;
 
 
   useEffect(() => {
@@ -663,10 +667,10 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
 
               <div className="space-y-0.5">
                 {([
-                  { value: 'all', label: 'All Runs', icon: <LayoutGrid className="h-4 w-4" />, count: runs.length },
-                  { value: 'running', label: 'Running', icon: <Loader2 className="h-4 w-4" />, count: metrics.running },
-                  { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-4 w-4" />, count: metrics.completed },
-                  { value: 'failed', label: 'Failed', icon: <AlertCircle className="h-4 w-4" />, count: metrics.failed },
+                  { value: 'all', label: 'All Runs', icon: <LayoutGrid className="h-4 w-4" />, count: serverStatusCounts.all },
+                  { value: 'running', label: 'Running', icon: <Loader2 className="h-4 w-4" />, count: serverStatusCounts.running },
+                  { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-4 w-4" />, count: serverStatusCounts.completed },
+                  { value: 'failed', label: 'Failed', icon: <AlertCircle className="h-4 w-4" />, count: serverStatusCounts.failed },
                 ] as const).map((status) => (
                   <button
                     key={status.value}

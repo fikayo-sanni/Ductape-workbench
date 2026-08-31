@@ -77,6 +77,12 @@ export interface ILog {
       page: number;
       limit: number;
       totalPages: number;
+      statusCounts?: {
+        all: number;
+        running: number;
+        completed: number;
+        failed: number;
+      };
     };
     data: {
       response: any;

@@ -88,6 +88,19 @@ export interface FeatureRunsQueryParams {
   start_date?: string;
   end_date?: string;
   limit?: number;
+  page?: number;
+}
+
+export interface FeatureRunStatusCounts {
+  all: number;
+  running: number;
+  completed: number;
+  failed: number;
+}
+
+export interface FeatureRunsPage {
+  data: ProcessorResultApiItem[];
+  metadata: { total: number; page: number; limit: number; totalPages: number; statusCounts: FeatureRunStatusCounts };
 }
 
 /** Run/step types used by FeatureExplorerTab and FeatureRunTab */
@@ -293,11 +306,18 @@ export function rawStepsFromRunResult(run: FeatureRunUi): ProcessorResultApiItem
 export const fetchFeatureRuns = async (
   params: FeatureRunsQueryParams
 ): Promise<ProcessorResultApiItem[]> => {
+  return (await fetchFeatureRunsPage(params)).data;
+};
+
+export const fetchFeatureRunsPage = async (
+  params: FeatureRunsQueryParams
+): Promise<FeatureRunsPage> => {
   const query: Record<string, string | number | undefined> = {
     workspace_id: params.workspace_id,
     user_id: params.user_id,
     public_key: params.public_key,
     limit: params.limit ?? 100,
+    page: params.page ?? 1,
   };
   if (params.feature_tag) query.feature_tag = params.feature_tag;
   if (params.feature_id) query.feature_id = params.feature_id;
@@ -314,14 +334,28 @@ export const fetchFeatureRuns = async (
     if (v !== undefined && v !== '') searchParams.set(k, String(v));
   });
 
-  const response = await apiClient.get<{ status?: boolean; data?: ProcessorResultApiItem[] }>(
+  const response = await apiClient.get<{ status?: boolean; data?: ProcessorResultApiItem[]; meta?: FeatureRunsPage['metadata'] }>(
     `/integrations/v1/processor/list?${searchParams.toString()}`
   );
 
   // Backend returns { status: true, data: array }; normalize to array
   const raw = response.data?.data ?? response.data;
   const data = Array.isArray(raw) ? raw : [];
-  return data;
+  return {
+    data,
+    metadata: response.data?.meta ?? {
+      total: data.length,
+      page: params.page ?? 1,
+      limit: params.limit ?? 100,
+      totalPages: 1,
+      statusCounts: {
+        all: data.length,
+        running: data.filter((item) => ['processing', 'running', 'pending'].includes(item.status)).length,
+        completed: data.filter((item) => ['success', 'completed'].includes(item.status)).length,
+        failed: data.filter((item) => ['fail', 'failed', 'error'].includes(item.status)).length,
+      },
+    },
+  };
 };
 
 /**

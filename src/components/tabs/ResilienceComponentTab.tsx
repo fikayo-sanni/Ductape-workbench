@@ -274,11 +274,12 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
     if (value.includes('run') || value.includes('pending')) return 'running';
     return 'completed';
   };
-  const statusCounts = useMemo(() => ({
+  const statusCounts = invocationPages?.pages[0]?.data?.logs?.metadata?.statusCounts ?? {
+    all: invocations.length,
     completed: invocations.filter((item: any) => invocationState(item) === 'completed').length,
     failed: invocations.filter((item: any) => invocationState(item) === 'failed').length,
     running: invocations.filter((item: any) => invocationState(item) === 'running').length,
-  }), [invocations]);
+  };
   const filteredInvocations = useMemo(() => {
     const now = Date.now();
     const ranges: Record<Exclude<TimeRange, 'all'>, number> = { '1h': 3_600_000, '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000 };
@@ -343,7 +344,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               <div className="mt-4 flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold uppercase text-grey-600">Status</span><button type="button" title="Refresh invocations" onClick={() => queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] })}><RefreshCw className="h-3.5 w-3.5 text-grey-500" /></button></div>
               <div className="space-y-0.5">
                 {([
-                  { value: 'all', label: 'All Invocations', icon: List, count: invocations.length },
+                  { value: 'all', label: 'All Invocations', icon: List, count: statusCounts.all },
                   { value: 'running', label: 'Running', icon: Loader2, count: statusCounts.running },
                   { value: 'completed', label: 'Completed', icon: CheckCircle2, count: statusCounts.completed },
                   { value: 'failed', label: 'Failed', icon: XCircle, count: statusCounts.failed },
