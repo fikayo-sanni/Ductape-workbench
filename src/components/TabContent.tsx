@@ -46,6 +46,7 @@ import NewNotificationTabContent from './tabs/NewNotificationTabContent';
 import NotificationTemplateTabContent from './tabs/NotificationTemplateTabContent';
 import NotificationExplorerTab from './tabs/NotificationExplorerTab';
 import ResilienceComponentTab from './tabs/ResilienceComponentTab';
+import ResilienceInvocationTab from './tabs/ResilienceInvocationTab';
 import NewMessageTabContent from './tabs/NewMessageTabContent';
 import MessageTabContent from './tabs/MessageTabContent';
 import NewMessageBrokerTopicContent from './tabs/NewMessageBrokerTopicContent';
@@ -460,6 +461,12 @@ export default function TabContent() {
             workspaceId={tab.data.workspaceId}
           />
         );
+
+      case 'resilience-invocation':
+        if (!tab.data?.invocation) {
+          return <UnavailableFeaturePanel key={tab.id} title="Invocation data unavailable" message="Open this invocation again from its resilience explorer." />;
+        }
+        return <ResilienceInvocationTab key={tab.id} {...tab.data} />;
 
       case 'agent':
         // Check if this is an agent explorer tab

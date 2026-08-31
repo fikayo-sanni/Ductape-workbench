@@ -15,6 +15,7 @@ export type TabType =
   | 'vector'
   | 'feature'
   | 'feature-run'
+  | 'resilience-invocation'
   | 'agent'
   | 'agent-run'
   | 'message-broker'

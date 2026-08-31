@@ -66,7 +66,7 @@ const responseStatuses = [
 
 // Component types mapped to LogEventTypes enum from backend (feature_step displayed as "Step")
 const componentTypes = [
-  { id: 'actions', name: 'Actions', icon: Box },
+  { id: 'actions', name: 'API', icon: Box },
   { id: 'database_actions', name: 'Database Actions', icon: Database },
   { id: 'database', name: 'Database', icon: Database },
   { id: 'graph', name: 'Graph', icon: Share2 },
@@ -92,7 +92,10 @@ const componentTypes = [
   { id: 'frontend', name: 'Frontend', icon: Activity },
 ];
 
-const normalizeLogType = (type: string) => (type || '').toLowerCase().trim();
+const normalizeLogType = (type: string) => {
+  const normalized = (type || '').toLowerCase().trim();
+  return normalized === 'action' ? 'actions' : normalized;
+};
 
 const getLogTypeLabel = (type: string): string => {
   const id = normalizeLogType(type);

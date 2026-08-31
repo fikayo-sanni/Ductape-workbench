@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   CheckCircle2,
+  ChevronRight,
   Code2,
   Gauge,
   HeartPulse,
@@ -99,11 +100,11 @@ function invocationTime(value?: string) {
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function InvocationList({ items, loading, onViewAll }: { items: any[]; loading: boolean; onViewAll?: () => void }) {
+function InvocationList({ items, loading, onViewAll, onOpen }: { items: any[]; loading: boolean; onViewAll?: () => void; onOpen: (item: any) => void }) {
   return (
     <section className="overflow-hidden rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
       <div className="flex items-center justify-between px-5 pb-2 pt-4">
-        <h2 className="text-sm font-semibold text-grey">Past invocations</h2>
+        <h2 className="text-sm font-semibold text-grey">{onViewAll ? 'Recent Invocations' : 'Invocations'}</h2>
         {onViewAll && items.length > 0 ? <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-primary" onClick={onViewAll}>View all</Button> : null}
       </div>
       {loading ? <p className="p-8 text-center text-sm text-grey-500">Loading invocations…</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-grey-500">No invocations recorded for this environment.</p> : (
@@ -114,12 +115,13 @@ function InvocationList({ items, loading, onViewAll }: { items: any[]; loading: 
             const id = item.process_id || item.execution_id || item._id || item.id || `invocation-${index + 1}`;
             const duration = item.duration_ms ?? item.latency ?? item.duration;
             return (
-              <div key={String(id)} className="grid grid-cols-[1fr_120px_140px_100px] items-center gap-4 px-5 py-3 hover:bg-grey-50 dark:hover:bg-grey-400/20">
+              <button type="button" key={String(id)} onClick={() => onOpen(item)} className={cn('grid w-full grid-cols-[1fr_120px_140px_100px_28px] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-grey-50 dark:hover:bg-grey-400/20', failed && 'bg-red/5')}>
                 <div className="flex min-w-0 items-center gap-3"><span className={cn('h-2 w-2 flex-shrink-0 rounded-full', failed ? 'bg-red' : 'bg-green')} /><div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</p><p className="truncate font-mono text-xs text-grey-500">{String(id)}</p></div></div>
                 <span className={cn('text-xs font-medium capitalize', failed ? 'text-red' : 'text-green')}>{state}</span>
                 <span className="text-xs text-grey-500">{item.event || item.action || item.type || '—'}</span>
                 <span className="text-right text-xs tabular-nums text-grey-500">{duration == null ? '—' : typeof duration === 'number' ? `${duration}ms` : String(duration)}</span>
-              </div>
+                <ChevronRight className="h-4 w-4 text-grey-500" />
+              </button>
             );
           })}
         </div>
@@ -129,7 +131,7 @@ function InvocationList({ items, loading, onViewAll }: { items: any[]; loading: 
 }
 
 export default function ResilienceComponentTab({ kind, resource, product, env }: ResilienceComponentTabProps) {
-  const { setSidebarCollapsed } = useWorkbenchStore();
+  const { setSidebarCollapsed, openTab } = useWorkbenchStore();
   const queryClient = useQueryClient();
   const { user, currentWorkspaceId } = useAuth();
   const [view, setView] = useState<View>('overview');
@@ -215,6 +217,24 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
       return true;
     });
   }, [invocations, searchQuery, statusFilter, timeRange]);
+
+  const openInvocation = (item: any) => {
+    const id = String(item.process_id || item.execution_id || item._id || item.id);
+    openTab({
+      id: `resilience-invocation-${kind}-${id}`,
+      type: 'resilience-invocation',
+      title: `Invocation ${invocationTime(item.timestamp || item.created_at || item.startedAt)}`,
+      itemId: id,
+      data: {
+        invocation: item,
+        kind,
+        resourceName: resource.name || resource.tag,
+        resourceTag: resource.tag,
+        productTag: product.tag,
+        env: env.slug,
+      },
+    });
+  };
 
   const generateCodeSections = (language: string) => {
     const prefix = language === 'typescript' ? 'import Ductape from "@ductape/sdk";\n\n' : '';
@@ -320,10 +340,10 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                 </section>
               )}
 
-              <InvocationList items={invocations.slice(0, 5)} loading={invocationsLoading} onViewAll={() => setView('invocations')} />
+              <InvocationList items={invocations.slice(0, 5)} loading={invocationsLoading} onViewAll={() => setView('invocations')} onOpen={openInvocation} />
             </div>
           )}
-          {view === 'invocations' && <div className="mx-auto max-w-6xl"><InvocationList items={filteredInvocations} loading={invocationsLoading} /></div>}
+          {view === 'invocations' && <div className="mx-auto max-w-6xl"><InvocationList items={filteredInvocations} loading={invocationsLoading} onOpen={openInvocation} /></div>}
         </div>
       </main>
 

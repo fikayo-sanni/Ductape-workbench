@@ -298,8 +298,6 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
     };
   }, [tabId, featureName, productTag, featureTag, statusFilter, searchQuery, timeRange, listViewMode, viewMode, executeInput, isSidebarCollapsed]);
 
-  const timeRangeParams = useMemo(() => getTimeRangeDates(timeRange), [timeRange]);
-
   const {
     data: apiRuns = [],
     isLoading: isLoadingRuns,
@@ -311,11 +309,14 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
       featureTag,
       productTag,
       envSlug,
-      timeRangeParams.start_date,
-      timeRangeParams.end_date,
+      timeRange,
     ],
-    queryFn: () =>
-      fetchFeatureRuns({
+    queryFn: () => {
+      // Calculate the rolling window for every request. Keeping concrete dates in
+      // component state made manual refreshes reuse an old end_date, excluding runs
+      // created after the explorer was first opened.
+      const timeRangeParams = getTimeRangeDates(timeRange);
+      return fetchFeatureRuns({
         workspace_id: currentWorkspaceId ?? '',
         user_id: user?._id ?? '',
         public_key: user?.public_key ?? '',
@@ -324,7 +325,8 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
         env: envSlug || undefined,
         ...timeRangeParams,
         limit: 200,
-      }),
+      });
+    },
     enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key),
   });
 
@@ -463,9 +465,16 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetch();
-    setIsRefreshing(false);
-    toast.success('Runs refreshed');
+    try {
+      const result = await refetch({ cancelRefetch: true });
+      if (result.error) throw result.error;
+      toast.success('Runs refreshed');
+    } catch (error) {
+      console.error('[FeatureExplorerTab] Failed to refresh runs', error);
+      toast.error('Failed to refresh runs');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleExecuteFeature = async () => {

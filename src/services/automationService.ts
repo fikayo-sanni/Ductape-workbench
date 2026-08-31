@@ -459,6 +459,11 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
+      'resilience-invocation': {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
       agent: {
         canInspectForms: true,
         canFillForms: true,
@@ -862,6 +867,7 @@ export class AutomationService {
       'session-user': 'Session User',
       feature: 'Feature',
       'feature-run': 'Feature Run',
+      'resilience-invocation': 'Resilience Invocation',
       agent: 'Agent',
       'agent-run': 'Agent Run',
       'notification-explorer': 'Notification Explorer',

@@ -53,6 +53,7 @@ const getTabIcon = (type: Tab['type']) => {
     vector: Boxes,
     feature: Workflow,
     'feature-run': Workflow,
+    'resilience-invocation': Activity,
     agent: Bot,
     'agent-run': Bot,
     'message-broker': MessageSquare,
