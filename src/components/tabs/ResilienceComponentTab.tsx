@@ -234,27 +234,29 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
   const invocationTotal = invocationPages?.pages[0]?.data?.logs?.metadata?.total
     ?? invocationPages?.pages[0]?.metadata?.total
     ?? invocations.length;
+  const invocationAllTotal = invocationPages?.pages[0]?.data?.logs?.metadata?.statusCounts?.all
+    ?? invocationTotal;
   const summary = useMemo(() => {
     if (kind === 'healthcheck') {
       return [
-        { label: 'Checks', value: invocations.length, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
+        { label: 'Checks', value: invocationAllTotal, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
         { label: 'Current status', value: status || 'Unknown', icon: status === 'healthy' ? CheckCircle2 : XCircle, color: status === 'healthy' ? 'text-green' : 'text-red', tint: status === 'healthy' ? 'bg-green/10' : 'bg-red/10' },
         { label: 'Average latency', value: currentEnv?.averageLatency || '—', icon: Gauge, color: 'text-blue', tint: 'bg-blue/10' },
       ];
     }
     if (kind === 'quota') {
       return [
-        { label: 'Invocations', value: invocations.length, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
+        { label: 'Invocations', value: invocationAllTotal, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
         { label: 'Options', value: options.length, icon: List, color: 'text-orange-600', tint: 'bg-orange-500/10' },
         { label: 'Quota units', value: options.reduce((sum: number, option: any) => sum + Number(option.quota || 0), 0), icon: Gauge, color: 'text-green', tint: 'bg-green/10' },
       ];
     }
     return [
-      { label: 'Invocations', value: invocations.length, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
+      { label: 'Invocations', value: invocationAllTotal, icon: Activity, color: 'text-primary', tint: 'bg-primary/10' },
       { label: 'Failover options', value: options.length, icon: List, color: 'text-red', tint: 'bg-red/10' },
       { label: 'Health-gated', value: options.filter((option: any) => option.healthcheck).length, icon: HeartPulse, color: 'text-green', tint: 'bg-green/10' },
     ];
-  }, [currentEnv, invocations.length, kind, options, status]);
+  }, [currentEnv, invocationAllTotal, kind, options, status]);
 
   const optionUsage = useMemo(() => {
     const total = Math.max(invocations.length, 1);

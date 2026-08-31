@@ -317,7 +317,7 @@ export const fetchFeatureRunsPage = async (
     user_id: params.user_id,
     public_key: params.public_key,
     limit: params.limit ?? 100,
-    page: params.page ?? 1,
+    page: params.page,
   };
   if (params.feature_tag) query.feature_tag = params.feature_tag;
   if (params.feature_id) query.feature_id = params.feature_id;
