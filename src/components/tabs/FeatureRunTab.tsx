@@ -130,10 +130,25 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
   const hasRestoredRef = useRef(false);
   const skipNextSaveRef = useRef(true); // skip first save on mount so we don't overwrite restored state
   const hasAlertedDisabledRef = useRef(false);
+  const contentScrollerRef = useRef<HTMLDivElement>(null);
   const { user, currentWorkspaceId: authWorkspaceId } = useAuth();
   const workbenchWorkspaceId = useWorkbenchStore((s) => s.currentWorkspaceId);
   // Same source as FeatureExplorerTab (auth); then workbench; then workspace saved when run tab was opened
   const currentWorkspaceId = authWorkspaceId ?? workbenchWorkspaceId ?? tabWorkspaceId ?? undefined;
+
+  const scrollStepIntoView = (processId: string): void => {
+    requestAnimationFrame(() => {
+      const scroller = contentScrollerRef.current;
+      const row = document.getElementById(`step-row-${processId}`);
+      if (!scroller || !row) return;
+
+      const scrollerRect = scroller.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const rowTop = scroller.scrollTop + rowRect.top - scrollerRect.top;
+      const centeredTop = rowTop - Math.max(0, (scroller.clientHeight - rowRect.height) / 2);
+      scroller.scrollTo({ top: Math.max(0, centeredTop), behavior: 'smooth' });
+    });
+  };
 
   // Restore state from tab state on mount (page refresh / tab switch back)
   useEffect(() => {
@@ -585,7 +600,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div ref={contentScrollerRef} className="flex-1 min-h-0 overflow-auto overscroll-contain">
         <div className="max-w-6xl mx-auto p-6 space-y-6">
           {/* Error Alert */}
           {run.error && (
@@ -648,7 +663,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                           type="button"
                           onClick={() => {
                             toggleStepExpanded(step.process_id);
-                            document.getElementById(`step-row-${step.process_id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            scrollStepIntoView(step.process_id);
                           }}
                           className={cn(
                             'px-4 py-2.5 rounded-lg border text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2',
