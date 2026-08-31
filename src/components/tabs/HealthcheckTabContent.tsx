@@ -56,7 +56,7 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
     );
   }
 
-  const healthy = environment?.status === 'healthy';
+  const healthy = environment?.status === 'healthy' || environment?.status === 'available';
   const latency = parseLatency(environment?.lastLatency || '0ms');
 
   return (

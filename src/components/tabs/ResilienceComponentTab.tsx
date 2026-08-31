@@ -26,8 +26,7 @@ import CodeSidebar from '@/components/CodeSidebar';
 import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
-import { useQueryClient } from '@tanstack/react-query';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { fetchLogs } from '@/services/logsServices';
 
@@ -123,11 +122,20 @@ function invocationAttempts(item: any): any[] {
   return [];
 }
 
-function InvocationList({ items, loading, onViewAll, onOpen }: { items: any[]; loading: boolean; onViewAll?: () => void; onOpen: (item: any) => void }) {
+function InvocationList({ items, loading, onViewAll, onOpen, total, hasMore, loadingMore, onLoadMore }: {
+  items: any[];
+  loading: boolean;
+  onViewAll?: () => void;
+  onOpen: (item: any) => void;
+  total?: number;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+}) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-white dark:bg-background">
       <div className="flex items-center justify-between border-b border-border px-6 py-3">
-        <span className="text-sm text-grey-600">Showing <span className="font-medium text-grey">{items.length}</span> invocations</span>
+        <span className="text-sm text-grey-600">Showing <span className="font-medium text-grey">{items.length}</span>{typeof total === 'number' && total > items.length ? ` of ${total}` : ''} invocations</span>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-background-secondary p-1">
           <button type="button" className="rounded bg-white p-1.5 text-grey shadow-sm dark:bg-background" title="Invocation list"><List className="h-4 w-4" /></button>
           <button type="button" className="rounded p-1.5 text-grey-600" title="Invocation timeline"><BarChart3 className="h-4 w-4" /></button>
@@ -163,6 +171,14 @@ function InvocationList({ items, loading, onViewAll, onOpen }: { items: any[]; l
           })}
         </div>
       )}
+      {hasMore && onLoadMore ? (
+        <div className="flex justify-center border-t border-border px-6 py-4">
+          <Button type="button" variant="outline" size="sm" disabled={loadingMore} onClick={onLoadMore}>
+            {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Load more invocations
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -183,21 +199,41 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
 
   useEffect(() => setSidebarCollapsed(true), [setSidebarCollapsed]);
 
-  const status = kind === 'healthcheck' ? currentEnv?.status : undefined;
+  const rawStatus = kind === 'healthcheck' ? currentEnv?.status : undefined;
+  const status = rawStatus === 'available'
+    ? 'healthy'
+    : rawStatus === 'unavailable'
+      ? 'unhealthy'
+      : rawStatus;
   const options = Array.isArray(resource.options) ? resource.options : [];
   const input = useMemo(() => exampleInput(resource), [resource]);
-  const { data: invocations = [], isLoading: invocationsLoading } = useQuery({
+  const {
+    data: invocationPages,
+    isLoading: invocationsLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: ['resilience-invocations', kind, currentWorkspaceId, product.tag, resource.tag, env.slug],
-    queryFn: async () => {
-      const response = await fetchLogs(
+    queryFn: ({ pageParam }) => fetchLogs(
         { workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key },
-        { product_tag: product.tag, parent_tag: resource.tag, env: env.slug, type: kind, limit: 100, page: 1, only_completed_execution: true },
-      );
-      return response.data?.logs?.data || [];
+        { product_tag: product.tag, parent_tag: resource.tag, env: env.slug, type: kind, limit: 100, page: pageParam, only_completed_execution: true },
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const metadata = lastPage.data?.logs?.metadata ?? lastPage.metadata;
+      return metadata && metadata.page < metadata.totalPages ? metadata.page + 1 : undefined;
     },
     enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key && product.tag && resource.tag),
     staleTime: 30_000,
   });
+  const invocations = useMemo(
+    () => invocationPages?.pages.flatMap((page) => page.data?.logs?.data || []) ?? [],
+    [invocationPages],
+  );
+  const invocationTotal = invocationPages?.pages[0]?.data?.logs?.metadata?.total
+    ?? invocationPages?.pages[0]?.metadata?.total
+    ?? invocations.length;
   const summary = useMemo(() => {
     if (kind === 'healthcheck') {
       return [
@@ -380,7 +416,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               <InvocationList items={invocations.slice(0, 5)} loading={invocationsLoading} onViewAll={() => setView('invocations')} onOpen={openInvocation} />
             </div>
           )}
-          {view === 'invocations' && <div className="mx-auto max-w-6xl"><InvocationList items={filteredInvocations} loading={invocationsLoading} onOpen={openInvocation} /></div>}
+          {view === 'invocations' && <div className="mx-auto max-w-6xl"><InvocationList items={filteredInvocations} loading={invocationsLoading} onOpen={openInvocation} total={invocationTotal} hasMore={hasNextPage} loadingMore={isFetchingNextPage} onLoadMore={() => void fetchNextPage()} /></div>}
         </div>
       </main>
 
