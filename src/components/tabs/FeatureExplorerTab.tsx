@@ -337,7 +337,12 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
     () => apiRuns.data.map((item, i) => mapProcessorResultToFeatureRun(item, i) as FeatureRun),
     [apiRuns]
   );
-  const serverStatusCounts = apiRuns.metadata.statusCounts;
+  const serverStatusCounts = apiRuns.metadata?.statusCounts ?? {
+    all: runs.length,
+    running: runs.filter((run) => run.status === 'running').length,
+    completed: runs.filter((run) => run.status === 'completed').length,
+    failed: runs.filter((run) => run.status === 'failed' || run.status === 'timeout').length,
+  };
 
 
   useEffect(() => {
