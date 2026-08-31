@@ -8,6 +8,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   Calendar,
+  BarChart3,
   Loader2,
   List,
   PanelLeft,
@@ -100,27 +101,63 @@ function invocationTime(value?: string) {
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+function invocationDuration(value: unknown) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms)) return '—';
+  return ms < 1_000 ? `${Math.round(ms)}ms` : `${(ms / 1_000).toFixed(2)}s`;
+}
+
+function invocationAttempts(item: any): any[] {
+  const candidates = [item?.data, item?.result, item?.data?.result, item?.result?.details, item?.data?.result?.details];
+  for (const candidate of candidates) {
+    let value = candidate;
+    if (typeof value === 'string') {
+      try { value = JSON.parse(value); } catch { continue; }
+    }
+    const providers = value?.details?.providers || value?.providers;
+    if (Array.isArray(providers)) {
+      const attempts = providers.flatMap((provider: any) => Array.isArray(provider?.attempts) ? provider.attempts : [provider]);
+      if (attempts.length) return attempts;
+    }
+  }
+  return [];
+}
+
 function InvocationList({ items, loading, onViewAll, onOpen }: { items: any[]; loading: boolean; onViewAll?: () => void; onOpen: (item: any) => void }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
-      <div className="flex items-center justify-between px-5 pb-2 pt-4">
-        <h2 className="text-sm font-semibold text-grey">{onViewAll ? 'Recent Invocations' : 'Invocations'}</h2>
-        {onViewAll && items.length > 0 ? <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-primary" onClick={onViewAll}>View all</Button> : null}
+    <section className="overflow-hidden rounded-lg border border-border bg-white dark:bg-background">
+      <div className="flex items-center justify-between border-b border-border px-6 py-3">
+        <span className="text-sm text-grey-600">Showing <span className="font-medium text-grey">{items.length}</span> invocations</span>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-background-secondary p-1">
+          <button type="button" className="rounded bg-white p-1.5 text-grey shadow-sm dark:bg-background" title="Invocation list"><List className="h-4 w-4" /></button>
+          <button type="button" className="rounded p-1.5 text-grey-600" title="Invocation timeline"><BarChart3 className="h-4 w-4" /></button>
+        </div>
       </div>
-      {loading ? <p className="p-8 text-center text-sm text-grey-500">Loading invocations…</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-grey-500">No invocations recorded for this environment.</p> : (
-        <div className="divide-y divide-grey-200">
+      {onViewAll && items.length > 0 ? <div className="flex justify-end border-b border-border px-6 py-2"><Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={onViewAll}>View all invocations</Button></div> : null}
+      <div className="sticky top-0 z-10 border-b border-border bg-background-secondary">
+        <div className="grid grid-cols-[1fr,120px,140px,120px,100px,180px,40px] gap-4 px-6 py-3 text-xs font-medium uppercase tracking-wider text-grey-600">
+          <div>Invocation</div><div>Status</div><div>Trigger</div><div>Started</div><div>Duration</div><div>Progress</div><div />
+        </div>
+      </div>
+      {loading ? <p className="p-8 text-center text-sm text-grey-500">Loading invocations…</p> : items.length === 0 ? <div className="flex flex-col items-center justify-center py-16 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-border"><Search className="h-6 w-6 text-grey-500" /></div><p className="font-medium text-grey">No invocations found</p><p className="mt-1 text-sm text-grey-500">Try adjusting your filters</p></div> : (
+        <div className="divide-y divide-border">
           {items.map((item, index) => {
             const state = String(item.status || item.outcome || (item.error ? 'failed' : 'completed')).toLowerCase();
             const failed = state.includes('fail') || state.includes('error');
+            const running = state.includes('run') || state.includes('pending');
             const id = item.process_id || item.execution_id || item._id || item.id || `invocation-${index + 1}`;
             const duration = item.duration_ms ?? item.latency ?? item.duration;
+            const attempts = invocationAttempts(item);
+            const completed = attempts.filter((attempt) => !attempt.error && !attempt.message).length;
             return (
-              <button type="button" key={String(id)} onClick={() => onOpen(item)} className={cn('grid w-full grid-cols-[1fr_120px_140px_100px_28px] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-grey-50 dark:hover:bg-grey-400/20', failed && 'bg-red/5')}>
-                <div className="flex min-w-0 items-center gap-3"><span className={cn('h-2 w-2 flex-shrink-0 rounded-full', failed ? 'bg-red' : 'bg-green')} /><div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</p><p className="truncate font-mono text-xs text-grey-500">{String(id)}</p></div></div>
-                <span className={cn('text-xs font-medium capitalize', failed ? 'text-red' : 'text-green')}>{state}</span>
-                <span className="text-xs text-grey-500">{item.event || item.action || item.type || '—'}</span>
-                <span className="text-right text-xs tabular-nums text-grey-500">{duration == null ? '—' : typeof duration === 'number' ? `${duration}ms` : String(duration)}</span>
-                <ChevronRight className="h-4 w-4 text-grey-500" />
+              <button type="button" key={String(id)} onClick={() => onOpen(item)} className={cn('grid w-full grid-cols-[1fr,120px,140px,120px,100px,180px,40px] items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-background-secondary', running && 'bg-primary/5', failed && 'bg-red/5')}>
+                <div className="flex min-w-0 items-center gap-3"><span className={cn('h-2 w-2 flex-shrink-0 rounded-full', failed ? 'bg-red' : running ? 'bg-primary' : 'bg-green')} /><div className="min-w-0"><p className="truncate font-semibold text-grey">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</p><p className="truncate font-mono text-xs text-grey-700">{String(id).slice(0, 8)}{String(id).length > 8 ? '…' : ''}</p></div></div>
+                <div><span className={cn('inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium capitalize', failed ? 'border-red/20 bg-red/10 text-red' : running ? 'border-primary/20 bg-primary/10 text-primary' : 'border-green/20 bg-green/10 text-green')}>{failed ? <XCircle className="h-3 w-3" /> : running ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}{state}</span></div>
+                <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><span className="truncate text-sm capitalize text-grey">{item.event || item.action || item.type || 'API'}</span></div>
+                <span className="text-sm text-grey-600">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</span>
+                <span className="font-mono text-sm text-grey-600">{invocationDuration(duration)}</span>
+                <div className="flex items-center gap-2"><div className="flex flex-1 gap-[3px]">{(attempts.length ? attempts : [item]).map((attempt, attemptIndex) => <span key={attemptIndex} className={cn('h-1.5 flex-1 rounded-full', attempt.error || attempt.message ? 'bg-red' : running ? 'bg-primary animate-pulse' : 'bg-green')} />)}</div><span className="w-10 text-right text-xs tabular-nums text-grey-700">{attempts.length ? `${completed}/${attempts.length}` : '1/1'}</span></div>
+                <div className="flex justify-end"><ChevronRight className="h-4 w-4 text-grey-500" /></div>
               </button>
             );
           })}
