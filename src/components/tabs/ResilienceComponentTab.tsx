@@ -412,7 +412,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               {kind === 'healthcheck' && currentEnv && (
                 <section className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
                   <h2 className="text-sm font-semibold text-grey">Latest probe</h2>
-                  <div className="mt-4"><JsonViewer data={currentEnv.response ?? currentEnv.payload ?? { status: status || 'unknown' }} /></div>
+                  <div className="mt-4"><JsonViewer data={currentEnv.response ?? currentEnv.payload ?? { status: status || 'unknown', ...(currentEnv.lastError ? { error: currentEnv.lastError } : {}) }} /></div>
                 </section>
               )}
 
