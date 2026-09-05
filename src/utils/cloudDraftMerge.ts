@@ -250,9 +250,14 @@ export function mergeGraphEnvFromDraft(
     if (typeof draftEnv.importExisting === 'boolean') {
       next.importExisting = draftEnv.importExisting;
     }
-    if (draftEnv.importExisting && draftEnv.credentialsStored) {
+    if (draftEnv.credentialsStored === true && draftEnv.importExisting) {
       next.credentialsStored = true;
+      delete next.masterPassword;
+    } else if (draftEnv.masterPassword && draftEnv.importExisting) {
+      next.masterPassword = String(draftEnv.masterPassword);
+      next.credentialsStored = false;
     } else if (draftEnv.importExisting === false) {
+      delete next.masterPassword;
       delete next.credentialsStored;
     }
     return next;

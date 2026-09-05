@@ -337,6 +337,19 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       }
     }
 
+    for (const env of envConnections) {
+      if (
+        databaseType === 'graph' &&
+        env.importExisting &&
+        env.cloud?.trim() &&
+        !env.credentialsStored &&
+        !env.masterPassword?.trim()
+      ) {
+        toast.error(`Enter the Aura instance password for ${env.env_name}`);
+        return;
+      }
+    }
+
     // Cloud-linked envs and workspace secret refs are resolved on save — skip URL format checks.
     for (const env of envConnections) {
       if (env.cloud?.trim() || env.linkedFromCloud) {
@@ -431,7 +444,16 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 if (env.securityGroups?.length) envConfig.securityGroups = env.securityGroups;
                 if (env.importExisting) {
                   envConfig.importExisting = true;
-                  if (env.credentialsStored) envConfig.credentialsStored = true;
+                  if (env.credentialsStored) {
+                    envConfig.credentialsStored = true;
+                  } else if (env.masterPassword?.trim()) {
+                    // Graph envs use `password` as their canonical credential field (matching
+                    // IProductGraphEnvs / materializeCloudLinkedGraphEnv's env.password read) —
+                    // databases use `masterPassword` for the same concept. `masterPassword` here
+                    // is only this form's internal field name for the password the user typed;
+                    // it must be translated to `password` in the outgoing graph payload.
+                    envConfig.password = env.masterPassword.trim();
+                  }
                 }
                 if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
               } else {
