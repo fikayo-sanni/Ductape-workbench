@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import CloudLinkPanel from '@/components/cloud/CloudLinkPanel';
 import OverageLimitBanner from '@/components/billing/OverageLimitBanner';
 import { isSecretRef, shouldHideManualCloudCredentials, mergeDatabaseEnvFromDraft, mergeGraphEnvFromDraft, mergeVectorEnvFromDraft } from '@/utils/cloudDraftMerge';
+import { useResourceSettlingStore } from '@/stores/resource-settling-store';
 
 interface InlineDatabaseFormProps {
   product: {
@@ -66,6 +67,7 @@ interface EnvConnection {
 export default function InlineDatabaseForm({ product, databaseType, onCancel, onSuccess }: InlineDatabaseFormProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
+  const markSettling = useResourceSettlingStore((state) => state.markSettling);
 
   // Proxy configuration
   const proxyConfig = product?.workspace_id && user?._id
@@ -255,6 +257,16 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       const cloudProvisioning = (variables.envs as Array<{ cloud?: string; linkedFromCloud?: boolean; importExisting?: boolean }>).some(
         (env) => (env.cloud || (env as any).linkedFromCloud) && !(env as any).importExisting,
       );
+      // Cloud-linked resources — provisioned OR imported — get a short settling window before
+      // connect is allowed, even when `provisionStatus` never reports "provisioning" (the import
+      // path: an existing cluster/instance is linked and the create call returns success
+      // immediately, but the connection-URL secret write can still lag a few seconds behind).
+      const isCloudLinked = (variables.envs as Array<{ cloud?: string; linkedFromCloud?: boolean }>).some(
+        (env) => env.cloud || (env as any).linkedFromCloud,
+      );
+      if (isCloudLinked) {
+        markSettling(databaseType, variables.tag);
+      }
       toast.success(
         cloudProvisioning
           ? `${getTypeTitle()} saved — cloud instances are provisioning (typically 10–15 min)`

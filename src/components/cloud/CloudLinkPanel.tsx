@@ -186,6 +186,7 @@ export default function CloudLinkPanel({
   const [provisionDbName, setProvisionDbName] = useState('');
   const [selectedSecurityGroups, setSelectedSecurityGroups] = useState<string[]>([]);
   const [existingDbPassword, setExistingDbPassword] = useState('');
+  const [existingGraphPassword, setExistingGraphPassword] = useState('');
   const [mongoDbName, setMongoDbName] = useState('');
   const [graphDatabase, setGraphDatabase] = useState('');
 
@@ -327,6 +328,16 @@ export default function CloudLinkPanel({
     (service === 'rds' || service === 'cloudsql' || service === 'postgresql' || service === 'mysql') &&
     !selectedResourceHasStoredCredentials;
 
+  // Aura shows the auto-generated database password only once, at instance creation, in the Aura
+  // console — it is never retrievable via the Aura API afterward, so linking an existing instance
+  // always needs it supplied manually here (unless it was already linked through Ductape before,
+  // same as the RDS/CloudSQL/self-hosted case above).
+  const needsExistingGraphPassword =
+    componentType === 'graphs' &&
+    Boolean(resourceId) &&
+    service === 'aura-instance' &&
+    !selectedResourceHasStoredCredentials;
+
   const applyStorageDraft = (draftEnv: Record<string, unknown>) => {
     const merged = mergeDraftForComponent(componentType, draftEnv);
     onDraftApplied(
@@ -405,6 +416,7 @@ export default function CloudLinkPanel({
     instance?: string;
     region?: string;
     securityGroups?: string[];
+    masterPassword?: string;
     importExisting?: boolean;
     credentialsStored?: boolean;
     database?: string;
@@ -413,10 +425,14 @@ export default function CloudLinkPanel({
     const instance = overrides?.instance ?? (resourceId || provisionName || '');
     const tags = overrides?.securityGroups ?? selectedSecurityGroups;
     const linkingExisting = overrides?.importExisting ?? Boolean(resourceId);
+    // Aura never reports stored credentials the way Atlas does (Atlas can mint/rotate a database
+    // user via its Admin API; Aura's one-time password can't be retrieved after instance creation)
+    // — so unlike databases' atlas-cluster case, aura-instance always falls through to the same
+    // selectedResourceHasStoredCredentials check as every other manually-credentialed provider.
     const credentialsStored =
-      overrides?.credentialsStored ??
-      (service === 'aura-instance' ? true : linkingExisting ? selectedResourceHasStoredCredentials : false);
+      overrides?.credentialsStored ?? (linkingExisting ? selectedResourceHasStoredCredentials : false);
     const db = overrides?.database ?? graphDatabase;
+    const password = overrides?.masterPassword ?? existingGraphPassword;
     applyStorageDraft({
       cloud: selectedConnection.tag,
       linkedFromCloud: true,
@@ -425,6 +441,7 @@ export default function CloudLinkPanel({
       importExisting: linkingExisting,
       credentialsStored: linkingExisting && credentialsStored,
       ...(db ? { database: db } : {}),
+      ...(linkingExisting && password && !credentialsStored ? { masterPassword: password } : {}),
       ...autoSecurityGroupsDraft(tags),
     });
   };
@@ -887,6 +904,39 @@ export default function CloudLinkPanel({
           </p>
         </div>
       ) : selectedResourceHasStoredCredentials && componentType === 'databases' && resourceId ? (
+        <p className="text-xs text-emerald-700 leading-relaxed rounded-md border border-emerald-500/25 bg-emerald-500/5 p-3">
+          Credentials for this instance are already in workspace secrets from a previous Ductape
+          link — no password needed.
+        </p>
+      ) : null}
+
+      {needsExistingGraphPassword ? (
+        <div className="space-y-1.5">
+          <Label htmlFor={`existing-graph-password-${envSlug}`}>Database password</Label>
+          <Input
+            id={`existing-graph-password-${envSlug}`}
+            type="password"
+            className="mt-0 bg-white"
+            value={existingGraphPassword}
+            onChange={(e) => {
+              setExistingGraphPassword(e.target.value);
+              notifyGraphCloudSelection({
+                masterPassword: e.target.value,
+                importExisting: true,
+                credentialsStored: false,
+              });
+            }}
+            placeholder="Aura instance password"
+            autoComplete="new-password"
+          />
+          <p className="text-xs text-grey-600 leading-relaxed">
+            Aura shows this password only once, when the instance was created, and it can't be
+            retrieved again afterward — enter it here to link this instance. The username is
+            always "neo4j" for Aura and doesn't need to be entered. Stored as a workspace secret
+            on save.
+          </p>
+        </div>
+      ) : selectedResourceHasStoredCredentials && componentType === 'graphs' && resourceId ? (
         <p className="text-xs text-emerald-700 leading-relaxed rounded-md border border-emerald-500/25 bg-emerald-500/5 p-3">
           Credentials for this instance are already in workspace secrets from a previous Ductape
           link — no password needed.

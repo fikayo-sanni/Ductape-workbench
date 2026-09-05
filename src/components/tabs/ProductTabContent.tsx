@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {useWorkbenchStore} from '@/stores/workbench-store';
+import {useResourceSettlingStore} from '@/stores/resource-settling-store';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
@@ -218,6 +219,10 @@ export default function ProductTabContent({
   const {user, currentWorkspaceId} = useAuth();
   const queryClient = useQueryClient();
   const hasRestoredStateRef = useRef(false);
+  // Subscribing to the whole map (not a per-item selector) is deliberate: resource cards are
+  // rendered from a plain closure (renderResourceCard), not their own components, so this is what
+  // makes the component re-render when a settling window starts or clears.
+  const settlingMap = useResourceSettlingStore((state) => state.settling);
 
   // Load persisted state from tab state manager
   const getPersistedState = () => {
@@ -1208,10 +1213,18 @@ export default function ProductTabContent({
     const isLoadingApp =
       category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
     const isActive = item.status === 'active' || item.active;
+    const isResourceSettling =
+      ['database', 'graph', 'vector'].includes(item._resourceType) &&
+      !!item.tag &&
+      (() => {
+        const expiresAt = settlingMap[`${item._resourceType}:${item.tag}`];
+        return expiresAt !== undefined && expiresAt > Date.now();
+      })();
     const isCloudProvisioning =
-      ['database', 'graph', 'vector', 'messageBroker'].includes(item._resourceType) &&
-      (item.provisionStatus === 'provisioning' ||
-        item.envs?.some((env: { provisionStatus?: string }) => env.provisionStatus === 'provisioning'));
+      isResourceSettling ||
+      (['database', 'graph', 'vector', 'messageBroker'].includes(item._resourceType) &&
+        (item.provisionStatus === 'provisioning' ||
+          item.envs?.some((env: { provisionStatus?: string }) => env.provisionStatus === 'provisioning')));
     const isCloudProvisionFailed =
       ['database', 'graph', 'vector', 'messageBroker'].includes(item._resourceType) &&
       (item.provisionStatus === 'failed' ||
