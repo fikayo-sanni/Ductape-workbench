@@ -64,6 +64,16 @@ interface EnvConnection {
   dbName?: string;
 }
 
+/** DT-039 trace: shows presence/shape of a possibly-sensitive value, never the plaintext. */
+function redact(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  const str = String(value);
+  if (!str) return 'empty-string';
+  const isSecretRef = str.startsWith('$Secret{') && str.endsWith('}');
+  return `len=${str.length}${isSecretRef ? ' isSecretRef=true' : ''} preview="${str.slice(0, 4)}..."`;
+}
+
 export default function InlineDatabaseForm({ product, databaseType, onCancel, onSuccess }: InlineDatabaseFormProps) {
   const { user, currentWorkspaceId } = useAuth();
   const queryClient = useQueryClient();
@@ -212,6 +222,17 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       // Use appropriate proxy based on database type
       if (databaseType === 'graph') {
         if (!graphProxy) throw new Error('Graph proxy not initialized');
+        console.log('[DT-039-TRACE] InlineDatabaseForm final graph.create() payload:', {
+          envs: values.envs.map((e: any) => ({
+            slug: e.slug,
+            cloud: e.cloud,
+            instance: e.instance,
+            importExisting: e.importExisting,
+            credentialsStored: e.credentialsStored,
+            password: redact(e.password),
+            username: redact(e.username),
+          })),
+        });
         return await graphProxy.graph.create({
           product: product.tag,
           name: values.name,
@@ -456,6 +477,14 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   }
                 }
                 if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
+                console.log('[DT-039-TRACE] InlineDatabaseForm.handleSave envConfig (cloud branch):', {
+                  slug: env.slug,
+                  envMasterPassword: redact(env.masterPassword),
+                  envCredentialsStored: env.credentialsStored,
+                  envImportExisting: env.importExisting,
+                  envConfigPassword: redact(envConfig.password),
+                  envConfigCredentialsStored: envConfig.credentialsStored,
+                });
               } else {
                 envConfig.connection_url = env.connection_url;
                 if (env.username?.trim()) envConfig.username = env.username;
@@ -729,6 +758,13 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                               draft as Record<string, unknown>,
                             ) as Partial<EnvConnection>),
                           };
+                          if (databaseType === 'graph') {
+                            console.log('[DT-039-TRACE] InlineDatabaseForm.onDraftApplied result:', {
+                              slug: env.slug,
+                              masterPassword: redact((updated[index] as any).masterPassword),
+                              credentialsStored: (updated[index] as any).credentialsStored,
+                            });
+                          }
                           setEnvConnections(updated);
                           if (draft.graphType && databaseType === 'graph') {
                             setFormData((prev) => ({ ...prev, type: String(draft.graphType) }));

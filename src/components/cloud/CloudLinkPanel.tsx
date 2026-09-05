@@ -117,6 +117,16 @@ const PROVISIONABLE_SERVICES = new Set([
   'vertex-vector-search',
 ]);
 
+/** DT-039 trace: shows presence/shape of a possibly-sensitive value, never the plaintext. */
+function redact(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  const str = String(value);
+  if (!str) return 'empty-string';
+  const isSecretRef = str.startsWith('$Secret{') && str.endsWith('}');
+  return `len=${str.length}${isSecretRef ? ' isSecretRef=true' : ''} preview="${str.slice(0, 4)}..."`;
+}
+
 function mergeDraftForComponent(
   componentType: CloudComponentKind,
   draftEnv: Record<string, unknown>,
@@ -340,6 +350,12 @@ export default function CloudLinkPanel({
 
   const applyStorageDraft = (draftEnv: Record<string, unknown>) => {
     const merged = mergeDraftForComponent(componentType, draftEnv);
+    if (componentType === 'graphs') {
+      console.log('[DT-039-TRACE] CloudLinkPanel.applyStorageDraft (post mergeDraftForComponent):', {
+        inputMasterPassword: redact(draftEnv.masterPassword),
+        mergedMasterPassword: redact(merged.masterPassword),
+      });
+    }
     onDraftApplied(
       componentType === 'storage' ? { ...merged, linkedFromCloud: true } : merged,
     );
@@ -433,7 +449,7 @@ export default function CloudLinkPanel({
       overrides?.credentialsStored ?? (linkingExisting ? selectedResourceHasStoredCredentials : false);
     const db = overrides?.database ?? graphDatabase;
     const password = overrides?.masterPassword ?? existingGraphPassword;
-    applyStorageDraft({
+    const draft = {
       cloud: selectedConnection.tag,
       linkedFromCloud: true,
       instance,
@@ -443,7 +459,14 @@ export default function CloudLinkPanel({
       ...(db ? { database: db } : {}),
       ...(linkingExisting && password && !credentialsStored ? { masterPassword: password } : {}),
       ...autoSecurityGroupsDraft(tags),
+    };
+    console.log('[DT-039-TRACE] CloudLinkPanel.notifyGraphCloudSelection draft:', {
+      linkingExisting,
+      credentialsStored,
+      passwordSource: overrides?.masterPassword !== undefined ? 'override' : 'existingGraphPassword state',
+      masterPassword: redact(draft.masterPassword),
     });
+    applyStorageDraft(draft);
   };
 
   useEffect(() => {

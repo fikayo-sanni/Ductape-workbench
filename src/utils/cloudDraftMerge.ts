@@ -4,6 +4,15 @@ export function isSecretRef(value: unknown): boolean {
   return typeof value === 'string' && value.startsWith('$Secret{');
 }
 
+/** DT-039 trace: shows presence/shape of a possibly-sensitive value, never the plaintext. */
+function redact(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  const str = String(value);
+  if (!str) return 'empty-string';
+  return `len=${str.length}${isSecretRef(str) ? ' isSecretRef=true' : ''} preview="${str.slice(0, 4)}..."`;
+}
+
 /** Hide manual credential fields once a cloud connection has been chosen. */
 export function shouldHideManualCloudCredentials(env: {
   cloud?: string;
@@ -260,6 +269,14 @@ export function mergeGraphEnvFromDraft(
       delete next.masterPassword;
       delete next.credentialsStored;
     }
+    console.log('[DT-039-TRACE] mergeGraphEnvFromDraft output:', {
+      slug: env.slug,
+      draftEnvMasterPassword: redact(draftEnv.masterPassword),
+      draftEnvImportExisting: draftEnv.importExisting,
+      draftEnvCredentialsStored: draftEnv.credentialsStored,
+      nextMasterPassword: redact(next.masterPassword),
+      nextCredentialsStored: next.credentialsStored,
+    });
     return next;
   }
   return {
