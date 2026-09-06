@@ -269,6 +269,15 @@ export function mergeGraphEnvFromDraft(
       delete next.masterPassword;
       delete next.credentialsStored;
     }
+    // username is no longer assumed to always be "neo4j" — see notifyGraphCloudSelection's
+    // comment. Same set/clear shape as masterPassword: an explicit value from the user overrides
+    // the backend's "neo4j" default; clearing the field or leaving cloud linking drops it, letting
+    // that default apply again rather than persisting a stale override.
+    if (draftEnv.username && draftEnv.importExisting) {
+      next.username = String(draftEnv.username);
+    } else if (!draftEnv.username || draftEnv.importExisting === false) {
+      delete next.username;
+    }
     console.log('[DT-039-TRACE] mergeGraphEnvFromDraft output:', {
       slug: env.slug,
       draftEnvMasterPassword: redact(draftEnv.masterPassword),
@@ -276,6 +285,7 @@ export function mergeGraphEnvFromDraft(
       draftEnvCredentialsStored: draftEnv.credentialsStored,
       nextMasterPassword: redact(next.masterPassword),
       nextCredentialsStored: next.credentialsStored,
+      nextUsername: next.username,
     });
     return next;
   }

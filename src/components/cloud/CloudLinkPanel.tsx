@@ -197,6 +197,7 @@ export default function CloudLinkPanel({
   const [selectedSecurityGroups, setSelectedSecurityGroups] = useState<string[]>([]);
   const [existingDbPassword, setExistingDbPassword] = useState('');
   const [existingGraphPassword, setExistingGraphPassword] = useState('');
+  const [existingGraphUsername, setExistingGraphUsername] = useState('');
   const [mongoDbName, setMongoDbName] = useState('');
   const [graphDatabase, setGraphDatabase] = useState('');
 
@@ -433,6 +434,7 @@ export default function CloudLinkPanel({
     region?: string;
     securityGroups?: string[];
     masterPassword?: string;
+    username?: string;
     importExisting?: boolean;
     credentialsStored?: boolean;
     database?: string;
@@ -449,6 +451,10 @@ export default function CloudLinkPanel({
       overrides?.credentialsStored ?? (linkingExisting ? selectedResourceHasStoredCredentials : false);
     const db = overrides?.database ?? graphDatabase;
     const password = overrides?.masterPassword ?? existingGraphPassword;
+    // No longer assumed to always be "neo4j" — live-tested and confirmed at least one real Aura
+    // instance uses a different database username instead. Left blank, the backend still defaults
+    // to "neo4j"; this only overrides that default when the user tells us otherwise.
+    const username = overrides?.username ?? existingGraphUsername;
     const draft = {
       cloud: selectedConnection.tag,
       linkedFromCloud: true,
@@ -458,6 +464,7 @@ export default function CloudLinkPanel({
       credentialsStored: linkingExisting && credentialsStored,
       ...(db ? { database: db } : {}),
       ...(linkingExisting && password && !credentialsStored ? { masterPassword: password } : {}),
+      ...(linkingExisting && username && !credentialsStored ? { username } : {}),
       ...autoSecurityGroupsDraft(tags),
     };
     console.log('[DT-039-TRACE] CloudLinkPanel.notifyGraphCloudSelection draft:', {
@@ -465,6 +472,7 @@ export default function CloudLinkPanel({
       credentialsStored,
       passwordSource: overrides?.masterPassword !== undefined ? 'override' : 'existingGraphPassword state',
       masterPassword: redact(draft.masterPassword),
+      username: draft.username,
     });
     applyStorageDraft(draft);
   };
@@ -935,6 +943,27 @@ export default function CloudLinkPanel({
 
       {needsExistingGraphPassword ? (
         <div className="space-y-1.5">
+          <Label htmlFor={`existing-graph-username-${envSlug}`}>Database username</Label>
+          <Input
+            id={`existing-graph-username-${envSlug}`}
+            className="mt-0 bg-white"
+            value={existingGraphUsername}
+            onChange={(e) => {
+              setExistingGraphUsername(e.target.value);
+              notifyGraphCloudSelection({
+                username: e.target.value,
+                importExisting: true,
+                credentialsStored: false,
+              });
+            }}
+            placeholder="neo4j (leave blank for the default)"
+            autoComplete="off"
+          />
+          <p className="text-xs text-grey-600 leading-relaxed">
+            Most Aura instances use "neo4j" — leave this blank to use that default. Only set it
+            if you know this instance uses a different database username, or if a previous attempt
+            with the default failed to authenticate.
+          </p>
           <Label htmlFor={`existing-graph-password-${envSlug}`}>Database password</Label>
           <Input
             id={`existing-graph-password-${envSlug}`}
@@ -954,9 +983,8 @@ export default function CloudLinkPanel({
           />
           <p className="text-xs text-grey-600 leading-relaxed">
             Aura shows this password only once, when the instance was created, and it can't be
-            retrieved again afterward — enter it here to link this instance. The username is
-            always "neo4j" for Aura and doesn't need to be entered. Stored as a workspace secret
-            on save.
+            retrieved again afterward — enter it here to link this instance. Stored as a workspace
+            secret on save.
           </p>
         </div>
       ) : selectedResourceHasStoredCredentials && componentType === 'graphs' && resourceId ? (

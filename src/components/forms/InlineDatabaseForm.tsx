@@ -467,22 +467,32 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   envConfig.importExisting = true;
                   if (env.credentialsStored) {
                     envConfig.credentialsStored = true;
-                  } else if (env.masterPassword?.trim()) {
-                    // Graph envs use `password` as their canonical credential field (matching
-                    // IProductGraphEnvs / materializeCloudLinkedGraphEnv's env.password read) —
-                    // databases use `masterPassword` for the same concept. `masterPassword` here
-                    // is only this form's internal field name for the password the user typed;
-                    // it must be translated to `password` in the outgoing graph payload.
-                    envConfig.password = env.masterPassword.trim();
+                  } else {
+                    if (env.masterPassword?.trim()) {
+                      // Graph envs use `password` as their canonical credential field (matching
+                      // IProductGraphEnvs / materializeCloudLinkedGraphEnv's env.password read) —
+                      // databases use `masterPassword` for the same concept. `masterPassword` here
+                      // is only this form's internal field name for the password the user typed;
+                      // it must be translated to `password` in the outgoing graph payload.
+                      envConfig.password = env.masterPassword.trim();
+                    }
+                    // username is no longer assumed to always be "neo4j" (see CloudLinkPanel) —
+                    // only set it when the user actually typed an override; leaving it unset lets
+                    // the backend's "neo4j" default apply, same as before this field existed.
+                    if (env.username?.trim()) {
+                      envConfig.username = env.username.trim();
+                    }
                   }
                 }
                 if (env.iamAuth !== undefined) envConfig.iamAuth = env.iamAuth;
                 console.log('[DT-039-TRACE] InlineDatabaseForm.handleSave envConfig (cloud branch):', {
                   slug: env.slug,
                   envMasterPassword: redact(env.masterPassword),
+                  envUsername: env.username,
                   envCredentialsStored: env.credentialsStored,
                   envImportExisting: env.importExisting,
                   envConfigPassword: redact(envConfig.password),
+                  envConfigUsername: envConfig.username,
                   envConfigCredentialsStored: envConfig.credentialsStored,
                 });
               } else {
