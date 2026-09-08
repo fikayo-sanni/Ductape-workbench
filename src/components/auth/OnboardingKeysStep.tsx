@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ArrowRight, Check, Copy, Eye, EyeOff, Key, Loader, Shield } from 'lucide-react';
+import { ArrowRight, Check, Copy, Eye, EyeOff, Key, Loader, RotateCcw, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import tokensServices from '@/services/tokensServices';
 
@@ -96,6 +95,7 @@ export default function OnboardingKeysStep({ workspaceId, onContinue }: Onboardi
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(60);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const fetchPublishableKey = useCallback(async () => {
@@ -170,25 +170,42 @@ export default function OnboardingKeysStep({ workspaceId, onContinue }: Onboardi
     );
   };
 
+  const sendOtp = async (resent = false) => {
+    if (sendingOtp) return;
+
+    setSendingOtp(true);
+    try {
+      await tokensServices.getTwoFA({
+        user_id: user?._id ?? '',
+        public_key: user?.public_key ?? '',
+      });
+      toast.success(resent ? 'A new verification code was sent' : 'Verification code sent to your email');
+      setOtpSent(true);
+      setShowOtpDialog(true);
+      setSecondsLeft(60);
+      if (resent) {
+        setOtpValues(['', '', '', '', '', '']);
+      }
+    } catch (error) {
+      toast.error(resent ? 'Failed to resend verification code.' : 'Failed to send verification code.');
+      console.error('Error sending OTP:', error);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
   const handleRequestOtp = async () => {
     if (otpSent) {
       setShowOtpDialog(true);
       return;
     }
 
-    try {
-      await tokensServices.getTwoFA({
-        user_id: user?._id ?? '',
-        public_key: user?.public_key ?? '',
-      });
-      toast.success('Verification code sent to your email');
-      setOtpSent(true);
-      setShowOtpDialog(true);
-      setSecondsLeft(60);
-    } catch (error) {
-      toast.error('Failed to send verification code.');
-      console.error('Error sending OTP:', error);
-    }
+    await sendOtp();
+  };
+
+  const handleResendOtp = () => {
+    if (secondsLeft > 0 || sendingOtp) return;
+    void sendOtp(true);
   };
 
   const handleVerifyOtp = async () => {
@@ -369,12 +386,31 @@ export default function OnboardingKeysStep({ workspaceId, onContinue }: Onboardi
               )}
             </Button>
 
-            <p className="text-center text-sm text-grey-600">
-              Resend available in{' '}
-              <span className={cn('font-semibold', secondsLeft > 0 ? 'text-primary' : 'text-grey')}>
-                {secondsLeft > 0 ? formatTime(secondsLeft) : 'now'}
-              </span>
-            </p>
+            <div className="flex flex-col items-center gap-2 text-sm text-grey-600">
+              {secondsLeft > 0 ? (
+                <p>
+                  Resend available in{' '}
+                  <span className="font-semibold text-primary">{formatTime(secondsLeft)}</span>
+                </p>
+              ) : (
+                <p>Didn&apos;t receive the code?</p>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleResendOtp}
+                disabled={secondsLeft > 0 || sendingOtp}
+                className="gap-2 text-primary"
+              >
+                {sendingOtp ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+                {sendingOtp ? 'Sending…' : 'Resend code'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
