@@ -73,6 +73,7 @@ import InlineNotifierForm from '@/components/forms/InlineNotifierForm';
 import CodeSidebar from '@/components/CodeSidebar';
 import {saveTabState, getTabState} from '@/lib/tab-state-manager';
 import { resolveProductAppAccessTag } from '@/utils/productAppAccess';
+import ProductObservabilityContent from './ProductObservabilityContent';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -83,6 +84,7 @@ interface ProductTabContentProps {
 // Resource category types for sidebar
 type ResourceCategory =
   | 'overview'
+  | 'observability'
   | 'apps'
   | 'environments'
   | 'databases'
@@ -2593,6 +2595,10 @@ export default function ProductTabContent({
       return renderOverview();
     }
 
+    if (activeCategory === 'observability') {
+      return <ProductObservabilityContent product={product} />;
+    }
+
     // Handle environments separately (not a resource)
     if (activeCategory === 'environments') {
       return renderCategoryContent(environmentsConfig);
@@ -2735,6 +2741,22 @@ export default function ProductTabContent({
                 >
                   {product?.envs?.length || 0}
                 </span>
+              </button>
+            </div>
+
+            {/* Product-level observability belongs above the resource catalogue. */}
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => handleCategoryChange('observability')}
+                className={cn(
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
+                  activeCategory === 'observability'
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-grey hover:bg-grey-100',
+                )}
+              >
+                <BarChart3 className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'observability' ? 'text-primary' : 'text-grey-600')} />
+                <span className="flex-1 text-left">Observability</span>
               </button>
             </div>
 

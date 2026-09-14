@@ -28,6 +28,12 @@ interface NewHealthcheckTabContentProps {
   tabId?: string;
 }
 
+const DEFAULT_INTERVAL_SECONDS: Record<string, number> = {
+  cache: 60, database: 60,
+  app: 120, feature: 120, graph: 120, vector: 120, events: 120, message_broker: 120,
+  storage: 300, notification: 300,
+};
+
 export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheckTabContentProps) {
   const { closeTab, openTab } = useWorkbenchStore();
   const { user, currentWorkspaceId } = useAuth();
@@ -52,7 +58,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       name: '',
       tag: '',
       description: '',
-      interval: '60', // Default: 60 seconds
+      interval: String(DEFAULT_INTERVAL_SECONDS.app),
       retries: 1,
       type: 'app', // Default type
       selectedApp: '',
@@ -488,13 +494,13 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   id="interval"
                   type="number"
                   min="1"
-                  placeholder="60"
+                  placeholder={String(DEFAULT_INTERVAL_SECONDS[formData.type] ?? 120)}
                   value={formData.interval}
                   onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
                   className="mt-2"
                 />
                 <p className="text-xs text-grey-600 mt-1">
-                  How often to perform the health check (in seconds)
+                  Probe-aware default: {DEFAULT_INTERVAL_SECONDS[formData.type] ?? 120}s. Override it for the target's SLO or provider limits.
                 </p>
               </div>
 
@@ -506,19 +512,19 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleIntervalPreset(30)}
+                    onClick={() => handleIntervalPreset(60)}
                     className="text-xs"
                   >
-                    30 seconds
+                    1 minute
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleIntervalPreset(60)}
+                    onClick={() => handleIntervalPreset(120)}
                     className="text-xs"
                   >
-                    1 minute
+                    2 minutes
                   </Button>
                   <Button
                     type="button"
@@ -584,7 +590,11 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                 </Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value) => setFormData({
+                    ...formData,
+                    type: value,
+                    interval: String(DEFAULT_INTERVAL_SECONDS[value] ?? 120),
+                  })}
                 >
                   <SelectTrigger className="mt-2">
                     <SelectValue />

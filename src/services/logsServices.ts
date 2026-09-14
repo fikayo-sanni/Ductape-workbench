@@ -67,6 +67,36 @@ export const fetchLogs = async (
   return response.data;
 };
 
+export interface ProductObservabilityQuery {
+  env?: string;
+  component?: string;
+  status?: 'success' | 'fail' | 'processing';
+  feature_tag?: string;
+  function_tag?: string;
+  session_id?: string;
+  process_id?: string;
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const fetchProductObservability = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  product_tag: string,
+  query: ProductObservabilityQuery = {},
+): Promise<any> => {
+  const queryString = qs.stringify(Object.fromEntries(Object.entries({
+    user_id, public_key, ...query,
+  }).filter(([, value]) => value !== undefined && value !== null)));
+  const response = await apiClient.get(
+    `/log/v1/products/${encodeURIComponent(product_tag)}/observability/${workspace_id}?${queryString}`,
+  );
+  return response.data.data;
+};
+
 // Session Dashboard Types
 export interface SessionDashboardQuery {
   product_tag: string;
