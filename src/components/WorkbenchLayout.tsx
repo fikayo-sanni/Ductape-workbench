@@ -34,7 +34,7 @@ function WorkbenchShell() {
 
   return (
     <>
-      <div data-testid="workbench-shell" className="flex flex-col h-screen bg-grey-100 overflow-hidden">
+      <div data-testid="workbench-shell" className="flex flex-col h-screen h-dvh bg-grey-100 overflow-hidden">
         <WorkbenchHeader />
 
         <div className="flex flex-1 min-h-0 overflow-hidden">

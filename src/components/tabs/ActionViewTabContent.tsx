@@ -1630,10 +1630,10 @@ println!("Action result: {:?}", result);`
         <div className="bg-white border-b border-grey-400 p-4 flex-shrink-0">
           {/* Environment Selector - Top Row */}
           {environments.length > 0 && (
-            <div className="flex items-center justify-between mb-3 pb-3 border-b border-grey-200">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3 pb-3 border-b border-grey-200">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <Label className="text-xs font-medium text-grey-700">Environment</Label>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   {customEnvs.map((env) => {
                     const originalEnv = environments.find((e: any) => e.slug === env.slug);
                     const isUpdating = updatingEnvSlugs.has(env.slug);
@@ -1657,13 +1657,13 @@ println!("Action result: {:?}", result);`
                 </div>
               </div>
               {baseUrl && (
-                <span className="text-xs text-grey-500 font-mono">{baseUrl}</span>
+                <span className="min-w-0 max-w-full truncate text-xs text-grey-500 font-mono">{baseUrl}</span>
               )}
             </div>
           )}
 
           {/* URL Input Row */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
             {/* Method Selector */}
             <Select
               value={formData.method}
@@ -1684,7 +1684,7 @@ println!("Action result: {:?}", result);`
             </Select>
 
             {/* URL Display */}
-            <div className="flex-1">
+            <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">
               <Input
                 placeholder={baseUrl ? "Full URL" : "Select an environment to see full URL"}
                 value={fullUrl}
@@ -1697,7 +1697,7 @@ println!("Action result: {:?}", result);`
             <Button
               onClick={handleTest}
               disabled={isLoadingRequest || !fullUrl || !baseUrl}
-              className="bg-primary text-white hover:bg-primary/90 h-10 px-6"
+              className="ml-auto md:ml-0 bg-primary text-white hover:bg-primary/90 h-10 px-4 md:px-6"
             >
               <Send className="h-4 w-4 mr-2" />
               {isLoadingRequest ? 'Sending...' : 'Send'}
@@ -2119,7 +2119,7 @@ println!("Action result: {:?}", result);`
 
       {/* Documentation Sidebar */}
       {showDocsSidebar && selectedActionForDocs && (
-        <div className="fixed top-0 right-0 h-full w-[500px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
+        <div className="fixed top-0 right-0 h-full w-full sm:w-[500px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
           <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
               <BookOpen className="w-5 h-5" />

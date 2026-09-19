@@ -1234,14 +1234,14 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
     <div className="h-full overflow-hidden bg-grey-100 flex flex-col relative">
       {/* Header Bar */}
       <div className="bg-white border-b border-grey-400 flex-shrink-0">
-        <div className="px-4 py-3 flex items-center gap-3">
+        <div className="px-4 py-3 flex flex-wrap items-center gap-3">
           {/* Method Badge */}
           <span className={cn('px-2 py-1 rounded text-xs font-bold', getMethodColor(formData.method))}>
             {formData.method}
           </span>
 
           {/* Request Name */}
-          <h2 className="text-lg font-semibold text-grey truncate flex-1">
+          <h2 className="text-lg font-semibold text-grey truncate flex-1 min-w-[6rem]">
             New Request
           </h2>
 
@@ -1289,10 +1289,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
         <div className="bg-white border-b border-grey-400 p-4 flex-shrink-0">
           {/* Environment Selector - Top Row */}
           {environments.length > 0 && (
-            <div className="flex items-center justify-between mb-3 pb-3 border-b border-grey-200">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3 pb-3 border-b border-grey-200">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <Label className="text-xs font-medium text-grey-700">Environment</Label>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   {customEnvs.map((env) => {
                     const originalEnv = environments.find((e: any) => e.slug === env.slug);
                     const isUpdating = updatingEnvSlugs.has(env.slug);
@@ -1316,13 +1316,13 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                 </div>
               </div>
               {baseUrl && (
-                <span className="text-xs text-grey-500 font-mono">{baseUrl}</span>
+                <span className="min-w-0 max-w-full truncate text-xs text-grey-500 font-mono">{baseUrl}</span>
               )}
             </div>
           )}
 
           {/* URL Input Row */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
             {/* Method Selector */}
             <Select
               value={formData.method}
@@ -1345,7 +1345,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
             </Select>
 
             {/* URL Input */}
-            <div className="flex-1">
+            <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">
               <Input
                 placeholder="https://api.example.com/v1/users"
                 value={fullUrl}
@@ -1360,7 +1360,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="bg-green text-white hover:bg-green/90 h-10 px-6"
+                className="ml-auto md:ml-0 bg-green text-white hover:bg-green/90 h-10 px-4 md:px-6"
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1373,7 +1373,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
               <Button
                 onClick={handleTest}
                 disabled={isLoadingRequest || !fullUrl}
-                className="bg-primary text-white hover:bg-primary/90 h-10 px-6"
+                className="ml-auto md:ml-0 bg-primary text-white hover:bg-primary/90 h-10 px-4 md:px-6"
               >
                 <Send className="h-4 w-4 mr-2" />
                 {isLoadingRequest ? "Sending..." : "Send"}

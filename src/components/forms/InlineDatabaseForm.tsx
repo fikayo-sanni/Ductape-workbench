@@ -559,11 +559,11 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-3 md:p-6">
       <div className="max-w-3xl mx-auto space-y-6 pb-24">
         <OverageLimitBanner assetType={databaseType} />
         {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
@@ -578,7 +578,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 {getTypeIcon()}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-grey">Create New {getTypeTitle()}</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-grey">Create New {getTypeTitle()}</h1>
                 <p className="text-sm text-grey-600">
                   Adding to {product.name}
                 </p>
@@ -588,7 +588,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -909,7 +909,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   {/* Neo4j specific fields */}
                   {!hideManualCredentials && formData.type === 'neo4j' && (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor={`username-${index}`}>Username</Label>
                           <Input
@@ -947,7 +947,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
 
                   {/* Memgraph specific fields */}
                   {!hideManualCredentials && formData.type === 'memgraph' && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor={`username-${index}`}>Username</Label>
                         <Input

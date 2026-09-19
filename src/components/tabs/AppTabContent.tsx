@@ -35,9 +35,11 @@ import {
   Box,
   ArrowLeft,
   Copy,
+  Menu,
 } from 'lucide-react';
 import {Link} from 'react-router-dom';
 import {cn} from '@/lib/utils';
+import {useIsMobile} from '@/hooks/useIsMobile';
 import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {useAuth} from '@/store/useAuth';
@@ -193,7 +195,10 @@ export default function AppTabContent({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     persistedState?.isSidebarCollapsed || false,
   );
-
+  // Phones get an off-canvas drawer instead of the inline (resizable) sidebar / icon rail.
+  const isMobile = useIsMobile();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const collapsed = isSidebarCollapsed && !isMobile;
   // State for creating a new action inline (instead of opening a new tab)
   const [isCreatingAction, setIsCreatingAction] = useState(false);
   const [newActionFolderId, setNewActionFolderId] = useState<string | null>(
@@ -204,6 +209,23 @@ export default function AppTabContent({
   // State for creating a new webhook inline
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
   const [isImportingWebhooks, setIsImportingWebhooks] = useState(false);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [
+    sidebarView,
+    selectedAction?.tag,
+    selectedWebhook?.tag,
+    isCreatingAction,
+    isCreatingWebhook,
+  ]);
+  const mobileSectionLabel = isCreatingAction
+    ? 'New action'
+    : selectedAction
+      ? selectedAction.name || selectedAction.tag || 'Action'
+      : selectedWebhook
+        ? selectedWebhook.name || selectedWebhook.tag || 'Webhook'
+        : ({overview: 'Overview', environments: 'Environments', webhooks: 'Webhooks', actions: 'Actions'} as Record<string, string>)[sidebarView] || 'Overview';
 
   // Resizable sidebar state
   const [sidebarWidth, setSidebarWidth] = useState<number>(
@@ -774,7 +796,7 @@ export default function AppTabContent({
     return (
       <div className="relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100">
         {/* Sidebar Skeleton */}
-        <div className="w-64 bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden">
+        <div className="hidden md:flex w-64 bg-white border-r border-grey-400 flex-col flex-shrink-0 min-h-0 overflow-hidden">
           <div className="p-4 border-b border-grey-400">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 bg-grey-300 rounded-lg animate-pulse" />
@@ -792,7 +814,7 @@ export default function AppTabContent({
           </div>
         </div>
         {/* Main Content Skeleton */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 md:p-6">
           <div className="h-32 bg-grey-200 rounded-lg animate-pulse mb-4" />
           <div className="h-64 bg-grey-200 rounded-lg animate-pulse" />
         </div>
@@ -1113,13 +1135,13 @@ export default function AppTabContent({
       <div className="h-full overflow-auto bg-grey-50">
         {/* Header Section */}
         <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
+          <div className="max-w-6xl mx-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3 md:gap-4">
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
                   <Globe className="h-6 w-6 text-blue-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="text-xl font-bold text-grey">Environments</h1>
                   <p className="text-sm text-grey-500">
                     {envsLength}{' '}
@@ -1144,7 +1166,7 @@ export default function AppTabContent({
         </div>
 
         {/* Content Section */}
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-4 md:px-6 md:py-6">
           {envsLength > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {envs.map((env: any) => {
@@ -1469,10 +1491,10 @@ export default function AppTabContent({
       >
         <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
           {/* Dashboard Header */}
-          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex min-w-0 items-start gap-3 md:gap-4">
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
                   {currentApp?.logo ? (
                     <img
                       src={currentApp?.logo}
@@ -1483,8 +1505,8 @@ export default function AppTabContent({
                     <BarChart3 className="h-6 w-6 text-white" />
                   )}
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-grey mb-2">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-grey mb-2 break-words">
                     {isProductView
                       ? `${currentApp?.app_name} in ${productDisplayName}`
                       : `${currentApp?.app_name} Dashboard`}
@@ -1558,7 +1580,7 @@ export default function AppTabContent({
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-row flex-wrap items-center gap-2 md:flex-col md:items-end">
                 {/* Version Selector */}
                 {currentApp?.versions && currentApp?.versions.length > 0 && (
                   <Select
@@ -1639,7 +1661,7 @@ export default function AppTabContent({
           </div>
 
           {isProductView && (
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h2 className="text-lg font-semibold text-grey">Product environments</h2>
                 {accessTag && connectedProductApp && (
@@ -1745,9 +1767,9 @@ export default function AppTabContent({
             className="bg-white dark:bg-background border-grey-300 dark:border-grey-400"
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             {/* Requests by Method */}
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-grey">
                   Requests by Method
@@ -1819,7 +1841,7 @@ export default function AppTabContent({
             </div>
 
             {/* Top Endpoints */}
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-grey">
                   Top Endpoints
@@ -1848,7 +1870,7 @@ export default function AppTabContent({
                   {topEndpoints.map((endpoint: any, index: number) => (
                     <div
                       key={endpoint.tag || index}
-                      className="flex items-center justify-between p-3 bg-grey-100 dark:bg-grey-500 rounded-lg hover:bg-grey-200 transition-colors cursor-pointer"
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 p-3 bg-grey-100 dark:bg-grey-500 rounded-lg hover:bg-grey-200 transition-colors cursor-pointer"
                       onClick={() => {
                         const action = selectedVersion?.actions?.find(
                           (a: any) =>
@@ -1858,10 +1880,10 @@ export default function AppTabContent({
                         if (action) handleSelectAction(action);
                       }}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         <span
                           className={cn(
-                            'px-1.5 py-0.5 rounded text-[10px] font-bold',
+                            'flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold',
                             getMethodColor(endpoint.method),
                           )}
                         >
@@ -1871,7 +1893,7 @@ export default function AppTabContent({
                           {endpoint.name}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-grey-600">
+                      <div className="flex flex-shrink-0 items-center gap-4 whitespace-nowrap text-xs text-grey-600">
                         <span>{endpoint.calls.toLocaleString()} calls</span>
                         <span className="text-grey-400">|</span>
                         <span>{endpoint.avgLatency}</span>
@@ -1902,7 +1924,7 @@ export default function AppTabContent({
           </div>
 
           {/* Environment Status for workspace-owned App definitions */}
-          {!isProductView && <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6">
+          {!isProductView && <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold text-grey">
                 {isProductView ? 'Product environments' : 'Environment Status'}
@@ -2033,12 +2055,26 @@ export default function AppTabContent({
         'relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100',
       )}
     >
-      {/* Sidebar */}
+      {/* Mobile drawer backdrop */}
+      {isMobile && isMobileNavOpen && (
+        <div
+          className="absolute inset-0 z-30 bg-black/40"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - off-canvas drawer on phones, inline (resizable / icon rail) from md up */}
       <div
         ref={sidebarRef}
-        style={{width: isSidebarCollapsed ? '56px' : `${sidebarWidth}px`}}
+        style={isMobile ? undefined : {width: collapsed ? '56px' : `${sidebarWidth}px`}}
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0 z-49',
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0',
+          isMobile
+            ? cn(
+                'z-40 w-72 max-w-[85%]',
+                isMobileNavOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full',
+              )
+            : 'z-49',
           isResizing && 'transition-none',
         )}
       >
@@ -2046,19 +2082,19 @@ export default function AppTabContent({
         <div
           className={cn(
             'flex-shrink-0 border-b border-grey-400',
-            isSidebarCollapsed ? 'p-2' : 'p-3',
+            collapsed ? 'p-2' : 'p-3',
           )}
         >
           <div
             className={cn(
               'flex items-center',
-              isSidebarCollapsed ? 'justify-center' : 'gap-2',
+              collapsed ? 'justify-center' : 'gap-2',
             )}
           >
             {/* App Logo */}
             <button
               onClick={() => {
-                if (isSidebarCollapsed) {
+                if (collapsed) {
                   setIsSidebarCollapsed(false);
                 } else {
                   setSidebarView('overview');
@@ -2070,10 +2106,10 @@ export default function AppTabContent({
               }}
               className={cn(
                 'rounded-lg bg-green/10 flex items-center justify-center text-green font-semibold flex-shrink-0 transition-all hover:ring-2 hover:ring-primary/50',
-                isSidebarCollapsed ? 'w-8 h-8 text-sm' : 'w-9 h-9 text-sm',
+                collapsed ? 'w-8 h-8 text-sm' : 'w-9 h-9 text-sm',
               )}
               title={
-                isSidebarCollapsed ? 'Expand sidebar' : 'Return to overview'
+                collapsed ? 'Expand sidebar' : 'Return to overview'
               }
             >
               {currentApp?.logo ? (
@@ -2086,7 +2122,7 @@ export default function AppTabContent({
                 getInitials(String(currentApp?.app_name))
               )}
             </button>
-            {!isSidebarCollapsed && (
+            {!collapsed && (
               <>
                 <button
                   onClick={() => {
@@ -2107,9 +2143,13 @@ export default function AppTabContent({
                   </p>
                 </button>
                 <button
-                  onClick={() => setIsSidebarCollapsed(true)}
+                  onClick={() =>
+                    isMobile
+                      ? setIsMobileNavOpen(false)
+                      : setIsSidebarCollapsed(true)
+                  }
                   className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
-                  title="Collapse sidebar"
+                  title={isMobile ? 'Close menu' : 'Collapse sidebar'}
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
@@ -2139,12 +2179,12 @@ export default function AppTabContent({
                   !isCreatingWebhook
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-grey hover:bg-grey-100',
-                isSidebarCollapsed && 'justify-center px-2',
+                collapsed && 'justify-center px-2',
               )}
-              title={isSidebarCollapsed ? 'Overview' : undefined}
+              title={collapsed ? 'Overview' : undefined}
             >
               <Home className="h-4 w-4 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>Overview</span>}
+              {!collapsed && <span>Overview</span>}
             </button>
           </div>
 
@@ -2163,10 +2203,10 @@ export default function AppTabContent({
                 sidebarView === 'environments'
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-grey hover:bg-grey-100',
-                isSidebarCollapsed && 'justify-center px-2',
+                collapsed && 'justify-center px-2',
               )}
               title={
-                isSidebarCollapsed ? `Environments (${envsCount})` : undefined
+                collapsed ? `Environments (${envsCount})` : undefined
               }
             >
               <Globe
@@ -2177,7 +2217,7 @@ export default function AppTabContent({
                     : 'text-grey-600',
                 )}
               />
-              {!isSidebarCollapsed && (
+              {!collapsed && (
                 <>
                   <span className="flex-1 text-left">Environments</span>
                   <span
@@ -2212,10 +2252,10 @@ export default function AppTabContent({
                 sidebarView === 'webhooks'
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-grey hover:bg-grey-100',
-                isSidebarCollapsed && 'justify-center px-2',
+                collapsed && 'justify-center px-2',
               )}
               title={
-                isSidebarCollapsed ? `Webhooks (${webhooksEventsCount} events)` : undefined
+                collapsed ? `Webhooks (${webhooksEventsCount} events)` : undefined
               }
             >
               <Webhook
@@ -2224,7 +2264,7 @@ export default function AppTabContent({
                   sidebarView === 'webhooks' ? 'text-primary' : 'text-grey-600',
                 )}
               />
-              {!isSidebarCollapsed && (
+              {!collapsed && (
                 <>
                   <span className="flex-1 text-left">Webhooks</span>
                   <span
@@ -2246,7 +2286,7 @@ export default function AppTabContent({
           <div className="px-2 mb-1">
             <button
               onClick={() => {
-                if (isSidebarCollapsed) {
+                if (collapsed) {
                   setIsSidebarCollapsed(false);
                 }
               }}
@@ -2255,11 +2295,11 @@ export default function AppTabContent({
                 selectedAction
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-grey hover:bg-grey-100',
-                isSidebarCollapsed && 'justify-center px-2',
-                !isSidebarCollapsed && 'hidden',
+                collapsed && 'justify-center px-2',
+                !collapsed && 'hidden',
               )}
               title={
-                isSidebarCollapsed ? `Actions (${actionsCount})` : undefined
+                collapsed ? `Actions (${actionsCount})` : undefined
               }
             >
               <Zap
@@ -2272,7 +2312,7 @@ export default function AppTabContent({
           </div>
 
           {/* Actions Section - Resource style like Products (only shown when expanded) */}
-          {!isSidebarCollapsed && (
+          {!collapsed && (
             <div className="px-2 mt-3">
               {/* Actions Header */}
               <div className="flex items-center justify-between mb-2">
@@ -2350,7 +2390,7 @@ export default function AppTabContent({
           )}
 
           {/* Expand button - only shown when collapsed */}
-          {isSidebarCollapsed && (
+          {collapsed && (
             <div className="px-2 mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
@@ -2364,7 +2404,7 @@ export default function AppTabContent({
         </div>
 
         {/* Resizer Handle */}
-        {!isSidebarCollapsed && (
+        {!collapsed && !isMobile && (
           <div
             onMouseDown={startResizing}
             className={cn(
@@ -2391,10 +2431,25 @@ export default function AppTabContent({
                     : 'overview'
         }
         className={cn(
-          'flex-1 flex flex-col min-h-0 overflow-hidden bg-grey-50 transition-all duration-300',
-          isSidebarCollapsed ? 'ml-12 sm:ml-14' : 'ml-0 sm:ml-64',
+          'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-grey-50 transition-all duration-300',
+          collapsed ? 'md:ml-14' : 'md:ml-64',
         )}
       >
+        {isMobile && (
+          <div className="flex h-11 flex-shrink-0 items-center gap-2 border-b border-grey-400 bg-white px-3">
+            <button
+              onClick={() => setIsMobileNavOpen(true)}
+              className="-ml-1 rounded p-1.5 text-grey-600 hover:bg-grey-100 hover:text-grey"
+              aria-label="Open app menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1 truncate text-sm">
+              <span className="font-medium text-grey">{currentApp?.app_name}</span>
+              <span className="text-grey-500"> / {mobileSectionLabel}</span>
+            </div>
+          </div>
+        )}
         {isCreatingAction ? (
           <RequestBuilder
             tabId={inlineActionTabId}

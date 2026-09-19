@@ -376,11 +376,11 @@ export default function InlineMessageBrokerForm({
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-3 md:p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         <OverageLimitBanner assetType="message-broker" />
         {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -394,14 +394,14 @@ export default function InlineMessageBrokerForm({
               <MessageSquare className="h-6 w-6 text-purple-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-grey">Create New Messaging</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-grey">Create New Messaging</h1>
               <p className="text-sm text-grey-600">Adding to {product.name}</p>
             </div>
           </div>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -467,7 +467,7 @@ export default function InlineMessageBrokerForm({
                 const hideManualCredentials = shouldHideManualCloudCredentials(env);
 
                 return (
-                <div key={env.slug} className="border border-grey-400 rounded-lg p-6 space-y-4 bg-grey-50">
+                <div key={env.slug} className="border border-grey-400 rounded-lg p-4 md:p-6 space-y-4 bg-grey-50">
                   <div className="flex items-center justify-between mb-4 pb-4 border-b border-grey-400">
                     <div>
                       <h4 className="font-semibold text-grey">{env.env_name}</h4>
@@ -524,7 +524,7 @@ export default function InlineMessageBrokerForm({
                   {/* Redis Configuration */}
                   {env.type === "REDIS" && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`redisHost-${index}`} className="required">Host</Label>
                           <Input
@@ -679,7 +679,7 @@ export default function InlineMessageBrokerForm({
                           className="mt-2"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`kafkaClientId-${index}`} className="required">Client ID</Label>
                           <Input
@@ -736,7 +736,7 @@ export default function InlineMessageBrokerForm({
                           </Select>
                         </div>
                         {env.kafkaSaslMechanism && (
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label htmlFor={`kafkaSaslUsername-${index}`} className="required">Username</Label>
                               <Input
@@ -808,7 +808,7 @@ export default function InlineMessageBrokerForm({
                           </Button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`gcpClientEmail-${index}`} className="required">Client Email</Label>
                           <Input
@@ -859,7 +859,7 @@ export default function InlineMessageBrokerForm({
                           NATS server URLs (e.g., nats://localhost:4222)
                         </p>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`natsUser-${index}`}>Username</Label>
                           <Input

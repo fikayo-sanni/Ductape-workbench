@@ -399,11 +399,11 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
   const isFormComplete = isStep1Complete && isStep2Complete;
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-3 md:p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         <OverageLimitBanner assetType="notifier" />
         {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -417,14 +417,14 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
               <Bell className="h-6 w-6 text-red" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-grey">Create New Notifier</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-grey">Create New Notifier</h1>
               <p className="text-sm text-grey-600">Adding to {product.name}</p>
             </div>
           </div>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm space-y-6">
           {Object.keys(fieldErrors).length > 0 && (
             <div className="p-3 rounded-lg bg-red/10 border border-red/30 text-sm text-red" role="alert">
               <span className="font-medium">Please fix the following:</span>

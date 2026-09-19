@@ -34,8 +34,10 @@ import {
   Home,
   FileText,
   Trash2,
+  Menu,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {useIsMobile} from '@/hooks/useIsMobile';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {useResourceSettlingStore} from '@/stores/resource-settling-store';
 import {Button} from '@/components/ui/button';
@@ -275,6 +277,14 @@ export default function ProductTabContent({
     persistedState?.isSidebarCollapsed || false,
   );
   const [isSidebarRefreshing, setIsSidebarRefreshing] = useState(false);
+  // Phones get an off-canvas drawer instead of the inline sidebar / icon rail.
+  const isMobile = useIsMobile();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const collapsed = isSidebarCollapsed && !isMobile;
+  const mobileSectionLabel =
+    ({overview: 'Overview', environments: 'Environments', observability: 'Observability'} as Record<string, string>)[activeCategory] ||
+    resourceCategories.find((c) => c.id === activeCategory)?.label ||
+    'Overview';
   // Which notification card is expanded to show templates inline (tag or null)
   const [expandedNotificationTag, setExpandedNotificationTag] = useState<
     string | null
@@ -289,6 +299,7 @@ export default function ProductTabContent({
   const handleCategoryChange = (category: ResourceCategory) => {
     setInlineCreateMode(null);
     setActiveCategory(category);
+    setIsMobileNavOpen(false);
   };
 
   // Persist sidebar state to tab state manager
@@ -2614,32 +2625,43 @@ export default function ProductTabContent({
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100">
-      {/* Sidebar - Responsive widths */}
+      {/* Mobile drawer backdrop */}
+      {isMobile && isMobileNavOpen && (
+        <div
+          className="absolute inset-0 z-30 bg-black/40"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - off-canvas drawer on phones, inline (or icon rail) from md up */}
       <div
         className={cn(
-          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0 z-25',
-          isSidebarCollapsed
-            ? 'w-12 sm:w-14' // Smaller on mobile, standard on tablet/desktop
-            : 'w-56 sm:w-64', // Slightly narrower on mobile
+          'bg-white border-r border-grey-400 flex flex-col flex-shrink-0 min-h-0 overflow-hidden transition-all duration-300 absolute inset-y-0 left-0',
+          isMobile
+            ? cn(
+                'z-40 w-72 max-w-[85%]',
+                isMobileNavOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full',
+              )
+            : cn('z-25', collapsed ? 'w-14' : 'w-64'),
         )}
       >
         {/* Header - Responsive padding */}
         <div
           className={cn(
             'flex-shrink-0 border-b border-grey-400',
-            isSidebarCollapsed ? 'p-1.5 sm:p-2' : 'p-2 sm:p-3',
+            collapsed ? 'p-1.5 sm:p-2' : 'p-2 sm:p-3',
           )}
         >
           <div
             className={cn(
               'flex items-center',
-              isSidebarCollapsed ? 'justify-center' : 'gap-1.5 sm:gap-2',
+              collapsed ? 'justify-center' : 'gap-1.5 sm:gap-2',
             )}
           >
             {/* Product Logo - Responsive sizing */}
             <button
               onClick={() => {
-                if (isSidebarCollapsed) {
+                if (collapsed) {
                   setIsSidebarCollapsed(false);
                 } else {
                   handleCategoryChange('overview');
@@ -2647,12 +2669,12 @@ export default function ProductTabContent({
               }}
               className={cn(
                 'rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0 transition-all hover:ring-2 hover:ring-primary/50',
-                isSidebarCollapsed
+                collapsed
                   ? 'w-7 h-7 sm:w-8 sm:h-8 text-[11px] sm:text-xs'
                   : 'w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm',
               )}
               title={
-                isSidebarCollapsed ? 'Expand sidebar' : 'Return to overview'
+                collapsed ? 'Expand sidebar' : 'Return to overview'
               }
             >
               {product?.logo ? (
@@ -2666,7 +2688,7 @@ export default function ProductTabContent({
               )}
             </button>
 
-            {!isSidebarCollapsed && (
+            {!collapsed && (
               <>
                 <button
                   onClick={() => handleCategoryChange('overview')}
@@ -2681,9 +2703,13 @@ export default function ProductTabContent({
                   </p>
                 </button>
                 <button
-                  onClick={() => setIsSidebarCollapsed(true)}
+                  onClick={() =>
+                    isMobile
+                      ? setIsMobileNavOpen(false)
+                      : setIsSidebarCollapsed(true)
+                  }
                   className="p-1 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
-                  title="Collapse sidebar"
+                  title={isMobile ? 'Close menu' : 'Collapse sidebar'}
                 >
                   <PanelLeftClose className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </button>
@@ -2693,7 +2719,7 @@ export default function ProductTabContent({
         </div>
 
         {/* Navigation - Responsive */}
-        {!isSidebarCollapsed ? (
+        {!collapsed ? (
           <div className="flex-1 overflow-y-auto py-2 min-h-0">
             {/* Overview */}
             <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
@@ -2980,12 +3006,27 @@ export default function ProductTabContent({
         )}
       </div>
       {/* Main Content */}
-      <div 
-    className={cn(
-      "flex-1 flex flex-col min-h-0 overflow-hidden bg-grey-50 transition-all duration-300",
-       isSidebarCollapsed ? "ml-12 sm:ml-14" : "ml-0 sm:ml-64"
-    )}
-  >
+      <div
+        className={cn(
+          'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-grey-50 transition-all duration-300',
+          collapsed ? 'md:ml-14' : 'md:ml-64',
+        )}
+      >
+        {isMobile && (
+          <div className="flex h-11 flex-shrink-0 items-center gap-2 border-b border-grey-400 bg-white px-3">
+            <button
+              onClick={() => setIsMobileNavOpen(true)}
+              className="-ml-1 rounded p-1.5 text-grey-600 hover:bg-grey-100 hover:text-grey"
+              aria-label="Open product menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1 truncate text-sm">
+              <span className="font-medium text-grey">{product?.name}</span>
+              <span className="text-grey-500"> / {mobileSectionLabel}</span>
+            </div>
+          </div>
+        )}
         {renderMainContent()}
       </div>
       {/* Modals */}
@@ -3024,7 +3065,7 @@ export default function ProductTabContent({
         open={showDatabaseTypeDialog}
         onOpenChange={setShowDatabaseTypeDialog}
       >
-        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
+        <DialogContent className="sm:max-w-md p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-sm sm:text-base md:text-lg text-grey">
               What type of database would you like to add?
@@ -3098,7 +3139,7 @@ export default function ProductTabContent({
         open={showIntelligenceTypeDialog}
         onOpenChange={setShowIntelligenceTypeDialog}
       >
-        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
+        <DialogContent className="sm:max-w-md p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-sm sm:text-base md:text-lg">
               What would you like to add?
@@ -3152,7 +3193,7 @@ export default function ProductTabContent({
         open={showResilienceTypeDialog}
         onOpenChange={setShowResilienceTypeDialog}
       >
-        <DialogContent className="sm:max-w-md mx-4 p-3 sm:p-6">
+        <DialogContent className="sm:max-w-md p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-sm sm:text-base md:text-lg">
               What would you like to configure?

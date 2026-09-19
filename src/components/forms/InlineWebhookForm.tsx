@@ -272,7 +272,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
   return (
     <div className="h-full overflow-auto bg-grey-50">
       <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 py-5">
+        <div className="max-w-3xl mx-auto px-4 py-4 md:px-6 md:py-5">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -294,8 +294,8 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-        <div className="bg-white rounded-lg border border-grey-400 p-6 space-y-6">
+      <div className="max-w-3xl mx-auto px-4 py-4 md:px-6 md:py-6 space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -352,7 +352,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-grey-400 p-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6">
           <div className="flex items-center gap-3 mb-4">
             <Globe className="h-5 w-5 text-primary" />
             <div>
@@ -406,7 +406,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
           )}
         </div>
 
-        <div className="bg-white rounded-lg border border-grey-400 p-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Zap className="h-5 w-5 text-purple-600" />

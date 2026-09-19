@@ -373,11 +373,11 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
   };
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-3 md:p-6">
       <div className="max-w-3xl mx-auto space-y-6 pb-24">
         <OverageLimitBanner assetType="storage" />
         {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
@@ -392,7 +392,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                 <HardDrive className="h-6 w-6 text-blue-500" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-grey">Create New Storage</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-grey">Create New Storage</h1>
                 <p className="text-sm text-grey-600">
                   Adding to {product.name}
                 </p>
@@ -402,7 +402,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -543,7 +543,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                   {/* AWS manual configuration — hidden when using cloud link */}
                   {env.type === 'aws' && !hideManualCredentials && (
                     <div className="space-y-4 pt-4 border-t border-grey-300">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`bucketName-${index}`} className="required">Bucket Name</Label>
                           <Input
@@ -565,7 +565,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`accessKeyId-${index}`}>Access Key ID</Label>
                           <Input
@@ -687,7 +687,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`gcpBucketName-${index}`} className="required">Bucket Name</Label>
                           <Input
@@ -732,7 +732,7 @@ export default function InlineStorageForm({ product, onCancel, onSuccess }: Inli
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor={`gcpClientEmail-${index}`}>Client Email</Label>
                           <Input

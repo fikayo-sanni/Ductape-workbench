@@ -186,13 +186,13 @@ export function AppWebhooksList({
     <>
       <div className="h-full overflow-auto bg-grey-50">
         <div className="bg-white border-b border-grey-300 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
+          <div className="max-w-6xl mx-auto px-4 py-4 md:px-6 md:py-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3 md:gap-4">
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center shadow-sm bg-blue-500/10">
                   <Webhook className="h-6 w-6 text-blue-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="text-xl font-bold text-grey">Webhooks</h1>
                   <p className="text-sm text-grey-500">
                     {canRegister
@@ -202,7 +202,7 @@ export function AppWebhooksList({
                 </div>
               </div>
               {canManage && (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3">
                   <Button variant="outline" onClick={onImport} className="gap-2 shadow-sm">
                     <Upload className="h-4 w-4" />
                     Import JSON
@@ -217,7 +217,7 @@ export function AppWebhooksList({
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-4 md:px-6 md:py-6">
           {mode === 'product' && !accessTag && (
             <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               {!productTag

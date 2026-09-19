@@ -162,7 +162,7 @@ export default function CodeSidebar({
 
   if (isSimpleMode && staticCode) {
     return (
-      <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
             <Code className="w-5 h-5" />
@@ -197,7 +197,7 @@ export default function CodeSidebar({
   }
 
   return (
-    <div className="fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
+    <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl border-l border-grey-300 z-50 overflow-y-auto">
       <div className="sticky top-0 bg-white border-b border-grey-300 p-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-grey flex items-center gap-2">
           <Code className="w-5 h-5" />

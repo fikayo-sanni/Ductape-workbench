@@ -200,11 +200,11 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
   const selectorOptions = schemaValidation.selectorOptions;
 
   return (
-    <div className="h-full overflow-auto bg-grey-100 p-6">
+    <div className="h-full overflow-auto bg-grey-100 p-3 md:p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         <OverageLimitBanner assetType="session" />
         {/* Header with Back Button */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -218,7 +218,7 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
               <KeyRound className="h-6 w-6 text-blue-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-grey">Create New Session</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-grey">Create New Session</h1>
               <p className="text-sm text-grey-600">
                 Adding to {product.name}
               </p>
@@ -227,7 +227,7 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm space-y-6">
+        <div className="bg-white rounded-lg border border-grey-400 p-4 md:p-6 shadow-sm space-y-6">
           {/* Session Name */}
           <div>
             <Label htmlFor="name" className="required">
@@ -276,7 +276,7 @@ export default function InlineSessionForm({ product, onCancel, onSuccess }: Inli
           </div>
 
           {/* Expiry and Period */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="expiry" className="required">
                 Expiry Duration
