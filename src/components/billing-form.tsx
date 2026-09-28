@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {Button} from '@/components/ui/button';
+import {Checkbox} from '@/components/ui/checkbox';
 import {useState, useEffect, useMemo} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {CreditCard, Loader} from 'lucide-react';
@@ -261,7 +262,10 @@ const formSchema = z.object({
   firstName: z.string().min(2).max(50),
   lastName: z.string().min(2).max(50),
   address: z.string().min(2).max(100),
-  addressLine: z.string().min(2).max(100),
+  // Apartment/suite/unit — most addresses don't have one; the backend already
+  // treats it as optional (billing.validator.create.ts allows '' / null), the
+  // frontend just never matched that.
+  addressLine: z.string().max(100).optional(),
   city: z.string().min(2).max(50),
   state: z.string().min(2).max(50),
   postal: z.string().min(2).max(50),
@@ -300,6 +304,12 @@ const paymentSchema = z.object({
     .max(4, 'CVV must be 3 or 4 digits')
     .regex(/^\d+$/, 'CVV must contain only numbers'),
   cardType: z.enum(CARD_TYPES, {required_error: 'Select card type'}),
+  // This card is stored (tokenized with Paystack, kept on file) for future
+  // charges as soon as this form submits — get explicit consent for that
+  // before it happens, not just imply it via the submit button's label.
+  saveConsent: z.literal(true, {
+    errorMap: () => ({message: 'Please confirm before saving your card'}),
+  }),
 });
 
 const emptyBilling = {
@@ -402,6 +412,7 @@ export default function BillingsInfo({
       expirationDate: '',
       cvv: '',
       cardType: undefined,
+      saveConsent: undefined as unknown as true,
     },
   });
 
@@ -410,7 +421,7 @@ export default function BillingsInfo({
       firstName: values.firstName,
       lastName: values.lastName,
       addressLine1: values.address,
-      addressLine2: values.addressLine,
+      addressLine2: values.addressLine ?? '',
       city: values.city,
       stateProvince: values.state,
       postalZipCode: values.postal,
@@ -539,6 +550,7 @@ export default function BillingsInfo({
         expirationDate: '',
         cvv: '',
         cardType: undefined,
+        saveConsent: undefined as unknown as true,
       });
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string };
@@ -734,7 +746,7 @@ export default function BillingsInfo({
                 render={({field}) => (
                   <FormItem>
                     <FormLabel className="text-grey font-semibold">
-                      Address line 2 (Apartment, suite, unit)
+                      Address line 2 (Apartment, suite, unit) — optional
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -1017,7 +1029,34 @@ export default function BillingsInfo({
                     />
                   </div>
 
-                  <Button type="submit" className="w-full h-9" disabled={isProcessing}>
+                  <FormField
+                    control={paymentForm.control}
+                    name="saveConsent"
+                    render={({field}) => (
+                      <FormItem>
+                        <div className="flex items-start gap-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value === true}
+                              onCheckedChange={(checked) => field.onChange(checked === true)}
+                              className="mt-0.5"
+                            />
+                          </FormControl>
+                          <FormLabel className="text-xs font-normal text-grey-600 leading-snug">
+                            I agree to have this card securely saved with Paystack for future
+                            plan changes and billing.
+                          </FormLabel>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full h-9"
+                    disabled={isProcessing || paymentForm.watch('saveConsent') !== true}
+                  >
                     {isProcessing ? (
                       <>
                         <Loader className="mr-2 h-4 w-4 animate-spin" />
