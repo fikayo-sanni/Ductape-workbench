@@ -24,6 +24,7 @@ export interface Workspace {
   updatedAt?: string;
   defaultEnvs?: Array<{
     env_name: string;
+    active?: boolean;
     slug: string;
     description: string;
     _id: string;

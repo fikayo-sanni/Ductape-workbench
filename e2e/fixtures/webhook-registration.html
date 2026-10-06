@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import { useAuth } from '/src/store/useAuth.tsx';
+import { AppWebhooksList } from '/src/components/app-webhooks/AppWebhooksList.tsx';
+import '/src/index.css';
+useAuth.getState().setUser({ _id: 'test-user', public_key: 'test-public', auth_token: 'test-token', workspaces: [] });
+useAuth.getState().setCurrentWorkspaceId('test-workspace');
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const webhooks = ['orders', 'payments', 'customers'].map(tag => ({ tag, name: tag, description: '', events: [],
+  envs: [{ slug: 'test', registration_url: 'https://example.com/register', method: 'POST', sample: '{}' }] }));
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider, { client },
+  React.createElement(AppWebhooksList, {
+    webhooks, app: { _id: 'app', tag: 'app' }, mode: new URLSearchParams(location.search).get('mode') || 'product',
+    productTag: 'product', accessTag: 'access', productEnvs: [{ slug: 'dev', env_name: 'Development' }, { slug: 'prd', env_name: 'Production' }],
+    onAddEvents() {}, onCreate() {}, onImport() {},
+  }), React.createElement(Toaster)));
+</script></body></html>

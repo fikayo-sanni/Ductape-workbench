@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import { useAuth } from '/src/store/useAuth.tsx';
+import CloudSidebar from '/src/components/CloudSidebar.tsx';
+import ProductsSidebar from '/src/components/ProductsSidebar.tsx';
+import AppsSidebar from '/src/components/AppsSidebar.tsx';
+import EnvironmentsSidebar from '/src/components/EnvironmentsSidebar.tsx';
+import '/src/index.css';
+
+useAuth.getState().setUser({ _id: 'test-user', public_key: 'test-public', auth_token: 'test-token', workspaces: [
+  { workspace_id: 'test-workspace', workspace_name: 'Test', accepted: true, defaultEnvs: [{ env_name: 'Original environment', slug: 'dev' }] },
+] });
+useAuth.getState().setCurrentWorkspaceId('test-workspace');
+const name = new URLSearchParams(location.search).get('section');
+const Component = { cloud: CloudSidebar, products: ProductsSidebar, apps: AppsSidebar, environments: EnvironmentsSidebar }[name];
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider, { client },
+  React.createElement('div', { style: { width: 280, height: '100vh' } }, React.createElement(Component)),
+  React.createElement(Toaster)));
+</script></body></html>

@@ -26,7 +26,7 @@ export function useProductWebhookRegistrations(
   } | null;
 
   return useQuery({
-    queryKey: ['product-webhook-registrations', productTag, accessTag],
+    queryKey: ['product-webhook-registrations', productTag, accessTag, currentWorkspaceId],
     queryFn: async () => {
       if (!productDuctape || !productTag || !accessTag) return [];
       await productDuctape.init(productTag);

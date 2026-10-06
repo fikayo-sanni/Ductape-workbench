@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Input } from './ui/input';
+import SidebarRefreshButton from './SidebarRefreshButton';
 import { Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IApp } from '@/types/app';
@@ -54,7 +55,7 @@ export default function AppsSidebar() {
   };
 
   // Fetch internal workspace apps
-  const { data: internalAppsData, isLoading: isLoadingInternal } = useQuery({
+  const { data: internalAppsData, isLoading: isLoadingInternal, isFetching: isFetchingInternal, refetch: refetchInternal } = useQuery({
     queryKey: ['apps', 'internal', currentWorkspaceId],
     queryFn: () =>
       appServicesReal.fetchApps({
@@ -67,7 +68,7 @@ export default function AppsSidebar() {
   });
 
   // Fetch third-party apps using the new access endpoint
-  const { data: thirdPartyAppsData, isLoading: isLoadingThirdParty } = useQuery({
+  const { data: thirdPartyAppsData, isLoading: isLoadingThirdParty, isFetching: isFetchingThirdParty, refetch: refetchThirdParty } = useQuery({
     queryKey: ['apps', 'third-party', currentWorkspaceId],
     queryFn: () =>
       appServicesReal.fetchWorkspaceApps({
@@ -185,7 +186,18 @@ export default function AppsSidebar() {
     <div className="h-full flex flex-col bg-white border-r border-grey-400">
       {/* Header */}
       <div className="p-4 border-b border-grey-400">
-        <h2 className="text-lg font-semibold text-grey mb-2">Apps</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-grey">Apps</h2>
+          <SidebarRefreshButton label="apps" isFetching={isFetchingInternal || isFetchingThirdParty}
+            disabled={!currentWorkspaceId || !user?._id || !user?.public_key}
+            onRefresh={async () => {
+              const results = await Promise.allSettled([
+                refetchInternal({ throwOnError: true }),
+                refetchThirdParty({ throwOnError: true }),
+              ]);
+              if (results.some(result => result.status === 'rejected')) throw new Error('Failed to refresh apps');
+            }} />
+        </div>
         <p className="text-xs text-grey-600">
           Manage your workspace applications
         </p>

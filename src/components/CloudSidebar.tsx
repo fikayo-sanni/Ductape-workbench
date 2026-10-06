@@ -6,6 +6,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useSDKProxy } from '@/services/sdkProxy';
 import { Input } from './ui/input';
+import SidebarRefreshButton from './SidebarRefreshButton';
 import { Button } from './ui/button';
 import { cloudTabTitle } from '@/components/cloud/CloudConnectionTagBadge';
 import CloudProviderIcon from '@/components/cloud/CloudProviderIcon';
@@ -60,7 +61,7 @@ export default function CloudSidebar() {
       : null;
   const sdkProxy = useSDKProxy(proxyConfig);
 
-  const { data: connections = [], isLoading } = useQuery({
+  const { data: connections = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: cloudConnectionsQueryKey(currentWorkspaceId),
     queryFn: async () => {
       if (!sdkProxy) return [];
@@ -126,10 +127,14 @@ export default function CloudSidebar() {
       <div className="p-4 border-b border-grey-400">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold text-grey">Cloud</h2>
-          <Button size="sm" variant="outline" onClick={handleAddConnection} className="gap-1">
-            <Plus className="h-4 w-4" />
-            Add
-          </Button>
+          <div className="flex items-center gap-1">
+            <SidebarRefreshButton label="cloud connections" isFetching={isFetching}
+              onRefresh={() => refetch({ throwOnError: true })} />
+            <Button size="sm" variant="outline" onClick={handleAddConnection} className="gap-1">
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-grey-600">
           AWS, GCP, Azure, MongoDB Atlas, and Neo4j Aura

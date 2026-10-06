@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Webhook,
@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -88,6 +89,15 @@ export function AppWebhooksList({
   const canManage = mode === 'internal';
   const canRegister = mode === 'product' && Boolean(productTag && accessTag);
   const [registrationWebhook, setRegistrationWebhook] = useState<IWebhook | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [registrationBatch, setRegistrationBatch] = useState<IWebhook[] | null>(null);
+  const selectedWebhooks = webhooks.filter(webhook => selectedTags.includes(webhook.tag));
+
+  useEffect(() => {
+    setSelectedTags([]);
+    setRegistrationBatch(null);
+    setRegistrationWebhook(null);
+  }, [currentWorkspaceId, app._id, productTag, accessTag, mode]);
 
   const { data: productRegistrations, isLoading: loadingRegistrations } =
     useProductWebhookRegistrations(productTag, accessTag, canRegister);
@@ -164,6 +174,7 @@ export function AppWebhooksList({
   const openRegistration = (webhook: IWebhook, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setSample(null);
+    setRegistrationBatch(null);
     setRegistrationWebhook(webhook);
   };
 
@@ -196,7 +207,7 @@ export function AppWebhooksList({
                   <h1 className="text-xl font-bold text-grey">Webhooks</h1>
                   <p className="text-sm text-grey-500">
                     {canRegister
-                      ? 'Register a consumer endpoint for each webhook to receive events via this product.'
+                      ? `${count} webhook collections`
                       : `${count} ${count === 1 ? 'webhook' : 'webhooks'} configured`}
                   </p>
                 </div>
@@ -233,6 +244,25 @@ export function AppWebhooksList({
             </div>
           )}
           {count > 0 ? (
+            <>
+            {canRegister && productEnvs.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <label className="flex items-center gap-2 text-sm text-grey">
+                  <Checkbox aria-label="Select all webhooks"
+                    checked={selectedWebhooks.length === count ? true : selectedWebhooks.length > 0 ? 'indeterminate' : false}
+                    onCheckedChange={checked => setSelectedTags(checked === true ? webhooks.map(webhook => webhook.tag) : [])} />
+                  {selectedWebhooks.length} selected
+                </label>
+                <Button disabled={selectedWebhooks.length === 0} className="gap-2"
+                  onClick={() => {
+                    setSample(null);
+                    setRegistrationWebhook(null);
+                    setRegistrationBatch(selectedWebhooks);
+                  }}>
+                  <Link2 className="h-4 w-4" />Register selected
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {webhooks.map((webhook) => {
                 const events = eventsForWebhook(webhook);
@@ -260,6 +290,12 @@ export function AppWebhooksList({
                   >
                     <div className="p-4">
                       <div className="flex items-start gap-3">
+                        {canRegister && productEnvs.length > 0 && (
+                          <Checkbox className="mt-3" aria-label={`Select ${displayName}`}
+                            checked={selectedTags.includes(webhook.tag)}
+                            onCheckedChange={checked => setSelectedTags(tags => checked === true
+                              ? [...new Set([...tags, webhook.tag])] : tags.filter(tag => tag !== webhook.tag))} />
+                        )}
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-500/10">
                           <Webhook className="h-5 w-5 text-blue-500" />
                         </div>
@@ -430,6 +466,7 @@ export function AppWebhooksList({
                 );
               })}
             </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="relative mb-8">
@@ -463,6 +500,17 @@ export function AppWebhooksList({
           accessTag={accessTag}
           productEnvs={productEnvs}
           onClose={() => setRegistrationWebhook(null)}
+        />
+      )}
+
+      {registrationBatch && canRegister && productTag && accessTag && (
+        <WebhookRegistrationSidebar
+          webhook={registrationBatch[0]}
+          webhooks={registrationBatch}
+          productTag={productTag}
+          accessTag={accessTag}
+          productEnvs={productEnvs}
+          onClose={() => setRegistrationBatch(null)}
         />
       )}
 

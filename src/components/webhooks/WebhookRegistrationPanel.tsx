@@ -94,7 +94,7 @@ export default function WebhookRegistrationPanel({
   ] as const;
 
   const { data: registrationRows, isLoading: loadingConfig } = useQuery({
-    queryKey: [...registrationQueryKey, webhookTag],
+    queryKey: [...registrationQueryKey, currentWorkspaceId, webhookTag],
     queryFn: async () => {
       if (!productDuctape || !productTag || !accessTag) return [];
       await productDuctape.init(productTag);

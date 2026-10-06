@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Input } from './ui/input';
+import SidebarRefreshButton from './SidebarRefreshButton';
 import { Search, Loader2, Database, HardDrive, MessageSquare, Box, Shield, Timer, Workflow, Bell, Heart, Settings2, Layers, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IProduct } from '@/types/product';
@@ -36,7 +37,7 @@ export default function ProductsSidebar() {
   };
 
   // Fetch products
-  const { data: productsData, isLoading } = useQuery({
+  const { data: productsData, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['products', currentWorkspaceId],
     queryFn: () =>
       productServicesReal.fetchProducts({
@@ -165,7 +166,12 @@ export default function ProductsSidebar() {
     <div className="h-full flex flex-col bg-white border-r border-grey-400" data-intro="products-view">
       {/* Header */}
       <div className="p-4 border-b border-grey-400">
-        <h2 className="text-lg font-semibold text-grey mb-3">Products</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-grey">Products</h2>
+          <SidebarRefreshButton label="products" isFetching={isFetching}
+            disabled={!currentWorkspaceId || !user?._id || !user?.public_key}
+            onRefresh={() => refetch({ throwOnError: true })} />
+        </div>
 
         {/* View Mode Toggle */}
         <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/store/useAuth';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import SidebarRefreshButton from './SidebarRefreshButton';
 import { Search, Settings2, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IEnvironment } from '@/types/environment';
@@ -25,6 +26,22 @@ export default function EnvironmentsSidebar() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEnv, setEditingEnv] = useState<IEnvironment | null>(null);
   const [envToDelete, setEnvToDelete] = useState<IEnvironment | null>(null);
+
+  const refreshEnvironments = async () => {
+    if (!user?._id || !user.public_key || !currentWorkspaceId) return;
+    const response = await workspaceServices.fetchWorkspaces({ user_id: user._id, public_key: user.public_key });
+    if (!response || response.status === false || !Array.isArray(response.data)) {
+      throw new Error('Failed to fetch environments');
+    }
+    const latest = useAuth.getState();
+    // A response from a previous login must not overwrite the current profile.
+    if (latest.user?._id !== user._id) return;
+    queryClient.setQueryData(['workspaces', user._id], response);
+    latest.setUser({ ...latest.user, workspaces: response.data.map(ws => ({
+      ...ws, accepted: ws.accepted ?? false, access_level: ws.access_level ?? '',
+      defaultEnvs: (ws.defaultEnvs ?? []).map(env => ({ ...env, active: env.active ?? false })),
+    })) });
+  };
 
   // Get current workspace environments from user
   const currentWorkspace = user?.workspaces?.find(w => w.workspace_id === currentWorkspaceId);
@@ -124,15 +141,19 @@ export default function EnvironmentsSidebar() {
       <div className="p-4 border-b border-grey-400">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold text-grey">Environments</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleAddEnv}
-            className="gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            Add
-          </Button>
+          <div className="flex items-center gap-1">
+            <SidebarRefreshButton label="environments" onRefresh={refreshEnvironments}
+              disabled={!currentWorkspaceId || !user?._id || !user?.public_key} />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAddEnv}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-grey-600">
           Manage your workspace environments
