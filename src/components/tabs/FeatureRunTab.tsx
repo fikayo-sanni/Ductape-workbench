@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { redactSensitive } from '@/utils/redactSensitive';
 import { useAuth } from '@/store/useAuth';
 import { getTabState, saveTabState } from '@/lib/tab-state-manager';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -940,17 +941,32 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                                 {stepAssets.map((asset) => {
                                   const config = getAssetConfig(asset.asset_type);
                                   return (
-                                    <div
+                                    <details
                                       key={asset.span_id ?? asset.process_id}
-                                      className="flex items-center gap-3 min-w-0 text-xs"
+                                      className="min-w-0 text-xs"
                                       style={{ paddingLeft: `${Math.min(asset.asset_depth ?? 0, 5) * 20}px` }}
                                     >
-                                      <span className={cn('w-6 h-6 flex items-center justify-center rounded', config.bg, config.text)}>{config.icon}</span>
+                                      <summary className="flex cursor-pointer items-center gap-3 min-w-0 py-1">
+                                      <span className={cn('w-6 h-6 shrink-0 flex items-center justify-center rounded', config.bg, config.text)}>{config.icon}</span>
                                       <span className="font-medium text-grey truncate">{asset.asset_tag ?? 'unknown'}</span>
                                       <span className="text-grey-700 font-mono truncate">{asset.asset_operation ?? 'execute'}</span>
                                       <span className="ml-auto text-grey-700 font-mono tabular-nums">{formatDuration(asset.asset_duration_ms ?? ((asset.end ?? 0) - (asset.start ?? 0)))}</span>
                                       {asset.status === 'fail' && <span className="text-red font-medium">Failed</span>}
-                                    </div>
+                                      <div className="relative h-5 min-w-16 flex-1 overflow-hidden rounded bg-grey-100 dark:bg-background-secondary" title="Timing within this step">
+                                        <div className={cn('absolute inset-y-0 min-w-[2px] rounded-sm', config.bar)} style={{
+                                          left: `${Math.max(0, Math.min(100, (((asset.start ?? step.start ?? 0) - (step.start ?? 0)) / Math.max(1, (step.end ?? 0) - (step.start ?? 0))) * 100))}%`,
+                                          width: `${Math.max(0, Math.min(100, ((asset.asset_duration_ms ?? ((asset.end ?? 0) - (asset.start ?? 0))) / Math.max(1, (step.end ?? 0) - (step.start ?? 0))) * 100))}%`,
+                                        }} />
+                                      </div>
+                                      </summary>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-3">
+                                        {([['Input', asset.input], ['Output', asset.result]] as const).map(([label, value]) => {
+                                          let parsed: unknown = value;
+                                          if (typeof value === 'string') { try { parsed = JSON.parse(value); } catch { parsed = value; } }
+                                          return <div key={label} className="min-w-0"><p className="mb-2 text-grey-700">{label}</p><pre className="max-h-64 overflow-auto rounded border border-border bg-background-tertiary p-3 text-grey">{parsed == null ? 'Not recorded' : JSON.stringify(redactSensitive(parsed), null, 2)}</pre></div>;
+                                        })}
+                                      </div>
+                                    </details>
                                   );
                                 })}
                               </div>

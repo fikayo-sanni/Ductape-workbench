@@ -68,17 +68,50 @@ export default function ResilienceInvocationTab({ invocation, kind, resourceName
   const events = useMemo(() => [...(query.data || [])].sort((a, b) => itemStart(a) - itemStart(b)), [query.data]);
   const invocationStart = itemStart(invocation) || Date.now();
   const invocationEnd = itemEnd(invocation) || invocationStart + Math.max(1, itemDuration(invocation));
-  const calls = useMemo(() => { const logged = loggedCalls(events, kind); return logged.length ? logged : embeddedAttempts(invocation, invocationStart, Math.max(1, invocationEnd - invocationStart)); }, [events, invocation, invocationEnd, invocationStart, kind]);
+  const compact = kind === 'healthcheck' && Boolean(parse(invocation.data)?.compact);
+  const retained = useQuery({
+    queryKey: ['healthcheck-retained-payload', currentWorkspaceId, productTag, env, resourceTag, invocationStart],
+    enabled: Boolean(compact && currentWorkspaceId && user?._id && user?.public_key),
+    queryFn: async () => {
+      const response = await fetchLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, {
+        product_tag: productTag, env, parent_tag: resourceTag, child_tag: 'probe',
+        end_date: new Date(invocationStart).toISOString(), page: 1, limit: 100,
+      });
+      return [...(response.data?.logs?.data || [])].filter((row) => {
+        const payload = callPayload(row);
+        return itemStart(row) <= invocationStart && !parse(row.data)?.compact && (payload.input != null || payload.output != null);
+      }).sort((a, b) => itemStart(b) - itemStart(a))[0] ?? null;
+    },
+  });
+  const calls = useMemo(() => {
+    const logged = loggedCalls(events, kind);
+    if (logged.length) return logged;
+    if (kind === 'healthcheck' && parse(invocation.data)?.compact) {
+      return [{
+        id, provider: resourceTag, operation: 'probe',
+        status: isFailed(invocation) ? 'failed' as const : 'completed' as const,
+        start: invocationStart, end: invocationEnd,
+        duration: Math.max(0, invocationEnd - invocationStart),
+        input: retained.data ? callPayload(retained.data).input : null,
+        output: retained.data ? callPayload(retained.data).output : { status: invocation.outcome, checkedAt: invocation.timestamp, latency_ms: itemDuration(invocation) },
+        data: null,
+      }];
+    }
+    return embeddedAttempts(invocation, invocationStart, Math.max(1, invocationEnd - invocationStart));
+  }, [events, invocation, invocationEnd, invocationStart, kind, id, resourceTag, retained.data]);
   const runStart = calls.length ? Math.min(...calls.map((call) => call.start)) : invocationStart;
   const runEnd = calls.length ? Math.max(...calls.map((call) => call.end)) : invocationEnd;
   const runDuration = Math.max(1, runEnd - runStart);
   const failed = isFailed(invocation) || calls.some((call) => call.status === 'failed');
   const completedCalls = calls.filter((call) => call.status === 'completed').length;
-  const safeInvocationData = useMemo(() => redactSensitive(invocation.data ?? invocation), [invocation]);
+  const safeInvocationData = useMemo(() => redactSensitive(compact && retained.data
+    ? { observation: invocation, retainedPayloadTimestamp: retained.data.timestamp, retainedPayload: parse(retained.data.data) }
+    : invocation.data ?? invocation), [invocation, compact, retained.data]);
 
   return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-grey-100 dark:bg-background">
     <header className="flex items-center justify-between border-b border-border bg-white px-6 py-5 dark:bg-background"><div className="flex min-w-0 items-center gap-4"><div className={cn('flex h-11 w-11 items-center justify-center rounded-lg', failed ? 'bg-red/10 text-red' : 'bg-green/10 text-green')}>{failed ? <XCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div><div className="min-w-0"><h1 className="truncate text-xl font-semibold text-grey">{resourceName} invocation</h1><div className="mt-1 flex items-center gap-2"><code className="text-xs text-grey-500">{resourceTag}</code><span className="text-grey-400">/</span><code className="truncate text-xs text-grey-500">{id}</code><Badge variant="outline">{env}</Badge></div></div></div><Button variant="outline" size="sm" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={cn('mr-2 h-4 w-4', query.isFetching && 'animate-spin')} />Refresh</Button></header>
     <div className="flex-1 overflow-auto p-6"><div className="mx-auto max-w-6xl">
+      {compact && <p className="mb-4 text-sm text-grey-600" role="status">{retained.isLoading ? 'Loading retained probe payload...' : retained.isError ? 'Unable to load retained probe payload.' : retained.data ? `Input/output retained from ${new Date(itemStart(retained.data)).toLocaleString()}. Timing and status belong to the selected invocation.` : 'No retained payload found in the latest 100 matching records. This invocation stores timing and status only.'}</p>}
       <section className="overflow-hidden rounded-xl border border-border bg-white dark:bg-background">
         <div className="flex items-center justify-between border-b border-border bg-white px-5 py-4 dark:bg-grey"><div className="flex items-center gap-3"><div className={cn('flex h-8 w-8 items-center justify-center rounded-lg', failed ? 'bg-red/10 text-red' : 'bg-green/10 text-green')}>{failed ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}</div><div><h2 className="font-semibold text-grey dark:text-white">Execution timeline</h2><p className="text-sm text-grey-600 dark:text-grey-200">{query.isLoading ? <span className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading calls…</span> : `${completedCalls} of ${calls.length} calls completed`}</p></div></div><span className="font-mono text-sm text-grey-600 dark:text-grey-200">{formatDuration(runDuration)}</span></div>
         <div className="border-b border-border bg-grey-100 px-5 py-2 dark:bg-background-secondary"><div className="flex items-center justify-between font-mono text-xs text-grey-700"><span>0ms</span><span>{formatDuration(runDuration / 4)}</span><span>{formatDuration(runDuration / 2)}</span><span>{formatDuration(runDuration * .75)}</span><span>{formatDuration(runDuration)}</span></div></div>
