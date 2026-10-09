@@ -955,7 +955,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   <div className="flex items-center gap-2 mt-1">
                     <code className="text-sm text-grey-600 font-mono">{broker.brokerTag || broker.tag}</code>
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-600/10 text-cyan-600">
-                      {totalMessagesCount} messages
+                      <LoadingValue loading={messagesLoading}>{totalMessagesCount}</LoadingValue> messages
                     </span>
                   </div>
                 </div>
@@ -1354,7 +1354,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <h2 className="text-sm font-semibold text-grey">Topics</h2>
                     <p className="text-xs text-grey-500 mt-1">Configured topics and observed usage in this environment</p>
                   </div>
-                  <span className="text-xs text-grey-500">{topicSummaries.length} total</span>
+                  <span className="text-xs text-grey-500"><LoadingValue loading={dashboardLoading}>{topicSummaries.length}</LoadingValue> total</span>
                 </div>
                 <div className="grid grid-cols-[minmax(220px,1fr),110px,100px,100px,130px,90px] gap-4 px-6 py-3 bg-background-secondary border-b border-border text-xs font-medium text-grey-600 uppercase tracking-wider">
                   <div>Topic</div>
@@ -2341,7 +2341,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     )}
                   </div>
                   <p className="text-sm text-grey-600">
-                    {totalMessagesCount} {totalMessagesCount === 1 ? 'message' : 'messages'}
+                    <LoadingValue loading={messagesLoading}>{totalMessagesCount}</LoadingValue> {totalMessagesCount === 1 ? 'message' : 'messages'}
                   </p>
                 </div>
 
@@ -2653,3 +2653,4 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     </div>
   );
 }
+import { LoadingValue } from '@/components/ui/loading-value';

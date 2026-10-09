@@ -7,7 +7,7 @@
  * (useAgentChat) must hold each ductape_mutate call for explicit user
  * approval before invoking WorkspaceDataTools.execute for it. The "secrets"
  * and "cloud" modules are blocked entirely, in both tiers, and a short list
- * of destructive database operations (raw execute, dropTable, truncateTable,
+ * of unsupported/destructive database operations (execute, dropTable, truncateTable,
  * dropIndex) is intentionally left off the write allowlist — those stay
  * something the user does deliberately in the workbench UI.
  */
@@ -19,6 +19,7 @@ import { SDKProxyService, type SDKModule } from '@/services/sdkProxy';
 import type { IProduct } from '@/types/product';
 import type { User } from '@/types/auth';
 import type { AgentToolDefinition } from './types';
+import { describeMethodContract, assertMutationContract, hasVerifiedMutationContract } from './methodContracts';
 
 export interface ToolContext {
   user: User;
@@ -39,9 +40,11 @@ const READ_METHODS: Record<string, Set<string>> = {
   ]),
   actions: new Set(['list', 'fetch']),
   databases: new Set([
+    'action.list', 'action.fetch',
     'list', 'fetch', 'listTables', 'listTablesWithInfo', 'describe', 'getSchema', 'listIndexes', 'count', 'query',
   ]),
   webhooks: new Set(['list', 'fetch', 'events.list', 'events.fetch']),
+  graph: new Set(['list', 'fetch', 'action.fetchAll', 'action.fetch']),
   notifications: new Set([
     'list', 'fetch', 'templates.list', 'templates.fetch', 'messages.list', 'messages.fetch', 'getMessages',
   ]),
@@ -70,12 +73,14 @@ const READ_METHODS: Record<string, Set<string>> = {
 };
 
 /**
- * Deliberately excludes raw "execute" (arbitrary SQL/commands), dropTable,
+ * databases.execute is a saved-action operation, not arbitrary SQL, but is
+ * not exposed by the current SDK proxy allowlist. Also excludes dropTable,
  * truncateTable, and dropIndex on databases — those stay UI-only regardless
  * of confirmation, since a chat click is a much lighter gate than the
  * workbench's own destructive-action UI.
  */
 const WRITE_METHODS: Record<string, Set<string>> = {
+  graph: new Set(['action.execute']),
   product: new Set([
     'create', 'update', 'updateValidation', 'environments.create', 'environments.update',
     'apps.connect', 'apps.add', 'apps.update', 'apps.webhooks.enable', 'apps.webhooks.generateLink',
@@ -89,6 +94,7 @@ const WRITE_METHODS: Record<string, Set<string>> = {
   actions: new Set(['create', 'update', 'delete', 'dispatch', 'run', 'import']),
   databases: new Set([
     'create', 'update', 'delete', 'connect', 'disconnect', 'closeAll',
+    'action.dispatch',
     'insert', 'updateData', 'deleteData', 'createTable', 'alterTable', 'createIndex',
   ]),
   webhooks: new Set([
@@ -155,6 +161,8 @@ export function describeAllowedReadMethods(): string {
 
 export function describeAllowedWriteMethods(): string {
   return Object.entries(WRITE_METHODS)
+    .map(([module, methods]) => [module, new Set([...methods].filter(method => hasVerifiedMutationContract(module, method)))] as const)
+    .filter(([, methods]) => methods.size > 0)
     .map(([module, methods]) => `- ${module}: ${Array.from(methods).join(', ')}`)
     .join('\n');
 }
@@ -205,6 +213,24 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     },
   },
   {
+    name: 'describe_method',
+    description:
+      'Look up the exact call shape for one module.method before calling ductape_query/ductape_mutate with it — ' +
+      'whether it takes separate positional arguments or one options object, in what order, and which fields that ' +
+      'object needs. Call this first for any module.method you have not already confirmed the shape of earlier in ' +
+      'this conversation; do not guess a shape and hope the call succeeds. Covers exactly the same module.method ' +
+      'combinations ductape_query/ductape_mutate accept (see their own descriptions for the full allowed list) — ' +
+      'asking about one not on that list just tells you so.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        module: { type: 'string', description: 'SDK module name, e.g. "databases", "vector", "sessions".' },
+        method: { type: 'string', description: 'Method name, e.g. "query", "upsert". Dotted names like "actions.create" are valid.' },
+      },
+      required: ['module', 'method'],
+    },
+  },
+  {
     name: 'ductape_query',
     description:
       'Read a Ductape SDK module directly (databases, storage, vector, sessions, caches, jobs, notifications, ' +
@@ -235,7 +261,7 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
     name: MUTATE_TOOL_NAME,
     description:
       'Create, update, or delete data through a Ductape SDK module (same module set as ductape_query, minus ' +
-      'secrets/cloud, plus raw database "execute"/dropTable/truncateTable/dropIndex which are never available ' +
+      'secrets/cloud, plus unsupported database "execute" and dropTable/truncateTable/dropIndex which are never available ' +
       'from chat). Every call to this tool is shown to the user for explicit approval before it runs — nothing ' +
       'executes silently. State exactly what you are about to do and why in your reply before calling this, so ' +
       'the confirmation the user sees makes sense. If they decline, do not retry the same call without them ' +
@@ -364,6 +390,33 @@ export class WorkspaceDataTools {
     };
   }
 
+  /** Pure lookup, no live call — returns the documented call shape plus whether it's reachable via query/mutate at all. */
+  private describeMethod(input: { module?: string; method?: string }): unknown {
+    const { module, method } = input;
+    if (!module || !method) {
+      throw new Error('"module" and "method" are both required.');
+    }
+    const readable = isReadMethodAllowed(module, method);
+    const writable = isWriteMethodAllowed(module, method);
+    return {
+      module,
+      method,
+      contract: describeMethodContract(module, method),
+      mutation_contract: writable ? (hasVerifiedMutationContract(module, method) ? 'verified' : 'unavailable: mutation blocked before dispatch') : 'not applicable',
+      reachable_via: BLOCKED_MODULES.has(module)
+        ? 'neither — this module is blocked from chat entirely'
+        : writable && !readable && !hasVerifiedMutationContract(module, method)
+          ? 'neither — authoritative mutation contract unavailable'
+        : readable && writable
+          ? 'both ductape_query and ductape_mutate'
+          : readable
+            ? 'ductape_query only (read-only)'
+            : writable
+              ? 'ductape_mutate only (requires user approval)'
+              : 'neither — not in the allowed list for either tool',
+    };
+  }
+
   /** Resolves the right public_key for module/product and dispatches through SDKProxyService. Not allowlist-aware — callers must check first. */
   private async dispatch(module: string, method: string, params: any[], product?: string): Promise<unknown> {
     let publicKey: string;
@@ -424,6 +477,7 @@ export class WorkspaceDataTools {
         `"${module}.${method}" is not a write method available from chat.\n\nAllowed module.method calls:\n${describeAllowedWriteMethods()}`,
       );
     }
+    assertMutationContract(module, method);
     return this.dispatch(module, method, params, product);
   }
 
@@ -437,6 +491,8 @@ export class WorkspaceDataTools {
         return this.listApps();
       case 'get_logs':
         return this.getLogs(input ?? {});
+      case 'describe_method':
+        return this.describeMethod(input ?? {});
       case 'ductape_query':
         return this.ductapeQuery(input ?? {});
       case MUTATE_TOOL_NAME:

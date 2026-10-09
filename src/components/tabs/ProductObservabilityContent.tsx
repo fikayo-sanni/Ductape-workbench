@@ -43,9 +43,9 @@ const percentile = (values: number[], ratio: number) => {
 const operationOf = (row: any) =>
   row?.function_tag || row?.feature_tag || row?.child_tag || row?.action || row?.parent_tag || row?.type || 'unknown';
 
-export default function ProductObservabilityContent({ product }: { product: any }) {
+export default function ProductObservabilityContent({ product, initialView = 'overview' }: { product: any; initialView?: View }) {
   const { user, currentWorkspaceId } = useAuth();
-  const [view, setView] = useState<View>('overview');
+  const [view, setView] = useState<View>(initialView);
   const [env, setEnv] = useState('all');
   const [logComponent, setLogComponent] = useState('all');
   const [logStatus, setLogStatus] = useState('all');

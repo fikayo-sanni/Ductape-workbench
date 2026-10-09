@@ -656,7 +656,7 @@ export default function SessionUserTab({
   // Debounce search term to avoid too many API calls
   const debouncedSearch = useDebouncedValue(logsFilters.searchTerm, 500);
 
-  const envSlug = user?.env || 'production';
+  const envSlug = user?.env || undefined;
 
   // Calculate active filter count
   const activeFilterCount = [
@@ -680,7 +680,7 @@ export default function SessionUserTab({
 
   // Fetch detailed user info with decrypted session data
   const { data: userDetails, isLoading: detailsLoading, refetch: refetchDetails } = useQuery({
-    queryKey: ['session-user-details', productTag, sessionTag, user?.identifier, envSlug],
+    queryKey: ['session-user-details', currentWorkspaceId, productTag, sessionTag, user?.identifier, envSlug],
     queryFn: () => {
       if (!currentWorkspaceId || !authUser?._id || !authUser?.public_key || !user?.identifier) {
         throw new Error('Missing auth parameters');
@@ -711,6 +711,7 @@ export default function SessionUserTab({
   } = useInfiniteQuery({
     queryKey: [
       'session-user-logs',
+      currentWorkspaceId,
       productTag,
       sessionTag,
       user?.identifier,
@@ -733,10 +734,6 @@ export default function SessionUserTab({
       let actualSessionTag = sessionTag;
       if (sessionTag.startsWith(`${productTag}:`)) {
         actualSessionTag = sessionTag.slice(productTag.length + 1);
-      } else if (sessionTag.includes(':')) {
-        // Fallback: extract the last segment after the last colon
-        const parts = sessionTag.split(':');
-        actualSessionTag = parts[parts.length - 1];
       }
 
       // Get date range from time range selection
@@ -779,7 +776,7 @@ export default function SessionUserTab({
 
   // Fetch user-specific dashboard metrics (activity timeline, peak hours, etc.) from logs service
   const { data: userDashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery({
-    queryKey: ['session-user-dashboard', productTag, sessionTag, user?.identifier, envSlug],
+    queryKey: ['session-user-dashboard', currentWorkspaceId, productTag, sessionTag, user?.identifier, envSlug],
     queryFn: () => {
       if (!currentWorkspaceId || !authUser?._id || !authUser?.public_key || !user?.identifier) {
         throw new Error('Missing auth parameters');

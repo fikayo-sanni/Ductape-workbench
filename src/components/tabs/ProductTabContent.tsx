@@ -76,6 +76,8 @@ import CodeSidebar from '@/components/CodeSidebar';
 import {saveTabState, getTabState} from '@/lib/tab-state-manager';
 import { resolveProductAppAccessTag } from '@/utils/productAppAccess';
 import ProductObservabilityContent from './ProductObservabilityContent';
+import RateLimitMonitoring from './RateLimitMonitoring';
+import FunctionsResourceContent from './FunctionsResourceContent';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -97,6 +99,8 @@ type ResourceCategory =
   | 'features'
   | 'intelligence'
   | 'resilience'
+  | 'rateLimits'
+  | 'functions'
   | 'notifications'
   | 'sessions';
 
@@ -112,6 +116,12 @@ interface ResourceCategoryConfig {
 }
 
 const resourceCategories: ResourceCategoryConfig[] = [
+  { id: 'functions', label: 'Functions', icon: Box, color: 'text-teal-600', bgColor: 'bg-teal-600/10', dataKey: 'functions', componentType: 'function' },
+  {
+    id: 'rateLimits', label: 'Rate Limits', icon: Timer,
+    color: 'text-teal-600', bgColor: 'bg-teal-600/10',
+    dataKey: 'rateLimits', componentType: 'rateLimit',
+  },
   // Enabled categories first
   {
     id: 'apps',
@@ -493,6 +503,7 @@ export default function ProductTabContent({
 
   // Get resources for a category
   const getResources = (category: ResourceCategoryConfig): any[] => {
+    if (category.id === 'functions') return (product?.functions ?? []).filter((fn: any) => fn.deleted !== true);
     if (category.id === 'apps') return connectedApps;
     // Combined Databases category (databases + graphs + vectors)
     if (category.id === 'databases') {
@@ -2609,6 +2620,12 @@ export default function ProductTabContent({
     if (activeCategory === 'observability') {
       return <ProductObservabilityContent product={product} />;
     }
+    if (activeCategory === 'rateLimits') {
+      return <RateLimitMonitoring key={product?.tag} product={product} />;
+    }
+    if (activeCategory === 'functions') {
+      return <FunctionsResourceContent product={product} onRefresh={() => void refetch()} />;
+    }
 
     // Handle environments separately (not a resource)
     if (activeCategory === 'environments') {
@@ -2853,7 +2870,7 @@ export default function ProductTabContent({
                     <span className="flex-1 text-left truncate">
                       {category.label}
                     </span>
-                    <span
+                    {category.id !== 'rateLimits' && <span
                       className={cn(
                         'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
                         isDisabled
@@ -2868,7 +2885,7 @@ export default function ProductTabContent({
                       ) : (
                         count
                       )}
-                    </span>
+                    </span>}
                   </button>
                 );
               })}
@@ -2965,7 +2982,7 @@ export default function ProductTabContent({
                     title={
                       isCatLoading
                         ? `${category.label} (Loading...)`
-                        : `${category.label} (${count})`
+                        : category.id === 'rateLimits' ? category.label : `${category.label} (${count})`
                     }
                   >
                     <Icon
@@ -3235,7 +3252,7 @@ export default function ProductTabContent({
                   Quota
                 </h3>
                 <p className="text-xs sm:text-sm text-grey-500">
-                  Rate limits and usage quotas
+                  Weighted provider distribution
                 </p>
               </div>
             </button>

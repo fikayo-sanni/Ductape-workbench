@@ -154,7 +154,7 @@ export default function SessionActivityTab({
 
   // Fetch session users
   const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
-    queryKey: ['session-users', productTag, sessionTag, envSlug],
+    queryKey: ['session-users', currentWorkspaceId, productTag, sessionTag, envSlug],
     queryFn: () => {
       if (!currentWorkspaceId || !user?._id || !user?.public_key) {
         throw new Error('Missing auth parameters');
@@ -177,7 +177,7 @@ export default function SessionActivityTab({
 
   // Fetch session dashboard metrics
   const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery({
-    queryKey: ['session-dashboard', productTag, sessionTag, envSlug],
+    queryKey: ['session-dashboard', currentWorkspaceId, productTag, sessionTag, envSlug],
     queryFn: () => {
       if (!currentWorkspaceId || !user?._id || !user?.public_key) {
         throw new Error('Missing auth parameters');
@@ -271,7 +271,7 @@ export default function SessionActivityTab({
 
   const handleOpenUser = (user: any) => {
     openTab({
-      id: `session-user-${user.ductape_user_id}`,
+      id: `session-user-${[currentWorkspaceId, productTag, sessionTag, user.env || envSlug || '', user.ductape_user_id].map(encodeURIComponent).join('/')}`,
       type: 'session-user',
       title: user.identifier,
       itemId: user.ductape_user_id,

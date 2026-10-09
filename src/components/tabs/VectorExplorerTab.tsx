@@ -1966,7 +1966,7 @@ await ductape.init();`,
               <Database className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-grey">{totalStats.totalVectors.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-grey"><LoadingValue loading={isConnecting || isLoadingNamespaces}>{totalStats.totalVectors.toLocaleString()}</LoadingValue></div>
               <div className="text-xs text-grey-500">Total Vectors</div>
             </div>
           </div>
@@ -1977,7 +1977,7 @@ await ductape.init();`,
               <Layers className="h-5 w-5 text-blue" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-grey">{totalStats.namespaceCount}</div>
+              <div className="text-2xl font-bold text-grey"><LoadingValue loading={isConnecting || isLoadingNamespaces}>{totalStats.namespaceCount}</LoadingValue></div>
               <div className="text-xs text-grey-500">Namespaces</div>
             </div>
           </div>
@@ -5281,3 +5281,4 @@ await ductape.init();`,
     </div>
   );
 }
+import { LoadingValue } from '@/components/ui/loading-value';

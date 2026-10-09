@@ -4145,9 +4145,9 @@ const result = await ductape.database.transaction(
             <>
               <div className="flex items-center justify-between px-2 py-2">
                 <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-                  {sidebarView === 'tables' && `${isNoSQL ? 'Collections' : 'Tables'} (${filteredTables.length})`}
-                  {sidebarView === 'migrations' && `Migrations (${filteredMigrations.length})`}
-                  {sidebarView === 'actions' && `Actions (${filteredActions.length})`}
+                  {sidebarView === 'tables' && <>{isNoSQL ? 'Collections' : 'Tables'} (<LoadingValue loading={isConnecting || isLoadingTables}>{filteredTables.length}</LoadingValue>)</>}
+                  {sidebarView === 'migrations' && <>Migrations (<LoadingValue loading={isConnecting || isLoadingMigrations}>{filteredMigrations.length}</LoadingValue>)</>}
+                  {sidebarView === 'actions' && <>Actions (<LoadingValue loading={isLoadingActions}>{filteredActions.length}</LoadingValue>)</>}
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -7838,3 +7838,4 @@ const result = await ductape.database.transaction(
     </div>
   );
 }
+import { LoadingValue } from '@/components/ui/loading-value';

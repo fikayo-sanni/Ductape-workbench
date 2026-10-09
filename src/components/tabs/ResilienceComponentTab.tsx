@@ -346,10 +346,10 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               <div className="mt-4 flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold uppercase text-grey-600">Status</span><button type="button" title="Refresh invocations" onClick={() => queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] })}><RefreshCw className="h-3.5 w-3.5 text-grey-500" /></button></div>
               <div className="space-y-0.5">
                 {([
-                  { value: 'all', label: 'All Invocations', icon: List, count: statusCounts.all },
-                  { value: 'running', label: 'Running', icon: Loader2, count: statusCounts.running },
-                  { value: 'completed', label: 'Completed', icon: CheckCircle2, count: statusCounts.completed },
-                  { value: 'failed', label: 'Failed', icon: XCircle, count: statusCounts.failed },
+                  { value: 'all', label: 'All Invocations', icon: List, count: <LoadingValue loading={invocationsLoading}>{statusCounts.all}</LoadingValue> },
+                  { value: 'running', label: 'Running', icon: Loader2, count: <LoadingValue loading={invocationsLoading}>{statusCounts.running}</LoadingValue> },
+                  { value: 'completed', label: 'Completed', icon: CheckCircle2, count: <LoadingValue loading={invocationsLoading}>{statusCounts.completed}</LoadingValue> },
+                  { value: 'failed', label: 'Failed', icon: XCircle, count: <LoadingValue loading={invocationsLoading}>{statusCounts.failed}</LoadingValue> },
                 ] as const).map(({ value, label, icon: StatusIcon, count }) => <button key={value} type="button" onClick={() => { setStatusFilter(value); setView('invocations'); }} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'invocations' && statusFilter === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><StatusIcon className={cn('h-4 w-4', value === 'running' && 'animate-spin')} /><span className="flex-1 text-left">{label}</span><span className="min-w-[20px] rounded bg-grey-100 px-1.5 py-0.5 text-center text-xs text-grey-600 dark:bg-grey-400/20">{count}</span></button>)}
               </div>
               <div className="mt-4 px-2"><p className="mb-2 text-xs font-semibold uppercase text-grey-600">Time Range</p><div className="space-y-0.5">{([{ value: '1h', label: 'Last Hour' }, { value: '24h', label: 'Last 24 Hours' }, { value: '7d', label: 'Last 7 Days' }, { value: '30d', label: 'Last 30 Days' }, { value: 'all', label: 'All Time' }] as const).map(({ value, label }) => <button key={value} type="button" onClick={() => setTimeRange(value)} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', timeRange === value ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><Calendar className="h-4 w-4" /><span>{label}</span></button>)}</div></div>
@@ -374,7 +374,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                     <div className={cn('mb-3 flex h-10 w-10 items-center justify-center rounded-lg', item.tint, item.color)}>
                       <item.icon className="h-5 w-5" />
                     </div>
-                    <p className={cn('text-2xl font-bold capitalize', item.color)}>{String(item.value)}</p>
+                    <p className={cn('text-2xl font-bold capitalize', item.color)}><LoadingValue loading={invocationsLoading && ['Checks', 'Invocations'].includes(item.label)}>{String(item.value)}</LoadingValue></p>
                     <p className="mt-1 text-xs font-medium text-grey-600">{item.label}</p>
                   </div>
                 ))}
@@ -427,3 +427,4 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
     </div>
   );
 }
+import { LoadingValue } from '@/components/ui/loading-value';

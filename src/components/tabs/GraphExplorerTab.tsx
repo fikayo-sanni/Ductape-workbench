@@ -2752,9 +2752,9 @@ await ductape.init();`,
             <>
               <div className="flex items-center justify-between px-2 py-2">
                 <div className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
-                  {sidebarView === 'labels' && `Node Labels (${filteredLabels.length})`}
-                  {sidebarView === 'relationships' && `Relationship Types (${filteredRelationships.length})`}
-                  {sidebarView === 'actions' && `Saved Actions (${filteredActions.length})`}
+                  {sidebarView === 'labels' && <>Node Labels (<LoadingValue loading={isConnecting || isLoadingLabels}>{filteredLabels.length}</LoadingValue>)</>}
+                  {sidebarView === 'relationships' && <>Relationship Types (<LoadingValue loading={isConnecting || isLoadingRelTypes}>{filteredRelationships.length}</LoadingValue>)</>}
+                  {sidebarView === 'actions' && <>Saved Actions (<LoadingValue loading={isLoadingActions}>{filteredActions.length}</LoadingValue>)</>}
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -6080,3 +6080,4 @@ await ductape.init();`,
     </div>
   );
 }
+import { LoadingValue } from '@/components/ui/loading-value';

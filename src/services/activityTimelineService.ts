@@ -58,7 +58,7 @@ export interface ActivityTimelineQuery {
 
 function combinedSessionTag(productTag?: string, sessionTag?: string): string | undefined {
   if (!sessionTag) return undefined;
-  if (sessionTag.includes(':')) return sessionTag;
+  if (productTag && sessionTag.startsWith(`${productTag}:`)) return sessionTag;
   return productTag ? `${productTag}:${sessionTag}` : sessionTag;
 }
 
@@ -295,11 +295,10 @@ function buildLogFilters(query: ActivityTimelineQuery): FetchLogsOptions {
     case 'notification':
       return { ...base, type: 'notification', parent_tag: componentTag };
     case 'session':
-      return { ...base, type: 'session', session_tag: sessionTagValue };
+      return { ...base, session_tag: sessionTagValue };
     case 'session-user':
       return {
         ...base,
-        type: 'session',
         session_tag: sessionTagValue,
         session_user_id: sessionUserId,
       };
