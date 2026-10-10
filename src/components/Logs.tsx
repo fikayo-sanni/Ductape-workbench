@@ -586,7 +586,7 @@ export default function Logs() {
     queryKey: ['workspace-logs', currentWorkspaceId, logsFilters.component, logsFilters.app, logsFilters.product, logsFilters.status, logsFilters.startDate, logsFilters.endDate, logsFilters.timeRange, debouncedSearch],
     queryFn: ({ pageParam = 1 }) => {
       const dateRange = getDateRange(logsFilters.timeRange);
-      return logsServicesReal.fetchLogs(
+      return logsServicesReal.fetchWorkspaceLogs(
         {
           user_id: user?._id ?? '',
           public_key: user?.public_key ?? '',

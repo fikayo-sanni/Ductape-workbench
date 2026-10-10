@@ -141,6 +141,8 @@ export interface LogsPayload {
 }
 
 export interface FetchLogsOptions {
+  /** fetchWorkspaceLogs only: also request exact all/running/completed/failed totals. */
+  includeCounts?: boolean;
   groupBy?: string;
   start_date?: string;
   end_date?: string;

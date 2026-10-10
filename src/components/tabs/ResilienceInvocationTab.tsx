@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ChevronDown, ChevronRight, Copy, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { fetchLogs } from '@/services/logsServices';
+import { fetchWorkspaceLogs } from '@/services/logsServices';
 import { useAuth } from '@/store/useAuth';
 import { cn } from '@/lib/utils';
 import { redactSensitive } from '@/utils/redactSensitive';
@@ -64,7 +64,7 @@ export default function ResilienceInvocationTab({ invocation, kind, resourceName
   const { user, currentWorkspaceId } = useAuth();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const id = processId(invocation);
-  const query = useQuery({ queryKey: ['resilience-invocation-trace', currentWorkspaceId, id], queryFn: async () => { const response = await fetchLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, { process_id: id, product_tag: productTag, env, page: 1, limit: 300 }); return response.data?.logs?.data || []; }, enabled: Boolean(id && currentWorkspaceId && user?._id && user?.public_key) });
+  const query = useQuery({ queryKey: ['resilience-invocation-trace', currentWorkspaceId, id], queryFn: async () => { const response = await fetchWorkspaceLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, { process_id: id, product_tag: productTag, env, page: 1, limit: 300 }); return response.data?.logs?.data || []; }, enabled: Boolean(id && currentWorkspaceId && user?._id && user?.public_key) });
   const events = useMemo(() => [...(query.data || [])].sort((a, b) => itemStart(a) - itemStart(b)), [query.data]);
   const invocationStart = itemStart(invocation) || Date.now();
   const invocationEnd = itemEnd(invocation) || invocationStart + Math.max(1, itemDuration(invocation));
@@ -73,7 +73,7 @@ export default function ResilienceInvocationTab({ invocation, kind, resourceName
     queryKey: ['healthcheck-retained-payload', currentWorkspaceId, productTag, env, resourceTag, invocationStart],
     enabled: Boolean(compact && currentWorkspaceId && user?._id && user?.public_key),
     queryFn: async () => {
-      const response = await fetchLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, {
+      const response = await fetchWorkspaceLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, {
         product_tag: productTag, env, parent_tag: resourceTag, child_tag: 'probe',
         end_date: new Date(invocationStart).toISOString(), page: 1, limit: 100,
       });

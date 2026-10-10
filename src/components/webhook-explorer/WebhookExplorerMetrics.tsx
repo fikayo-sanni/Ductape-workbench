@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
-import { fetchLogs } from '@/services/logsServices';
+import { fetchWorkspaceLogs } from '@/services/logsServices';
 import { cn } from '@/lib/utils';
 
 export function WebhookEnvMetrics({
@@ -21,7 +21,7 @@ export function WebhookEnvMetrics({
         throw new Error('Missing auth parameters');
       }
 
-      const response = await fetchLogs(
+      const response = await fetchWorkspaceLogs(
         {
           workspace_id: currentWorkspaceId,
           user_id: user._id,
@@ -92,7 +92,7 @@ export function useWebhookGlobalMetrics(webhookTag: string, appTag: string) {
         throw new Error('Missing auth parameters');
       }
 
-      const response = await fetchLogs(
+      const response = await fetchWorkspaceLogs(
         {
           workspace_id: currentWorkspaceId,
           user_id: user._id,

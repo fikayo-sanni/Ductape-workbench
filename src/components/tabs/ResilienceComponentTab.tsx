@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
-import { fetchLogs } from '@/services/logsServices';
+import { fetchWorkspaceLogs } from '@/services/logsServices';
 
 type ResilienceKind = 'healthcheck' | 'quota' | 'fallback';
 type View = 'overview' | 'invocations';
@@ -215,9 +215,9 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
     fetchNextPage,
   } = useInfiniteQuery({
     queryKey: ['resilience-invocations', kind, currentWorkspaceId, product.tag, resource.tag, env.slug],
-    queryFn: ({ pageParam }) => fetchLogs(
+    queryFn: ({ pageParam }) => fetchWorkspaceLogs(
         { workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key },
-        { product_tag: product.tag, parent_tag: resource.tag, env: env.slug, type: kind, limit: 100, page: pageParam, only_completed_execution: true },
+        { product_tag: product.tag, parent_tag: resource.tag, env: env.slug, type: kind, limit: 100, page: pageParam, only_completed_execution: true, includeCounts: true },
       ),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/store/useAuth';
-import { fetchLogs } from '@/services/logsServices';
+import { fetchWorkspaceLogs } from '@/services/logsServices';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +18,7 @@ export default function RateLimitMonitoring({ product }: { product: any }) {
   const query = useQuery({
     queryKey: ['rate-limit-decisions', currentWorkspaceId, product?.tag, env, tag, outcome, start, end, page],
     enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key && product?.tag),
-    queryFn: () => fetchLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, {
+    queryFn: () => fetchWorkspaceLogs({ workspace_id: currentWorkspaceId!, user_id: user!._id, public_key: user!.public_key }, {
       product_tag: product.tag, type: 'rate_limit', env: env === 'all' ? undefined : env,
       action: outcome === 'all' ? undefined : outcome,
       parent_tag: tag.trim() || undefined, start_date: start, end_date: end, page, limit: 50,

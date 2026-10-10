@@ -6,9 +6,27 @@ const formatDate = (date: Date) => {
   return date.toISOString().split('T')[0]; // "YYYY-MM-DD"
 };
 
-export const fetchLogs = async (
+/**
+ * Full workspace analytics: the log page plus chart series and resource totals.
+ * Views that only render a list of logs should use fetchWorkspaceLogs instead.
+ */
+export const fetchLogs = (data: FetchLogsData, payload: FetchLogsOptions = {}): Promise<LogsResponse> =>
+  requestWorkspaceLogs('analytics', data, payload);
+
+/**
+ * The workspace log list only: same `data.logs.{metadata,data}` shape and decrypted payloads, without the
+ * chart, app and product totals. Pass `includeCounts` for views that show all/running/completed/failed tabs;
+ * otherwise `metadata.total` is capped (see `totalIsCapped`).
+ */
+export const fetchWorkspaceLogs = (
   data: FetchLogsData,
-  payload: FetchLogsOptions = {}
+  payload: FetchLogsOptions & { includeCounts?: boolean } = {}
+): Promise<LogsResponse> => requestWorkspaceLogs('workspace-logs', data, payload);
+
+const requestWorkspaceLogs = async (
+  route: 'analytics' | 'workspace-logs',
+  data: FetchLogsData,
+  { includeCounts, ...payload }: FetchLogsOptions & { includeCounts?: boolean } = {}
 ): Promise<LogsResponse> => {
   const { workspace_id, user_id, public_key } = data;
 
@@ -54,6 +72,7 @@ export const fetchLogs = async (
       page: payload.page || 1,
       limit: payload.limit || 20,
       only_completed_execution: payload.only_completed_execution,
+      include_counts: includeCounts ? true : undefined,
       ...payload,
     }).filter(([_, value]) => value !== undefined && value !== null)
   );
@@ -61,7 +80,7 @@ export const fetchLogs = async (
   const queryString = qs.stringify(cleanedPayload);
 
   const response = await apiClient.get<LogsResponse>(
-    `/log/v1/analytics/${workspace_id}?${queryString}`
+    `/log/v1/${route}/${workspace_id}?${queryString}`
   );
 
   return response.data;
@@ -1489,6 +1508,7 @@ export const fetchGraphDashboard = async (
 
 const logsServices = {
   fetchLogs,
+  fetchWorkspaceLogs,
   fetchSessionDashboard,
   fetchStorageDashboard,
   fetchCacheDashboard,
