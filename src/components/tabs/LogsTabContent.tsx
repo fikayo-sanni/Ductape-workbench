@@ -314,14 +314,13 @@ export default function LogsTabContent() {
     queryKey: ['workspace-logs', currentWorkspaceId, filters, debouncedSearch],
     queryFn: ({ pageParam = 1 }) => {
       const dateRange = getDateRange(filters.timeRange);
-      return logsServices.fetchLogs(
+      return logsServices.fetchWorkspaceLogs(
         {
           user_id: user?._id ?? '',
           public_key: user?.public_key ?? '',
           workspace_id: currentWorkspaceId ?? '',
         },
         {
-          component: filters.component === 'all' ? undefined : filters.component,
           type: filters.component === 'all' ? undefined : filters.component,
           app_id: filters.app === 'all' ? undefined : filters.app,
           product_id: filters.product === 'all' ? undefined : filters.product,
