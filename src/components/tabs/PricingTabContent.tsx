@@ -1369,7 +1369,7 @@ export default function PricingTabContent() {
           <li className="flex items-start gap-2 text-sm py-1">
             <CheckCircle className="h-4 w-4 text-green mt-0.5 flex-shrink-0" />
             <span className="font-medium text-base text-[#78797A]">
-              {formatNumber(plan.monthlyRequests)} API requests/month
+              {formatNumber(plan.monthlyRequests)} feature runs/month
             </span>
           </li>
 
@@ -1429,7 +1429,7 @@ export default function PricingTabContent() {
 
             <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
               <li>
-                • API: ${plan.usagePricing.additionalRequestPrice} per request
+                • Runs: ${plan.usagePricing.additionalRequestPrice} per feature run
               </li>
               <li>
                 • Storage: ${plan.usagePricing.additionalStoragePrice} per GB
@@ -1488,7 +1488,7 @@ export default function PricingTabContent() {
           <li className="flex items-start gap-2 text-sm py-1">
             <CheckCircle className="h-4 w-4 text-[#391484] mt-0.5 flex-shrink-0" />
             <span className="font-medium text-base text-[#78797A]">
-              {formatNumber(plan.monthlyRequests)} api requests/month
+              {formatNumber(plan.monthlyRequests)} feature runs/month
             </span>
           </li>
           <li className="flex items-start gap-2 text-sm py-1">
@@ -1532,7 +1532,7 @@ export default function PricingTabContent() {
             </p>
             <ul className="text-xs text-[#78797A] space-y-0.5 pl-4">
               <li>
-                • API: ${plan.usagePricing.additionalRequestPrice} per request
+                • Runs: ${plan.usagePricing.additionalRequestPrice} per feature run
               </li>
               <li>
                 • Storage: ${plan.usagePricing.additionalStoragePrice} per GB
@@ -1743,7 +1743,7 @@ export default function PricingTabContent() {
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-blue-500" />
                       <span className="text-sm font-semibold text-grey">
-                        API Requests
+                        Feature Runs
                       </span>
                     </div>
                     <span className="text-xs text-grey-600">
@@ -3325,7 +3325,7 @@ export default function PricingTabContent() {
                         <Zap className="h-4 w-4 text-blue-600" />
                       </div>
                       <span className="font-semibold text-grey">
-                        API Requests
+                        Feature Runs
                       </span>
                     </div>
                   </div>
@@ -3759,7 +3759,7 @@ export default function PricingTabContent() {
                           <span>
                             {selectedPlan.monthlyRequests?.toLocaleString() ||
                               'Unlimited'}{' '}
-                            API requests/month
+                            feature runs/month
                           </span>
                         </div>
                       </li>

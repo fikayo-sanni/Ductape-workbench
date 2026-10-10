@@ -29,7 +29,7 @@ export function PlanFeatureList({ plan, compact = false }: PlanFeatureListProps)
   const features: string[] = [];
 
   if (plan.monthlyRequests != null) {
-    features.push(`${formatLimit(plan.monthlyRequests)} API requests / month`);
+    features.push(`${formatLimit(plan.monthlyRequests)} feature runs / month`);
   }
   features.push(`${formatStorage(plan.fileTransfer)} file transfer`);
   features.push(`${formatLimit(plan.users)} users`);
