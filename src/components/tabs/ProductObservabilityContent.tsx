@@ -1,18 +1,33 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3, FileText, FunctionSquare, Gauge, HeartPulse, Loader2, Search } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, HeartPulse, RefreshCw, Search } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/store/useAuth';
 import { fetchProductObservability } from '@/services/logsServices';
+import { describeStatus } from '@/utils/observabilityNarrative';
 import { cn } from '@/lib/utils';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { format } from 'date-fns';
+import {
+  DataTable,
+  Panel,
+  Pill,
+  SectionEmpty,
+  SectionError,
+  SectionLoading,
+  SectionPage,
+  SegmentedTabs,
+  StatTile,
+  StatusDot,
+  type SectionTint,
+  type Tone,
+} from './ProductSection';
 
-type View = 'overview' | 'logs' | 'functions' | 'features' | 'health';
+export type ObservabilityView = 'overview' | 'logs' | 'functions' | 'features' | 'health';
 
-const views: Array<{ id: View; label: string }> = [
+const VIEWS: Array<{ id: ObservabilityView; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'logs', label: 'Logs' },
   { id: 'functions', label: 'Functions' },
@@ -20,128 +35,650 @@ const views: Array<{ id: View; label: string }> = [
   { id: 'health', label: 'Health' },
 ];
 
-const logComponents = ['all', 'actions', 'database', 'storage', 'cache', 'message_broker', 'jobs', 'session', 'feature', 'feature_step', 'functions', 'healthcheck'];
-const timeRanges = [{ id: '1h', label: '1 hour', ms: 3_600_000 }, { id: '24h', label: '24 hours', ms: 86_400_000 }, { id: '7d', label: '7 days', ms: 604_800_000 }, { id: '30d', label: '30 days', ms: 2_592_000_000 }];
+const TINT: SectionTint = { bg: 'bg-primary/10', text: 'text-primary' };
 
-const isFailure = (row: any) =>
-  row?.failed_execution === true || /fail|error|unavailable|unhealthy/i.test(String(row?.status || ''));
+const LOG_COMPONENTS = ['all', 'actions', 'database', 'storage', 'cache', 'message_broker', 'jobs', 'session', 'feature', 'feature_step', 'functions', 'healthcheck'];
+
+const TIME_RANGES = [
+  { id: '1h', label: '1 hour', ms: 3_600_000 },
+  { id: '24h', label: '24 hours', ms: 86_400_000 },
+  { id: '7d', label: '7 days', ms: 604_800_000 },
+  { id: '30d', label: '30 days', ms: 2_592_000_000 },
+];
+
+/** Friendly names for the raw log types. */
+const KIND_LABELS: Record<string, string> = {
+  actions: 'Actions',
+  action: 'Actions',
+  database: 'Databases',
+  storage: 'Storage',
+  cache: 'Caches',
+  message_broker: 'Message brokers',
+  jobs: 'Jobs',
+  session: 'Sessions',
+  feature: 'Features',
+  feature_step: 'Feature steps',
+  functions: 'Functions',
+  healthcheck: 'Health checks',
+  rate_limit: 'Rate limits',
+  notification: 'Notifications',
+};
+
+const kindLabel = (type: unknown) => {
+  const key = String(type || 'unknown');
+  return KIND_LABELS[key] ?? key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+};
+
+type OperationSort = 'calls' | 'slowest' | 'failures';
+
+const SORTS: Array<{ id: OperationSort; label: string }> = [
+  { id: 'calls', label: 'Most used' },
+  { id: 'slowest', label: 'Slowest' },
+  { id: 'failures', label: 'Most failures' },
+];
+
+const isFailure = (row: any) => row?.failed_execution === true || /fail|error|unavailable|unhealthy/i.test(String(row?.status || ''));
+
 const latencyOf = (row: any) => {
   const stored = Number(row?.latency);
   if (Number.isFinite(stored) && stored > 0) return stored;
   const derived = Number(row?.end) - Number(row?.start);
   return Number.isFinite(derived) && derived > 0 ? derived : null;
 };
-const measuredLatency = (value: unknown) => {
+
+const measured = (value: unknown) => {
   const latency = Number(value);
   return Number.isFinite(latency) && latency > 0 ? latency : null;
 };
+
 const percentile = (values: number[], ratio: number) => {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
 };
-const operationOf = (row: any) =>
-  row?.function_tag || row?.feature_tag || row?.child_tag || row?.action || row?.parent_tag || row?.type || 'unknown';
 
-export default function ProductObservabilityContent({ product, initialView = 'overview' }: { product: any; initialView?: View }) {
+const operationOf = (row: any) => row?.function_tag || row?.feature_tag || row?.child_tag || row?.action || row?.parent_tag || row?.type || 'unknown';
+
+const ms = (value: number | null | undefined) => (value == null ? '-' : `${Math.round(value)} ms`);
+
+const isAvailable = (status: unknown) => {
+  const text = String(status || '');
+  return text.includes('available') && !text.includes('unavailable');
+};
+
+interface Props {
+  product: any;
+  initialView?: ObservabilityView;
+  /**
+   * Render only the content, without the page header or its own scroll area, so it can sit inside
+   * another section's page (for example the Functions "Activity" tab).
+   */
+  embedded?: boolean;
+}
+
+export default function ProductObservabilityContent({ product, initialView = 'overview', embedded = false }: Props) {
   const { user, currentWorkspaceId } = useAuth();
-  const [view, setView] = useState<View>(initialView);
+  const [view, setView] = useState<ObservabilityView>(initialView);
   const [env, setEnv] = useState('all');
   const [logComponent, setLogComponent] = useState('all');
   const [logStatus, setLogStatus] = useState('all');
   const [logSearch, setLogSearch] = useState('');
   const [timeRange, setTimeRange] = useState('24h');
-  const range = timeRanges.find((item) => item.id === timeRange) ?? timeRanges[1];
-  const startDate = new Date(Date.now() - range.ms).toISOString();
+  const [sort, setSort] = useState<OperationSort>('calls');
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const range = TIME_RANGES.find(item => item.id === timeRange) ?? TIME_RANGES[1];
+  const enabled = Boolean(currentWorkspaceId && user?._id && user?.public_key && product?._id && product?.tag);
+  // The window is computed when the request runs, so Refresh always reaches "now".
+  const read = (extra: Record<string, unknown>) => {
+    const now = Date.now();
+    return fetchProductObservability(currentWorkspaceId!, user!._id, user!.public_key, product.tag, {
+      env: env === 'all' ? undefined : env,
+      start_date: new Date(now - range.ms).toISOString(),
+      end_date: new Date(now).toISOString(),
+      page: 1,
+      ...extra,
+    } as any);
+  };
+
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['product-observability', currentWorkspaceId, product?._id, product?.tag, env, view, logComponent, logStatus, logSearch, timeRange],
-    queryFn: () => fetchProductObservability(
-      currentWorkspaceId!, user!._id, user!.public_key, product.tag,
-      {
-        env: env === 'all' ? undefined : env,
+    queryFn: () =>
+      read({
         component: view === 'functions' ? 'functions' : view === 'features' ? 'feature,feature_step' : view === 'logs' && logComponent !== 'all' ? logComponent : undefined,
-        status: view === 'logs' && logStatus !== 'all' ? logStatus as 'success' | 'fail' | 'processing' : undefined,
+        status: view === 'logs' && logStatus !== 'all' ? logStatus : undefined,
         process_id: view === 'logs' && logSearch.trim() ? logSearch.trim() : undefined,
-        start_date: startDate,
-        end_date: new Date().toISOString(),
-        page: 1,
         limit: 200,
-      },
-    ),
-    enabled: Boolean(currentWorkspaceId && user?._id && user?.public_key && product?._id && product?.tag),
+      }),
+    enabled,
     staleTime: 30_000,
   });
 
-  const logs = useMemo(() => data?.logs ?? [], [data]);
+  // The overview lists the latest failures on their own, so they are not limited to the 200 most recent operations.
+  const failuresQuery = useQuery({
+    queryKey: ['product-observability-failures', currentWorkspaceId, product?._id, product?.tag, env, timeRange],
+    queryFn: () => read({ status: 'fail', limit: 8 }),
+    enabled: enabled && view === 'overview',
+    staleTime: 30_000,
+  });
+
+  const logs: any[] = useMemo(() => data?.logs ?? [], [data]);
   const visibleLogs = useMemo(() => {
-    if (view === 'functions') return logs.filter((row: any) => String(row.type).toLowerCase() === 'functions' || row.function_tag);
-    if (view === 'features') return logs.filter((row: any) => /^feature(?:_step)?$/i.test(String(row.type)) || row.feature_tag);
+    if (view === 'functions') return logs.filter(row => String(row.type).toLowerCase() === 'functions' || row.function_tag);
+    if (view === 'features') return logs.filter(row => /^feature(?:_step)?$/i.test(String(row.type)) || row.feature_tag);
     return logs;
   }, [logs, view]);
+
+  const operations: any[] = useMemo(() => data?.operations ?? [], [data]);
   const metrics = useMemo(() => {
     const failures = logs.filter(isFailure).length;
-    const latencies = logs.map(latencyOf).filter((value: number | null): value is number => value !== null);
+    const latencies = logs.map(latencyOf).filter((value): value is number => value !== null);
     return {
       total: data?.summary?.total ?? logs.length,
       failures: data?.summary?.failures ?? failures,
       errorRate: data?.summary?.errorRatePercent ?? (logs.length ? (failures / logs.length) * 100 : 0),
-      p50: measuredLatency(data?.summary?.p50LatencyMs) ?? percentile(latencies, 0.5),
-      p95: measuredLatency(data?.summary?.p95LatencyMs) ?? percentile(latencies, 0.95),
+      p50: measured(data?.summary?.p50LatencyMs) ?? percentile(latencies, 0.5),
+      p95: measured(data?.summary?.p95LatencyMs) ?? percentile(latencies, 0.95),
     };
   }, [data, logs]);
-  const healthchecks = data?.healthchecks ?? product?.healthchecks ?? [];
 
-  const cards = [
-    { label: 'Operations', value: metrics.total, icon: Activity },
-    { label: 'Error rate', value: `${metrics.errorRate.toFixed(1)}%`, icon: AlertTriangle },
-    { label: 'p50 latency', value: metrics.p50 == null ? '—' : `${Math.round(metrics.p50)} ms`, icon: Clock3 },
-    { label: 'p95 latency', value: metrics.p95 == null ? '—' : `${Math.round(metrics.p95)} ms`, icon: Gauge },
-  ];
+  const healthchecks: any[] = data?.healthchecks ?? product?.healthchecks ?? [];
+  const unhealthyChecks = healthchecks.filter(check => (check.envs ?? []).some((item: any) => (env === 'all' || item.slug === env) && item.status && !isAvailable(item.status))).length;
+
+  const topFailing = useMemo(() => {
+    const worst = [...operations].filter(row => row.failures > 0).sort((a, b) => b.failures - a.failures)[0];
+    return worst ? { operation: String(worst.operation || 'unknown'), failures: Number(worst.failures) } : undefined;
+  }, [operations]);
+
+  const narrative = describeStatus({
+    total: metrics.total,
+    failures: metrics.failures,
+    errorRatePercent: metrics.errorRate,
+    topFailing,
+    unhealthyChecks,
+    totalChecks: healthchecks.length,
+    rangeLabel: range.label,
+  });
+
+  const openFailures = () => {
+    setLogComponent('all');
+    setLogSearch('');
+    setLogStatus('fail');
+    setView('logs');
+  };
+
+  const filters = (
+    <>
+      <Select value={env} onValueChange={setEnv}>
+        <SelectTrigger className="h-9 w-40 bg-white" aria-label="Environment">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All environments</SelectItem>
+          {(product?.envs ?? []).map((item: any) => (
+            <SelectItem key={item.slug} value={item.slug}>
+              {item.name || item.slug}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={timeRange} onValueChange={setTimeRange}>
+        <SelectTrigger className="h-9 w-36 bg-white" aria-label="Time range">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TIME_RANGES.map(item => (
+            <SelectItem key={item.id} value={item.id}>
+              Last {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        disabled={isFetching}
+        onClick={() => {
+          void refetch();
+          if (view === 'overview') void failuresQuery.refetch();
+        }}
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
+        <span className="hidden sm:inline">Refresh</span>
+      </Button>
+    </>
+  );
+
+  const body = isLoading ? (
+    <SectionLoading label="Loading activity..." />
+  ) : isError ? (
+    <SectionError onRetry={() => void refetch()}>Activity could not be loaded. Your product is unaffected; this is a read-only view.</SectionError>
+  ) : (
+    <>
+      {view === 'overview' && (
+        <Overview
+          narrative={narrative}
+          metrics={metrics}
+          timeline={data?.timeline ?? []}
+          operations={operations}
+          sort={sort}
+          onSort={setSort}
+          failures={failuresQuery.data?.logs ?? []}
+          failuresLoading={failuresQuery.isLoading}
+          healthchecks={healthchecks}
+          env={env}
+          onOpenFailures={openFailures}
+          onOpenHealth={() => setView('health')}
+        />
+      )}
+      {view === 'health' && <HealthView healthchecks={healthchecks} env={env} />}
+      {view === 'logs' && (
+        <>
+          <Panel>
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" />
+                <Input value={logSearch} onChange={event => setLogSearch(event.target.value)} placeholder="Find one run by its exact process ID" className="pl-9" />
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Select value={logComponent} onValueChange={setLogComponent}>
+                  <SelectTrigger className="h-9 w-48 bg-white" aria-label="Component">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOG_COMPONENTS.map(item => (
+                      <SelectItem key={item} value={item}>
+                        {item === 'all' ? 'All components' : kindLabel(item)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={logStatus} onValueChange={setLogStatus}>
+                  <SelectTrigger className="h-9 w-40 bg-white" aria-label="Status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="success">Succeeded</SelectItem>
+                    <SelectItem value="fail">Failed</SelectItem>
+                    <SelectItem value="processing">Running</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </Panel>
+          <LogTable rows={visibleLogs} emptyLabel="logs" />
+        </>
+      )}
+      {(view === 'functions' || view === 'features') && (
+        <>
+          <KindSummary operations={operations} kinds={view === 'functions' ? ['functions'] : ['feature', 'feature_step']} />
+          <LogTable rows={visibleLogs} emptyLabel={view} />
+        </>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">{filters}</div>
+        {body}
+      </>
+    );
+  }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-grey-100">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-grey-300 bg-white px-6 py-4">
-        <div><h1 className="text-xl font-semibold text-grey">Product observability</h1><p className="text-sm text-grey-500">Runs, logs, functions, health and performance in one place.</p></div>
-        <div className="flex items-center gap-2">
-          <Select value={env} onValueChange={setEnv}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All environments</SelectItem>{(product?.envs ?? []).map((item: any) => <SelectItem key={item.slug} value={item.slug}>{item.name || item.slug}</SelectItem>)}</SelectContent></Select>
-          <Button variant="outline" onClick={() => void refetch()}>Refresh</Button>
-        </div>
-      </header>
-      <nav className="flex gap-1 overflow-x-auto border-b border-grey-300 bg-white px-6">
-        {views.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={cn('border-b-2 px-3 py-3 text-sm font-medium', view === item.id ? 'border-primary text-primary' : 'border-transparent text-grey-600 hover:text-grey')}>{item.label}</button>)}
-      </nav>
-      <main className="flex-1 overflow-auto p-6">
-        {isLoading ? <div className="flex h-48 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : isError ? <div className="rounded-lg border border-red-200 bg-white p-6 text-sm text-red-600">Observability data could not be loaded. The product remains available; retry this read-only view.</div> : (
-          <div className="mx-auto max-w-7xl space-y-6">
-            {view === 'overview' && <>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ label, value, icon: Icon }) => <div key={label} className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm"><Icon className="mb-3 h-5 w-5 text-primary" /><p className="text-2xl font-bold text-grey">{value}</p><p className="text-xs text-grey-500">{label}</p></div>)}</div>
-              <ObservabilityTimeline rows={data?.timeline ?? []} />
-              <SlowestOperations rows={(data?.operations ?? []).slice(0, 10)} />
-            </>}
+    <SectionPage
+      icon={BarChart3}
+      tint={TINT}
+      title="Observability"
+      subtitle={`How ${product?.name || 'this product'} has been running in the last ${range.label}`}
+      actions={filters}
+      toolbar={<SegmentedTabs label="Observability views" value={view} onChange={setView} options={VIEWS} />}
+    >
+      {body}
+    </SectionPage>
+  );
+}
 
-            {view === 'health' ? <div className="grid gap-4 lg:grid-cols-2">{healthchecks.length ? healthchecks.map((check: any) => <section key={check.tag} className="rounded-lg border border-grey-300 bg-white p-5"><div className="flex items-center gap-3"><HeartPulse className="h-5 w-5 text-red-500" /><div><h2 className="font-semibold text-grey">{check.name || check.tag}</h2><p className="text-xs text-grey-500">{check.probe?.type || 'healthcheck'} · every {Math.round(Number(check.interval || check.checkIntervals || 0) / 1000)}s</p></div></div><div className="mt-4 space-y-2">{(check.envs ?? []).filter((item: any) => env === 'all' || item.slug === env).map((item: any) => <div key={item.slug} className="flex items-start justify-between rounded bg-grey-100 p-3 text-sm"><div><p className="font-medium text-grey">{item.slug}</p>{item.lastError && <p className="mt-1 max-w-xl text-xs text-red-600">{item.lastError.message || String(item.lastError)}</p>}</div><span className={cn('flex items-center gap-1 capitalize', String(item.status).includes('available') && !String(item.status).includes('unavailable') ? 'text-green' : 'text-red-600')}>{String(item.status).includes('available') && !String(item.status).includes('unavailable') ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{item.status || 'unknown'}</span></div>)}</div></section>) : <p className="rounded-lg border border-grey-300 bg-white p-8 text-center text-sm text-grey-500">No healthchecks are configured.</p>}</div> : null}
+function Overview({
+  narrative,
+  metrics,
+  timeline,
+  operations,
+  sort,
+  onSort,
+  failures,
+  failuresLoading,
+  healthchecks,
+  env,
+  onOpenFailures,
+  onOpenHealth,
+}: {
+  narrative: ReturnType<typeof describeStatus>;
+  metrics: { total: number; failures: number; errorRate: number; p50: number | null; p95: number | null };
+  timeline: any[];
+  operations: any[];
+  sort: OperationSort;
+  onSort: (next: OperationSort) => void;
+  failures: any[];
+  failuresLoading: boolean;
+  healthchecks: any[];
+  env: string;
+  onOpenFailures: () => void;
+  onOpenHealth: () => void;
+}) {
+  const tone: Tone = narrative.tone;
+  const Icon = tone === 'good' ? CheckCircle2 : tone === 'neutral' ? Activity : AlertTriangle;
 
-            {view === 'logs' && <><div className="rounded-lg border border-grey-300 bg-white p-4 shadow-sm"><div className="flex flex-col gap-4"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" /><Input value={logSearch} onChange={(event) => setLogSearch(event.target.value)} placeholder="Search by exact process ID" className="pl-9" /></div><div className="flex flex-wrap gap-3"><Select value={logComponent} onValueChange={setLogComponent}><SelectTrigger className="w-48"><SelectValue /></SelectTrigger><SelectContent>{logComponents.map((item) => <SelectItem key={item} value={item}>{item === 'all' ? 'All components' : item.replace(/_/g, ' ')}</SelectItem>)}</SelectContent></Select><Select value={logStatus} onValueChange={setLogStatus}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="success">Success</SelectItem><SelectItem value="fail">Failed</SelectItem><SelectItem value="processing">Processing</SelectItem></SelectContent></Select><div className="flex flex-wrap gap-1">{timeRanges.map((item) => <button key={item.id} onClick={() => setTimeRange(item.id)} className={cn('rounded-md px-3 py-2 text-xs font-medium', timeRange === item.id ? 'bg-primary text-white' : 'bg-grey-100 text-grey-600 hover:text-grey')}>{item.label}</button>)}</div></div></div></div><LogTable rows={visibleLogs} emptyLabel="logs" /></>}
-            {(view === 'functions' || view === 'features') && <LogTable rows={visibleLogs} emptyLabel={view} />}
-            {view === 'overview' && <div className="grid gap-4 lg:grid-cols-2"><section className="rounded-lg border border-grey-300 bg-white p-5"><div className="flex items-center gap-2"><FunctionSquare className="h-5 w-5 text-violet-600" /><h2 className="font-semibold text-grey">Functions</h2></div><p className="mt-3 text-3xl font-bold text-grey">{logs.filter((row: any) => String(row.type).toLowerCase() === 'functions' || row.function_tag).length}</p><p className="text-xs text-grey-500">invocations in this sample</p></section><section className="rounded-lg border border-grey-300 bg-white p-5"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><h2 className="font-semibold text-grey">Healthchecks</h2></div><p className="mt-3 text-3xl font-bold text-grey">{healthchecks.length}</p><p className="text-xs text-grey-500">configured checks</p></section></div>}
-          </div>
+  const sorted = useMemo(() => {
+    const rows = [...operations];
+    if (sort === 'slowest') rows.sort((a, b) => (b.maxLatencyMs ?? 0) - (a.maxLatencyMs ?? 0));
+    else if (sort === 'failures') rows.sort((a, b) => b.failures - a.failures || b.calls - a.calls);
+    else rows.sort((a, b) => b.calls - a.calls);
+    return rows.slice(0, 8);
+  }, [operations, sort]);
+
+  return (
+    <>
+      <div
+        className={cn(
+          'flex items-start gap-3 rounded-lg border p-4 sm:p-5',
+          tone === 'good' && 'border-green/30 bg-green/5',
+          tone === 'warn' && 'border-orange/40 bg-orange/5',
+          tone === 'bad' && 'border-red/30 bg-red/5',
+          tone === 'neutral' && 'border-grey-400 bg-white',
         )}
-      </main>
+      >
+        <Icon className={cn('mt-0.5 h-5 w-5 flex-shrink-0', tone === 'good' && 'text-green', tone === 'warn' && 'text-orange', tone === 'bad' && 'text-red', tone === 'neutral' && 'text-grey-500')} />
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-grey sm:text-base">{narrative.title}</h2>
+          <p className="mt-0.5 text-xs text-grey-600 sm:text-sm">{narrative.detail}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
+        <StatTile label="Operations" value={metrics.total.toLocaleString()} hint="actions, features, functions and more" tone="info" />
+        <StatTile label="Failed" value={metrics.failures.toLocaleString()} hint={`${metrics.errorRate >= 10 ? Math.round(metrics.errorRate) : metrics.errorRate.toFixed(1)}% of operations`} tone={metrics.failures ? 'bad' : 'good'} />
+        <StatTile label="Typical response" value={ms(metrics.p50)} hint="half of operations finish faster" />
+        <StatTile label="Slow responses" value={ms(metrics.p95)} hint="1 in 20 operations takes longer" tone={metrics.p95 && metrics.p95 > 5000 ? 'warn' : 'neutral'} />
+      </div>
+
+      <Panel title="Activity over time" description="Successful and failed operations, per day.">
+        {timeline.length ? (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={timeline}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={value => format(new Date(`${value}T00:00:00`), 'MMM d')} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="successful" name="Succeeded" stackId="outcome" fill="#00875A" />
+                <Bar dataKey="failures" name="Failed" stackId="outcome" fill="#DC3444" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-10 text-center text-sm text-grey-500">No activity in this time window.</p>
+        )}
+      </Panel>
+
+      <KindSummary operations={operations} />
+
+      <Panel
+        title="Latest failures"
+        description="The most recent operations that did not succeed."
+        action={
+          failures.length ? (
+            <Button variant="ghost" size="sm" onClick={onOpenFailures}>
+              See all in Logs
+            </Button>
+          ) : undefined
+        }
+        flush
+      >
+        {failuresLoading ? (
+          <SectionLoading label="Loading failures..." />
+        ) : failures.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-grey-500">No failures in this time window.</p>
+        ) : (
+          <ul className="divide-y divide-grey-300">
+            {failures.map((row, index) => (
+              <li key={String(row._id || row.process_id || index)} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
+                <span className="w-28 flex-shrink-0 text-xs text-grey-500" title={row.timestamp ? new Date(row.timestamp).toLocaleString() : ''}>
+                  {row.timestamp ? formatDistanceToNow(new Date(row.timestamp), { addSuffix: true }) : '-'}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">{operationOf(row)}</code>
+                    <Pill>{kindLabel(row.type || row.component)}</Pill>
+                    {row.env || row.app_env ? <Pill>{row.env || row.app_env}</Pill> : null}
+                  </div>
+                  <p className="mt-1 break-words text-xs text-grey-600 sm:text-sm">{row.message || row.name || 'No error message was recorded.'}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel
+        title="What is running"
+        description="Each operation your product performed in this period."
+        action={<SegmentedTabs label="Sort operations" value={sort} onChange={onSort} options={SORTS} />}
+        flush
+      >
+        {sorted.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-grey-500">No operations were recorded in this period.</p>
+        ) : (
+          <DataTable head={['Operation', 'Kind', 'Calls', 'Failed', 'Average', 'Slowest']} minWidth={640}>
+            {sorted.map(row => (
+              <tr key={`${row.type}:${row.operation}`} className="hover:bg-grey-100">
+                <td className="px-4 py-3 font-mono text-xs font-medium text-grey sm:text-sm">{row.operation || 'unknown'}</td>
+                <td className="px-4 py-3 text-grey-600">{kindLabel(row.type)}</td>
+                <td className="px-4 py-3 text-grey">{Number(row.calls).toLocaleString()}</td>
+                <td className={cn('px-4 py-3', row.failures ? 'font-medium text-red' : 'text-grey-500')}>{row.failures ? Number(row.failures).toLocaleString() : '0'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-grey-600">{ms(row.averageLatencyMs)}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-medium text-grey">{ms(row.maxLatencyMs)}</td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+      </Panel>
+
+      <HealthSummary healthchecks={healthchecks} env={env} onOpen={onOpenHealth} />
+    </>
+  );
+}
+
+/** One tile per kind of thing that ran (actions, features, functions...), built from the per-operation aggregates. */
+function KindSummary({ operations, kinds }: { operations: any[]; kinds?: string[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, { type: string; calls: number; failures: number; weighted: number; timed: number }>();
+    for (const row of operations) {
+      const type = String(row.type || 'unknown');
+      if (kinds && !kinds.includes(type)) continue;
+      const group = map.get(type) ?? { type, calls: 0, failures: 0, weighted: 0, timed: 0 };
+      group.calls += Number(row.calls) || 0;
+      group.failures += Number(row.failures) || 0;
+      if (row.averageLatencyMs != null) {
+        group.weighted += row.averageLatencyMs * row.calls;
+        group.timed += row.calls;
+      }
+      map.set(type, group);
+    }
+    return [...map.values()].sort((a, b) => b.calls - a.calls);
+  }, [operations, kinds]);
+
+  if (!groups.length) return null;
+  return (
+    <Panel title="What ran" description="Operations grouped by what kind of thing they are.">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {groups.map(group => {
+          const failedShare = group.calls ? Math.round((group.failures / group.calls) * 100) : 0;
+          return (
+            <div key={group.type} className="rounded-lg border border-grey-300 p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium text-grey">{kindLabel(group.type)}</h3>
+                {group.failures ? <Pill tone="bad">{failedShare}% failed</Pill> : <Pill tone="good">All succeeded</Pill>}
+              </div>
+              <p className="mt-2 text-2xl font-bold text-grey">{group.calls.toLocaleString()}</p>
+              <p className="text-xs text-grey-500">
+                {group.calls === 1 ? 'call' : 'calls'}
+                {group.timed ? ` · ${ms(group.weighted / group.timed)} on average` : ''}
+              </p>
+              <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-grey-100" aria-hidden="true">
+                <div className="h-full bg-green" style={{ width: `${100 - failedShare}%` }} />
+                <div className="h-full bg-red" style={{ width: `${failedShare}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function envStatuses(check: any, env: string) {
+  return (check.envs ?? []).filter((item: any) => env === 'all' || item.slug === env);
+}
+
+function HealthSummary({ healthchecks, env, onOpen }: { healthchecks: any[]; env: string; onOpen: () => void }) {
+  return (
+    <Panel
+      title="Health checks"
+      description="Whether the things your product depends on are reachable."
+      action={
+        healthchecks.length ? (
+          <Button variant="ghost" size="sm" onClick={onOpen}>
+            Details
+          </Button>
+        ) : undefined
+      }
+      flush
+    >
+      {healthchecks.length === 0 ? (
+        <p className="px-4 py-10 text-center text-sm text-grey-500">No health checks are configured for this product.</p>
+      ) : (
+        <ul className="divide-y divide-grey-300">
+          {healthchecks.map(check => (
+            <li key={check.tag} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <span className="text-sm font-medium text-grey">{check.name || check.tag}</span>
+              <div className="flex flex-wrap gap-2">
+                {envStatuses(check, env).map((item: any) => (
+                  <span key={item.slug} className="inline-flex items-center gap-1.5 text-xs text-grey-600">
+                    <StatusDot tone={!item.status ? 'neutral' : isAvailable(item.status) ? 'good' : 'bad'} />
+                    {item.slug}: {item.status || 'not checked yet'}
+                  </span>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function HealthView({ healthchecks, env }: { healthchecks: any[]; env: string }) {
+  if (!healthchecks.length) {
+    return <SectionEmpty icon={HeartPulse} tint={TINT} title="No health checks yet" description="Health checks probe the apps, databases and other things your product depends on. Add one under Resilience to see it here." />;
+  }
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {healthchecks.map(check => (
+        <Panel
+          key={check.tag}
+          title={check.name || check.tag}
+          description={`${check.probe?.type || 'healthcheck'} probe, every ${Math.round(Number(check.interval || check.checkIntervals || 0) / 1000)} seconds`}
+        >
+          <div className="space-y-2">
+            {envStatuses(check, env).map((item: any) => {
+              const ok = isAvailable(item.status);
+              return (
+                <div key={item.slug} className="flex items-start justify-between gap-3 rounded-lg bg-grey-100 p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-grey">{item.slug}</p>
+                    {item.lastError ? <p className="mt-1 break-words text-xs text-red">{item.lastError.message || String(item.lastError)}</p> : null}
+                  </div>
+                  <Pill tone={!item.status ? 'neutral' : ok ? 'good' : 'bad'} className="capitalize">
+                    {ok ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                    {item.status || 'unknown'}
+                  </Pill>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      ))}
     </div>
   );
 }
 
-function ObservabilityTimeline({ rows }: { rows: any[] }) {
-  return <section className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm"><h2 className="font-semibold text-grey">Product activity</h2><p className="mb-4 text-xs text-grey-500">Successful and failed operations from the product observability aggregate.</p>{rows.length ? <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={rows}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} /><Tooltip /><Legend /><Bar dataKey="successful" name="Successful" stackId="outcome" fill="#22c55e" /><Bar dataKey="failures" name="Failed" stackId="outcome" fill="#ef4444" /></BarChart></ResponsiveContainer></div> : <p className="py-12 text-center text-sm text-grey-500">No activity in this time window.</p>}</section>;
-}
-
-function SlowestOperations({ rows }: { rows: any[] }) {
-  return <section className="rounded-lg border border-grey-300 bg-white shadow-sm"><div className="border-b border-grey-200 p-5"><h2 className="font-semibold text-grey">Slowest operations</h2><p className="text-xs text-grey-500">Server-side aggregates for the selected environment and time window.</p></div>{rows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-grey-100 text-xs uppercase text-grey-500"><tr><th className="px-5 py-3">Operation</th><th className="px-5 py-3">Type</th><th className="px-5 py-3">Calls</th><th className="px-5 py-3">Failures</th><th className="px-5 py-3">Average</th><th className="px-5 py-3">Slowest</th></tr></thead><tbody className="divide-y divide-grey-200">{rows.map((row) => <tr key={`${row.type}:${row.operation}`}><td className="px-5 py-3 font-mono font-medium text-grey">{row.operation || 'unknown'}</td><td className="px-5 py-3 capitalize text-grey-600">{String(row.type || 'unknown').replace(/_/g, ' ')}</td><td className="px-5 py-3 text-grey">{row.calls}</td><td className={cn('px-5 py-3', row.failures ? 'text-red-600' : 'text-grey')}>{row.failures}</td><td className="px-5 py-3 text-grey">{row.averageLatencyMs == null ? '—' : `${Math.round(row.averageLatencyMs)} ms`}</td><td className="px-5 py-3 font-semibold text-grey">{row.maxLatencyMs == null ? '—' : `${Math.round(row.maxLatencyMs)} ms`}</td></tr>)}</tbody></table></div> : <p className="p-8 text-center text-sm text-grey-500">No timed operations found.</p>}</section>;
-}
-
 function LogTable({ rows, emptyLabel }: { rows: any[]; emptyLabel: string }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  if (!rows.length) return <p className="rounded-lg border border-grey-300 bg-white p-8 text-center text-sm text-grey-500">No {emptyLabel} found for this environment and time window.</p>;
-  return <div className="overflow-hidden rounded-lg border border-grey-300 bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="border-b border-grey-300 bg-grey-100 text-xs uppercase text-grey-500"><tr><th className="w-10 px-3 py-3" /><th className="px-3 py-3">Time</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Component</th><th className="px-3 py-3">Environment</th><th className="px-3 py-3">Operation</th><th className="px-3 py-3">Message</th><th className="px-3 py-3">Latency</th><th className="px-3 py-3">Process ID</th></tr></thead><tbody className="divide-y divide-grey-200">{rows.map((row: any, index) => { const key = String(row._id || row.process_id || index); const open = expanded[key]; const latency = latencyOf(row); return <Fragment key={key}><tr onClick={() => setExpanded((current) => ({ ...current, [key]: !open }))} className="cursor-pointer hover:bg-grey-50"><td className="px-3 py-3">{open ? <ChevronDown className="h-4 w-4 text-grey-600" /> : <ChevronRight className="h-4 w-4 text-grey-600" />}</td><td className="whitespace-nowrap px-3 py-3 font-medium text-grey">{row.timestamp ? format(new Date(row.timestamp), 'MMM dd, HH:mm:ss') : '—'}</td><td className="px-3 py-3"><span className={cn('inline-flex items-center gap-1.5 capitalize', isFailure(row) ? 'text-red-600' : row.status === 'processing' ? 'text-orange-600' : 'text-green')}><span className={cn('h-2 w-2 rounded-full', isFailure(row) ? 'bg-red' : row.status === 'processing' ? 'bg-orange-500' : 'bg-green')} />{row.status || (isFailure(row) ? 'failed' : 'success')}</span></td><td className="px-3 py-3 capitalize text-grey-600">{String(row.type || row.component || 'unknown').replace(/_/g, ' ')}</td><td className="px-3 py-3"><span className="rounded bg-grey-100 px-2 py-1 text-xs font-medium uppercase text-grey-600">{row.env || row.app_env || '—'}</span></td><td className="px-3 py-3"><code className="rounded bg-primary/10 px-2 py-1 text-xs text-primary">{operationOf(row)}</code></td><td className="max-w-64 truncate px-3 py-3 text-grey-600">{row.message || row.name || '—'}</td><td className="whitespace-nowrap px-3 py-3 text-grey">{latency == null ? '—' : `${Math.round(latency)} ms`}</td><td className="px-3 py-3"><code className="text-xs text-grey-600">{row.process_id ? `${String(row.process_id).slice(0, 12)}${String(row.process_id).length > 12 ? '…' : ''}` : '—'}</code></td></tr>{open && <tr className="bg-grey-50"><td colSpan={9} className="px-12 py-4"><dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4"><div><dt className="text-grey-500">Process ID</dt><dd className="mt-1 break-all font-mono text-grey">{row.process_id || '—'}</dd></div><div><dt className="text-grey-500">Feature</dt><dd className="mt-1 font-mono text-grey">{row.feature_tag || '—'}</dd></div><div><dt className="text-grey-500">Function</dt><dd className="mt-1 font-mono text-grey">{row.function_tag || '—'}</dd></div><div><dt className="text-grey-500">Session</dt><dd className="mt-1 font-mono text-grey">{row.session_id || '—'}</dd></div><div className="sm:col-span-2 lg:col-span-4"><dt className="text-grey-500">Correlation</dt><dd className="mt-1 break-all font-mono text-grey">trace {row.trace_id || '—'} · parent {row.parent_process_id || '—'}</dd></div></dl></td></tr>}</Fragment>; })}</tbody></table></div></div>;
+  if (!rows.length) {
+    return <p className="rounded-lg border border-grey-400 bg-white p-8 text-center text-sm text-grey-500">No {emptyLabel} found for this environment and time window.</p>;
+  }
+  return (
+    <Panel flush>
+      <DataTable head={['', 'Time', 'Status', 'Kind', 'Environment', 'Operation', 'Message', 'Took']} minWidth={900}>
+        {rows.map((row, index) => {
+          const key = String(row._id || row.process_id || index);
+          const open = Boolean(expanded[key]);
+          const failed = isFailure(row);
+          const running = row.status === 'processing';
+          const tone: Tone = failed ? 'bad' : running ? 'warn' : 'good';
+          const latency = latencyOf(row);
+          return (
+            <Fragment key={key}>
+              <tr onClick={() => setExpanded(current => ({ ...current, [key]: !open }))} className="cursor-pointer hover:bg-grey-100">
+                <td className="w-8 px-3 py-3">{open ? <ChevronDown className="h-4 w-4 text-grey-600" /> : <ChevronRight className="h-4 w-4 text-grey-600" />}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-medium text-grey">{row.timestamp ? format(new Date(row.timestamp), 'MMM dd, HH:mm:ss') : '-'}</td>
+                <td className="px-4 py-3">
+                  <Pill tone={tone}>
+                    <StatusDot tone={tone} />
+                    {failed ? 'Failed' : running ? 'Running' : 'Succeeded'}
+                  </Pill>
+                </td>
+                <td className="px-4 py-3 text-grey-600">{kindLabel(row.type || row.component)}</td>
+                <td className="px-4 py-3">{row.env || row.app_env ? <Pill>{row.env || row.app_env}</Pill> : '-'}</td>
+                <td className="px-4 py-3">
+                  <code className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">{operationOf(row)}</code>
+                </td>
+                <td className="max-w-64 truncate px-4 py-3 text-grey-600">{row.message || row.name || '-'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-grey">{ms(latency)}</td>
+              </tr>
+              {open ? (
+                <tr className="bg-grey-100">
+                  <td colSpan={8} className="px-6 py-4">
+                    {row.message ? <p className="mb-3 break-words text-sm text-grey">{row.message}</p> : null}
+                    <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                      <Detail label="Run ID" value={row.process_id} />
+                      <Detail label="Feature" value={row.feature_tag} />
+                      <Detail label="Function" value={row.function_tag} />
+                      <Detail label="Session" value={row.session_id} />
+                      <Detail label="Trace" value={row.trace_id} wide />
+                      <Detail label="Started by run" value={row.parent_process_id} wide />
+                    </dl>
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
+          );
+        })}
+      </DataTable>
+    </Panel>
+  );
+}
+
+function Detail({ label, value, wide }: { label: string; value?: string; wide?: boolean }) {
+  return (
+    <div className={wide ? 'sm:col-span-2' : undefined}>
+      <dt className="text-grey-500">{label}</dt>
+      <dd className="mt-1 break-all font-mono text-grey">{value || '-'}</dd>
+    </div>
+  );
 }
