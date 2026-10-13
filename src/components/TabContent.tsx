@@ -1,3 +1,5 @@
+import {useEffect, useState} from 'react';
+import {IsRestoringProvider} from '@tanstack/react-query';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {Tab} from '@/types/tab';
 import RequestPanel from './RequestPanel';
@@ -188,6 +190,16 @@ function UnavailableFeaturePanel({
 
 export default function TabContent() {
   const {tabs, activeTabId, activeView} = useWorkbenchStore();
+
+  // A tab's content is only mounted once it has been shown. Restoring a workspace with many open tabs would
+  // otherwise start every tab's requests at once, and the logs service answers that burst with timeouts.
+  const [shownTabIds, setShownTabIds] = useState<Set<string>>(
+    () => new Set(activeTabId ? [activeTabId] : []),
+  );
+  useEffect(() => {
+    if (!activeTabId) return;
+    setShownTabIds((previous) => (previous.has(activeTabId) ? previous : new Set(previous).add(activeTabId)));
+  }, [activeTabId]);
 
   if (tabs.length === 0) {
     return (
@@ -702,6 +714,8 @@ export default function TabContent() {
     <div className="flex-1 min-h-0 overflow-hidden w-full relative">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
+        // Never-shown tabs stay unmounted, so they make no requests until the user opens them.
+        if (!isActive && !shownTabIds.has(tab.id)) return null;
         return (
           <div
             key={tab.id}
@@ -712,7 +726,9 @@ export default function TabContent() {
             }
             aria-hidden={!isActive}
           >
-            {renderTabContent(tab)}
+            {/* Hidden tabs stay mounted so switching back is instant, but their queries are paused: they neither
+                poll nor refetch in the background, and catch up when the tab is shown again. */}
+            <IsRestoringProvider value={!isActive}>{renderTabContent(tab)}</IsRestoringProvider>
           </div>
         );
       })}
