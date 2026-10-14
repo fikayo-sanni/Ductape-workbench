@@ -36,6 +36,20 @@ export type CloudRecommendedApi = {
   scope: string;
 };
 
+/** What it takes to deploy code from Ductape into the customer's own project. Optional on top of connecting for resources. */
+export type CloudDeployGuide = {
+  title: string;
+  summary: string;
+  /** What Ductape will and will not do in the project. */
+  safety: string;
+  /** What a deploy leaves in the project. */
+  creates: string[];
+  apis: Array<{ apiLabel: string; serviceId: string; purpose: string }>;
+  roles: Array<{ roleName: string; roleId: string; purpose: string }>;
+  steps: CloudSetupStep[];
+  troubleshooting: Array<{ problem: string; fix: string }>;
+};
+
 export type CloudProviderGuide = {
   label: string;
   shortLabel: string;
@@ -49,7 +63,15 @@ export type CloudProviderGuide = {
   recommendedApis?: CloudRecommendedApi[];
   recommendedApisHint?: string;
   networkingGuides?: CloudNetworkingGuide[];
+  deployGuide?: CloudDeployGuide;
 };
+
+/** Google Cloud Console → IAM for a project, where roles are granted to a service account. */
+export function gcpIamUrl(projectId?: string): string {
+  const base = 'https://console.cloud.google.com/iam-admin/iam';
+  const trimmed = projectId?.trim();
+  return trimmed ? `${base}?project=${encodeURIComponent(trimmed)}` : base;
+}
 
 /** Google Cloud Console → APIs & Services → Enable API for a project. */
 export function gcpApiEnableUrl(serviceId: string, projectId?: string): string {
@@ -264,6 +286,54 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
       },
     ],
     ductapeFieldHint: 'Use the same project ID and service account JSON you created in GCP.',
+    deployGuide: {
+      title: 'Deploy code with Ductape (optional)',
+      summary:
+        'Lets Ductape build your source and deploy it to Cloud Run in your own project, using the service account you create and control. This is separate from managing resources: it needs its own APIs, roles and the deploy scope on the connection.',
+      safety:
+        'Ductape only adds resources it labels as its own (ductape_managed), never changes or reuses one it did not create, and never deletes anything, including what it created. Removing deployed resources is always your own action. Use a dedicated project if you can, so what Ductape adds is easy to see.',
+      creates: [
+        'A Cloud Storage bucket named <project id>-ductape-source, where your source is uploaded to be built',
+        'An Artifact Registry repository named "ductape" in the region you build in, holding the built images',
+        'One Cloud Build per build',
+        'One Cloud Run service per deployed version of a function or service (private: callers need an identity token)',
+        'One Secret Manager secret per deployed function, holding its signing key (a service gets none)',
+      ],
+      apis: [
+        { apiLabel: 'Cloud Run Admin API', serviceId: 'run.googleapis.com', purpose: 'Create and update the services that run your code' },
+        { apiLabel: 'Cloud Build API', serviceId: 'cloudbuild.googleapis.com', purpose: 'Build your source into an image' },
+        { apiLabel: 'Artifact Registry API', serviceId: 'artifactregistry.googleapis.com', purpose: 'Store the built images' },
+        { apiLabel: 'Secret Manager API', serviceId: 'secretmanager.googleapis.com', purpose: 'Hold each function\'s signing key' },
+        { apiLabel: 'Cloud Storage API', serviceId: 'storage.googleapis.com', purpose: 'Stage uploaded source for builds' },
+        { apiLabel: 'Cloud Resource Manager API', serviceId: 'cloudresourcemanager.googleapis.com', purpose: 'Read the project to find its number' },
+        { apiLabel: 'Identity and Access Management (IAM) API', serviceId: 'iam.googleapis.com', purpose: 'Run services as the runtime service account' },
+      ],
+      roles: [
+        { roleName: 'Cloud Run Admin', roleId: 'roles/run.admin', purpose: 'Create and update Cloud Run services, move traffic, and let the service account call them' },
+        { roleName: 'Cloud Build Editor', roleId: 'roles/cloudbuild.builds.editor', purpose: 'Start source builds and read their result' },
+        { roleName: 'Artifact Registry Administrator', roleId: 'roles/artifactregistry.admin', purpose: 'Create the image repository and read built images' },
+        { roleName: 'Secret Manager Admin', roleId: 'roles/secretmanager.admin', purpose: 'Create each deployment\'s signing-key secret and let the runtime account read it' },
+        { roleName: 'Storage Admin', roleId: 'roles/storage.admin', purpose: 'Create the source staging bucket and read uploaded source' },
+        { roleName: 'Service Account User', roleId: 'roles/iam.serviceAccountUser', purpose: 'Deploy a service that runs as the runtime service account' },
+        { roleName: 'Browser', roleId: 'roles/browser', purpose: 'Read the project to find its number' },
+      ],
+      steps: [
+        { title: 'Enable the seven APIs', body: 'Open each API below and press Enable. A switched-off API makes a deploy fail with "has not been used in project … or it is disabled", and a freshly enabled one can take a minute or two to switch on.' },
+        { title: 'Grant the seven roles', body: 'In IAM, grant the roles below to the service account you created above, on the project. The account needs all seven at once: some IAM screens replace the roles an account already has instead of adding to them, so afterwards open the account and check it lists all seven. Validation names any role still missing.' },
+        { title: 'Create a deploy connection from a terminal', body: 'The deploy scope is set when the connection is created with the CLI or an assistant using the MCP server, not in this form yet. Run: ductape cloud connections create --provider gcp --name "<name>" --tag <tag> --deploy. Then: ductape cloud connections complete <tag> --service-account-file <path to the key file>, and optionally --runtime-service-account <email> for the account your services run as. The key stays on your disk and is never printed or pasted.' },
+        { title: 'Validate', body: 'Run ductape cloud connections validate <tag>. A failure lists exactly which permissions are missing and which roles grant them. Grant those, wait a minute, and validate again.' },
+        { title: 'Build and deploy', body: 'Once the connection is active, build with ductape deploy builds create, plan and apply, and watch the result under Deployments in the product.' },
+      ],
+      troubleshooting: [
+        { problem: '"<API> has not been used in project <id> before or it is disabled"', fix: 'Enable that API (step 1), wait a minute or two, and try again.' },
+        { problem: 'Validation lists missing permissions and the roles that grant them', fix: 'Grant exactly those roles to the Ductape service account on the project (step 2) and validate again.' },
+        { problem: '"caller does not have permission to act as service account …" when a build or deploy starts', fix: 'Grant roles/iam.serviceAccountUser to the Ductape service account on the project. Cloud Build and Cloud Run run as a service account, and the Ductape account must be allowed to act as it.' },
+        { problem: 'A role you granted is reported missing again, or one that was there before has gone', fix: 'Some IAM screens replace the roles on an account instead of adding to them. Open the Ductape service account in IAM, check that it holds all seven roles together, and validate again.' },
+        { problem: 'A build fails with a permission error', fix: 'Builds run as Cloud Build\'s own service account, shown in the build log. Give that account roles/artifactregistry.writer, roles/logging.logWriter and roles/storage.objectViewer.' },
+        { problem: 'The connection says it was not created for deploys', fix: 'Create it with --deploy so it carries the deploy scope. A connection made for resources only cannot build or deploy.' },
+        { problem: 'A deployed service answers 401 or 403 in a browser', fix: 'That is intended. Services are private and Ductape calls them with an identity token. Making one public is a separate, approved step that does not exist yet.' },
+      ],
+    },
     recommendedRolesHint:
       'In Google Cloud Console → IAM & Admin → Service Accounts → your account → Permissions → Grant access, add each role at project level for the features you use.',
     recommendedApisHint:

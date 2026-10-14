@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import {
   CLOUD_PROVIDER_GUIDES,
   gcpApiEnableUrl,
+  gcpIamUrl,
   providerBadgeClass,
   type CloudProvider,
   type CloudSetupLink,
@@ -151,6 +152,91 @@ export default function CloudSetupGuidePanel({
           {guide.recommendedRolesHint ? (
             <p className="text-xs text-grey-600 mt-2">{guide.recommendedRolesHint}</p>
           ) : null}
+        </div>
+      ) : null}
+
+      {!compact && guide.deployGuide ? (
+        <div className="pt-2 border-t border-blue-500/20 space-y-4" data-testid="deploy-guide">
+          <div>
+            <p className="text-sm font-semibold text-grey">{guide.deployGuide.title}</p>
+            <p className="text-xs text-grey-600 mt-1 leading-relaxed">{guide.deployGuide.summary}</p>
+            <p className="text-xs text-grey-600 mt-2 leading-relaxed rounded-md bg-white/60 border border-blue-500/20 px-3 py-2">
+              {guide.deployGuide.safety}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-grey mb-1">What a deploy leaves in your project</p>
+            <ul className="text-xs text-grey-600 space-y-1 list-disc pl-4">
+              {guide.deployGuide.creates.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <ol className="text-sm text-grey-600 space-y-3 list-none">
+            {guide.deployGuide.steps.map((step, i) => (
+              <li key={step.title} className="flex gap-3">
+                <span className="text-grey font-medium shrink-0 w-5">{i + 1}.</span>
+                <div className="min-w-0">
+                  <span className="font-medium text-grey">{step.title}</span>
+                  <p className="mt-0.5 leading-relaxed break-words">{step.body}</p>
+                  {i === 0 ? (
+                    <ul className="mt-2 space-y-2">
+                      {guide.deployGuide!.apis.map((api) => (
+                        <li key={api.serviceId} className="text-xs">
+                          <a
+                            href={gcpApiEnableUrl(api.serviceId, gcpProjectId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span className="font-medium">{api.apiLabel}</span>
+                          </a>
+                          <span className="ml-2 font-mono text-grey bg-white/80 px-1.5 py-0.5 rounded border border-blue-500/20">{api.serviceId}</span>
+                          <span className="block text-grey-600 mt-0.5">{api.purpose}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {i === 1 ? (
+                    <div className="mt-2 space-y-2">
+                      <a
+                        href={gcpIamUrl(gcpProjectId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span className="font-medium">Open IAM for the project</span>
+                      </a>
+                      <ul className="text-xs space-y-1.5">
+                        {guide.deployGuide!.roles.map((role) => (
+                          <li key={role.roleId} className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                            <code className="font-mono text-grey bg-white/80 px-1.5 py-0.5 rounded border border-blue-500/20 shrink-0">{role.roleId}</code>
+                            <span><span className="text-grey font-medium">{role.roleName}</span>{' — '}{role.purpose}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div>
+            <p className="text-xs font-semibold text-grey mb-2">If something goes wrong</p>
+            <ul className="text-xs text-grey-600 space-y-2">
+              {guide.deployGuide.troubleshooting.map((item) => (
+                <li key={item.problem} className="leading-relaxed">
+                  <span className="font-medium text-grey">{item.problem}</span>
+                  <span className="block">{item.fix}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       ) : null}
 

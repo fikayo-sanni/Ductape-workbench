@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Box, RefreshCw, Rocket, Search, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/store/useAuth';
-import { fetchDeploymentJournal, fetchProductDeployments, fetchProductEnvironments, type IDeployAuth } from '@/services/deployServices';
+import { fetchDeploymentJournal, type IDeployAuth } from '@/services/deployServices';
+import { useDeployAuth, useProductDeployments, useProductEnvironments } from '@/hooks/useProductDeployments';
 import {
   deployErrorMessage, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, shortHash, totals,
   type DeployableKind, type IDeployment, type IJournalEntry,
@@ -21,11 +21,6 @@ const when = (value: string | undefined): string => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 };
-
-function useDeployAuth(): IDeployAuth | undefined {
-  const { user, currentWorkspaceId } = useAuth();
-  return currentWorkspaceId && user?._id && user.public_key ? { workspaceId: currentWorkspaceId, userId: user._id, publicKey: user.public_key } : undefined;
-}
 
 function KindPill({ kind }: { kind: DeployableKind }) {
   const Icon = kind === 'service' ? Server : Box;
@@ -54,20 +49,8 @@ export default function DeploymentsResourceContent({ product }: { product: any }
   const [env, setEnv] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const enabled = Boolean(auth && tag);
-
-  const deployments = useQuery({
-    queryKey: ['deployments', auth?.workspaceId, tag],
-    queryFn: () => fetchProductDeployments(auth!, tag!),
-    enabled,
-    // A deployment that is still moving is re-read until it settles.
-    refetchInterval: (query) => ((query.state.data ?? []).some((d) => isInFlight(d.state)) ? POLL_MS : false),
-  });
-  const environments = useQuery({
-    queryKey: ['deployment-environments', auth?.workspaceId, tag],
-    queryFn: () => fetchProductEnvironments(auth!, tag!),
-    enabled,
-  });
+  const deployments = useProductDeployments(tag);
+  const environments = useProductEnvironments(tag);
 
   const all = deployments.data ?? [];
   const selected = all.find((d) => d.id === selectedId) ?? null;

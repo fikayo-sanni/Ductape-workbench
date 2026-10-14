@@ -80,6 +80,8 @@ import ProductObservabilityContent from './ProductObservabilityContent';
 import RateLimitMonitoring from './RateLimitMonitoring';
 import FunctionsResourceContent from './FunctionsResourceContent';
 import DeploymentsResourceContent from './DeploymentsResourceContent';
+import {useProductDeployments} from '@/hooks/useProductDeployments';
+import {totals as deploymentTotals, describeState} from '@/utils/deployments';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -402,6 +404,16 @@ export default function ProductTabContent({
   });
 
   const product = fetchedProductData || initialProduct;
+  // Counters for the Deployments entry in the side nav. Shares its query with the Deployments section, so the server is asked once.
+  const deploymentsQuery = useProductDeployments(product?.tag);
+  const deploymentStats = deploymentTotals(deploymentsQuery.data ?? []);
+  // No counter when the server cannot say (for example it has no deploy support), rather than a misleading 0.
+  const deploymentsKnown = !deploymentsQuery.isError && deploymentsQuery.data !== undefined;
+  // Counts per environment slug, for the Environments card on the Overview.
+  const deploymentsByEnv = new Map<string, ReturnType<typeof deploymentTotals>>();
+  for (const slug of new Set((deploymentsQuery.data ?? []).map((d) => d.env))) {
+    deploymentsByEnv.set(slug, deploymentTotals((deploymentsQuery.data ?? []).filter((d) => d.env === slug)));
+  }
 
   // Check if product data is incomplete
   const isProductDataIncomplete =
@@ -2276,7 +2288,7 @@ export default function ProductTabContent({
                 <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
                   Overview
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
                   <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
                     <p className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
                       {totalResources}
@@ -2309,6 +2321,26 @@ export default function ProductTabContent({
                       Active Envs
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryChange('deployments')}
+                    className="text-center p-2 sm:p-3 rounded-lg bg-grey-50 hover:bg-grey-100 transition-colors"
+                    data-testid="overview-deployments-tile"
+                  >
+                    <p className={cn('text-xl sm:text-2xl md:text-3xl font-bold', deploymentsKnown && deploymentStats.attention > 0 ? 'text-red' : 'text-teal-600')}>
+                      {deploymentsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-grey-500" /> : deploymentsKnown ? deploymentStats.total : '-'}
+                    </p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
+                      Deployments
+                    </p>
+                    {deploymentsKnown && deploymentStats.total > 0 ? (
+                      <p className="text-[9px] sm:text-[10px] text-grey-500">
+                        {deploymentStats.active} active
+                        {deploymentStats.inFlight > 0 ? `, ${deploymentStats.inFlight} in progress` : ''}
+                        {deploymentStats.attention > 0 ? `, ${deploymentStats.attention} need attention` : ''}
+                      </p>
+                    ) : null}
+                  </button>
                 </div>
               </div>
 
@@ -2349,6 +2381,41 @@ export default function ProductTabContent({
                       </div>
                     </div>
                   )}
+
+                  {deploymentsKnown && (deploymentsQuery.data ?? []).slice(0, 3).map((d) => {
+                    const state = describeState(d.state);
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => handleCategoryChange('deployments')}
+                        className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50 hover:bg-grey-100 transition-colors text-left"
+                        data-testid="overview-deployment-activity"
+                      >
+                        <div
+                          className={cn(
+                            'w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                            state.tone === 'good' ? 'bg-green/10' : state.tone === 'bad' ? 'bg-red/10' : state.tone === 'warn' ? 'bg-orange/10' : 'bg-primary/10',
+                          )}
+                        >
+                          <Rocket
+                            className={cn(
+                              'h-3 w-3 sm:h-4 sm:w-4',
+                              state.tone === 'good' ? 'text-green' : state.tone === 'bad' ? 'text-red' : state.tone === 'warn' ? 'text-orange' : 'text-primary',
+                            )}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-grey truncate">
+                            {d.name} {d.version}: {state.label.toLowerCase()} in {d.env}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-grey-500">
+                            {new Date(d.updatedAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
 
                   {(product?.databases?.length || 0) > 0 && (
                     <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
@@ -2416,6 +2483,15 @@ export default function ProductTabContent({
                     <Workflow className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Create Feature</span>
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
+                    size="sm"
+                    onClick={() => handleCategoryChange('deployments')}
+                  >
+                    <Rocket className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>View Deployments</span>
+                  </Button>
                 </div>
               </div>
 
@@ -2480,6 +2556,21 @@ export default function ProductTabContent({
                               {env.slug}
                             </span>
                           </div>
+
+                          {/* What is deployed here */}
+                          {deploymentsKnown && (deploymentsByEnv.get(env.slug)?.total ?? 0) > 0 ? (
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-medium flex-shrink-0',
+                                (deploymentsByEnv.get(env.slug)?.attention ?? 0) > 0 ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600',
+                              )}
+                              title={`${deploymentsByEnv.get(env.slug)?.active ?? 0} active, ${deploymentsByEnv.get(env.slug)?.attention ?? 0} need attention`}
+                              data-testid="overview-env-deployments"
+                            >
+                              <Rocket className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              {deploymentsByEnv.get(env.slug)?.total}
+                            </span>
+                          ) : null}
 
                           {/* Status badge */}
                           <span
@@ -2817,6 +2908,31 @@ export default function ProductTabContent({
               >
                 <Rocket className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'deployments' ? 'text-primary' : 'text-grey-600')} />
                 <span className="flex-1 text-left">Deployments</span>
+                {deploymentsQuery.isLoading ? (
+                  <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-grey-500" />
+                ) : deploymentsKnown ? (
+                  <>
+                    {deploymentStats.attention > 0 ? (
+                      <span
+                        className="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center bg-red/10 text-red"
+                        title={`${deploymentStats.attention} failed or rolled back`}
+                        data-testid="deployments-attention-count"
+                      >
+                        {deploymentStats.attention}
+                      </span>
+                    ) : null}
+                    <span
+                      className={cn(
+                        'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
+                        activeCategory === 'deployments' ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600',
+                      )}
+                      title={`${deploymentStats.active} active, ${deploymentStats.inFlight} in progress`}
+                      data-testid="deployments-count"
+                    >
+                      {deploymentStats.total}
+                    </span>
+                  </>
+                ) : null}
               </button>
             </div>
 
@@ -3009,12 +3125,22 @@ export default function ProductTabContent({
                   setIsSidebarCollapsed(false);
                 }}
                 className={cn(
-                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors',
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
                   activeCategory === 'deployments' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100',
                 )}
-                title="Deployments"
+                title={deploymentsKnown ? `Deployments (${deploymentStats.total}${deploymentStats.attention > 0 ? `, ${deploymentStats.attention} need attention` : ''})` : 'Deployments'}
               >
                 <Rocket className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'deployments' ? 'text-primary' : 'text-grey-600')} />
+                {deploymentsKnown && deploymentStats.total > 0 ? (
+                  <span
+                    className={cn(
+                      'absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium',
+                      deploymentStats.attention > 0 ? 'bg-red' : 'bg-primary',
+                    )}
+                  >
+                    {deploymentStats.total > 9 ? '9+' : deploymentStats.total}
+                  </span>
+                ) : null}
               </button>
             </div>
 
