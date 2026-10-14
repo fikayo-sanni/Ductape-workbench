@@ -1,13 +1,60 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Box, Clock3, RefreshCw, Repeat2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/store/useAuth';
+import { fetchProductObservability } from '@/services/logsServices';
+import { formatLatencyMs, formatThroughput, trafficFor, type FunctionTraffic, type OperationStat } from '@/utils/functionTraffic';
 import { schemaToRows, valueToRows, type FieldRow, type ValueRow } from '@/utils/schemaRows';
 import ProductObservabilityContent from './ProductObservabilityContent';
-import { DataTable, Panel, Pill, SectionEmpty, SectionPage, SegmentedTabs, TEAL } from './ProductSection';
+import { DataTable, Panel, Pill, SectionEmpty, SectionPage, SegmentedTabs, StatTile, TEAL, type Tone } from './ProductSection';
 
 type View = 'definitions' | 'activity';
+
+const TRAFFIC_RANGES = [
+  { id: '1h', label: 'Last hour', ms: 3_600_000 },
+  { id: '24h', label: 'Last 24 hours', ms: 86_400_000 },
+  { id: '7d', label: 'Last 7 days', ms: 604_800_000 },
+  { id: '30d', label: 'Last 30 days', ms: 2_592_000_000 },
+] as const;
+type TrafficRangeId = (typeof TRAFFIC_RANGES)[number]['id'];
+
+/** What the traffic numbers are doing right now: loading, unavailable, or the recorded stats per function. */
+interface TrafficState {
+  status: 'loading' | 'error' | 'ready';
+  windowMs: number;
+  operations: OperationStat[];
+}
+
+/** Recorded function calls for the product, grouped by function. Re-read whenever the window or product changes. */
+function useFunctionTraffic(product: any, rangeId: TrafficRangeId): TrafficState & { refetch: () => void } {
+  const { user, currentWorkspaceId } = useAuth();
+  const range = TRAFFIC_RANGES.find(item => item.id === rangeId) ?? TRAFFIC_RANGES[1];
+  const enabled = Boolean(currentWorkspaceId && user?._id && user?.public_key && product?.tag);
+  const query = useQuery({
+    queryKey: ['function-traffic', currentWorkspaceId, product?.tag, rangeId],
+    queryFn: () => {
+      const now = Date.now();
+      return fetchProductObservability(currentWorkspaceId!, user!._id, user!.public_key, product.tag, {
+        component: 'functions',
+        start_date: new Date(now - range.ms).toISOString(),
+        end_date: new Date(now).toISOString(),
+        page: 1,
+        limit: 1,
+      } as any);
+    },
+    enabled,
+    staleTime: 30_000,
+  });
+  return {
+    status: query.isError ? 'error' : query.isLoading || !enabled ? 'loading' : 'ready',
+    windowMs: range.ms,
+    operations: query.data?.operations ?? [],
+    refetch: () => void query.refetch(),
+  };
+}
 
 interface OperationView {
   name: string;
@@ -77,6 +124,8 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [view, setView] = useState<View>('definitions');
+  const [rangeId, setRangeId] = useState<TrafficRangeId>('24h');
+  const traffic = useFunctionTraffic(product, rangeId);
 
   const functions = useMemo(
     () => (product?.functions ?? []).filter((fn: any) => fn.deleted !== true).map(toFunctionView),
@@ -88,7 +137,15 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   );
 
   const refresh = (
-    <Button variant="outline" size="sm" className="gap-2" onClick={onRefresh}>
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-2"
+      onClick={() => {
+        onRefresh();
+        traffic.refetch();
+      }}
+    >
       <RefreshCw className="h-3.5 w-3.5" />
       <span className="hidden sm:inline">Refresh</span>
     </Button>
@@ -108,7 +165,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
           </Button>
         }
       >
-        <FunctionDetail fn={selected} />
+        <FunctionDetail fn={selected} traffic={traffic} rangeId={rangeId} onRange={setRangeId} />
       </SectionPage>
     );
   }
@@ -138,15 +195,18 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
         </>
       }
       toolbar={
-        <SegmentedTabs
-          label="Function views"
-          value={view}
-          onChange={setView}
-          options={[
-            { id: 'definitions', label: 'Definitions' },
-            { id: 'activity', label: 'Activity' },
-          ]}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SegmentedTabs
+            label="Function views"
+            value={view}
+            onChange={setView}
+            options={[
+              { id: 'definitions', label: 'Definitions' },
+              { id: 'activity', label: 'Activity' },
+            ]}
+          />
+          {view === 'definitions' && count > 0 ? <TrafficRangeTabs value={rangeId} onChange={setRangeId} /> : null}
+        </div>
       }
     >
       {view === 'activity' ? (
@@ -173,7 +233,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:gap-5 lg:grid-cols-3">
           {filtered.map((fn: FunctionView) => (
-            <FunctionCard key={fn.tag} fn={fn} onOpen={() => setSelectedTag(fn.tag)} />
+            <FunctionCard key={fn.tag} fn={fn} traffic={traffic} onOpen={() => setSelectedTag(fn.tag)} />
           ))}
         </div>
       )}
@@ -181,7 +241,44 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   );
 }
 
-function FunctionCard({ fn, onOpen }: { fn: FunctionView; onOpen: () => void }) {
+function TrafficRangeTabs({ value, onChange }: { value: TrafficRangeId; onChange: (id: TrafficRangeId) => void }) {
+  return (
+    <SegmentedTabs
+      label="Traffic period"
+      value={value}
+      onChange={onChange}
+      options={TRAFFIC_RANGES.map(item => ({ id: item.id, label: item.id }))}
+    />
+  );
+}
+
+function errorTone(percent: number): Tone {
+  return percent >= 10 ? 'bad' : percent > 0 ? 'warn' : 'good';
+}
+
+/** Traffic, latency and throughput for one function card. Shows dashes while loading and says so when it cannot load. */
+function CardMetrics({ fn, traffic }: { fn: FunctionView; traffic: TrafficState }) {
+  const stats = traffic.status === 'ready' ? trafficFor(traffic.operations, fn.tag, traffic.windowMs) : null;
+  const dash = traffic.status === 'error' ? 'n/a' : '-';
+  const cells: Array<{ label: string; value: string; hint?: string }> = [
+    { label: 'Traffic', value: stats ? stats.calls.toLocaleString() : traffic.status === 'ready' ? '0' : dash, hint: stats ? `${stats.failures.toLocaleString()} failed` : undefined },
+    { label: 'Latency', value: stats ? formatLatencyMs(stats.p95LatencyMs ?? stats.averageLatencyMs) : dash, hint: stats ? (stats.p95LatencyMs !== null ? 'p95' : 'average') : undefined },
+    { label: 'Throughput', value: stats ? formatThroughput(stats.callsPerMinute) : dash },
+  ];
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-grey-300 pt-3" title={traffic.status === 'error' ? 'Traffic could not be loaded.' : undefined}>
+      {cells.map(cell => (
+        <div key={cell.label} className="min-w-0">
+          <p className="text-[10px] uppercase tracking-wide text-grey-500">{cell.label}</p>
+          <p className="truncate text-sm font-semibold text-grey">{cell.value}</p>
+          {cell.hint ? <p className={cn('truncate text-[10px]', cell.label === 'Traffic' && stats && stats.failures > 0 ? 'text-red' : 'text-grey-500')}>{cell.hint}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FunctionCard({ fn, traffic, onOpen }: { fn: FunctionView; traffic: TrafficState; onOpen: () => void }) {
   const names = fn.operations.map(op => op.name);
   const shown = names.slice(0, 3);
   const transports = transportsOf(fn);
@@ -223,7 +320,33 @@ function FunctionCard({ fn, onOpen }: { fn: FunctionView; onOpen: () => void }) 
           ))}
         </div>
       ) : null}
+      <CardMetrics fn={fn} traffic={traffic} />
     </button>
+  );
+}
+
+function TrafficPanel({ fn, traffic, rangeId, onRange }: { fn: FunctionView; traffic: TrafficState; rangeId: TrafficRangeId; onRange: (id: TrafficRangeId) => void }) {
+  const stats: FunctionTraffic | null = traffic.status === 'ready' ? trafficFor(traffic.operations, fn.tag, traffic.windowMs) : null;
+  const period = TRAFFIC_RANGES.find(item => item.id === rangeId)?.label.toLowerCase() ?? '';
+  let body;
+  if (traffic.status === 'loading') body = <p className="py-6 text-center text-sm text-grey-500">Loading traffic...</p>;
+  else if (traffic.status === 'error') body = <p className="py-6 text-center text-sm text-grey-500">Traffic could not be loaded. Try Refresh.</p>;
+  else if (!stats) body = <p className="py-6 text-center text-sm text-grey-500">No calls were recorded for this function in the {period}.</p>;
+  else {
+    body = (
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatTile label="Traffic" value={stats.calls.toLocaleString()} hint="calls" />
+        <StatTile label="Failed" value={stats.failures.toLocaleString()} hint={`${stats.errorRatePercent >= 10 ? Math.round(stats.errorRatePercent) : stats.errorRatePercent.toFixed(1)}% of calls`} tone={errorTone(stats.errorRatePercent)} />
+        <StatTile label="Average latency" value={formatLatencyMs(stats.averageLatencyMs)} hint={stats.maxLatencyMs !== null ? `slowest ${formatLatencyMs(stats.maxLatencyMs)}` : undefined} />
+        <StatTile label="Slow calls (p95)" value={formatLatencyMs(stats.p95LatencyMs)} hint={stats.p95LatencyMs !== null ? '1 in 20 takes longer' : 'not reported yet'} />
+        <StatTile label="Throughput" value={formatThroughput(stats.callsPerMinute)} hint="averaged over the period" />
+      </div>
+    );
+  }
+  return (
+    <Panel title="Traffic" description={`Recorded calls to ${fn.name}.`} action={<TrafficRangeTabs value={rangeId} onChange={onRange} />}>
+      {body}
+    </Panel>
   );
 }
 
@@ -261,10 +384,21 @@ function SampleTable({ rows }: { rows: ValueRow[] }) {
   );
 }
 
-function FunctionDetail({ fn }: { fn: FunctionView }) {
+function FunctionDetail({
+  fn,
+  traffic,
+  rangeId,
+  onRange,
+}: {
+  fn: FunctionView;
+  traffic: TrafficState;
+  rangeId: TrafficRangeId;
+  onRange: (id: TrafficRangeId) => void;
+}) {
   const transports = transportsOf(fn);
   return (
     <>
+      <TrafficPanel fn={fn} traffic={traffic} rangeId={rangeId} onRange={onRange} />
       <Panel title="About">
         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-4">
@@ -333,11 +467,11 @@ function FunctionDetail({ fn }: { fn: FunctionView }) {
           <div className="grid divide-y divide-grey-300 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
             <div className="min-w-0">
               <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Takes</p>
-              <FieldTable rows={op.input} emptyLabel="No input." />
+              <FieldTable rows={op.input} emptyLabel="Input schema not published." />
             </div>
             <div className="min-w-0">
               <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Returns</p>
-              <FieldTable rows={op.output} emptyLabel="No output." />
+              <FieldTable rows={op.output} emptyLabel="Output schema not published." />
             </div>
           </div>
         </Panel>
