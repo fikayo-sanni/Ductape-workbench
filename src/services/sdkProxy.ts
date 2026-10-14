@@ -53,6 +53,7 @@ export type SDKModule =
   | 'caches'
   | 'sessions'
   | 'quotas'
+  | 'rateLimits'
   | 'actions'
   | 'jobs'
   | 'logs'
@@ -638,6 +639,21 @@ export class SDKProxyService {
   };
 
   // ==================== QUOTAS MODULE ====================
+  /**
+   * Rate limit policies stored on the product. A tag's limits cannot change once published: create a
+   * new version under a new tag instead. Only name and description can be updated.
+   */
+  rateLimits = {
+    policies: {
+      create: <T = any>(product: string, data: any) => this.execute<T>('rateLimits', 'policies.create', product, data),
+      list: <T = any>(product: string) => this.execute<T>('rateLimits', 'policies.list', product),
+      fetch: <T = any>(product: string, tag: string) => this.execute<T>('rateLimits', 'policies.fetch', product, tag),
+      update: <T = any>(product: string, tag: string, data: { name?: string; description?: string }) =>
+        this.execute<T>('rateLimits', 'policies.update', product, tag, data),
+      delete: <T = any>(product: string, tag: string) => this.execute<T>('rateLimits', 'policies.delete', product, tag),
+    },
+  };
+
   quotas = {
     create: <T = any>(product: string, data: any) =>
       this.execute<T>('quotas', 'create', product, data),

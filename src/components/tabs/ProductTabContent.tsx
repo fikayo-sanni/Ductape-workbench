@@ -116,12 +116,6 @@ interface ResourceCategoryConfig {
 }
 
 const resourceCategories: ResourceCategoryConfig[] = [
-  { id: 'functions', label: 'Functions', icon: Box, color: 'text-teal-600', bgColor: 'bg-teal-600/10', dataKey: 'functions', componentType: 'function' },
-  {
-    id: 'rateLimits', label: 'Rate Limits', icon: Timer,
-    color: 'text-teal-600', bgColor: 'bg-teal-600/10',
-    dataKey: 'rateLimits', componentType: 'rateLimit',
-  },
   // Enabled categories first
   {
     id: 'apps',
@@ -204,6 +198,7 @@ const resourceCategories: ResourceCategoryConfig[] = [
     dataKey: 'features',
     componentType: 'feature',
   },
+  { id: 'functions', label: 'Functions', icon: Box, color: 'text-teal-600', bgColor: 'bg-teal-600/10', dataKey: 'functions', componentType: 'function' },
   {
     id: 'intelligence',
     label: 'Intelligence',
@@ -223,6 +218,17 @@ const resourceCategories: ResourceCategoryConfig[] = [
     componentType: 'resilience',
   },
 ];
+
+/** Shown in the sidebar directly under Observability rather than in the resource list. */
+const rateLimitsCategory: ResourceCategoryConfig = {
+  id: 'rateLimits',
+  label: 'Rate Limits',
+  icon: Timer,
+  color: 'text-teal-600',
+  bgColor: 'bg-teal-600/10',
+  dataKey: 'rateLimits',
+  componentType: 'rateLimit',
+};
 
 export default function ProductTabContent({
   tabId,
@@ -293,7 +299,7 @@ export default function ProductTabContent({
   const collapsed = isSidebarCollapsed && !isMobile;
   const mobileSectionLabel =
     ({overview: 'Overview', environments: 'Environments', observability: 'Observability'} as Record<string, string>)[activeCategory] ||
-    resourceCategories.find((c) => c.id === activeCategory)?.label ||
+    [...resourceCategories, rateLimitsCategory].find((c) => c.id === activeCategory)?.label ||
     'Overview';
   // Which notification card is expanded to show templates inline (tag or null)
   const [expandedNotificationTag, setExpandedNotificationTag] = useState<
@@ -504,6 +510,7 @@ export default function ProductTabContent({
   // Get resources for a category
   const getResources = (category: ResourceCategoryConfig): any[] => {
     if (category.id === 'functions') return (product?.functions ?? []).filter((fn: any) => fn.deleted !== true);
+    if (category.id === 'rateLimits') return ((product as any)?.rateLimits ?? []).filter((policy: any) => policy.deleted !== true);
     if (category.id === 'apps') return connectedApps;
     // Combined Databases category (databases + graphs + vectors)
     if (category.id === 'databases') {
@@ -2201,7 +2208,7 @@ export default function ProductTabContent({
   // Render overview dashboard (activity-focused)
   const renderOverview = () => {
     // Calculate some mock activity metrics (in real app, these would come from API)
-    const totalResources = resourceCategories.reduce(
+    const totalResources = [...resourceCategories, rateLimitsCategory].reduce(
       (sum, cat) => sum + getResourceCount(cat),
       0,
     );
@@ -2621,7 +2628,7 @@ export default function ProductTabContent({
       return <ProductObservabilityContent product={product} />;
     }
     if (activeCategory === 'rateLimits') {
-      return <RateLimitMonitoring key={product?.tag} product={product} />;
+      return <RateLimitMonitoring key={product?.tag} product={product} onRefresh={() => void refetch()} />;
     }
     if (activeCategory === 'functions') {
       return <FunctionsResourceContent product={product} onRefresh={() => void refetch()} />;
@@ -2639,6 +2646,10 @@ export default function ProductTabContent({
 
     return renderOverview();
   };
+
+  const rateLimitCount = getResourceCount(rateLimitsCategory);
+  const rateLimitsLoading =
+    isSidebarRefreshing || (isFetchingProduct && (!fetchedProductData || isProductDataIncomplete));
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden bg-grey-100">
@@ -2803,6 +2814,30 @@ export default function ProductTabContent({
               </button>
             </div>
 
+            {/* Rate limits sit with observability: both are about how the product is behaving. */}
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => handleCategoryChange('rateLimits')}
+                className={cn(
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
+                  activeCategory === 'rateLimits'
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-grey hover:bg-grey-100',
+                )}
+              >
+                <Timer className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'rateLimits' ? 'text-primary' : 'text-grey-600')} />
+                <span className="flex-1 text-left truncate">Rate Limits</span>
+                <span
+                  className={cn(
+                    'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
+                    activeCategory === 'rateLimits' ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600',
+                  )}
+                >
+                  {rateLimitsLoading ? <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin mx-auto" /> : rateLimitCount}
+                </span>
+              </button>
+            </div>
+
             {/* Divider */}
             <div className="px-3 sm:px-4 py-1.5 sm:py-2">
               <div className="flex items-center justify-between">
@@ -2870,7 +2905,7 @@ export default function ProductTabContent({
                     <span className="flex-1 text-left truncate">
                       {category.label}
                     </span>
-                    {category.id !== 'rateLimits' && <span
+                    <span
                       className={cn(
                         'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
                         isDisabled
@@ -2885,7 +2920,7 @@ export default function ProductTabContent({
                       ) : (
                         count
                       )}
-                    </span>}
+                    </span>
                   </button>
                 );
               })}
@@ -2945,6 +2980,45 @@ export default function ProductTabContent({
               </button>
             </div>
 
+            {/* Collapsed: Observability and Rate Limits */}
+            <div className="px-1 mb-0.5 sm:mb-1 space-y-0.5">
+              <button
+                onClick={() => {
+                  handleCategoryChange('observability');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn(
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors',
+                  activeCategory === 'observability' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100',
+                )}
+                title="Observability"
+              >
+                <BarChart3 className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'observability' ? 'text-primary' : 'text-grey-600')} />
+              </button>
+              <button
+                onClick={() => {
+                  handleCategoryChange('rateLimits');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn(
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
+                  activeCategory === 'rateLimits' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100',
+                )}
+                title={rateLimitsLoading ? 'Rate Limits (Loading...)' : `Rate Limits (${rateLimitCount})`}
+              >
+                <Timer className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'rateLimits' ? 'text-primary' : 'text-grey-600')} />
+                {rateLimitsLoading ? (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-grey-200 rounded-full flex items-center justify-center">
+                    <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-500" />
+                  </span>
+                ) : rateLimitCount > 0 ? (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-primary text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium">
+                    {rateLimitCount > 9 ? '9+' : rateLimitCount}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+
             {/* Collapsed: Categories */}
             <div className="px-1 space-y-0.5">
               {resourceCategories.map(category => {
@@ -2982,7 +3056,7 @@ export default function ProductTabContent({
                     title={
                       isCatLoading
                         ? `${category.label} (Loading...)`
-                        : category.id === 'rateLimits' ? category.label : `${category.label} (${count})`
+                        : `${category.label} (${count})`
                     }
                   >
                     <Icon

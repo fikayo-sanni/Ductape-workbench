@@ -60,3 +60,40 @@ test('summarizeDecisions copes with an empty batch', () => {
   assert.equal(summary.total, 0);
   assert.equal(summary.policies.length, 0);
 });
+
+const { mergePolicies } = load('../src/utils/rateLimitSummary.ts');
+
+test('mergePolicies lists stored policies first, then code-defined ones, and links versions', () => {
+  const summaries = summarizeDecisions([
+    { parent_tag: 'login', env: 'prd', timestamp: '2026-10-01T10:00:00Z', data: { outcome: 'allowed', limit: 5 } },
+    { parent_tag: 'in-code', env: 'prd', timestamp: '2026-10-01T10:00:00Z', data: { outcome: 'allowed', limit: 9 } },
+    { parent_tag: 'removed', env: 'prd', timestamp: '2026-10-01T10:00:00Z', data: { outcome: 'allowed' } },
+  ]).policies;
+  const views = plain(mergePolicies(
+    [
+      { tag: 'login-v2', supersedes: 'login', limit: 10 },
+      { tag: 'login', limit: 5 },
+      { tag: 'removed', deleted: true },
+      { tag: 'idle', limit: 1 },
+    ],
+    summaries,
+  ));
+
+  assert.deepEqual(views.map(view => [view.tag, view.source]), [
+    ['idle', 'workbench'], ['login', 'workbench'], ['login-v2', 'workbench'], ['in-code', 'code'],
+  ]);
+  assert.equal(views.find(view => view.tag === 'login').supersededBy, 'login-v2');
+  assert.equal(views.find(view => view.tag === 'login').stats.total, 1);
+  assert.equal(views.find(view => view.tag === 'idle').stats, undefined);
+  assert.equal(views.find(view => view.tag === 'removed'), undefined);
+});
+
+test('the recorded window is read from decisions and kept on the policy summary', () => {
+  assert.equal(decisionDetails({ data: { outcome: 'allowed', limit: 5, window: '15m' } }).window, '15m');
+  assert.equal(decisionDetails({ data: { outcome: 'allowed', window: '' } }).window, undefined);
+  const { policies } = summarizeDecisions([
+    { parent_tag: 'login', data: { outcome: 'allowed', limit: 5 } },
+    { parent_tag: 'login', data: { outcome: 'rejected', limit: 5, window: '1m' } },
+  ]);
+  assert.equal(policies[0].window, '1m');
+});
