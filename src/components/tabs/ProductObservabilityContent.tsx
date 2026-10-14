@@ -1,13 +1,14 @@
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, HeartPulse, RefreshCw, Search } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, HeartPulse, Inbox, RefreshCw, Search } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/store/useAuth';
-import { fetchProductObservability } from '@/services/logsServices';
+import { fetchProductObservability, fetchWorkspaceLogs } from '@/services/logsServices';
+import { LogList, type FetchLogPayload } from '@/components/log-table/LogTable';
 import { describeStatus } from '@/utils/observabilityNarrative';
 import { cn } from '@/lib/utils';
 import {
@@ -307,13 +308,13 @@ export default function ProductObservabilityContent({ product, initialView = 'ov
               </div>
             </div>
           </Panel>
-          <LogTable rows={visibleLogs} emptyLabel="logs" />
+          <LogTable rows={visibleLogs} emptyLabel="logs" product={product} />
         </>
       )}
       {(view === 'functions' || view === 'features') && (
         <>
           <KindSummary operations={operations} kinds={view === 'functions' ? ['functions'] : ['feature', 'feature_step']} />
-          <LogTable rows={visibleLogs} emptyLabel={view} />
+          <LogTable rows={visibleLogs} emptyLabel={view} product={product} />
         </>
       )}
     </>
@@ -617,68 +618,28 @@ function HealthView({ healthchecks, env }: { healthchecks: any[]; env: string })
   );
 }
 
-function LogTable({ rows, emptyLabel }: { rows: any[]; emptyLabel: string }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  if (!rows.length) {
-    return <p className="rounded-lg border border-grey-400 bg-white p-8 text-center text-sm text-grey-500">No {emptyLabel} found for this environment and time window.</p>;
-  }
+function LogTable({ rows, emptyLabel, product }: { rows: any[]; emptyLabel: string; product: any }) {
+  const { user, currentWorkspaceId } = useAuth();
+  // The observability list leaves each payload out to stay light, so an opened row loads its own.
+  const fetchPayload: FetchLogPayload = async log => {
+    const response = await fetchWorkspaceLogs(
+      { user_id: user?._id ?? '', public_key: user?.public_key ?? '', workspace_id: currentWorkspaceId ?? '' },
+      { process_id: log.process_id, product_tag: product.tag, limit: 20 },
+    );
+    const found = response?.data?.logs?.data ?? [];
+    return (found.find(item => item._id === log._id) ?? found[0])?.data;
+  };
   return (
-    <Panel flush>
-      <DataTable head={['', 'Time', 'Status', 'Kind', 'Environment', 'Operation', 'Message', 'Took']} minWidth={900}>
-        {rows.map((row, index) => {
-          const key = String(row._id || row.process_id || index);
-          const open = Boolean(expanded[key]);
-          const failed = isFailure(row);
-          const running = row.status === 'processing';
-          const tone: Tone = failed ? 'bad' : running ? 'warn' : 'good';
-          const latency = latencyOf(row);
-          return (
-            <Fragment key={key}>
-              <tr onClick={() => setExpanded(current => ({ ...current, [key]: !open }))} className="cursor-pointer hover:bg-grey-100">
-                <td className="w-8 px-3 py-3">{open ? <ChevronDown className="h-4 w-4 text-grey-600" /> : <ChevronRight className="h-4 w-4 text-grey-600" />}</td>
-                <td className="whitespace-nowrap px-4 py-3 font-medium text-grey">{row.timestamp ? format(new Date(row.timestamp), 'MMM dd, HH:mm:ss') : '-'}</td>
-                <td className="px-4 py-3">
-                  <Pill tone={tone}>
-                    <StatusDot tone={tone} />
-                    {failed ? 'Failed' : running ? 'Running' : 'Succeeded'}
-                  </Pill>
-                </td>
-                <td className="px-4 py-3 text-grey-600">{kindLabel(row.type || row.component)}</td>
-                <td className="px-4 py-3">{row.env || row.app_env ? <Pill>{row.env || row.app_env}</Pill> : '-'}</td>
-                <td className="px-4 py-3">
-                  <code className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">{operationOf(row)}</code>
-                </td>
-                <td className="max-w-64 truncate px-4 py-3 text-grey-600">{row.message || row.name || '-'}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-grey">{ms(latency)}</td>
-              </tr>
-              {open ? (
-                <tr className="bg-grey-100">
-                  <td colSpan={8} className="px-6 py-4">
-                    {row.message ? <p className="mb-3 break-words text-sm text-grey">{row.message}</p> : null}
-                    <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                      <Detail label="Run ID" value={row.process_id} />
-                      <Detail label="Feature" value={row.feature_tag} />
-                      <Detail label="Function" value={row.function_tag} />
-                      <Detail label="Session" value={row.session_id} />
-                      <Detail label="Trace" value={row.trace_id} wide />
-                      <Detail label="Started by run" value={row.parent_process_id} wide />
-                    </dl>
-                  </td>
-                </tr>
-              ) : null}
-            </Fragment>
-          );
-        })}
-      </DataTable>
-    </Panel>
-  );
-}
-
-function Detail({ label, value, wide }: { label: string; value?: string; wide?: boolean }) {
-  return (
-    <div className={wide ? 'sm:col-span-2' : undefined}>
-      <dt className="text-grey-500">{label}</dt>
-      <dd className="mt-1 break-all font-mono text-grey">{value || '-'}</dd>
+    <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
+      {rows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16">
+          <Inbox className="h-12 w-12 text-grey-400 mb-3" />
+          <p className="text-grey-600 font-medium">No {emptyLabel} found</p>
+          <p className="text-sm text-grey-500 mt-1">Nothing was recorded for this environment and time window.</p>
+        </div>
+      ) : (
+        <LogList logs={rows} fetchPayload={fetchPayload} />
+      )}
     </div>
   );
 }
