@@ -17,6 +17,7 @@ export interface DecisionDetails {
   outcome: string;
   remaining?: number;
   limit?: number;
+  window?: string;
   latency?: number;
 }
 
@@ -28,6 +29,8 @@ export interface PolicySummary {
   /** Bypassed, unavailable and drift decisions: the limiter could not give a normal answer. */
   other: number;
   limit?: number;
+  /** Window the policy had when the decision was recorded, for example "1m". */
+  window?: string;
   lastAt?: number;
   envs: string[];
 }
@@ -61,6 +64,7 @@ export function decisionDetails(row: DecisionRow): DecisionDetails {
     outcome: String(data.outcome || fallback),
     remaining: num(data.remaining),
     limit: num(data.limit),
+    window: typeof data.window === 'string' && data.window ? data.window : undefined,
     latency: num(row.latency) ?? num(data.latency),
   };
 }
@@ -71,7 +75,7 @@ export function summarizeDecisions(rows: DecisionRow[]): DecisionSummary {
 
   for (const row of rows) {
     const tag = row.parent_tag || 'unknown';
-    const { outcome, limit } = decisionDetails(row);
+    const { outcome, limit, window } = decisionDetails(row);
     let policy = byPolicy.get(tag);
     if (!policy) {
       policy = { tag, total: 0, allowed: 0, rejected: 0, other: 0, envs: [], envSet: new Set() };
@@ -90,6 +94,7 @@ export function summarizeDecisions(rows: DecisionRow[]): DecisionSummary {
       summary.other += 1;
     }
     if (limit !== undefined && policy.limit === undefined) policy.limit = limit;
+    if (window && policy.window === undefined) policy.window = window;
     if (row.env) policy.envSet.add(row.env);
     const at = row.timestamp ? new Date(row.timestamp).getTime() : NaN;
     if (Number.isFinite(at) && (policy.lastAt === undefined || at > policy.lastAt)) policy.lastAt = at;

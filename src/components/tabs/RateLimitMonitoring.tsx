@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, GitBranchPlus, Pencil, Plus, RefreshCw, Time
 import { useAuth } from '@/store/useAuth';
 import { fetchWorkspaceLogs } from '@/services/logsServices';
 import { decisionDetails, mergePolicies, summarizeDecisions, type PolicyView, type StoredPolicy } from '@/utils/rateLimitSummary';
-import { describePolicy, describeStrategy } from '@/utils/rateLimitForm';
+import { describePolicy, describeStrategy, describeWindow } from '@/utils/rateLimitForm';
 import { useResilienceProxy } from '@/hooks/useResilienceProxy';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -369,7 +369,7 @@ function PolicyCard({
   const rejectedShare = stats ? percent(stats.rejected, stats.total) : 0;
   const title = stored?.name && stored.name !== stored.tag ? stored.name : view.tag;
   const overrides = stored?.envs?.length ?? 0;
-  const definition = stored ? describePolicy(stored) : stats?.limit !== undefined ? `Limit ${stats.limit.toLocaleString()} per window` : 'Limit not recorded';
+  const definition = stored ? describePolicy(stored) : stats?.limit !== undefined ? `Limit ${stats.limit.toLocaleString()}${stats.window ? ` per ${describeWindow(stats.window)}` : ' per window'}` : 'Limit not recorded';
 
   return (
     <div className={cn('flex flex-col rounded-lg border bg-white transition-all hover:border-primary hover:shadow-md', selected ? 'border-primary ring-1 ring-primary' : 'border-grey-400')}>

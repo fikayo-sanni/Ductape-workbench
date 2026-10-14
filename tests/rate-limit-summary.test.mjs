@@ -87,3 +87,13 @@ test('mergePolicies lists stored policies first, then code-defined ones, and lin
   assert.equal(views.find(view => view.tag === 'idle').stats, undefined);
   assert.equal(views.find(view => view.tag === 'removed'), undefined);
 });
+
+test('the recorded window is read from decisions and kept on the policy summary', () => {
+  assert.equal(decisionDetails({ data: { outcome: 'allowed', limit: 5, window: '15m' } }).window, '15m');
+  assert.equal(decisionDetails({ data: { outcome: 'allowed', window: '' } }).window, undefined);
+  const { policies } = summarizeDecisions([
+    { parent_tag: 'login', data: { outcome: 'allowed', limit: 5 } },
+    { parent_tag: 'login', data: { outcome: 'rejected', limit: 5, window: '1m' } },
+  ]);
+  assert.equal(policies[0].window, '1m');
+});
