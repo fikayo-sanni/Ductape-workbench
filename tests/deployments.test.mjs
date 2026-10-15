@@ -15,7 +15,7 @@ function load(relative) {
 }
 
 const {
-  compareVersions, deployErrorMessage, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, shortHash, totals,
+  DEPLOY_PROVIDERS, buildTotals, compareVersions, deployErrorMessage, describeBuildStatus, hasDeployScope, isBuildInFlight, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, shortHash, totals,
 } = load('../src/utils/deployments.ts');
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
@@ -116,4 +116,33 @@ test('errors say what the server said, or that the server has no deploy support'
   assert.equal(deployErrorMessage({ response: { status: 403, data: { errors: ['no access'] } } }), 'no access');
   assert.equal(deployErrorMessage(new Error('Network Error')), 'Network Error');
   assert.equal(deployErrorMessage(undefined), 'The deployments could not be loaded.');
+});
+
+const build = (status, over = {}) => ({ id: 'b', kind: 'function', productTag: 'p', name: 'n', version: '1.0.0', connectionTag: 'gcp-main', region: 'europe-west2', status, builder: 'dockerfile', imageRepository: 'r', createdAt: 'x', updatedAt: 'x', ...over });
+
+test('build statuses carry a label and a colour, and running ones are known', () => {
+  assert.deepEqual(plain(describeBuildStatus('succeeded')), { label: 'Succeeded', tone: 'good' });
+  assert.deepEqual(plain(describeBuildStatus('failed')), { label: 'Failed', tone: 'bad' });
+  assert.deepEqual(plain(describeBuildStatus('expired')), { label: 'Expired', tone: 'warn' });
+  assert.deepEqual(plain(describeBuildStatus('building')), { label: 'Building', tone: 'info' });
+  assert.deepEqual(plain(describeBuildStatus('awaiting_upload')), { label: 'Waiting for source', tone: 'neutral' });
+  assert.deepEqual(plain(describeBuildStatus('queued_somewhere')), { label: 'queued_somewhere', tone: 'neutral' }, 'an unknown status is shown as it came');
+  assert.equal(isBuildInFlight('building'), true);
+  assert.equal(isBuildInFlight('awaiting_upload'), true);
+  assert.equal(isBuildInFlight('succeeded'), false);
+  assert.equal(isBuildInFlight('failed'), false);
+});
+
+test('build totals count what is running and what failed', () => {
+  assert.deepEqual(plain(buildTotals([build('succeeded'), build('succeeded'), build('building'), build('awaiting_upload'), build('failed'), build('expired')])), { total: 6, inFlight: 2, succeeded: 2, failed: 1 });
+  assert.deepEqual(plain(buildTotals([])), { total: 0, inFlight: 0, succeeded: 0, failed: 0 });
+});
+
+test('a connection can deploy only with the deploy scope, and only GCP can deploy today', () => {
+  assert.equal(hasDeployScope(['storage', 'deploy']), true);
+  assert.equal(hasDeployScope(['storage', 'broker']), false);
+  assert.equal(hasDeployScope([]), false);
+  assert.equal(hasDeployScope(undefined), false);
+  assert.equal(DEPLOY_PROVIDERS.has('gcp'), true);
+  for (const provider of ['aws', 'azure', 'mongodb_atlas', 'neo4j_aura']) assert.equal(DEPLOY_PROVIDERS.has(provider), false, provider);
 });

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
-import { fetchProductDeployments, fetchProductEnvironments, type IDeployAuth } from '@/services/deployServices';
-import { isInFlight } from '@/utils/deployments';
+import { fetchConnectionBuilds, fetchConnectionDeployments, fetchProductDeployments, fetchProductEnvironments, type IDeployAuth } from '@/services/deployServices';
+import { isBuildInFlight, isInFlight } from '@/utils/deployments';
 
 const POLL_MS = 5000;
 
@@ -32,4 +32,23 @@ export function useProductEnvironments(productTag: string | undefined) {
     queryFn: () => fetchProductEnvironments(auth!, productTag!),
     enabled: Boolean(auth && productTag),
   });
+}
+
+/** What was applied through one cloud connection: its deployments, and the builds that ran through it. Re-read while either is moving. */
+export function useConnectionDeployActivity(connectionTag: string | undefined, enabled: boolean) {
+  const auth = useDeployAuth();
+  const on = Boolean(auth && connectionTag && enabled);
+  const deployments = useQuery({
+    queryKey: ['connection-deployments', auth?.workspaceId, connectionTag],
+    queryFn: () => fetchConnectionDeployments(auth!, connectionTag!),
+    enabled: on,
+    refetchInterval: (query) => ((query.state.data ?? []).some((d) => isInFlight(d.state)) ? POLL_MS : false),
+  });
+  const builds = useQuery({
+    queryKey: ['connection-builds', auth?.workspaceId, connectionTag],
+    queryFn: () => fetchConnectionBuilds(auth!, connectionTag!),
+    enabled: on,
+    refetchInterval: (query) => ((query.state.data ?? []).some((b) => isBuildInFlight(b.status)) ? POLL_MS : false),
+  });
+  return { deployments, builds };
 }

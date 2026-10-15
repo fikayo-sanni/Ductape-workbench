@@ -213,3 +213,70 @@ export function deployErrorMessage(error: unknown): string {
   if (message) return response?.data?.meta?.code ? `${message} [${response.data.meta.code}]` : message;
   return error instanceof Error ? error.message : 'The deployments could not be loaded.';
 }
+
+// ---- Builds -------------------------------------------------------------------------------------------------------------------
+
+export type BuildStatus = 'awaiting_upload' | 'building' | 'succeeded' | 'failed' | 'expired';
+
+/** A build of source code into an image in the customer's own cloud account. */
+export interface IBuild {
+  id: string;
+  kind: DeployableKind;
+  productTag: string;
+  name: string;
+  version: string;
+  connectionTag: string;
+  region: string;
+  status: BuildStatus;
+  builder: string;
+  imageRepository: string;
+  imageDigest?: string;
+  releaseHash?: string;
+  logUrl?: string;
+  error?: { code: string; message: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+const BUILD_LABEL: Record<BuildStatus, string> = {
+  awaiting_upload: 'Waiting for source',
+  building: 'Building',
+  succeeded: 'Succeeded',
+  failed: 'Failed',
+  expired: 'Expired',
+};
+
+export function describeBuildStatus(status: string): { label: string; tone: Tone } {
+  const known = status as BuildStatus;
+  const label = BUILD_LABEL[known] ?? status;
+  if (known === 'succeeded') return { label, tone: 'good' };
+  if (known === 'failed') return { label, tone: 'bad' };
+  if (known === 'expired') return { label, tone: 'warn' };
+  if (known === 'building') return { label, tone: 'info' };
+  return { label, tone: 'neutral' };
+}
+
+/** Builds that are still moving: waiting for their source, or running. */
+export const isBuildInFlight = (status: string): boolean => status === 'awaiting_upload' || status === 'building';
+
+export interface IBuildTotals {
+  total: number;
+  inFlight: number;
+  succeeded: number;
+  failed: number;
+}
+
+export function buildTotals(builds: IBuild[]): IBuildTotals {
+  return {
+    total: builds.length,
+    inFlight: builds.filter((b) => isBuildInFlight(b.status)).length,
+    succeeded: builds.filter((b) => b.status === 'succeeded').length,
+    failed: builds.filter((b) => b.status === 'failed').length,
+  };
+}
+
+/** Which providers Ductape Deploy can use today. Others cannot have anything deployed or built through them yet. */
+export const DEPLOY_PROVIDERS: ReadonlySet<string> = new Set(['gcp']);
+
+/** Whether a connection was created with the deploy scope, which a build or deploy through it needs. */
+export const hasDeployScope = (scopes: readonly string[] | undefined): boolean => Boolean(scopes?.includes('deploy'));
