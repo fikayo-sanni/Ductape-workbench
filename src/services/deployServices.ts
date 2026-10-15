@@ -4,7 +4,7 @@
  */
 
 import apiClient from '@/config/axiosinstance';
-import type { DeployableKind, IDeployment, IJournalEntry, IProductEnvironment } from '@/utils/deployments';
+import type { DeployableKind, IBuild, IDeployment, IJournalEntry, IProductEnvironment } from '@/utils/deployments';
 
 const BASE = '/integrations/v1/deploy';
 
@@ -35,5 +35,17 @@ export async function fetchProductEnvironments(auth: IDeployAuth, productTag: st
 /** What happened to one deployment, oldest first. */
 export async function fetchDeploymentJournal(auth: IDeployAuth, deploymentId: string): Promise<IJournalEntry[]> {
   const { data } = await apiClient.get<{ data: IJournalEntry[] }>(`${BASE}/deployments/${encodeURIComponent(deploymentId)}/journal?${params(auth)}`);
+  return data.data ?? [];
+}
+
+/** Everything applied through one cloud connection, across every product, newest change first. */
+export async function fetchConnectionDeployments(auth: IDeployAuth, connectionTag: string): Promise<IDeployment[]> {
+  const { data } = await apiClient.get<{ data: IDeployment[] }>(`${BASE}/deployments?${params(auth, { connectionTag })}`);
+  return data.data ?? [];
+}
+
+/** Every build that ran through one cloud connection, newest first. */
+export async function fetchConnectionBuilds(auth: IDeployAuth, connectionTag: string): Promise<IBuild[]> {
+  const { data } = await apiClient.get<{ data: IBuild[] }>(`${BASE}/builds?${params(auth, { connectionTag })}`);
   return data.data ?? [];
 }

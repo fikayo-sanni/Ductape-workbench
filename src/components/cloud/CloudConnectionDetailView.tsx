@@ -13,11 +13,15 @@ import {
   Boxes,
   Bell,
   Sparkles,
+  Rocket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import CloudConnectionResourcesPanel from '@/components/cloud/CloudConnectionResourcesPanel';
+import CloudConnectionDeployActivity from '@/components/cloud/CloudConnectionDeployActivity';
+import { useConnectionDeployActivity } from '@/hooks/useProductDeployments';
+import { DEPLOY_PROVIDERS } from '@/utils/deployments';
 import CloudConnectionTagBadge from '@/components/cloud/CloudConnectionTagBadge';
 import CloudCopySnippet from '@/components/cloud/CloudCopySnippet';
 import CloudProviderIcon from '@/components/cloud/CloudProviderIcon';
@@ -115,6 +119,10 @@ export default function CloudConnectionDetailView({
   const scopes = connection.scopes || [];
   const isActive = isCloudConnectionActive(connection.status);
   const showSecurityGroupsTab = Boolean(securityGroupsContent);
+  // Builds and deployments run through a connection, for the providers Ductape Deploy can use today.
+  const showDeploymentsTab = Boolean(connection.tag) && isActive && DEPLOY_PROVIDERS.has(provider);
+  const deployActivity = useConnectionDeployActivity(connection.tag, showDeploymentsTab);
+  const deploymentCount = deployActivity.deployments.data?.length;
   const defaultTab = showSetupTab
     ? 'setup'
     : isActive && scopes.length > 0
@@ -234,6 +242,20 @@ export default function CloudConnectionDetailView({
               >
                 <Server className="h-3.5 w-3.5" />
                 Resources
+              </TabsTrigger>
+            )}
+            {showDeploymentsTab && (
+              <TabsTrigger
+                value="deployments"
+                className="rounded-none border-b-2 border-transparent px-0 pb-3 pt-3 text-grey-600 data-[state=active]:border-primary data-[state=active]:text-grey data-[state=active]:shadow-none data-[state=active]:bg-transparent gap-1.5"
+              >
+                <Rocket className="h-3.5 w-3.5" />
+                Deployments
+                {deploymentCount !== undefined && deploymentCount > 0 ? (
+                  <span className="rounded bg-grey-100 px-1.5 py-0.5 text-[10px] text-grey-600" data-testid="connection-deployments-count">
+                    {deploymentCount}
+                  </span>
+                ) : null}
               </TabsTrigger>
             )}
             {showSecurityGroupsTab && (
@@ -356,6 +378,12 @@ export default function CloudConnectionDetailView({
                 connection={connection}
                 variant="panel"
               />
+            </TabsContent>
+          )}
+
+          {showDeploymentsTab && (
+            <TabsContent value="deployments" className="mt-0">
+              <CloudConnectionDeployActivity connection={connection} />
             </TabsContent>
           )}
 
