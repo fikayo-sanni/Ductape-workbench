@@ -15,6 +15,14 @@ function load(relative) {
 }
 
 const { schemaToRows, valueToRows } = load('../src/utils/schemaRows.ts');
+const { functionPayload } = load('../src/utils/functionPayload.ts');
+
+test('function activity distinguishes real payloads from metadata and missing samples', () => {
+  assert.equal(functionPayload(undefined).payload_unavailable, true);
+  assert.equal(functionPayload({ operation: 'generate' }).payload_unavailable, true);
+  assert.equal(functionPayload(JSON.stringify({ input: {}, output: null })).output, null);
+  assert.equal(functionPayload({ input: { password: '[REDACTED]' } }).input.password, '[REDACTED]');
+});
 
 // The module runs in a separate vm realm; copy into this realm before deep comparison.
 const pick = (rows, fn) => Array.from(rows, fn);
@@ -66,6 +74,9 @@ test('schemaToRows handles non-object and empty schemas', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].name, '(value)');
   assert.equal(rows[0].type, 'list of number');
+  assert.equal(schemaToRows({ type: 'object' })[0].note, 'Object; fields unspecified');
+  assert.equal(schemaToRows({ type: 'object', properties: {} })[0].note, 'Object; fields unspecified');
+  assert.equal(schemaToRows({ type: 'object', additionalProperties: false })[0].note, 'No fields allowed');
 });
 
 test('valueToRows flattens a sample payload and accepts JSON text', () => {

@@ -35,6 +35,7 @@ type Schema = {
   maximum?: number;
   minItems?: number;
   maxItems?: number;
+  additionalProperties?: boolean | Schema;
 };
 
 const MAX_DEPTH = 3;
@@ -106,6 +107,8 @@ export function schemaToRows(schema: unknown): FieldRow[] {
   if (root.type === 'object' || root.properties) {
     const rows: FieldRow[] = [];
     walk(root, 0, rows);
+    if (!rows.length) rows.push({ name: '(value)', type: 'object', required: true,
+      note: root.additionalProperties === false ? 'No fields allowed' : 'Object; fields unspecified', depth: 0 });
     return rows;
   }
   return [{ name: '(value)', type: typeLabel(root), required: true, note: noteFor(root), depth: 0 }];
