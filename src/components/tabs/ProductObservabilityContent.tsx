@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/store/useAuth';
 import { fetchProductObservability, fetchWorkspaceLogs } from '@/services/logsServices';
 import { LogList, type FetchLogPayload } from '@/components/log-table/LogTable';
+import { functionPayload } from '@/utils/functionPayload';
 import { describeStatus } from '@/utils/observabilityNarrative';
+import { describeStrategy, healthView } from '@/utils/healthcheckStrategy';
 import { cn } from '@/lib/utils';
 import {
   DataTable,
@@ -570,8 +572,8 @@ function HealthSummary({ healthchecks, env, onOpen }: { healthchecks: any[]; env
               <div className="flex flex-wrap gap-2">
                 {envStatuses(check, env).map((item: any) => (
                   <span key={item.slug} className="inline-flex items-center gap-1.5 text-xs text-grey-600">
-                    <StatusDot tone={!item.status ? 'neutral' : isAvailable(item.status) ? 'good' : 'bad'} />
-                    {item.slug}: {item.status || 'not checked yet'}
+                    <StatusDot tone={healthView(item).tone} />
+                    {item.slug}: {healthView(item).label.toLowerCase()}
                   </span>
                 ))}
               </div>
@@ -593,20 +595,22 @@ function HealthView({ healthchecks, env }: { healthchecks: any[]; env: string })
         <Panel
           key={check.tag}
           title={check.name || check.tag}
-          description={`${check.probe?.type || 'healthcheck'} probe, every ${Math.round(Number(check.interval || check.checkIntervals || 0) / 1000)} seconds`}
+          description={`${check.probe?.type || 'healthcheck'} probe. ${describeStrategy(check, `every ${Math.round(Number(check.interval || check.checkIntervals || 0) / 1000)} seconds`)}`}
         >
           <div className="space-y-2">
             {envStatuses(check, env).map((item: any) => {
-              const ok = isAvailable(item.status);
+              const view = healthView(item);
+              const ok = view.tone === 'good';
               return (
                 <div key={item.slug} className="flex items-start justify-between gap-3 rounded-lg bg-grey-100 p-3 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium text-grey">{item.slug}</p>
+                    {healthView(item).note ? <p className="mt-0.5 text-xs text-grey-500">{healthView(item).note}</p> : null}
                     {item.lastError ? <p className="mt-1 break-words text-xs text-red">{item.lastError.message || String(item.lastError)}</p> : null}
                   </div>
-                  <Pill tone={!item.status ? 'neutral' : ok ? 'good' : 'bad'} className="capitalize">
+                  <Pill tone={view.tone}>
                     {ok ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {item.status || 'unknown'}
+                    {view.label}
                   </Pill>
                 </div>
               );
@@ -627,7 +631,10 @@ function LogTable({ rows, emptyLabel, product }: { rows: any[]; emptyLabel: stri
       { process_id: log.process_id, product_tag: product.tag, limit: 20 },
     );
     const found = response?.data?.logs?.data ?? [];
-    return (found.find(item => item._id === log._id) ?? found[0])?.data;
+    const exact = found.find(item => log._id && item._id === log._id);
+    if (log.type === 'functions') return functionPayload(exact?.data);
+    return exact?.data ?? { payload_unavailable: true,
+      reason: 'No retained payload was returned for this exact activity record. Contract publication does not capture execution samples.' };
   };
   return (
     <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
