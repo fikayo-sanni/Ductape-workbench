@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, Edit, Trash2, Activity, Heart, MessageSquare, Settings2, Box, Timer, Bell } from 'lucide-react';
+import { Copy, Eye, EyeOff, Edit, Trash2, Activity, Heart, MessageSquare, Settings2, Box, Timer, Bell, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
 import { useState } from 'react';
@@ -71,7 +71,7 @@ const componentConfig: Record<string, {
     ],
   },
   job: {
-    icon: Box,
+    icon: CalendarClock,
     title: 'Job',
     color: 'bg-purple-500/10 text-purple-500',
     fields: [

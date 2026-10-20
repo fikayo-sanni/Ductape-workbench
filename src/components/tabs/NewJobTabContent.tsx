@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Box, Save, CheckCircle, Loader2 } from 'lucide-react';
+import { CalendarClock, Save, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/store/useAuth';
 import { useDuctape } from '@/hooks/useDuctape';
@@ -383,7 +383,7 @@ export default function NewJobTabContent({ tabId, data }: NewJobTabContentProps)
         <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <Box className="h-6 w-6 text-purple-500" />
+              <CalendarClock className="h-6 w-6 text-purple-500" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-grey">Create New Job</h1>
