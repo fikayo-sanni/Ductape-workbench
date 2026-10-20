@@ -15,6 +15,10 @@ import {
   Filter,
   X as CloseIcon,
   Layers,
+  CheckCircle2,
+  ChevronRight,
+  RefreshCw,
+  HeartPulse,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
@@ -32,9 +36,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {Button} from '@/components/ui/button';
+import {useWorkbenchStore} from '@/stores/workbench-store';
+import {Panel, Pill, type Tone} from '@/components/tabs/ProductSection';
+import {productHealth, workspaceAttention, type Severity} from '@/utils/productOverview';
 
 export default function Dashboard() {
   const {currentWorkspaceId, user} = useAuth();
+  const {openTab} = useWorkbenchStore();
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   // Filter state
@@ -82,6 +90,8 @@ export default function Dashboard() {
     data: dashboardData,
     isLoading,
     error,
+    refetch,
+    isFetching,
   } = useQuery({
     queryKey: [
       'dashboard',
@@ -114,14 +124,10 @@ export default function Dashboard() {
   const clearFilters = () => {
     setSelectedAppId('all');
     setSelectedProductId('all');
-    setSelectedTimeRange('7d');
   };
 
   // Check if any filters are active
-  const hasActiveFilters =
-    selectedAppId !== 'all' ||
-    selectedProductId !== 'all' ||
-    selectedTimeRange !== '7d';
+  const hasActiveFilters = selectedAppId !== 'all' || selectedProductId !== 'all';
 
   const dashboardPayload = dashboardData?.data ?? dashboardData;
   const statsFromApi: Array<{
@@ -237,20 +243,103 @@ export default function Dashboard() {
     );
   }
 
+  const productList: any[] = productsData?.data ?? [];
+  const attention = workspaceAttention(productList);
+  const watchedProducts = productList.filter(product => productHealth(product).state !== 'unwatched').length;
+  const usageByName = new Map(topProducts.map(product => [product.name, product]));
+  const typeColors: Record<string, string> = {
+    Actions: 'bg-blue-500',
+    Session: 'bg-green',
+    Storage: 'bg-purple-500',
+    Cache: 'bg-yellow',
+    Notifications: 'bg-indigo-500',
+    Database: 'bg-pink-500',
+    Queue: 'bg-orange-500',
+    Feature: 'bg-cyan-500',
+    Other: 'bg-grey-500',
+  };
+
+  const banner = (() => {
+    if (productList.length === 0) {
+      return {tone: 'neutral' as const, title: 'No products yet', detail: 'Create a product to start building. Its health and activity will show up here.'};
+    }
+    if (attention.length > 0) {
+      const down = attention.filter(item => item.severity === 'bad').length;
+      const products = new Set(attention.map(item => item.productId)).size;
+      return {
+        tone: down > 0 ? ('bad' as const) : ('warn' as const),
+        title: `${attention.length} health ${attention.length === 1 ? 'check needs' : 'checks need'} attention`,
+        detail: `Across ${products} ${products === 1 ? 'product' : 'products'}. The worst are listed on the right.`,
+      };
+    }
+    if (watchedProducts === 0) {
+      return {tone: 'neutral' as const, title: 'Nothing is being health checked yet', detail: 'Add a health check to a product and its status will be tracked here.'};
+    }
+    return {
+      tone: 'good' as const,
+      title: 'Everything being watched is healthy',
+      detail: `${watchedProducts} of ${productList.length} ${productList.length === 1 ? 'product has' : 'products have'} health checks, and none is failing.`,
+    };
+  })();
+  const bannerStyle: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
+    good: 'border-green/30 bg-green/5',
+    warn: 'border-orange/30 bg-orange/5',
+    bad: 'border-red/30 bg-red/5',
+    neutral: 'border-grey-400 bg-grey-100',
+  };
+  const severityStyle: Record<Severity, {tile: string; text: string}> = {
+    bad: {tile: 'bg-red/10', text: 'text-red'},
+    warn: {tile: 'bg-orange/10', text: 'text-orange'},
+    info: {tile: 'bg-primary/10', text: 'text-primary'},
+  };
+  const healthTone: Record<string, Tone> = {good: 'good', warn: 'warn', bad: 'bad', unwatched: 'neutral'};
+
+  const openProduct = (product: any) =>
+    openTab({
+      id: `product-${product._id}`,
+      type: 'product',
+      title: product.name,
+      itemId: product._id,
+      data: product,
+    });
+  const openProductById = (id: string) => {
+    const product = productList.find(item => String(item._id) === id);
+    if (product) openProduct(product);
+  };
+  const initials = (name: string) =>
+    String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('');
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-grey-100 w-full p-3 sm:p-4 md:p-6 pb-10">
-      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-grey mb-1">
-              Workspace Dashboard
-            </h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-grey mb-1">Workspace dashboard</h1>
             <p className="text-xs sm:text-sm text-grey-600">
-              Monitor your products, apps, and infrastructure in real-time
+              {productList.length} {productList.length === 1 ? 'product' : 'products'}
+              {appsData?.data ? `, ${appsData.data.length} ${appsData.data.length === 1 ? 'app' : 'apps'}` : ''}. Updated {lastUpdated.toLocaleTimeString()}.
             </p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-grey-400 bg-white p-0.5" role="tablist" aria-label="Period">
+              {timeRanges.map(range => (
+                <button
+                  key={range.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedTimeRange === range.value}
+                  onClick={() => setSelectedTimeRange(range.value)}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    selectedTimeRange === range.value ? 'bg-primary text-white' : 'text-grey-600 hover:text-grey',
+                  )}
+                  title={range.label}
+                >
+                  {range.value}
+                </button>
+              ))}
+            </div>
             <Button
               variant={showFilters ? 'default' : 'outline'}
               size="sm"
@@ -261,21 +350,13 @@ export default function Dashboard() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-1 bg-primary text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 text-[10px] sm:text-xs flex items-center justify-center">
-                  {
-                    [
-                      selectedAppId !== 'all',
-                      selectedProductId !== 'all',
-                      selectedTimeRange !== '7d',
-                    ].filter(Boolean).length
-                  }
+                  {[selectedAppId !== 'all', selectedProductId !== 'all'].filter(Boolean).length}
                 </span>
               )}
             </Button>
-            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-grey-600">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Last updated:</span>
-              <span>{lastUpdated.toLocaleTimeString()}</span>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching} className="gap-2 text-xs sm:text-sm px-2 sm:px-3" aria-label="Refresh">
+              <RefreshCw className={cn('h-3 w-3 sm:h-4 sm:w-4', isFetching && 'animate-spin')} />
+            </Button>
           </div>
         </div>
 
@@ -285,33 +366,24 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h3 className="font-semibold text-grey flex items-center gap-2 text-sm sm:text-base">
                 <Filter className="h-4 w-4" />
-                Filter Dashboard Data
+                Filter dashboard data
               </h3>
               {hasActiveFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="gap-2 text-grey-600 hover:text-grey text-xs sm:text-sm px-2 sm:px-3"
-                >
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-2 text-grey-600 hover:text-grey text-xs sm:text-sm px-2 sm:px-3">
                   <CloseIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Clear All</span>
+                  <span className="hidden sm:inline">Clear all</span>
                 </Button>
               )}
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {/* App Filter */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="text-xs sm:text-sm font-medium text-grey-600 mb-1 sm:mb-2 block">
-                  Internal App
-                </label>
+                <label className="text-xs sm:text-sm font-medium text-grey-600 mb-1 sm:mb-2 block">Internal app</label>
                 <Select value={selectedAppId} onValueChange={setSelectedAppId}>
                   <SelectTrigger className="h-9 sm:h-10 text-sm">
-                    <SelectValue placeholder="All Apps" />
+                    <SelectValue placeholder="All apps" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Apps</SelectItem>
+                    <SelectItem value="all">All apps</SelectItem>
                     {appsData?.data?.map((app: any) => (
                       <SelectItem key={app._id} value={app._id}>
                         {app.app_name}
@@ -320,22 +392,15 @@ export default function Dashboard() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Product Filter */}
               <div>
-                <label className="text-xs sm:text-sm font-medium text-grey-600 mb-1 sm:mb-2 block">
-                  Product
-                </label>
-                <Select
-                  value={selectedProductId}
-                  onValueChange={setSelectedProductId}
-                >
+                <label className="text-xs sm:text-sm font-medium text-grey-600 mb-1 sm:mb-2 block">Product</label>
+                <Select value={selectedProductId} onValueChange={setSelectedProductId}>
                   <SelectTrigger className="h-9 sm:h-10 text-sm">
-                    <SelectValue placeholder="All Products" />
+                    <SelectValue placeholder="All products" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Products</SelectItem>
-                    {productsData?.data?.map((product: any) => (
+                    <SelectItem value="all">All products</SelectItem>
+                    {productList.map((product: any) => (
                       <SelectItem key={product._id} value={product._id}>
                         {product.name}
                       </SelectItem>
@@ -343,134 +408,56 @@ export default function Dashboard() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Time Range Filter */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-grey-600 mb-1 sm:mb-2 block">
-                  Time Range
-                </label>
-                <Select
-                  value={selectedTimeRange}
-                  onValueChange={setSelectedTimeRange}
-                >
-                  <SelectTrigger className="h-9 sm:h-10 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeRanges.map(range => (
-                      <SelectItem key={range.value} value={range.value}>
-                        {range.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-
-            {/* Active Filters Display */}
-            {hasActiveFilters && (
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-grey-400">
-                <p className="text-xs text-grey-600 mb-2">Active Filters:</p>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {selectedAppId !== 'all' && (
-                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
-                      <span className="max-w-[150px] sm:max-w-none truncate">
-                        App:{' '}
-                        {
-                          appsData?.data?.find(
-                            (a: any) => a._id === selectedAppId,
-                          )?.app_name
-                        }
-                      </span>
-                      <button
-                        onClick={() => setSelectedAppId('all')}
-                        className="hover:bg-primary/20 rounded p-0.5"
-                      >
-                        <CloseIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  {selectedProductId !== 'all' && (
-                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
-                      <span className="max-w-[150px] sm:max-w-none truncate">
-                        Product:{' '}
-                        {
-                          productsData?.data?.find(
-                            (p: any) => p._id === selectedProductId,
-                          )?.name
-                        }
-                      </span>
-                      <button
-                        onClick={() => setSelectedProductId('all')}
-                        className="hover:bg-primary/20 rounded p-0.5"
-                      >
-                        <CloseIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  {selectedTimeRange !== '7d' && (
-                    <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
-                      <span>
-                        {
-                          timeRanges.find(r => r.value === selectedTimeRange)
-                            ?.label
-                        }
-                      </span>
-                      <button
-                        onClick={() => setSelectedTimeRange('7d')}
-                        className="hover:bg-primary/20 rounded p-0.5"
-                      >
-                        <CloseIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-          {stats.map(stat => {
-            const Icon = stat.icon;
-            const TrendIcon = stat.trend === 'up' ? TrendingUp : TrendingDown;
+        {/* Workspace status */}
+        <div className={cn('flex items-start gap-3 rounded-xl border p-4', bannerStyle[banner.tone])}>
+          {banner.tone === 'good' ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-green" />
+          ) : banner.tone === 'neutral' ? (
+            <HeartPulse className="mt-0.5 h-5 w-5 flex-shrink-0 text-grey-600" />
+          ) : (
+            <AlertTriangle className={cn('mt-0.5 h-5 w-5 flex-shrink-0', banner.tone === 'bad' ? 'text-red' : 'text-orange')} />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-grey sm:text-base">{banner.title}</p>
+            <p className="mt-0.5 text-xs text-grey-600 sm:text-sm">{banner.detail}</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          {stats.map(item => {
+            const Icon = item.icon;
+            const TrendIcon = item.trend === 'up' ? TrendingUp : TrendingDown;
             return (
-              <div
-                key={stat.title}
-                className="bg-white rounded-lg border border-grey-400 p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
+              <div key={item.title} className="bg-white rounded-xl border border-grey-400 p-3 sm:p-4 shadow-sm">
                 <div className="flex items-start justify-between mb-2 sm:mb-3">
-                  <div
-                    className={cn(
-                      'w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center',
-                      stat.bgColor,
-                    )}
-                  >
-                    <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', stat.color)} />
+                  <div className={cn('w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center', item.bgColor)}>
+                    <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', item.color)} />
                   </div>
                   <div
                     className={cn(
                       'flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 sm:px-2 sm:py-1 rounded',
-                      stat.trend === 'up'
-                        ? 'text-green bg-green/10'
-                        : 'text-red bg-red/10',
+                      item.trend === 'up' ? 'text-green bg-green/10' : 'text-red bg-red/10',
                     )}
+                    title={`Compared with the previous ${timeRanges.find(range => range.value === selectedTimeRange)?.label.replace('Last ', '').toLowerCase()}`}
                   >
                     <TrendIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                    {stat.change}
+                    {item.change}
                   </div>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-grey mb-0.5 sm:mb-1">
-                  {stat.value}
-                </h3>
-                <p className="text-xs sm:text-sm text-grey-600">{stat.title}</p>
+                <h3 className="text-xl sm:text-2xl font-bold text-grey mb-0.5 tabular-nums">{item.value}</h3>
+                <p className="text-xs sm:text-sm text-grey-600">{item.title}</p>
               </div>
             );
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Timeline, and what needs attention beside it at the same height */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           <ActivityTimelinePanel
             title="Activity timeline"
             kind="workspace"
@@ -478,221 +465,173 @@ export default function Dashboard() {
             enabled={!!currentWorkspaceId}
             className="lg:col-span-2 border-grey-400"
           />
-
-          {/* Activity by Type */}
-          <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-semibold text-grey">
-                Activity by Type
-              </h2>
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-grey-600" />
-            </div>
-            <div className="space-y-2 sm:space-y-3">
-              {activityByType.length > 0 ? (
-                activityByType.map((activity, index) => {
-                  // Color mapping for different activity types
-                  const getTypeColor = (type: string) => {
-                    const typeColors: Record<string, string> = {
-                      Actions: 'bg-blue-500',
-                      Session: 'bg-green',
-                      Storage: 'bg-purple-500',
-                      Cache: 'bg-yellow',
-                      Notifications: 'bg-indigo-500',
-                      Database: 'bg-pink-500',
-                      Queue: 'bg-orange-500',
-                      Feature: 'bg-cyan-500',
-                      Other: 'bg-grey-500',
-                    };
-                    return typeColors[type] || 'bg-primary';
-                  };
-
-                  return (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="text-grey font-medium truncate max-w-[120px] sm:max-w-none">
-                          {activity.type}
-                        </span>
-                        <span className="text-grey-600 text-xs sm:text-sm">
-                          {activity.count} ({activity.percentage}%)
-                        </span>
-                      </div>
-                      <div className="w-full bg-grey-200 rounded-full h-1.5 sm:h-2">
-                        <div
-                          className={cn(
-                            'h-1.5 sm:h-2 rounded-full transition-all',
-                            getTypeColor(activity.type),
-                          )}
-                          style={{width: `${activity.percentage}%`}}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-                  <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
-                  <p className="text-sm sm:text-base text-grey-600 font-medium">
-                    No activity data
-                  </p>
-                  <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
-                    Activity breakdown will appear here
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Top Products by Usage */}
-        <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-base sm:text-lg font-semibold text-grey">
-              Top Products by Usage
-            </h2>
-            <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-grey-600" />
-          </div>
-          {topProducts.length > 0 ? (
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="min-w-[640px] sm:min-w-0">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-grey-400">
-                      <th className="text-left text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3 pl-4 sm:pl-0">
-                        Product
-                      </th>
-                      <th className="text-right text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3">
-                        Resources
-                      </th>
-                      <th className="text-right text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3 hidden sm:table-cell">
-                        Internal
-                      </th>
-                      <th className="text-right text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3 hidden sm:table-cell">
-                        Outbound
-                      </th>
-                      <th className="text-right text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3 hidden sm:table-cell">
-                        Inbound
-                      </th>
-                      <th className="text-right text-xs sm:text-sm font-medium text-grey-600 pb-2 sm:pb-3">
-                        Growth
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topProducts.map((product, index) => (
-                      <tr
-                        key={index}
-                        className="border-b border-grey-400 last:border-b-0"
-                      >
-                        <td className="py-2 sm:py-3 pl-4 sm:pl-0">
-                          <div className="flex items-center gap-1.5 sm:gap-2">
-                            <Package className="h-3 w-3 sm:h-4 sm:w-4 text-grey-600 flex-shrink-0" />
-                            <span className="text-xs sm:text-sm text-grey font-medium truncate max-w-[120px] sm:max-w-none">
-                              {product.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="text-right text-xs sm:text-sm text-grey">
-                          {product.resources}
-                        </td>
-                        <td className="text-right text-xs sm:text-sm text-grey hidden sm:table-cell">
-                          {product.internalCalls}
-                        </td>
-                        <td className="text-right text-xs sm:text-sm text-grey hidden sm:table-cell">
-                          {product.externalOutbound}
-                        </td>
-                        <td className="text-right text-xs sm:text-sm text-grey hidden sm:table-cell">
-                          {product.externalInbound}
-                        </td>
-                        <td className="text-right">
-                          <span className="text-xs sm:text-sm font-medium text-green">
-                            {product.growth}
+          <div className="relative">
+            <div className="flex flex-col lg:absolute lg:inset-0">
+              <Panel
+                title="Needs attention"
+                description={attention.length ? `${attention.length} to look at` : undefined}
+                flush={attention.length > 0}
+                className="flex min-h-0 flex-col lg:flex-1"
+                bodyClassName="min-h-0 max-h-80 flex-1 overflow-y-auto lg:max-h-none"
+              >
+                {attention.length ? (
+                  <ul className="divide-y divide-grey-300">
+                    {attention.map(item => (
+                      <li key={item.id}>
+                        <button type="button" onClick={() => openProductById(item.productId)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-grey-100 sm:px-5">
+                          <span className={cn('mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', severityStyle[item.severity].tile)}>
+                            <AlertTriangle className={cn('h-4 w-4', severityStyle[item.severity].text)} />
                           </span>
-                        </td>
-                      </tr>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-grey">{item.title}</span>
+                            <span className="mt-0.5 block text-xs text-grey-600">
+                              {item.productName}
+                              {item.detail ? `. ${item.detail}` : ''}
+                            </span>
+                          </span>
+                          <ChevronRight className="mt-1 h-4 w-4 flex-shrink-0 text-grey-600" />
+                        </button>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </ul>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10">
+                      <CheckCircle2 className="h-4 w-4 text-green" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-grey">All clear</p>
+                      <p className="mt-0.5 text-xs text-grey-600">No health check is failing in any product.</p>
+                    </div>
+                  </div>
+                )}
+              </Panel>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-              <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
-              <p className="text-sm sm:text-base text-grey-600 font-medium">
-                No usage data available
-              </p>
-              <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
-                Product usage statistics will appear here
-              </p>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Resource Usage */}
-        <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-base sm:text-lg font-semibold text-grey">
-              Resource Usage
-            </h2>
-            <Database className="h-4 w-4 sm:h-5 sm:w-5 text-grey-600" />
-          </div>
-          {resourceUsage.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {resourceUsage.map(resource => {
-                // Get appropriate icon based on resource type
-                const getResourceIcon = (type: string) => {
-                  switch (type?.toLowerCase()) {
-                    case 'database':
-                      return Database;
-                    case 'storage':
-                      return HardDrive;
-                    case 'cache':
-                      return Layers;
-                    case 'queue':
-                      return MessageSquare;
-                    default:
-                      return Database;
-                  }
-                };
-
-                const IconComponent = getResourceIcon(resource.type);
-
+        {/* Products */}
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-grey sm:text-base">Products</h2>
+          {productList.length ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {productList.map((product: any) => {
+                const health = productHealth(product);
+                const usage = usageByName.get(product.name);
+                const resourceTotal = [product.apps, product.databases, product.storage, product.caches, product.messageBrokers, product.features, product.functions, product.jobs, product.notifications, product.sessions]
+                  .reduce((sum: number, list: any) => sum + (Array.isArray(list) ? list.filter((item: any) => item?.deleted !== true).length : 0), 0);
                 return (
-                  <div
-                    key={resource.name}
-                    className="p-3 sm:p-4 rounded-lg border border-grey-400 hover:border-primary transition-colors"
+                  <button
+                    key={product._id}
+                    type="button"
+                    onClick={() => openProduct(product)}
+                    className="rounded-xl border border-grey-400 bg-white p-4 text-left shadow-sm transition-colors hover:border-primary"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 text-grey-600" />
-                      <div
-                        className={cn(
-                          'w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full',
-                          resource.status === 'healthy' && 'bg-green',
-                          resource.status === 'warning' && 'bg-yellow',
-                          resource.status === 'error' && 'bg-red',
-                        )}
-                      />
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-white">
+                        {product.logo ? <img src={product.logo} alt="" className="h-full w-full rounded-lg object-cover" /> : initials(product.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-grey">{product.name}</p>
+                        <p className="truncate font-mono text-xs text-grey-600">{product.tag}</p>
+                      </div>
+                      <Pill tone={healthTone[health.state]}>
+                        {health.state === 'unwatched'
+                          ? 'Not watched'
+                          : health.state === 'good'
+                            ? `${health.summary.healthy} healthy`
+                            : `${health.summary.problems.length} to check`}
+                      </Pill>
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-bold text-grey mb-0.5 sm:mb-1">
-                      {resource.count}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-grey-600 truncate">
-                      {resource.name}
-                    </p>
-                  </div>
+                    <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-grey-300 pt-3 text-center">
+                      <div>
+                        <dd className="text-sm font-semibold tabular-nums text-grey">{resourceTotal}</dd>
+                        <dt className="text-[11px] text-grey-600">Resources</dt>
+                      </div>
+                      <div>
+                        <dd className="text-sm font-semibold tabular-nums text-grey">{usage?.internalCalls ?? '-'}</dd>
+                        <dt className="text-[11px] text-grey-600">Internal calls</dt>
+                      </div>
+                      <div>
+                        <dd className="text-sm font-semibold tabular-nums text-grey">{(product.envs ?? []).filter((env: any) => env?.active).length}/{(product.envs ?? []).length}</dd>
+                        <dt className="text-[11px] text-grey-600">Envs active</dt>
+                      </div>
+                    </dl>
+                  </button>
                 );
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-              <Database className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
-              <p className="text-sm sm:text-base text-grey-600 font-medium">
-                No resource data available
-              </p>
-              <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
-                Resource usage metrics will appear here
-              </p>
+            <div className="rounded-xl border border-dashed border-grey-400 bg-white p-8 text-center">
+              <Package className="mx-auto mb-2 h-8 w-8 text-grey-600" />
+              <p className="text-sm font-medium text-grey">No products yet</p>
+              <p className="mt-1 text-xs text-grey-600">Products you create show up here with their health and usage.</p>
             </div>
           )}
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+          {/* Activity by type */}
+          <Panel title="Activity by type" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
+            {activityByType.length > 0 ? (
+              <div className="space-y-3">
+                {activityByType.map((activity, index) => (
+                  <div key={index} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="truncate font-medium text-grey">{activity.type}</span>
+                      <span className="text-grey-600 tabular-nums">
+                        {activity.count} ({activity.percentage}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-grey-200 sm:h-2">
+                      <div className={cn('h-1.5 rounded-full transition-all sm:h-2', typeColors[activity.type] || 'bg-primary')} style={{width: `${activity.percentage}%`}} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <BarChart3 className="mb-2 h-10 w-10 text-grey-600" />
+                <p className="text-sm font-medium text-grey-600">No activity data</p>
+                <p className="mt-1 px-4 text-center text-xs text-grey-600">The breakdown appears here once something runs.</p>
+              </div>
+            )}
+          </Panel>
+
+          {/* Resource usage */}
+          <Panel title="Resource usage" className="lg:col-span-2" action={<Database className="h-4 w-4 text-grey-600" />}>
+            {resourceUsage.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {resourceUsage.map(resource => {
+                  const IconComponent =
+                    resource.type?.toLowerCase() === 'storage' ? HardDrive : resource.type?.toLowerCase() === 'cache' ? Layers : resource.type?.toLowerCase() === 'queue' ? MessageSquare : Database;
+                  return (
+                    <div key={resource.name} className="rounded-lg border border-grey-400 p-3 transition-colors hover:border-primary sm:p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <IconComponent className="h-4 w-4 text-grey-600 sm:h-5 sm:w-5" />
+                        <span
+                          className={cn(
+                            'h-2 w-2 rounded-full',
+                            resource.status === 'healthy' && 'bg-green',
+                            resource.status === 'warning' && 'bg-yellow',
+                            resource.status === 'error' && 'bg-red',
+                          )}
+                        />
+                      </div>
+                      <p className="text-xl font-bold tabular-nums text-grey sm:text-2xl">{resource.count}</p>
+                      <p className="truncate text-xs text-grey-600 sm:text-sm">{resource.name}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Database className="mb-2 h-10 w-10 text-grey-600" />
+                <p className="text-sm font-medium text-grey-600">No resource data available</p>
+                <p className="mt-1 px-4 text-center text-xs text-grey-600">Resource totals appear here once products have resources.</p>
+              </div>
+            )}
+          </Panel>
         </div>
       </div>
     </div>
