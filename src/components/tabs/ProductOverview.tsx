@@ -22,6 +22,7 @@ import {
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { MarkdownViewer } from '@/components/ui/markdown-editor';
+import LogoEditor from '@/components/LogoEditor';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/store/useAuth';
 import { fetchProductObservability } from '@/services/logsServices';
@@ -83,6 +84,8 @@ interface Props {
   onAddEnvironment: () => void;
   onEditEnvironment: (env: any) => void;
   onDeleteProduct: () => void;
+  /** Saves a new logo URL for the product; '' removes it. */
+  onLogoChange: (logo: string) => Promise<void>;
 }
 
 const PERIODS = [
@@ -133,6 +136,7 @@ export default function ProductOverview({
   onAddEnvironment,
   onEditEnvironment,
   onDeleteProduct,
+  onLogoChange,
 }: Props) {
   const { user, currentWorkspaceId } = useAuth();
   const [periodId, setPeriodId] = useState<PeriodId>('24h');
@@ -228,13 +232,14 @@ export default function ProductOverview({
         <section className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-lg font-semibold text-white sm:h-14 sm:w-14 md:h-16 md:w-16 md:text-xl">
-                {product?.logo ? (
-                  <img src={product.logo} alt={product.name} className="h-full w-full rounded-xl object-cover" />
-                ) : (
-                  initials(product?.name)
-                )}
-              </div>
+              <LogoEditor
+                logo={product?.logo}
+                subject="product"
+                onSave={onLogoChange}
+                className="h-12 w-12 rounded-xl sm:h-14 sm:w-14 md:h-16 md:w-16"
+                fallbackClassName="bg-primary text-lg font-semibold text-white md:text-xl"
+                fallback={initials(product?.name)}
+              />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="break-words text-xl font-bold text-grey sm:text-2xl">{product?.name}</h1>

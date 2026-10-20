@@ -52,6 +52,26 @@ const updateHealthcheckStrategy = async (data: {
   });
 };
 
+/**
+ * Sets (or with '' clears) a product's logo. The value is the public URL of an uploaded image.
+ */
+const updateProductLogo = async (data: {
+  product_id: string;
+  logo: string;
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<void> => {
+  const { product_id, logo, workspace_id, user_id, public_key } = data;
+  await apiClient.put(`/integrations/v1/${product_id}`, {
+    action: 'update',
+    logo,
+    workspace_id,
+    user_id,
+    public_key,
+  });
+};
+
 const fetchProduct = async (data: {
   product_id: string;
   user_id: string;
@@ -116,6 +136,7 @@ const deleteProduct = async (data: {
 };
 
 const productServices = {
+  updateProductLogo,
   updateHealthcheckStrategy,
   fetchProducts,
   fetchProduct,

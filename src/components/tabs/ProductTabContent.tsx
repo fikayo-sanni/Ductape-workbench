@@ -2269,6 +2269,20 @@ export default function ProductTabContent({
       onAddEnvironment={() => setShowCreateEnvModal(true)}
       onEditEnvironment={handleEditEnvironment}
       onDeleteProduct={() => setShowDeleteProductModal(true)}
+      onLogoChange={async (logo) => {
+        await productServices.updateProductLogo({
+          product_id: product!._id,
+          logo,
+          workspace_id: currentWorkspaceId || '',
+          user_id: user?._id || '',
+          public_key: user?.public_key || '',
+        });
+        await refetch();
+        // The product also appears in the sidebar and the workspace dashboard.
+        void queryClient.invalidateQueries({
+          predicate: (query) => ['products', 'workspace-products'].includes(String(query.queryKey[0])),
+        });
+      }}
     />
   );
 
