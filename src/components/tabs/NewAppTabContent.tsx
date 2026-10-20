@@ -710,7 +710,7 @@ export default function NewAppTabContent({ tabId, data }: NewAppTabContentProps)
                       <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">
                         {env.productEnvSlug || env.slug}
                       </span>
-                      <ArrowRight className="h-3 w-3 text-grey-400" />
+                      <ArrowRight className="h-3 w-3 text-grey-600" />
                       <span className="text-xs text-grey-600">App environment:</span>
                       <span className="text-xs font-medium text-grey bg-grey-100 px-2 py-1 rounded">
                         {env.slug}

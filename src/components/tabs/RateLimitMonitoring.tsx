@@ -227,7 +227,7 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
                   Show all policies
                 </Button>
               ) : (
-                <p className="text-xs text-grey-500">{summary.total > 0 ? 'Select a policy to filter the decisions below.' : 'Decisions appear here once a policy is used.'}</p>
+                <p className="text-xs text-grey-600">{summary.total > 0 ? 'Select a policy to filter the decisions below.' : 'Decisions appear here once a policy is used.'}</p>
               )}
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:gap-5 lg:grid-cols-3">
@@ -258,7 +258,7 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
             ) : decisions.isLoading ? (
               <SectionLoading label="Loading decisions..." />
             ) : rows.length === 0 ? (
-              <p className="px-4 py-12 text-center text-sm text-grey-500">No decisions match these filters.</p>
+              <p className="px-4 py-12 text-center text-sm text-grey-600">No decisions match these filters.</p>
             ) : (
               <DataTable head={['When', 'Policy', 'Environment', 'Decision', 'Capacity', 'Latency']} minWidth={720}>
                 {rows.map(row => {
@@ -288,7 +288,7 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
                             </div>
                           </div>
                         ) : (
-                          <span className="text-grey-500">-</span>
+                          <span className="text-grey-600">-</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-grey-600">{details.latency !== undefined ? `${Math.round(details.latency)} ms` : '-'}</td>
@@ -380,13 +380,13 @@ function PolicyCard({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-xs font-medium text-grey sm:text-sm">{title}</h3>
-            {title !== view.tag ? <p className="truncate font-mono text-[11px] text-grey-500">{view.tag}</p> : null}
+            {title !== view.tag ? <p className="truncate font-mono text-[11px] text-grey-600">{view.tag}</p> : null}
           </div>
           {stats ? stats.rejected > 0 ? <Pill tone="bad">{rejectedShare}% rejected</Pill> : <Pill tone="good">No rejections</Pill> : <Pill>No decisions yet</Pill>}
         </div>
 
         <p className="mt-3 text-xs text-grey sm:text-sm">{definition}</p>
-        {stored?.description ? <p className="mt-1 line-clamp-2 text-[11px] text-grey-500 sm:text-xs">{stored.description}</p> : null}
+        {stored?.description ? <p className="mt-1 line-clamp-2 text-[11px] text-grey-600 sm:text-xs">{stored.description}</p> : null}
 
         <div className="mt-2 flex flex-wrap gap-1.5">
           {view.source === 'code' ? <Pill tone="info">Defined in code</Pill> : null}
@@ -409,7 +409,7 @@ function PolicyCard({
               <span>{stats.rejected.toLocaleString()} rejected</span>
               {stats.other ? <span>{stats.other.toLocaleString()} limiter problems</span> : null}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-grey-300 pt-3 text-[11px] text-grey-500">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-grey-300 pt-3 text-[11px] text-grey-600">
               {stats.envs.map(slug => (
                 <Pill key={slug}>{slug}</Pill>
               ))}

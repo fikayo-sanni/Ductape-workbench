@@ -72,7 +72,7 @@ export function WebhookEnvMetrics({
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {cells.map((cell) => (
         <div key={cell.label} className="rounded-lg bg-grey-50 border border-grey-200 px-3 py-2.5">
-          <p className="text-[10px] uppercase tracking-wide text-grey-500 font-medium">{cell.label}</p>
+          <p className="text-[10px] uppercase tracking-wide text-grey-600 font-medium">{cell.label}</p>
           <p className={cn('text-lg font-semibold tabular-nums', cell.className)}>
             {isLoading ? '…' : cell.value}
           </p>

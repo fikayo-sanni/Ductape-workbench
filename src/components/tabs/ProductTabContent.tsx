@@ -673,7 +673,7 @@ export default function ProductTabContent({
               <p className="text-sm sm:text-base font-medium text-grey-700">
                 Loading product configuration...
               </p>
-              <p className="text-xs sm:text-sm text-grey-500 mt-1 sm:mt-2">
+              <p className="text-xs sm:text-sm text-grey-600 mt-1 sm:mt-2">
                 Fetching product details and components
               </p>
             </div>
@@ -715,7 +715,7 @@ export default function ProductTabContent({
             The product data could not be retrieved.
           </p>
           {productId && (
-            <p className="text-grey-500 text-xs sm:text-sm mt-2 sm:mt-3 break-all">
+            <p className="text-grey-600 text-xs sm:text-sm mt-2 sm:mt-3 break-all">
               Product ID: {productId}
             </p>
           )}
@@ -1752,7 +1752,7 @@ export default function ProductTabContent({
                 </span>
               )}
             </div>
-            <p className="text-[10px] sm:text-xs text-grey-500 truncate">
+            <p className="text-[10px] sm:text-xs text-grey-600 truncate">
               {item.tag || item.slug}
             </p>
 
@@ -1804,7 +1804,7 @@ export default function ProductTabContent({
 
             {/* Category-specific detail */}
             {detailText && (
-              <p className="text-[10px] sm:text-xs text-grey-500 mt-1 sm:mt-1.5">
+              <p className="text-[10px] sm:text-xs text-grey-600 mt-1 sm:mt-1.5">
                 {detailText}
               </p>
             )}
@@ -1812,7 +1812,7 @@ export default function ProductTabContent({
             {/* Environment Buttons - Responsive with wrapping */}
             {hasEnvs && !excludeEnvButtons && (
               <div className="mt-1.5 sm:mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <ItemIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-grey-400 flex-shrink-0" />
+                <ItemIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-grey-600 flex-shrink-0" />
                 {itemEnvs.slice(0, 3).map((env: any) => (
                   <button
                     key={env.slug}
@@ -1827,7 +1827,7 @@ export default function ProductTabContent({
                     className={cn(
                       'inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium transition-colors',
                       isCloudProvisioning
-                        ? 'bg-grey-100 text-grey-500 cursor-not-allowed'
+                        ? 'bg-grey-100 text-grey-600 cursor-not-allowed'
                         : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
                     )}
                     title={
@@ -1841,7 +1841,7 @@ export default function ProductTabContent({
                   </button>
                 ))}
                 {itemEnvs.length > 3 && (
-                  <span className="text-[9px] sm:text-[10px] text-grey-500">
+                  <span className="text-[9px] sm:text-[10px] text-grey-600">
                     +{itemEnvs.length - 3}
                   </span>
                 )}
@@ -1892,7 +1892,7 @@ export default function ProductTabContent({
                   <span className="text-[10px] sm:text-xs font-semibold text-grey-600 uppercase tracking-wide">
                     Templates
                   </span>
-                  <span className="text-[9px] sm:text-[10px] text-grey-500 bg-grey-100 px-1.5 sm:px-2 py-0.5 rounded-full">
+                  <span className="text-[9px] sm:text-[10px] text-grey-600 bg-grey-100 px-1.5 sm:px-2 py-0.5 rounded-full">
                     {templates.length}
                   </span>
                 </div>
@@ -1919,11 +1919,11 @@ export default function ProductTabContent({
               {/* Empty State - Responsive with better visual */}
               {templates.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-2 sm:py-3 text-center">
-                  <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-grey-400 mb-1 sm:mb-2 opacity-50" />
-                  <p className="text-[10px] sm:text-xs text-grey-500">
+                  <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-grey-600 mb-1 sm:mb-2 opacity-50" />
+                  <p className="text-[10px] sm:text-xs text-grey-600">
                     No templates yet
                   </p>
-                  <p className="text-[9px] sm:text-[10px] text-grey-400 mt-0.5">
+                  <p className="text-[9px] sm:text-[10px] text-grey-600 mt-0.5">
                     Create one to get started
                   </p>
                 </div>
@@ -1954,21 +1954,21 @@ export default function ProductTabContent({
                             {msg.name || msg.tag}
                           </div>
                           {msg.tag && (
-                            <div className="text-[8px] sm:text-[9px] text-grey-400 truncate sm:hidden">
+                            <div className="text-[8px] sm:text-[9px] text-grey-600 truncate sm:hidden">
                               {msg.tag}
                             </div>
                           )}
                         </div>
-                        <span className="text-[8px] sm:text-[10px] text-grey-500 truncate flex-shrink-0 hidden sm:inline">
+                        <span className="text-[8px] sm:text-[10px] text-grey-600 truncate flex-shrink-0 hidden sm:inline">
                           {msg.tag}
                         </span>
-                        <ChevronRight className="h-3 w-3 text-grey-400 flex-shrink-0 hidden sm:block" />
+                        <ChevronRight className="h-3 w-3 text-grey-600 flex-shrink-0 hidden sm:block" />
                       </button>
                     </li>
                   ))}
                   {templates.length > 5 && (
                     <li className="text-center pt-1">
-                      <span className="text-[9px] sm:text-[10px] text-grey-500">
+                      <span className="text-[9px] sm:text-[10px] text-grey-600">
                         +{templates.length - 5} more templates
                       </span>
                     </li>
@@ -2062,7 +2062,7 @@ export default function ProductTabContent({
                   <h1 className="text-base sm:text-lg md:text-xl font-bold text-grey">
                     {category.label}
                   </h1>
-                  <p className="text-xs sm:text-sm text-grey-500">
+                  <p className="text-xs sm:text-sm text-grey-600">
                     {isCategoryLoading ? (
                       <span className="flex items-center gap-1 sm:gap-1.5">
                         <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin" />
@@ -2081,7 +2081,7 @@ export default function ProductTabContent({
                 {/* Search bar - responsive width */}
                 {count > 0 && (
                   <div className="relative flex-1 sm:flex-initial">
-                    <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-grey-400" />
+                    <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-grey-600" />
                     <Input
                       type="text"
                       placeholder={`Search...`}
@@ -2136,7 +2136,7 @@ export default function ProductTabContent({
             <>
               {/* Results count when searching - Responsive */}
               {searchQuery && (
-                <p className="text-xs sm:text-sm text-grey-500 mb-3 sm:mb-4">
+                <p className="text-xs sm:text-sm text-grey-600 mb-3 sm:mb-4">
                   Showing {filteredResources.length} of {count}{' '}
                   {count === 1
                     ? singularLabel.toLowerCase()
@@ -2181,7 +2181,7 @@ export default function ProductTabContent({
                   <h3 className="text-base sm:text-lg md:text-xl font-semibold text-grey mb-1 sm:mb-2 text-center px-4">
                     No results found
                   </h3>
-                  <p className="text-xs sm:text-sm text-grey-500 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4">
+                  <p className="text-xs sm:text-sm text-grey-600 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4">
                     We couldn't find any {category.label.toLowerCase()} matching
                     "
                     <span className="font-medium text-grey">{searchQuery}</span>
@@ -2201,7 +2201,7 @@ export default function ProductTabContent({
                   <h3 className="text-base sm:text-lg md:text-xl font-semibold text-grey mb-1 sm:mb-2 text-center px-4">
                     No {category.label.toLowerCase()} yet
                   </h3>
-                  <p className="text-xs sm:text-sm text-grey-500 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-grey-600 text-center max-w-xs sm:max-w-sm md:max-w-md mb-4 sm:mb-6 px-4 leading-relaxed">
                     {getCategoryDescription(category.id)}
                   </p>
                   <Button
@@ -2329,13 +2329,13 @@ export default function ProductTabContent({
                     data-testid="overview-deployments-tile"
                   >
                     <p className={cn('text-xl sm:text-2xl md:text-3xl font-bold', deploymentsKnown && deploymentStats.attention > 0 ? 'text-red' : 'text-teal-600')}>
-                      {deploymentsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-grey-500" /> : deploymentsKnown ? deploymentStats.total : '-'}
+                      {deploymentsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-grey-600" /> : deploymentsKnown ? deploymentStats.total : '-'}
                     </p>
                     <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
                       Deployments
                     </p>
                     {deploymentsKnown && deploymentStats.total > 0 ? (
-                      <p className="text-[9px] sm:text-[10px] text-grey-500">
+                      <p className="text-[9px] sm:text-[10px] text-grey-600">
                         {deploymentStats.active} active
                         {deploymentStats.inFlight > 0 ? `, ${deploymentStats.inFlight} in progress` : ''}
                         {deploymentStats.attention > 0 ? `, ${deploymentStats.attention} need attention` : ''}
@@ -2360,7 +2360,7 @@ export default function ProductTabContent({
                       <p className="text-xs sm:text-sm font-medium text-grey">
                         Product initialized
                       </p>
-                      <p className="text-[10px] sm:text-xs text-grey-500">
+                      <p className="text-[10px] sm:text-xs text-grey-600">
                         Ready for configuration
                       </p>
                     </div>
@@ -2376,7 +2376,7 @@ export default function ProductTabContent({
                           {connectedApps.length} app
                           {connectedApps.length !== 1 ? 's' : ''} connected
                         </p>
-                        <p className="text-[10px] sm:text-xs text-grey-500">
+                        <p className="text-[10px] sm:text-xs text-grey-600">
                           External integrations active
                         </p>
                       </div>
@@ -2410,7 +2410,7 @@ export default function ProductTabContent({
                           <p className="text-xs sm:text-sm font-medium text-grey truncate">
                             {d.name} {d.version}: {state.label.toLowerCase()} in {d.env}
                           </p>
-                          <p className="text-[10px] sm:text-xs text-grey-500">
+                          <p className="text-[10px] sm:text-xs text-grey-600">
                             {new Date(d.updatedAt).toLocaleString()}
                           </p>
                         </div>
@@ -2429,7 +2429,7 @@ export default function ProductTabContent({
                           {(product?.databases?.length || 0) !== 1 ? 's' : ''}{' '}
                           configured
                         </p>
-                        <p className="text-[10px] sm:text-xs text-grey-500">
+                        <p className="text-[10px] sm:text-xs text-grey-600">
                           Data layer ready
                         </p>
                       </div>
@@ -2590,11 +2590,11 @@ export default function ProductTabContent({
                   </div>
                 ) : (
                   <div className="text-center py-6 sm:py-8 border-2 border-dashed border-grey-200 rounded-lg">
-                    <Settings2 className="h-6 w-6 sm:h-8 sm:w-8 text-grey-400 mx-auto mb-1 sm:mb-2" />
+                    <Settings2 className="h-6 w-6 sm:h-8 sm:w-8 text-grey-600 mx-auto mb-1 sm:mb-2" />
                     <p className="text-xs sm:text-sm text-grey-600 mb-0.5 sm:mb-1">
                       No environments yet
                     </p>
-                    <p className="text-[10px] sm:text-xs text-grey-500">
+                    <p className="text-[10px] sm:text-xs text-grey-600">
                       Configure dev, staging, and production
                     </p>
                   </div>
@@ -2834,7 +2834,7 @@ export default function ProductTabContent({
                       ? setIsMobileNavOpen(false)
                       : setIsSidebarCollapsed(true)
                   }
-                  className="p-1 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1 rounded hover:bg-grey-100 text-grey-600 hover:text-grey transition-colors"
                   title={isMobile ? 'Close menu' : 'Collapse sidebar'}
                 >
                   <PanelLeftClose className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -2910,7 +2910,7 @@ export default function ProductTabContent({
                 <Rocket className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'deployments' ? 'text-primary' : 'text-grey-600')} />
                 <span className="flex-1 text-left">Deployments</span>
                 {deploymentsQuery.isLoading ? (
-                  <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-grey-500" />
+                  <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-grey-600" />
                 ) : deploymentsKnown ? (
                   <>
                     {deploymentStats.attention > 0 ? (
@@ -2980,13 +2980,13 @@ export default function ProductTabContent({
             {/* Divider */}
             <div className="px-3 sm:px-4 py-1.5 sm:py-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-xs font-semibold text-grey-500 uppercase tracking-wider">
+                <span className="text-[10px] sm:text-xs font-semibold text-grey-600 uppercase tracking-wider">
                   Resources
                 </span>
                 <button
                   onClick={handleRefresh}
                   disabled={isSidebarRefreshing}
-                  className="text-grey-500 hover:text-primary transition-colors"
+                  className="text-grey-600 hover:text-primary transition-colors"
                   title="Refresh"
                 >
                   <RefreshCw
@@ -3025,7 +3025,7 @@ export default function ProductTabContent({
                     className={cn(
                       'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
                       isDisabled
-                        ? 'text-grey-400 cursor-not-allowed opacity-50'
+                        ? 'text-grey-600 cursor-not-allowed opacity-50'
                         : isActive
                           ? 'bg-primary/10 text-primary font-medium'
                           : 'text-grey hover:bg-grey-100',
@@ -3035,7 +3035,7 @@ export default function ProductTabContent({
                       className={cn(
                         'h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0',
                         isDisabled
-                          ? 'text-grey-400'
+                          ? 'text-grey-600'
                           : isActive
                             ? 'text-primary'
                             : 'text-grey-600',
@@ -3048,7 +3048,7 @@ export default function ProductTabContent({
                       className={cn(
                         'text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center',
                         isDisabled
-                          ? 'bg-grey-100 text-grey-400'
+                          ? 'bg-grey-100 text-grey-600'
                           : isActive
                             ? 'bg-primary/20 text-primary'
                             : 'bg-grey-100 text-grey-600',
@@ -3161,7 +3161,7 @@ export default function ProductTabContent({
                 <Timer className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'rateLimits' ? 'text-primary' : 'text-grey-600')} />
                 {rateLimitsLoading ? (
                   <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-grey-200 rounded-full flex items-center justify-center">
-                    <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-500" />
+                    <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-600" />
                   </span>
                 ) : rateLimitCount > 0 ? (
                   <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-primary text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium">
@@ -3213,7 +3213,7 @@ export default function ProductTabContent({
                     className={cn(
                       'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
                       isDisabled
-                        ? 'text-grey-400 cursor-not-allowed opacity-50'
+                        ? 'text-grey-600 cursor-not-allowed opacity-50'
                         : isActive
                           ? 'bg-primary/10 text-primary'
                           : 'text-grey hover:bg-grey-100',
@@ -3228,7 +3228,7 @@ export default function ProductTabContent({
                       className={cn(
                         'h-4 w-4 sm:h-5 sm:w-5',
                         isDisabled
-                          ? 'text-grey-400'
+                          ? 'text-grey-600'
                           : isActive
                             ? 'text-primary'
                             : 'text-grey-600',
@@ -3236,7 +3236,7 @@ export default function ProductTabContent({
                     />
                     {isCatLoading ? (
                       <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-grey-200 rounded-full flex items-center justify-center">
-                        <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-500" />
+                        <Loader2 className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-spin text-grey-600" />
                       </span>
                     ) : count > 0 && !isDisabled ? (
                       <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-primary text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium">
@@ -3252,7 +3252,7 @@ export default function ProductTabContent({
             <div className="px-1 mt-3 sm:mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                className="w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
                 title="Expand sidebar"
               >
                 <PanelLeft className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -3279,7 +3279,7 @@ export default function ProductTabContent({
             </button>
             <div className="min-w-0 flex-1 truncate text-sm">
               <span className="font-medium text-grey">{product?.name}</span>
-              <span className="text-grey-500"> / {mobileSectionLabel}</span>
+              <span className="text-grey-600"> / {mobileSectionLabel}</span>
             </div>
           </div>
         )}
@@ -3342,7 +3342,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Database
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   SQL, NoSQL, or other traditional databases
                 </p>
               </div>
@@ -3362,7 +3362,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Graph Database
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   Neo4j, Neptune, or graph-based stores
                 </p>
               </div>
@@ -3382,7 +3382,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Vector Store
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   Pinecone, Weaviate, or embedding stores
                 </p>
               </div>
@@ -3416,7 +3416,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Agent
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   AI agents for automated tasks and workflows
                 </p>
               </div>
@@ -3436,7 +3436,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Model
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   ML models for inference and predictions
                 </p>
               </div>
@@ -3470,7 +3470,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Fallback
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   Backup strategies for error handling
                 </p>
               </div>
@@ -3490,7 +3490,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Quota
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   Weighted provider distribution
                 </p>
               </div>
@@ -3510,7 +3510,7 @@ export default function ProductTabContent({
                 <h3 className="text-sm sm:text-base font-medium text-grey">
                   Health Check
                 </h3>
-                <p className="text-xs sm:text-sm text-grey-500">
+                <p className="text-xs sm:text-sm text-grey-600">
                   Service health monitoring
                 </p>
               </div>

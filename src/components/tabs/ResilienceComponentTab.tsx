@@ -147,7 +147,7 @@ function InvocationList({ items, loading, onViewAll, onOpen, total, hasMore, loa
           <div>Invocation</div><div>Status</div><div>Trigger</div><div>Started</div><div>Duration</div><div>Progress</div><div />
         </div>
       </div>
-      {loading ? <p className="p-8 text-center text-sm text-grey-500">Loading invocations…</p> : items.length === 0 ? <div className="flex flex-col items-center justify-center py-16 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-border"><Search className="h-6 w-6 text-grey-500" /></div><p className="font-medium text-grey">No invocations found</p><p className="mt-1 text-sm text-grey-500">Try adjusting your filters</p></div> : (
+      {loading ? <p className="p-8 text-center text-sm text-grey-600">Loading invocations…</p> : items.length === 0 ? <div className="flex flex-col items-center justify-center py-16 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-border"><Search className="h-6 w-6 text-grey-600" /></div><p className="font-medium text-grey">No invocations found</p><p className="mt-1 text-sm text-grey-600">Try adjusting your filters</p></div> : (
         <div className="divide-y divide-border">
           {items.map((item, index) => {
             const state = String(item.status || item.outcome || (item.error ? 'failed' : 'completed')).toLowerCase();
@@ -165,7 +165,7 @@ function InvocationList({ items, loading, onViewAll, onOpen, total, hasMore, loa
                 <span className="text-sm text-grey-600">{invocationTime(item.timestamp || item.created_at || item.startedAt)}</span>
                 <span className="font-mono text-sm text-grey-600">{invocationDuration(duration)}</span>
                 <div className="flex items-center gap-2"><div className="flex flex-1 gap-[3px]">{(attempts.length ? attempts : [item]).map((attempt, attemptIndex) => <span key={attemptIndex} className={cn('h-1.5 flex-1 rounded-full', attempt.error || attempt.message ? 'bg-red' : running ? 'bg-primary animate-pulse' : 'bg-green')} />)}</div><span className="w-10 text-right text-xs tabular-nums text-grey-700">{attempts.length ? `${completed}/${attempts.length}` : '1/1'}</span></div>
-                <div className="flex justify-end"><ChevronRight className="h-4 w-4 text-grey-500" /></div>
+                <div className="flex justify-end"><ChevronRight className="h-4 w-4 text-grey-600" /></div>
               </button>
             );
           })}
@@ -330,10 +330,10 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
         <div className={cn('border-b border-grey-400', collapsed ? 'p-2' : 'p-4')}>
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
             <div className={cn('flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg', meta.tint, meta.accent)}><Icon className="h-5 w-5" /></div>
-            {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-grey">{resource.name || resource.tag}</p><p className="truncate text-xs text-grey-500">{env.name || env.slug}</p></div><button type="button" className="rounded p-1.5 text-grey-500 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(true)} title="Collapse sidebar"><PanelLeftClose className="h-4 w-4" /></button></>}
+            {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-grey">{resource.name || resource.tag}</p><p className="truncate text-xs text-grey-600">{env.name || env.slug}</p></div><button type="button" className="rounded p-1.5 text-grey-600 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(true)} title="Collapse sidebar"><PanelLeftClose className="h-4 w-4" /></button></>}
           </div>
         </div>
-        {!collapsed && <div className="border-b border-grey-300 p-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" /><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search invocations..." className="h-9 pl-9 text-sm" /></div></div>}
+        {!collapsed && <div className="border-b border-grey-300 p-3"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-600" /><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search invocations..." className="h-9 pl-9 text-sm" /></div></div>}
         <nav className="flex-1 overflow-y-auto p-2">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
@@ -343,7 +343,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
           ) : (
             <>
               <button type="button" onClick={() => setView('overview')} className={cn('flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm', view === 'overview' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100 dark:hover:bg-grey-400/20')}><LayoutDashboard className="h-4 w-4" /><span className="flex-1 text-left font-medium">Overview</span></button>
-              <div className="mt-4 flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold uppercase text-grey-600">Status</span><button type="button" title="Refresh invocations" onClick={() => queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] })}><RefreshCw className="h-3.5 w-3.5 text-grey-500" /></button></div>
+              <div className="mt-4 flex items-center justify-between px-2 py-2"><span className="text-xs font-semibold uppercase text-grey-600">Status</span><button type="button" title="Refresh invocations" onClick={() => queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] })}><RefreshCw className="h-3.5 w-3.5 text-grey-600" /></button></div>
               <div className="space-y-0.5">
                 {([
                   { value: 'all', label: 'All Invocations', icon: List, count: <LoadingValue loading={invocationsLoading}>{statusCounts.all}</LoadingValue> },
@@ -356,12 +356,12 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
             </>
           )}
         </nav>
-        <div className="border-t border-grey-400 p-2">{collapsed ? <button type="button" className="flex h-9 w-full items-center justify-center rounded text-grey-500 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(false)} title="Expand sidebar"><PanelLeft className="h-4 w-4" /></button> : null}</div>
+        <div className="border-t border-grey-400 p-2">{collapsed ? <button type="button" className="flex h-9 w-full items-center justify-center rounded text-grey-600 hover:bg-grey-100 dark:hover:bg-grey-400/20" onClick={() => setCollapsed(false)} title="Expand sidebar"><PanelLeft className="h-4 w-4" /></button> : null}</div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-grey-300 bg-white px-6 py-5 dark:border-grey-400 dark:bg-background">
-          <div className="flex min-w-0 items-center gap-4"><div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg', meta.tint, meta.accent)}><Icon className="h-6 w-6" /></div><div className="min-w-0"><h1 className="truncate text-xl font-semibold text-grey">{resource.name || resource.tag}</h1><div className="mt-1 flex items-center gap-2"><code className="truncate text-sm text-grey-500">{resource.tag}</code><Badge variant="outline">{env.slug}</Badge></div></div></div>
+          <div className="flex min-w-0 items-center gap-4"><div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg', meta.tint, meta.accent)}><Icon className="h-6 w-6" /></div><div className="min-w-0"><h1 className="truncate text-xl font-semibold text-grey">{resource.name || resource.tag}</h1><div className="mt-1 flex items-center gap-2"><code className="truncate text-sm text-grey-600">{resource.tag}</code><Badge variant="outline">{env.slug}</Badge></div></div></div>
           <div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={() => setShowCode(true)}><Code2 className="mr-2 h-4 w-4" />View code</Button><Button type="button" variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['activity-timeline', kind] }); queryClient.invalidateQueries({ queryKey: ['resilience-invocations', kind] }); }}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
         </header>
 
@@ -386,7 +386,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                 <section className="rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
                   <div className="px-5 pb-2 pt-4">
                     <h2 className="text-sm font-semibold text-grey">Options</h2>
-                    <p className="mt-1 text-xs text-grey-500">Ordered execution path and share of recent invocations</p>
+                    <p className="mt-1 text-xs text-grey-600">Ordered execution path and share of recent invocations</p>
                   </div>
                   <div className="p-5">
                     {optionUsage.length ? (
@@ -395,16 +395,16 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
                           <div key={option.id || `${option.event}-${index}`} className="grid grid-cols-[180px_1fr_72px] items-center gap-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-grey-100 text-xs font-semibold text-grey-600 dark:bg-grey-400/20">{index + 1}</span>
-                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><p className="mt-0.5 truncate text-xs capitalize text-grey-500">{optionProvider(option)}</p></div>
+                              <div className="min-w-0"><p className="truncate text-sm font-medium text-grey">{option.name || option.event || option.tag}</p><p className="mt-0.5 truncate text-xs capitalize text-grey-600">{optionProvider(option)}</p></div>
                             </div>
                             <div className="relative h-7 overflow-hidden rounded bg-grey-100 dark:bg-grey-400/20">
                               <div className={cn('h-full min-w-[3px] rounded', kind === 'quota' ? 'bg-orange-500' : 'bg-red')} style={{ width: `${percent}%` }} />
                             </div>
-                            <div className="text-right"><p className="text-sm font-semibold text-grey">{percent}%</p><p className="text-[10px] text-grey-500">{count} calls</p></div>
+                            <div className="text-right"><p className="text-sm font-semibold text-grey">{percent}%</p><p className="text-[10px] text-grey-600">{count} calls</p></div>
                           </div>
                         ))}
                       </div>
-                    ) : <p className="py-6 text-center text-sm text-grey-500">No options configured.</p>}
+                    ) : <p className="py-6 text-center text-sm text-grey-600">No options configured.</p>}
                   </div>
                 </section>
               )}

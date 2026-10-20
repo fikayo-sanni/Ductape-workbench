@@ -21,12 +21,12 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete notifier data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the notifier from your product to reload it.
           </p>
         </div>
@@ -104,7 +104,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
     return (
       <div className="bg-grey-100 p-6">
         <div className="text-center py-12">
-          <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600">Notifier not found</p>
         </div>
       </div>
@@ -336,14 +336,14 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                                 <Label className="text-xs font-semibold text-grey uppercase tracking-wide block">TLS / Secure</Label>
                                 <p className="text-xs text-grey-600 mt-1">Enable secure connection</p>
                               </div>
-                              <span className={`text-xs ${smtpConfig.secure ? 'text-green' : 'text-grey-400'}`}>
+                              <span className={`text-xs ${smtpConfig.secure ? 'text-green' : 'text-grey-600'}`}>
                                 {smtpConfig.secure ? 'Enabled' : 'Disabled'}
                               </span>
                             </div>
                             {smtpConfig.tls != null && (
                               <div className="flex items-center justify-between border border-grey-300 rounded-lg p-3 bg-grey-50">
                                 <Label className="text-xs font-semibold text-grey uppercase tracking-wide block">TLS Reject Unauthorized</Label>
-                                <span className={`text-xs ${smtpConfig.tls?.rejectUnauthorized === false ? 'text-grey-400' : 'text-green'}`}>
+                                <span className={`text-xs ${smtpConfig.tls?.rejectUnauthorized === false ? 'text-grey-600' : 'text-green'}`}>
                                   {smtpConfig.tls?.rejectUnauthorized === false ? 'Disabled' : 'Enabled'}
                                 </span>
                               </div>
@@ -651,7 +651,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                                 <span className="font-medium text-grey w-32">{key}:</span>
                                 <span className="text-grey-600 font-mono flex-1">{String(value)}</span>
                               </div>
-                            )) : <span className="text-grey-500 text-sm">—</span>}
+                            )) : <span className="text-grey-600 text-sm">—</span>}
                           </div>
                         </div>
                         <div>
@@ -662,7 +662,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                                 <span className="font-medium text-grey w-32">{key}:</span>
                                 <span className="text-grey-600 font-mono flex-1">{String(value)}</span>
                               </div>
-                            )) : <span className="text-grey-500 text-sm">—</span>}
+                            )) : <span className="text-grey-600 text-sm">—</span>}
                           </div>
                         </div>
                         <div>
@@ -673,7 +673,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
                                 <span className="font-medium text-grey w-32">{key}:</span>
                                 <span className="text-grey-600 font-mono flex-1">{String(value)}</span>
                               </div>
-                            )) : <span className="text-grey-500 text-sm">—</span>}
+                            )) : <span className="text-grey-600 text-sm">—</span>}
                           </div>
                         </div>
                         <div>
@@ -693,7 +693,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
         ) : (
           <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
             <div className="text-center py-8">
-              <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
               <p className="text-sm text-grey-600">No environment configurations</p>
             </div>
           </div>

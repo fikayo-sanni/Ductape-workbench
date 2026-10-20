@@ -64,7 +64,7 @@ export function SearchableActionPicker({
                   <div className="text-xs text-grey-600 font-mono">{action.tag}</div>
                 ) : null}
                 {action.method ? (
-                  <div className="text-[10px] text-grey-500 uppercase">{action.method}</div>
+                  <div className="text-[10px] text-grey-600 uppercase">{action.method}</div>
                 ) : null}
               </button>
             ))

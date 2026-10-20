@@ -273,7 +273,7 @@ export default function RateLimitFormDialog({ open, onOpenChange, mode, product,
                 <button type="button" onClick={() => setShowOverrides(value => !value)} className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left" aria-expanded={showOverrides}>
                   <span>
                     <span className="block text-sm font-medium text-grey">Different limits per environment</span>
-                    <span className="block text-xs text-grey-500">Optional. For example a higher limit in production than in sandbox.</span>
+                    <span className="block text-xs text-grey-600">Optional. For example a higher limit in production than in sandbox.</span>
                   </span>
                   {showOverrides ? <ChevronDown className="h-4 w-4 text-grey-600" /> : <ChevronRight className="h-4 w-4 text-grey-600" />}
                 </button>
@@ -288,7 +288,7 @@ export default function RateLimitFormDialog({ open, onOpenChange, mode, product,
             ) : null}
 
             <div className="rounded-lg bg-grey-100 px-4 py-3 text-sm text-grey">
-              <span className="text-xs font-semibold uppercase tracking-wide text-grey-500">Summary</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-grey-600">Summary</span>
               <p className="mt-1">
                 Allows {preview}. {describeStrategy(form.strategy).replace(/^./, character => character.toUpperCase())}; {form.failurePolicy === 'fail_open' ? 'requests are let through' : 'requests are blocked'} if the limiter is unavailable.
               </p>
@@ -322,7 +322,7 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
     <div className="space-y-1.5">
       <Label className="text-sm text-grey">{label}</Label>
       {children}
-      {error ? <p className="text-xs text-red">{error}</p> : hint ? <p className="text-xs text-grey-500">{hint}</p> : null}
+      {error ? <p className="text-xs text-red">{error}</p> : hint ? <p className="text-xs text-grey-600">{hint}</p> : null}
     </div>
   );
 }

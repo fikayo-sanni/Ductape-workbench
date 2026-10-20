@@ -52,7 +52,7 @@ export function WebhookExplorerEventPanel({
           <h3 className="text-base font-semibold text-grey mb-1">
             {searchQuery ? 'No matching events' : hasEvents ? 'Select an event' : 'No events yet'}
           </h3>
-          <p className="text-sm text-grey-500 mb-5">
+          <p className="text-sm text-grey-600 mb-5">
             {searchQuery
               ? 'Try a different search term.'
               : hasEvents
@@ -87,7 +87,7 @@ export function WebhookExplorerEventPanel({
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-semibold text-grey">{selectedEvent.name}</h2>
-            <code className="text-sm font-mono text-grey-500 mt-0.5 block">
+            <code className="text-sm font-mono text-grey-600 mt-0.5 block">
               {webhookTag}:{selectedEvent.tag}
             </code>
             {selectedEvent.description && (
@@ -119,7 +119,7 @@ export function WebhookExplorerEventPanel({
               Selectors
             </Label>
             {selectors.length === 0 ? (
-              <p className="text-sm text-grey-500">No selectors configured</p>
+              <p className="text-sm text-grey-600">No selectors configured</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {selectors.map((sel, idx) => (

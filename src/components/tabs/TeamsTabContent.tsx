@@ -317,7 +317,7 @@ export default function TeamsTabContent() {
 
           {allMembers.length === 0 ? (
             <div className="text-center py-8">
-              <Users className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <Users className="h-12 w-12 text-grey-600 mx-auto mb-3" />
               <p className="text-sm text-grey-600">No team members yet</p>
               {canManageMembers ? (
                 <Button

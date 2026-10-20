@@ -1193,7 +1193,7 @@ ductape.processor.notification.send(&request)?;`
     return (
       <div className="bg-grey-100 p-6">
         <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <FileText className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600">Message not found</p>
         </div>
       </div>

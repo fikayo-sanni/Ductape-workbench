@@ -153,7 +153,7 @@ export function StepInputMapper({
                   <div>
                     <code className="text-sm font-mono text-primary">{field.mapKey}</code>
                     {field.type ? (
-                      <span className="ml-2 text-[10px] text-grey-500">{field.type}</span>
+                      <span className="ml-2 text-[10px] text-grey-600">{field.type}</span>
                     ) : null}
                   </div>
                   {field.required ? (

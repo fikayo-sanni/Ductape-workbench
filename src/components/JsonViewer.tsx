@@ -25,12 +25,12 @@ function JsonNode({ data, keyName, level = 0, isLast = true, defaultExpanded = f
   const isEmpty = isExpandable && Object.keys(data).length === 0;
 
   const renderValue = (value: any) => {
-    if (value === null) return <span className="text-grey-500 dark:text-grey-400 italic">null</span>;
-    if (value === undefined) return <span className="text-grey-500 dark:text-grey-400 italic">undefined</span>;
+    if (value === null) return <span className="text-grey-600 dark:text-grey-600 italic">null</span>;
+    if (value === undefined) return <span className="text-grey-600 dark:text-grey-600 italic">undefined</span>;
     if (typeof value === 'string') return <span className="text-emerald-700 dark:text-emerald-400">&quot;{value}&quot;</span>;
     if (typeof value === 'number') return <span className="text-blue-700 dark:text-blue-400">{value}</span>;
     if (typeof value === 'boolean') return <span className="text-amber-700 dark:text-amber-400">{String(value)}</span>;
-    return <span className="text-grey dark:text-grey-300">{String(value)}</span>;
+    return <span className="text-grey dark:text-grey-600">{String(value)}</span>;
   };
 
   const getPreview = () => {

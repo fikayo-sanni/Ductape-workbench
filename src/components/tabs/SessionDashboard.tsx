@@ -111,7 +111,7 @@ export default function SessionDashboard({
             <div className="h-8 w-48 bg-grey-200 rounded animate-pulse mb-2" />
             <div className="flex items-center gap-2">
               <div className="h-6 w-24 bg-grey-200 rounded animate-pulse" />
-              <span className="text-grey-400">•</span>
+              <span className="text-grey-600">•</span>
               <div className="h-5 w-32 bg-grey-200 rounded animate-pulse" />
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function SessionDashboard({
             </code>
             {productName && (
               <>
-                <span className="text-grey-400">•</span>
+                <span className="text-grey-600">•</span>
                 <span className="text-sm text-grey-600">{productName}</span>
               </>
             )}
@@ -291,9 +291,9 @@ export default function SessionDashboard({
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <BarChart3 className="h-12 w-12 text-grey-400 mb-3" />
+                  <BarChart3 className="h-12 w-12 text-grey-600 mb-3" />
                   <p className="text-grey-600 font-medium">No peak hours data</p>
-                  <p className="text-sm text-grey-500 mt-1">Patterns will emerge over time</p>
+                  <p className="text-sm text-grey-600 mt-1">Patterns will emerge over time</p>
                 </div>
               )}
             </div>

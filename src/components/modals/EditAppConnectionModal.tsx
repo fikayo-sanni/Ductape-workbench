@@ -286,7 +286,7 @@ export default function EditAppConnectionModal({
               <section key={mapping.product_env_slug} className="border border-grey-300 dark:border-grey-500 rounded-lg p-4 space-y-4">
                 <div>
                   <p className="text-sm font-semibold text-grey">{mapping.product_env_slug}</p>
-                  <p className="text-xs text-grey-500">Product environment</p>
+                  <p className="text-xs text-grey-600">Product environment</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>App environment</Label>
@@ -303,7 +303,7 @@ export default function EditAppConnectionModal({
                 ))}
                 <div className="space-y-3 border-t border-grey-200 dark:border-grey-500 pt-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-500">Optional. Leave empty if this environment does not require authentication.</p></div>
+                    <div><p className="text-sm font-medium text-grey">Authentication</p><p className="text-xs text-grey-600">Optional. Leave empty if this environment does not require authentication.</p></div>
                     {(version?.auths?.length ?? 0) > 0 && (
                       <Button type="button" variant={replaceAuth[mapping.product_env_slug] ? 'default' : 'outline'} size="sm" onClick={() => setReplaceAuth(current => ({ ...current, [mapping.product_env_slug]: !current[mapping.product_env_slug] }))}>
                         <RotateCcw className="h-3.5 w-3.5 mr-1.5" />{credentialsSaved ? 'Replace saved auth' : replaceAuth[mapping.product_env_slug] ? 'Cancel auth setup' : 'Use App authentication'}
@@ -319,7 +319,7 @@ export default function EditAppConnectionModal({
                       </Select>
                       {fieldsForAuth(selectedAuth, version).map(field => {
                         const fieldKey = `${field.location}:${field.key}`;
-                        return <div key={fieldKey} className="space-y-1.5"><Label>{field.key} <span className="text-grey-400">({field.location})</span></Label><Input type="password" placeholder={field.sampleValue || ''} value={authValues[mapping.product_env_slug]?.[fieldKey] || ''} onChange={event => setAuthValues(current => ({ ...current, [mapping.product_env_slug]: { ...(current[mapping.product_env_slug] ?? {}), [fieldKey]: event.target.value } }))} /></div>;
+                        return <div key={fieldKey} className="space-y-1.5"><Label>{field.key} <span className="text-grey-600">({field.location})</span></Label><Input type="password" placeholder={field.sampleValue || ''} value={authValues[mapping.product_env_slug]?.[fieldKey] || ''} onChange={event => setAuthValues(current => ({ ...current, [mapping.product_env_slug]: { ...(current[mapping.product_env_slug] ?? {}), [fieldKey]: event.target.value } }))} /></div>;
                       })}
                     </>
                   )}

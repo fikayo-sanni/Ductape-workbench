@@ -405,7 +405,7 @@ export default function NotificationTemplateTabContent({ tabId, data }: Notifica
                   Auto-generate
                 </Button>
               </div>
-              <p className="text-xs text-grey-500 mt-1">
+              <p className="text-xs text-grey-600 mt-1">
                 Full tag: {notificationTag}:{formData.tag || 'tag'}
               </p>
             </div>

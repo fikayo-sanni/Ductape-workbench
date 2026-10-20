@@ -322,7 +322,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle className={cn(
                 "h-5 w-5",
-                isStep1Complete ? "text-green" : "text-grey-400"
+                isStep1Complete ? "text-green" : "text-grey-600"
               )} />
               <h2 className="text-lg font-semibold text-grey">1. Basic Information</h2>
             </div>
@@ -387,7 +387,7 @@ export default function NewNotificationTabContent({ data, tabId }: NewNotificati
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle className={cn(
                 "h-5 w-5",
-                isStep2Complete ? "text-green" : "text-grey-400"
+                isStep2Complete ? "text-green" : "text-grey-600"
               )} />
               <h2 className="text-lg font-semibold text-grey">2. Select Channels</h2>
             </div>

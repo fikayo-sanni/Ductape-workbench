@@ -530,11 +530,11 @@ export default function Dashboard() {
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-                  <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-400 mb-2 sm:mb-3" />
+                  <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
                   <p className="text-sm sm:text-base text-grey-600 font-medium">
                     No activity data
                   </p>
-                  <p className="text-xs sm:text-sm text-grey-500 mt-1 text-center px-4">
+                  <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
                     Activity breakdown will appear here
                   </p>
                 </div>
@@ -616,11 +616,11 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-              <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-400 mb-2 sm:mb-3" />
+              <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
               <p className="text-sm sm:text-base text-grey-600 font-medium">
                 No usage data available
               </p>
-              <p className="text-xs sm:text-sm text-grey-500 mt-1 text-center px-4">
+              <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
                 Product usage statistics will appear here
               </p>
             </div>
@@ -684,11 +684,11 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-              <Database className="h-10 w-10 sm:h-12 sm:w-12 text-grey-400 mb-2 sm:mb-3" />
+              <Database className="h-10 w-10 sm:h-12 sm:w-12 text-grey-600 mb-2 sm:mb-3" />
               <p className="text-sm sm:text-base text-grey-600 font-medium">
                 No resource data available
               </p>
-              <p className="text-xs sm:text-sm text-grey-500 mt-1 text-center px-4">
+              <p className="text-xs sm:text-sm text-grey-600 mt-1 text-center px-4">
                 Resource usage metrics will appear here
               </p>
             </div>

@@ -741,7 +741,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Runs</span>
-                    <MessageSquare className="h-4 w-4 text-grey-400" />
+                    <MessageSquare className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.total}</p>
                   <div className="mt-2 h-8">
@@ -753,7 +753,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Success Rate</span>
-                    <CheckCircle className="h-4 w-4 text-grey-400" />
+                    <CheckCircle className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className={cn(
                     'text-2xl font-bold',
@@ -763,24 +763,24 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                   )}>
                     {metrics.successRate.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-grey-500 mt-2">{metrics.completed} succeeded</p>
+                  <p className="text-xs text-grey-600 mt-2">{metrics.completed} succeeded</p>
                 </div>
 
                 {/* Active */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Active</span>
-                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-purple-500 animate-spin' : 'text-grey-400')} />
+                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-purple-500 animate-spin' : 'text-grey-600')} />
                   </div>
                   <p className="text-2xl font-bold text-purple-500">{metrics.running}</p>
-                  <p className="text-xs text-grey-500 mt-2">currently running</p>
+                  <p className="text-xs text-grey-600 mt-2">currently running</p>
                 </div>
 
                 {/* Errors */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Errors</span>
-                    <AlertCircle className="h-4 w-4 text-grey-400" />
+                    <AlertCircle className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-red">{metrics.failed}</p>
                   <div className="mt-2 h-8">
@@ -792,20 +792,20 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Tokens</span>
-                    <Zap className="h-4 w-4 text-grey-400" />
+                    <Zap className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{formatTokens(metrics.totalTokens)}</p>
-                  <p className="text-xs text-grey-500 mt-2">{metrics.totalToolCalls} tool calls</p>
+                  <p className="text-xs text-grey-600 mt-2">{metrics.totalToolCalls} tool calls</p>
                 </div>
 
                 {/* Cost */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Cost</span>
-                    <DollarSign className="h-4 w-4 text-grey-400" />
+                    <DollarSign className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">${metrics.totalCost.toFixed(2)}</p>
-                  <p className="text-xs text-grey-500 mt-2">avg: {formatDuration(metrics.avgDuration)}</p>
+                  <p className="text-xs text-grey-600 mt-2">avg: {formatDuration(metrics.avgDuration)}</p>
                 </div>
               </div>
 
@@ -901,12 +901,12 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                           <div className={cn('w-2 h-2 rounded-full', statusConfig.dotColor)} />
                           <div>
                             <p className="text-sm font-medium text-grey">#{run.runNumber}</p>
-                            <p className="text-xs text-grey-500 truncate max-w-[300px]">{run.input}</p>
+                            <p className="text-xs text-grey-600 truncate max-w-[300px]">{run.input}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="text-xs text-grey-500">{formatTokens(run.tokens.total)} tokens</span>
-                          <span className="text-xs text-grey-500">{formatTime(run.startedAt)}</span>
+                          <span className="text-xs text-grey-600">{formatTokens(run.tokens.total)} tokens</span>
+                          <span className="text-xs text-grey-600">{formatTime(run.startedAt)}</span>
                         </div>
                       </div>
                     );
@@ -997,7 +997,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-grey-500 truncate max-w-[300px]">{run.input}</p>
+                          <p className="text-xs text-grey-600 truncate max-w-[300px]">{run.input}</p>
                         </div>
                       </div>
 
@@ -1020,7 +1020,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                         <div className="min-w-0">
                           <p className="text-sm text-grey">{triggerConfig.label}</p>
                           {run.triggeredByUser && run.triggeredByUser !== 'system' && (
-                            <p className="text-xs text-grey-500 truncate">{run.triggeredByUser}</p>
+                            <p className="text-xs text-grey-600 truncate">{run.triggeredByUser}</p>
                           )}
                         </div>
                       </div>
@@ -1045,7 +1045,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                           <Zap className="h-3 w-3" />
                           {formatTokens(run.tokens.total)}
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-grey-500">
+                        <div className="flex items-center gap-1 text-xs text-grey-600">
                           <Wrench className="h-3 w-3" />
                           {run.toolCalls} tools
                         </div>
@@ -1058,7 +1058,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
 
                       {/* Arrow */}
                       <div className="flex justify-end">
-                        <ChevronRight className="h-4 w-4 text-grey-400" />
+                        <ChevronRight className="h-4 w-4 text-grey-600" />
                       </div>
                     </div>
                   );
@@ -1068,10 +1068,10 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
               {filteredRuns.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
-                    <Search className="h-6 w-6 text-grey-500" />
+                    <Search className="h-6 w-6 text-grey-600" />
                   </div>
                   <p className="text-grey font-medium">No runs found</p>
-                  <p className="text-grey-500 text-sm mt-1">Try adjusting your filters</p>
+                  <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
                 </div>
               )}
                 </div>
@@ -1100,7 +1100,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
                 value={executeInput}
                 onChange={(e) => setExecuteInput(e.target.value)}
                 placeholder="What would you like the agent to help you with?"
-                className="h-32 mt-2 bg-grey-100 border-grey-400 text-grey placeholder:text-grey-400"
+                className="h-32 mt-2 bg-grey-100 border-grey-400 text-grey placeholder:text-grey-600"
               />
             </div>
           </div>

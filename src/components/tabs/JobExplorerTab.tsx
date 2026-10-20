@@ -353,7 +353,7 @@ console.log('Result:', result);`
               <p className="text-xs text-grey-600 font-mono truncate">{jobTag}</p>
             </div>
           </div>
-          <p className="text-xs text-grey-500">{product?.name} · {envSlug}</p>
+          <p className="text-xs text-grey-600">{product?.name} · {envSlug}</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 min-h-0 space-y-0.5">
           {[
@@ -421,14 +421,14 @@ console.log('Result:', result);`
 
         <div className="flex-1 overflow-auto p-6">
           {!currentWorkspaceId || !user?._id || !productTag || !jobTag ? (
-            <div className="flex items-center justify-center p-6 text-grey-500 text-sm">
+            <div className="flex items-center justify-center p-6 text-grey-600 text-sm">
               Select a workspace and open a job to view invocations.
             </div>
           ) : jobExecutionsError ? (
             <div className="flex flex-col items-center justify-center gap-4 p-6">
               <AlertCircle className="h-12 w-12 text-red" />
               <p className="text-grey font-medium">Failed to load job runs</p>
-              <p className="text-grey-500 text-sm text-center max-w-md">
+              <p className="text-grey-600 text-sm text-center max-w-md">
                 {(jobExecutionsError as Error)?.message ?? 'Something went wrong.'}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -528,19 +528,19 @@ console.log('Result:', result);`
                             <StatusIcon className={cn('h-4 w-4', statusConfig.color, (statusConfig as any).animate && 'animate-spin')} />
                             <div>
                               <p className="text-sm font-medium text-grey">{statusConfig.label} · {formatTime(run.startedAt)}</p>
-                              <p className="text-xs text-grey-500">{getTriggerConfig(run.triggeredBy).label} · {formatDuration(run.duration)}</p>
-                              <p className="text-xs text-grey-400 font-mono truncate" title={run.jobId}>{run.jobId}</p>
+                              <p className="text-xs text-grey-600">{getTriggerConfig(run.triggeredBy).label} · {formatDuration(run.duration)}</p>
+                              <p className="text-xs text-grey-600 font-mono truncate" title={run.jobId}>{run.jobId}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className="text-xs text-grey-500">{formatDuration(run.duration)}</span>
+                            <span className="text-xs text-grey-600">{formatDuration(run.duration)}</span>
                             <span className={cn(
                               'text-xs font-medium',
                               run.status === 'completed' && 'text-green',
                               run.status === 'failed' && 'text-red',
                               run.status === 'running' && 'text-indigo-500'
                             )}>{statusConfig.label}</span>
-                            <ChevronDown className={cn('h-4 w-4 text-grey-400 transition-transform flex-shrink-0', isExpanded && 'rotate-180')} />
+                            <ChevronDown className={cn('h-4 w-4 text-grey-600 transition-transform flex-shrink-0', isExpanded && 'rotate-180')} />
                           </div>
                         </div>
                         {isExpanded && (
@@ -565,11 +565,11 @@ console.log('Result:', result);`
             <div className="bg-white rounded-lg border border-border shadow-sm">
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-grey">Past invocations</h3>
-                <p className="text-xs text-grey-500 mt-1">{runs.length} runs</p>
+                <p className="text-xs text-grey-600 mt-1">{runs.length} runs</p>
               </div>
               <div className="divide-y divide-border">
                 {runs.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-grey-500 text-sm">
+                  <div className="px-5 py-8 text-center text-grey-600 text-sm">
                     No past invocations for this job yet.
                   </div>
                 ) : runs.map((run) => {
@@ -593,8 +593,8 @@ console.log('Result:', result);`
                           <StatusIcon className={cn('h-4 w-4 flex-shrink-0', statusConfig.color, (statusConfig as any).animate && 'animate-spin')} />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-grey truncate">{statusConfig.label} · {formatTime(run.startedAt)}</p>
-                            <p className="text-xs text-grey-500">{triggerConfig.label} · {formatDuration(run.duration)}</p>
-                            <p className="text-xs text-grey-400 font-mono truncate" title={run.jobId}>{run.jobId}</p>
+                            <p className="text-xs text-grey-600">{triggerConfig.label} · {formatDuration(run.duration)}</p>
+                            <p className="text-xs text-grey-600 font-mono truncate" title={run.jobId}>{run.jobId}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 flex-shrink-0">
@@ -604,7 +604,7 @@ console.log('Result:', result);`
                             statusConfig.bg,
                             statusConfig.border
                           )}>{statusConfig.label}</span>
-                          <ChevronDown className={cn('h-4 w-4 text-grey-400 transition-transform', isExpanded && 'rotate-180')} />
+                          <ChevronDown className={cn('h-4 w-4 text-grey-600 transition-transform', isExpanded && 'rotate-180')} />
                         </div>
                       </div>
                       {isExpanded && (
@@ -628,11 +628,11 @@ console.log('Result:', result);`
             <div className="bg-white rounded-lg border border-border shadow-sm">
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-grey">Future invocations</h3>
-                <p className="text-xs text-grey-500 mt-1">{scheduled.length} scheduled</p>
+                <p className="text-xs text-grey-600 mt-1">{scheduled.length} scheduled</p>
               </div>
               <div className="divide-y divide-border">
                 {scheduled.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-grey-500 text-sm">
+                  <div className="px-5 py-8 text-center text-grey-600 text-sm">
                     No future invocations scheduled for this job.
                   </div>
                 ) : scheduled.map((s) => (
@@ -643,7 +643,7 @@ console.log('Result:', result);`
                         <p className="text-sm font-medium text-grey">
                           {formatTime(s.nextRun, false)}
                         </p>
-                        <p className="text-xs text-grey-500">
+                        <p className="text-xs text-grey-600">
                           {s.recurrence === 'recurring' && s.cron ? `Cron: ${s.cron}` : 'One-time'}
                         </p>
                       </div>

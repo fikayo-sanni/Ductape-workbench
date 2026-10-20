@@ -352,7 +352,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                 <div className="space-y-3">
                   <div>
                     <Label className="text-sm text-grey-600 mb-1 block">
-                      Title <span className="text-grey-500">(use {`{{}}`} for variables)</span>
+                      Title <span className="text-grey-600">(use {`{{}}`} for variables)</span>
                     </Label>
                     <Input
                       value={formData.pushTitle}
@@ -362,7 +362,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                   </div>
                   <div>
                     <Label className="text-sm text-grey-600 mb-1 block">
-                      Body <span className="text-grey-500">(use {`{{}}`} for variables)</span>
+                      Body <span className="text-grey-600">(use {`{{}}`} for variables)</span>
                     </Label>
                     <Textarea
                       value={formData.pushBody}
@@ -373,7 +373,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                   </div>
                   <div>
                     <Label className="text-sm text-grey-600 mb-1 block">
-                      Data (JSON) <span className="text-grey-500">(optional, use {`{{}}`} for variables)</span>
+                      Data (JSON) <span className="text-grey-600">(optional, use {`{{}}`} for variables)</span>
                     </Label>
                     <Textarea
                       value={formData.pushData}
@@ -397,7 +397,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                 <div className="space-y-3">
                   <div>
                     <Label className="text-sm text-grey-600 mb-1 block">
-                      Subject <span className="text-grey-500">(use {`{{}}`} for variables)</span>
+                      Subject <span className="text-grey-600">(use {`{{}}`} for variables)</span>
                     </Label>
                     <Input
                       value={formData.emailSubject}
@@ -407,7 +407,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                   </div>
                   <div>
                     <Label className="text-sm text-grey-600 mb-1 block">
-                      Template <span className="text-grey-500">(HTML, use {`{{}}`} for variables)</span>
+                      Template <span className="text-grey-600">(HTML, use {`{{}}`} for variables)</span>
                     </Label>
                     <Textarea
                       value={formData.emailTemplate}
@@ -430,7 +430,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                 </div>
                 <div>
                   <Label className="text-sm text-grey-600 mb-1 block">
-                    Message <span className="text-grey-500">(use {`{{}}`} for variables)</span>
+                    Message <span className="text-grey-600">(use {`{{}}`} for variables)</span>
                   </Label>
                   <Input
                     value={formData.sms}
@@ -452,7 +452,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                 {/* Body Section */}
                 <div>
                   <Label className="text-sm text-grey-600 mb-2 block">
-                    Body (JSON) <span className="text-grey-500">(use {`{{}}`} for variables, supports nested objects)</span>
+                    Body (JSON) <span className="text-grey-600">(use {`{{}}`} for variables, supports nested objects)</span>
                   </Label>
                   <Textarea
                     value={formData.callbackBody}
@@ -461,14 +461,14 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                     className="font-mono text-sm"
                     rows={8}
                   />
-                  <p className="text-xs text-grey-500 mt-1">Enter valid JSON. Supports nested structures for complex data.</p>
+                  <p className="text-xs text-grey-600 mt-1">Enter valid JSON. Supports nested structures for complex data.</p>
                 </div>
 
                 {/* Headers, Params, Query Section */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-sm text-grey-600 block">
-                      Additional Fields <span className="text-grey-500">(Headers, Params, Query)</span>
+                      Additional Fields <span className="text-grey-600">(Headers, Params, Query)</span>
                     </Label>
                     <Button
                       type="button"
@@ -549,7 +549,7 @@ export default function NewMessageTabContent({ tabId, data }: NewMessageTabConte
                       </div>
                     ))}
                     {formData.callbackFields.length === 0 && (
-                      <p className="text-xs text-grey-500 italic">No additional fields. Click "Add Field" to add headers, params, or query strings.</p>
+                      <p className="text-xs text-grey-600 italic">No additional fields. Click "Add Field" to add headers, params, or query strings.</p>
                     )}
                   </div>
                 </div>

@@ -1316,7 +1316,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                 </div>
               </div>
               {baseUrl && (
-                <span className="min-w-0 max-w-full truncate text-xs text-grey-500 font-mono">{baseUrl}</span>
+                <span className="min-w-0 max-w-full truncate text-xs text-grey-600 font-mono">{baseUrl}</span>
               )}
             </div>
           )}
@@ -1503,10 +1503,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   {query.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <Hash className="h-6 w-6 text-grey-400" />
+                        <Hash className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No query parameters</p>
-                      <p className="text-sm text-grey-500">Add query parameters to your request</p>
+                      <p className="text-sm text-grey-600">Add query parameters to your request</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1544,7 +1544,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                               onClick={() => removeKeyValue(index, setQuery)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1578,10 +1578,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   {params.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <Hash className="h-6 w-6 text-grey-400" />
+                        <Hash className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No path parameters</p>
-                      <p className="text-sm text-grey-500">Add path parameters like :id or :slug</p>
+                      <p className="text-sm text-grey-600">Add path parameters like :id or :slug</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1619,7 +1619,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                               onClick={() => removeKeyValue(index, setParams)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1654,10 +1654,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                   {headers.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <FileCode className="h-6 w-6 text-grey-400" />
+                        <FileCode className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No headers defined</p>
-                      <p className="text-sm text-grey-500">Add custom headers to your request</p>
+                      <p className="text-sm text-grey-600">Add custom headers to your request</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1695,7 +1695,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                               onClick={() => removeKeyValue(index, setHeaders)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1817,10 +1817,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                           {formDataFields.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                                <Code className="h-6 w-6 text-grey-400" />
+                                <Code className="h-6 w-6 text-grey-600" />
                               </div>
                               <p className="text-grey-600 font-medium mb-1">No form fields</p>
-                              <p className="text-sm text-grey-500">Add form data fields to your request</p>
+                              <p className="text-sm text-grey-600">Add form data fields to your request</p>
                             </div>
                           ) : (
                             formDataFields.map((item, index) => (
@@ -1857,7 +1857,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                                     onClick={() => removeKeyValue(index, setFormDataFields)}
                                     variant="ghost"
                                     size="sm"
-                                    className="text-grey-400 hover:text-red hover:bg-red/10"
+                                    className="text-grey-600 hover:text-red hover:bg-red/10"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1891,10 +1891,10 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                 <div className="flex items-center justify-center h-full text-grey-600">
                   <div className="text-center">
                     <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                      <Send className="h-6 w-6 text-grey-400" />
+                      <Send className="h-6 w-6 text-grey-600" />
                     </div>
                     <p className="text-grey-600 font-medium mb-1">No response yet</p>
-                    <p className="text-sm text-grey-500">Send a request to see the response</p>
+                    <p className="text-sm text-grey-600">Send a request to see the response</p>
                   </div>
                 </div>
               ) : (
@@ -1918,14 +1918,14 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                       </span>
                       {response.time !== undefined && (
                         <>
-                          <span className="text-grey-300 mx-2">|</span>
+                          <span className="text-grey-600 mx-2">|</span>
                           <span className="text-sm font-medium text-grey-600">Time:</span>
                           <span className="text-sm text-grey-700">{response.time}ms</span>
                         </>
                       )}
                       {response.size !== undefined && (
                         <>
-                          <span className="text-grey-300 mx-2">|</span>
+                          <span className="text-grey-600 mx-2">|</span>
                           <span className="text-sm font-medium text-grey-600">Size:</span>
                           <span className="text-sm text-grey-700">{response.size} bytes</span>
                         </>
@@ -2008,7 +2008,7 @@ export default function RequestBuilder({ tabId, data }: RequestBuilderProps) {
                 className="bg-grey-50 font-mono text-sm"
                 placeholder="auto-generated"
               />
-              <p className="text-xs text-grey-500">
+              <p className="text-xs text-grey-600">
                 Auto-generated from name. Used as a unique identifier.
               </p>
             </div>

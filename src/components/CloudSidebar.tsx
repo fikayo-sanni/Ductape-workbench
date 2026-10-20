@@ -158,7 +158,7 @@ export default function CloudSidebar() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-10 px-2">
-            <Cloud className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+            <Cloud className="h-8 w-8 text-grey-600 mx-auto mb-2" />
             <p className="text-sm text-grey-600">
               {searchQuery ? 'No matching connections' : 'No connections yet'}
             </p>

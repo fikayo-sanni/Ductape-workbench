@@ -182,7 +182,7 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
                   </div>
                   <button
                     onClick={() => copyToClipboard(run.id, 'Run ID')}
-                    className="text-grey-400 hover:text-grey-600 transition-colors"
+                    className="text-grey-600 hover:text-grey transition-colors"
                     title="Copy Run ID"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
                   {agentName && (
                     <div className="flex items-center gap-1.5 text-sm text-grey-600">
                       <span className="font-medium text-grey">{agentName}</span>
-                      {agentTag && <code className="text-xs text-grey-400 font-mono">{agentTag}</code>}
+                      {agentTag && <code className="text-xs text-grey-600 font-mono">{agentTag}</code>}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-grey-600">
@@ -227,7 +227,7 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="text-grey-400 hover:text-grey">
+                  <Button size="sm" variant="ghost" className="text-grey-600 hover:text-grey">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -251,11 +251,11 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <triggerConfig.icon className={cn('h-4 w-4', triggerConfig.color)} />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Trigger</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Trigger</span>
               </div>
               <p className={cn('text-sm font-semibold', triggerConfig.color)}>{triggerConfig.label}</p>
               {run.triggeredByUser && run.triggeredByUser !== 'system' && (
-                <p className="text-xs text-grey-400 mt-0.5">{run.triggeredByUser}</p>
+                <p className="text-xs text-grey-600 mt-0.5">{run.triggeredByUser}</p>
               )}
             </div>
 
@@ -263,7 +263,7 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <MessageSquare className="h-4 w-4 text-purple-500" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Messages</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Messages</span>
               </div>
               <p className="text-sm font-semibold text-grey">{run.messages.length}</p>
             </div>
@@ -272,7 +272,7 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <Wrench className="h-4 w-4 text-yellow" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Tool Calls</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Tool Calls</span>
               </div>
               <p className="text-sm font-semibold text-grey">{run.toolCalls}</p>
             </div>
@@ -281,20 +281,20 @@ export default function AgentRunTab({ run, agentName, agentTag }: AgentRunTabPro
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <Zap className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Tokens</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Tokens</span>
               </div>
               <p className="text-sm font-semibold text-grey">{run.tokens.total.toLocaleString()}</p>
-              <p className="text-xs text-grey-400 mt-0.5">{run.tokens.input.toLocaleString()}↓ {run.tokens.output.toLocaleString()}↑</p>
+              <p className="text-xs text-grey-600 mt-0.5">{run.tokens.input.toLocaleString()}↓ {run.tokens.output.toLocaleString()}↑</p>
             </div>
 
             {/* Cost */}
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign className="h-4 w-4 text-green" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Cost</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Cost</span>
               </div>
               <p className="text-sm font-semibold text-grey">{formatCost(run.cost)}</p>
-              <p className="text-xs text-grey-400 mt-0.5">{run.model.split('-').slice(0, 3).join('-')}</p>
+              <p className="text-xs text-grey-600 mt-0.5">{run.model.split('-').slice(0, 3).join('-')}</p>
             </div>
           </div>
         </div>

@@ -83,7 +83,7 @@ export function ActivityTimelinePanel({
   const renderOutcomesChart = () => {
     if (!hasOutcomes) {
       return (
-        <p className="text-sm text-grey-500 py-8 text-center">
+        <p className="text-sm text-grey-600 py-8 text-center">
           No success/failure data in this period.
         </p>
       );
@@ -173,7 +173,7 @@ export function ActivityTimelinePanel({
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-grey">{title}</h2>
           {(isLoading || isFetching) && (
-            <Loader2 className="h-4 w-4 animate-spin text-grey-400" />
+            <Loader2 className="h-4 w-4 animate-spin text-grey-600" />
           )}
         </div>
 
@@ -307,7 +307,7 @@ export function ActivityTimelinePanel({
       ) : viewMode === 'outcomes' ? (
         <div className="w-full">
           {!hasOutcomes && hasVolume ? (
-            <p className="text-sm text-grey-500 py-8 text-center">
+            <p className="text-sm text-grey-600 py-8 text-center">
               Volume is available, but success/failure breakdown is not returned for this resource yet.
               Restart the logs service if you recently deployed timeline updates.
             </p>
@@ -351,7 +351,7 @@ export function ActivityTimelinePanel({
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-sm text-grey-500 py-8 text-center">
+            <p className="text-sm text-grey-600 py-8 text-center">
               {hasVolume
                 ? 'Operations were recorded, but none have duration (start/end or latency) for this period.'
                 : 'No latency data in this period.'}
@@ -359,7 +359,7 @@ export function ActivityTimelinePanel({
           )}
         </div>
       ) : points.length === 0 ? (
-        <p className="text-sm text-grey-500 py-8 text-center">No activity in this period.</p>
+        <p className="text-sm text-grey-600 py-8 text-center">No activity in this period.</p>
       ) : chartData.length > 14 ? (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">

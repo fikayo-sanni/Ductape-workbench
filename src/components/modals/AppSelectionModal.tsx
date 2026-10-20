@@ -111,7 +111,7 @@ export default function AppSelectionModal({
               </div>
             ) : filteredApps.length === 0 ? (
               <div className="text-center py-8 text-grey-600">
-                <Grid3x3 className="h-12 w-12 mx-auto mb-2 text-grey-400" />
+                <Grid3x3 className="h-12 w-12 mx-auto mb-2 text-grey-600" />
                 <p className="text-sm">
                   {relevantApps.length === 0
                     ? productId

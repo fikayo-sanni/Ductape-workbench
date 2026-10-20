@@ -33,7 +33,7 @@ export function WebhookRegistrationSidebar({
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-grey truncate">Register {webhooks ? 'webhooks' : 'webhook'}</h2>
-              <p className="text-sm text-grey-500 truncate">{webhooks ? `${webhooks.length} selected` : webhook.name || webhook.tag}</p>
+              <p className="text-sm text-grey-600 truncate">{webhooks ? `${webhooks.length} selected` : webhook.name || webhook.tag}</p>
             </div>
           </div>
           <Button

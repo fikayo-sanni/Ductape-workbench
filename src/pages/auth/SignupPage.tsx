@@ -256,9 +256,9 @@ function SignupForm() {
                       }
                     >
                       {showPassword.password ? (
-                        <EyeOff className="h-4 w-4 text-grey-500" />
+                        <EyeOff className="h-4 w-4 text-grey-600" />
                       ) : (
-                        <Eye className="h-4 w-4 text-grey-500" />
+                        <Eye className="h-4 w-4 text-grey-600" />
                       )}
                     </Button>
                   </div>
@@ -292,9 +292,9 @@ function SignupForm() {
                       }
                     >
                       {showPassword.confirmPassword ? (
-                        <EyeOff className="h-4 w-4 text-grey-500" />
+                        <EyeOff className="h-4 w-4 text-grey-600" />
                       ) : (
-                        <Eye className="h-4 w-4 text-grey-500" />
+                        <Eye className="h-4 w-4 text-grey-600" />
                       )}
                     </Button>
                   </div>

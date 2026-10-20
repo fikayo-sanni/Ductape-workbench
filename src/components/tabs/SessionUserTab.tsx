@@ -224,7 +224,7 @@ const formatLatency = (latencyMs: number | undefined): string | null => {
 
 // Get latency color based on value
 const getLatencyColor = (latencyMs: number | undefined): string => {
-  if (latencyMs === undefined || latencyMs === null) return 'text-grey-500';
+  if (latencyMs === undefined || latencyMs === null) return 'text-grey-600';
   if (latencyMs < 200) return 'text-green'; // Fast
   if (latencyMs < 1000) return 'text-yellow-600'; // Moderate
   if (latencyMs < 3000) return 'text-orange-500'; // Slow
@@ -586,9 +586,9 @@ function SessionLogsTable({ logs, isLoading }: { logs: any[]; isLoading: boolean
   if (!logs || logs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Inbox className="h-12 w-12 text-grey-400 mb-3" />
+        <Inbox className="h-12 w-12 text-grey-600 mb-3" />
         <p className="text-grey-600 font-medium">No logs found</p>
-        <p className="text-sm text-grey-500 mt-1">
+        <p className="text-sm text-grey-600 mt-1">
           Session activity will appear here as the user interacts
         </p>
       </div>
@@ -919,7 +919,7 @@ export default function SessionUserTab({
                 </button>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-600 hover:text-grey transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -1008,7 +1008,7 @@ export default function SessionUserTab({
                     <span className="text-sm text-grey-600">Sessions</span>
                   </div>
                   {detailsLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-grey-500" />
+                    <Loader2 className="h-3 w-3 animate-spin text-grey-600" />
                   ) : (
                     <span className="text-sm font-semibold text-grey">{userDetails?.totalSessions || displayUser.session_count || 0}</span>
                   )}
@@ -1019,7 +1019,7 @@ export default function SessionUserTab({
                     <span className="text-sm text-grey-600">Active</span>
                   </div>
                   {detailsLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-grey-500" />
+                    <Loader2 className="h-3 w-3 animate-spin text-grey-600" />
                   ) : (
                     <span className="text-sm font-semibold text-green">{userDetails?.activeSessionsCount || 0}</span>
                   )}
@@ -1031,7 +1031,7 @@ export default function SessionUserTab({
                       <span className="text-sm text-grey-600">Success</span>
                     </div>
                     {logsLoading ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-grey-500" />
+                      <Loader2 className="h-3 w-3 animate-spin text-grey-600" />
                     ) : (
                       <span className="text-sm font-semibold text-grey">
                         {successRate}%
@@ -1049,7 +1049,7 @@ export default function SessionUserTab({
           <div className="px-2 mt-4">
             <button
               onClick={() => setIsSidebarCollapsed(false)}
-              className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+              className="w-full flex items-center justify-center p-2 rounded-lg text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
               title="Expand sidebar"
             >
               <PanelLeft className="h-4 w-4" />
@@ -1108,7 +1108,7 @@ export default function SessionUserTab({
               <div className="text-center">
                 <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
                 <p className="text-sm font-medium text-grey-700">Loading user details...</p>
-                <p className="text-xs text-grey-500 mt-1">Fetching session data and activity logs</p>
+                <p className="text-xs text-grey-600 mt-1">Fetching session data and activity logs</p>
               </div>
             </div>
           ) : (
@@ -1207,9 +1207,9 @@ export default function SessionUserTab({
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <Clock className="h-10 w-10 text-grey-300 mb-3" />
+                        <Clock className="h-10 w-10 text-grey-600 mb-3" />
                         <p className="text-grey-600">No peak hours data</p>
-                        <p className="text-sm text-grey-500 mt-1">Activity patterns will appear over time</p>
+                        <p className="text-sm text-grey-600 mt-1">Activity patterns will appear over time</p>
                       </div>
                     )}
                   </div>
@@ -1293,7 +1293,7 @@ export default function SessionUserTab({
                         <p className="text-xs text-grey-600">{totalLogsCount} log entries</p>
                       </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-grey-400 -rotate-90" />
+                    <ChevronDown className="h-4 w-4 text-grey-600 -rotate-90" />
                   </div>
                 </button>
               </div>

@@ -15,7 +15,7 @@ const when = (value: string | undefined): string => {
 };
 
 function KindLabel({ kind }: { kind: DeployableKind }) {
-  return <span className="text-[10px] uppercase tracking-wide text-grey-500">{kind === 'service' ? 'Service' : 'Function'}</span>;
+  return <span className="text-[10px] uppercase tracking-wide text-grey-600">{kind === 'service' ? 'Service' : 'Function'}</span>;
 }
 
 function DeploymentRow({ d }: { d: IDeployment }) {

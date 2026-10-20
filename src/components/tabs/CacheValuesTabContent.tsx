@@ -101,12 +101,12 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
     return (
       <div className="h-full flex items-center justify-center bg-background-tertiary">
         <div className="text-center">
-          <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Layers className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete cache data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the cache from your product to reload it.
           </p>
         </div>
@@ -442,9 +442,9 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
     return (
       <div className="h-full flex items-center justify-center bg-background-tertiary">
         <div className="text-center">
-          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Zap className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete cache data</p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Unable to load cache values. Please try reopening this cache.
           </p>
         </div>
@@ -484,7 +484,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -642,7 +642,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
             <div className="flex-shrink-0 p-2 border-t border-grey-400 bg-grey-50">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                className="w-full flex items-center justify-center p-2 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                 title="Expand sidebar"
               >
                 <PanelLeft className="h-4 w-4" />
@@ -845,7 +845,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Entries</span>
-                    <Database className="h-4 w-4 text-grey-400" />
+                    <Database className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.total}</p>
                   <div className="mt-2 h-8">
@@ -857,17 +857,17 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Cumulative Reads</span>
-                    <Zap className="h-4 w-4 text-grey-400" />
+                    <Zap className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-orange-500">{metrics.totalReads.toLocaleString()}</p>
-                  <p className="text-xs text-grey-500 mt-2">all time</p>
+                  <p className="text-xs text-grey-600 mt-2">all time</p>
                 </div>
 
                 {/* Avg Latency */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Avg Latency</span>
-                    <Timer className="h-4 w-4 text-grey-400" />
+                    <Timer className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.avgLatency.toFixed(1)}ms</p>
                   <div className="mt-2 h-8">
@@ -882,7 +882,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <Clock className="h-4 w-4 text-orange-500" />
                   </div>
                   <p className="text-2xl font-bold text-orange-500">{metrics.expiringSoon}</p>
-                  <p className="text-xs text-grey-500 mt-2">within 1 hour</p>
+                  <p className="text-xs text-grey-600 mt-2">within 1 hour</p>
                 </div>
 
                 {/* Permanent */}
@@ -892,17 +892,17 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                     <Shield className="h-4 w-4 text-green" />
                   </div>
                   <p className="text-2xl font-bold text-green">{metrics.permanent}</p>
-                  <p className="text-xs text-grey-500 mt-2">no expiration</p>
+                  <p className="text-xs text-grey-600 mt-2">no expiration</p>
                 </div>
 
                 {/* Components */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Components</span>
-                    <Layers className="h-4 w-4 text-grey-400" />
+                    <Layers className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.uniqueComponents}</p>
-                  <p className="text-xs text-grey-500 mt-2">unique sources</p>
+                  <p className="text-xs text-grey-600 mt-2">unique sources</p>
                 </div>
               </div>
 
@@ -999,11 +999,11 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                           <div className={cn('w-2 h-2 rounded-full', expiryConfig.dotColor)} />
                           <div>
                             <p className="text-sm font-medium text-grey font-mono">{item.key}</p>
-                            <p className="text-xs text-grey-500">{item.component_tag}</p>
+                            <p className="text-xs text-grey-600">{item.component_tag}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="text-xs text-grey-500">{item.reads?.toLocaleString() || 0} reads</span>
+                          <span className="text-xs text-grey-600">{item.reads?.toLocaleString() || 0} reads</span>
                           <span className={cn('text-xs', expiryConfig.color)}>{expiryConfig.label}</span>
                         </div>
                       </div>
@@ -1173,9 +1173,9 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                               {/* Arrow */}
                               <div className="flex justify-end">
                                 {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-grey-400" />
+                                  <ChevronDown className="h-4 w-4 text-grey-600" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-grey-400" />
+                                  <ChevronRight className="h-4 w-4 text-grey-600" />
                                 )}
                               </div>
                             </div>

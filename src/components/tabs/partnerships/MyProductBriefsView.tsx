@@ -71,7 +71,7 @@ export default function MyProductBriefsView() {
             </Badge>
           </div>
           <p className="text-sm text-grey-600 line-clamp-2 mb-3">{brief.description}</p>
-          <p className="text-xs text-grey-500">
+          <p className="text-xs text-grey-600">
             Product: {brief.product?.app_name} • Updated{' '}
             {new Date(brief.updated_at).toLocaleDateString()}
           </p>
@@ -162,7 +162,7 @@ export default function MyProductBriefsView() {
           {briefs.length === 0 ? (
             <div className="bg-white rounded-lg border border-grey-400 p-12 text-center">
               <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-4">
-                <FileText className="h-8 w-8 text-grey-400" />
+                <FileText className="h-8 w-8 text-grey-600" />
               </div>
               <h3 className="text-lg font-semibold text-grey mb-2">No briefs yet</h3>
               <p className="text-grey-600 mb-6 max-w-md mx-auto">

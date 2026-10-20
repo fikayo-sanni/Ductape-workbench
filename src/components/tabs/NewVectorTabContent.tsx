@@ -231,7 +231,7 @@ export default function NewVectorTabContent({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-3 w-3 text-grey-500" />
+                        <Info className="h-3 w-3 text-grey-600" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Unique identifier used in SDK calls</p>
@@ -278,7 +278,7 @@ export default function NewVectorTabContent({
                     <SelectItem key={p.value} value={p.value}>
                       <div>
                         <span className="font-medium">{p.label}</span>
-                        <span className="text-grey-500 ml-2 text-xs">{p.description}</span>
+                        <span className="text-grey-600 ml-2 text-xs">{p.description}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -299,7 +299,7 @@ export default function NewVectorTabContent({
                 className={cn('mt-1', errors.indexName && 'border-red')}
               />
               {errors.indexName && <p className="text-xs text-red mt-1">{errors.indexName}</p>}
-              <p className="text-xs text-grey-500 mt-1">The name of the index or collection in your vector database</p>
+              <p className="text-xs text-grey-600 mt-1">The name of the index or collection in your vector database</p>
             </div>
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function NewVectorTabContent({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-3 w-3 text-grey-500" />
+                        <Info className="h-3 w-3 text-grey-600" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Must match your embedding model's output dimensions</p>
@@ -374,7 +374,7 @@ export default function NewVectorTabContent({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-grey-500 mt-1">
+                <p className="text-xs text-grey-600 mt-1">
                   {DISTANCE_METRICS.find((m) => m.value === metric)?.description}
                 </p>
               </div>
@@ -437,7 +437,7 @@ export default function NewVectorTabContent({
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-grey-500">
+            <div className="text-center py-8 text-grey-600">
               <p className="text-sm">No environments configured for this product</p>
               <p className="text-xs mt-1">Add environments to the product first</p>
             </div>

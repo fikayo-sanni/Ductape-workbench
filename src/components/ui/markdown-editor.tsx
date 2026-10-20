@@ -62,7 +62,7 @@ export function MarkdownEditor({
               placeholder={placeholder}
               className={cn('font-mono text-sm', minHeight)}
             />
-            <div className="absolute bottom-2 right-2 text-xs text-grey-500 flex items-center gap-1">
+            <div className="absolute bottom-2 right-2 text-xs text-grey-600 flex items-center gap-1">
               <FileText className="h-3 w-3" />
               Markdown supported
             </div>
@@ -79,7 +79,7 @@ export function MarkdownEditor({
                 </ReactMarkdown>
               </div>
             ) : (
-              <p className="text-grey-500 text-sm italic">{placeholder}</p>
+              <p className="text-grey-600 text-sm italic">{placeholder}</p>
             )}
           </div>
         )}

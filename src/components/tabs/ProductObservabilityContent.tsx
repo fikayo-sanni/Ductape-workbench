@@ -280,7 +280,7 @@ export default function ProductObservabilityContent({ product, initialView = 'ov
           <Panel>
             <div className="flex flex-col gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-600" />
                 <Input value={logSearch} onChange={event => setLogSearch(event.target.value)} placeholder="Find one run by its exact process ID" className="pl-9" />
               </div>
               <div className="flex flex-wrap gap-3">
@@ -394,7 +394,7 @@ function Overview({
           tone === 'neutral' && 'border-grey-400 bg-white',
         )}
       >
-        <Icon className={cn('mt-0.5 h-5 w-5 flex-shrink-0', tone === 'good' && 'text-green', tone === 'warn' && 'text-orange', tone === 'bad' && 'text-red', tone === 'neutral' && 'text-grey-500')} />
+        <Icon className={cn('mt-0.5 h-5 w-5 flex-shrink-0', tone === 'good' && 'text-green', tone === 'warn' && 'text-orange', tone === 'bad' && 'text-red', tone === 'neutral' && 'text-grey-600')} />
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-grey sm:text-base">{narrative.title}</h2>
           <p className="mt-0.5 text-xs text-grey-600 sm:text-sm">{narrative.detail}</p>
@@ -424,7 +424,7 @@ function Overview({
             </ResponsiveContainer>
           </div>
         ) : (
-          <p className="py-10 text-center text-sm text-grey-500">No activity in this time window.</p>
+          <p className="py-10 text-center text-sm text-grey-600">No activity in this time window.</p>
         )}
       </Panel>
 
@@ -445,12 +445,12 @@ function Overview({
         {failuresLoading ? (
           <SectionLoading label="Loading failures..." />
         ) : failures.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-grey-500">No failures in this time window.</p>
+          <p className="px-4 py-10 text-center text-sm text-grey-600">No failures in this time window.</p>
         ) : (
           <ul className="divide-y divide-grey-300">
             {failures.map((row, index) => (
               <li key={String(row._id || row.process_id || index)} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-                <span className="w-28 flex-shrink-0 text-xs text-grey-500" title={row.timestamp ? new Date(row.timestamp).toLocaleString() : ''}>
+                <span className="w-28 flex-shrink-0 text-xs text-grey-600" title={row.timestamp ? new Date(row.timestamp).toLocaleString() : ''}>
                   {row.timestamp ? formatDistanceToNow(new Date(row.timestamp), { addSuffix: true }) : '-'}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -474,7 +474,7 @@ function Overview({
         flush
       >
         {sorted.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-grey-500">No operations were recorded in this period.</p>
+          <p className="px-4 py-10 text-center text-sm text-grey-600">No operations were recorded in this period.</p>
         ) : (
           <DataTable head={['Operation', 'Kind', 'Calls', 'Failed', 'Average', 'Slowest']} minWidth={640}>
             {sorted.map(row => (
@@ -482,7 +482,7 @@ function Overview({
                 <td className="px-4 py-3 font-mono text-xs font-medium text-grey sm:text-sm">{row.operation || 'unknown'}</td>
                 <td className="px-4 py-3 text-grey-600">{kindLabel(row.type)}</td>
                 <td className="px-4 py-3 text-grey">{Number(row.calls).toLocaleString()}</td>
-                <td className={cn('px-4 py-3', row.failures ? 'font-medium text-red' : 'text-grey-500')}>{row.failures ? Number(row.failures).toLocaleString() : '0'}</td>
+                <td className={cn('px-4 py-3', row.failures ? 'font-medium text-red' : 'text-grey-600')}>{row.failures ? Number(row.failures).toLocaleString() : '0'}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-grey-600">{ms(row.averageLatencyMs)}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-medium text-grey">{ms(row.maxLatencyMs)}</td>
               </tr>
@@ -528,7 +528,7 @@ function KindSummary({ operations, kinds }: { operations: any[]; kinds?: string[
                 {group.failures ? <Pill tone="bad">{failedShare}% failed</Pill> : <Pill tone="good">All succeeded</Pill>}
               </div>
               <p className="mt-2 text-2xl font-bold text-grey">{group.calls.toLocaleString()}</p>
-              <p className="text-xs text-grey-500">
+              <p className="text-xs text-grey-600">
                 {group.calls === 1 ? 'call' : 'calls'}
                 {group.timed ? ` · ${ms(group.weighted / group.timed)} on average` : ''}
               </p>
@@ -563,7 +563,7 @@ function HealthSummary({ healthchecks, env, onOpen }: { healthchecks: any[]; env
       flush
     >
       {healthchecks.length === 0 ? (
-        <p className="px-4 py-10 text-center text-sm text-grey-500">No health checks are configured for this product.</p>
+        <p className="px-4 py-10 text-center text-sm text-grey-600">No health checks are configured for this product.</p>
       ) : (
         <ul className="divide-y divide-grey-300">
           {healthchecks.map(check => (
@@ -605,7 +605,7 @@ function HealthView({ healthchecks, env }: { healthchecks: any[]; env: string })
                 <div key={item.slug} className="flex items-start justify-between gap-3 rounded-lg bg-grey-100 p-3 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium text-grey">{item.slug}</p>
-                    {healthView(item).note ? <p className="mt-0.5 text-xs text-grey-500">{healthView(item).note}</p> : null}
+                    {healthView(item).note ? <p className="mt-0.5 text-xs text-grey-600">{healthView(item).note}</p> : null}
                     {item.lastError ? <p className="mt-1 break-words text-xs text-red">{item.lastError.message || String(item.lastError)}</p> : null}
                   </div>
                   <Pill tone={view.tone}>
@@ -640,9 +640,9 @@ function LogTable({ rows, emptyLabel, product }: { rows: any[]; emptyLabel: stri
     <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <Inbox className="h-12 w-12 text-grey-400 mb-3" />
+          <Inbox className="h-12 w-12 text-grey-600 mb-3" />
           <p className="text-grey-600 font-medium">No {emptyLabel} found</p>
-          <p className="text-sm text-grey-500 mt-1">Nothing was recorded for this environment and time window.</p>
+          <p className="text-sm text-grey-600 mt-1">Nothing was recorded for this environment and time window.</p>
         </div>
       ) : (
         <LogList logs={rows} fetchPayload={fetchPayload} />

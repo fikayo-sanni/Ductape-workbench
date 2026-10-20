@@ -45,15 +45,15 @@ function SessionEnvMetrics({ productTag, sessionTag, env }: { productTag: string
       <div className="grid grid-cols-3 gap-4 mt-4 p-4 bg-grey-50 rounded-lg border border-grey-400">
         <div>
           <p className="text-xs text-grey-600 mb-1">Active Users</p>
-          <p className="text-lg font-semibold text-grey-400">...</p>
+          <p className="text-lg font-semibold text-grey-600">...</p>
         </div>
         <div>
           <p className="text-xs text-grey-600 mb-1">Inactive Users</p>
-          <p className="text-lg font-semibold text-grey-400">...</p>
+          <p className="text-lg font-semibold text-grey-600">...</p>
         </div>
         <div>
           <p className="text-xs text-grey-600 mb-1">Expired Users</p>
-          <p className="text-lg font-semibold text-grey-400">...</p>
+          <p className="text-lg font-semibold text-grey-600">...</p>
         </div>
       </div>
     );
@@ -90,12 +90,12 @@ export default function SessionTabContent({ session }: SessionTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <KeyRound className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <KeyRound className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete session data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the session from your product to reload it.
           </p>
         </div>

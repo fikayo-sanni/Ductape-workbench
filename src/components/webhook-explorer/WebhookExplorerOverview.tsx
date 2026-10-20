@@ -112,7 +112,7 @@ export function WebhookExplorerOverview({
               <p className={cn('text-2xl font-bold tabular-nums', card.valueClass ?? 'text-grey')}>
                 {card.value}
               </p>
-              <p className="text-xs text-grey-500 mt-0.5">{card.label}</p>
+              <p className="text-xs text-grey-600 mt-0.5">{card.label}</p>
             </div>
           ))}
         </div>
@@ -130,7 +130,7 @@ export function WebhookExplorerOverview({
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-semibold text-grey">Environment endpoints</h3>
             {appEnvironments.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-grey-300 bg-white p-8 text-center text-sm text-grey-500">
+              <div className="rounded-xl border border-dashed border-grey-300 bg-white p-8 text-center text-sm text-grey-600">
                 No environments configured for this app version.
               </div>
             ) : (
@@ -199,7 +199,7 @@ export function WebhookExplorerOverview({
                 </button>
               </div>
               {events.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-grey-500 text-center">No events defined</p>
+                <p className="px-4 py-6 text-xs text-grey-600 text-center">No events defined</p>
               ) : (
                 <ul className="divide-y divide-grey-100">
                   {events.slice(0, 6).map((event) => {
@@ -214,7 +214,7 @@ export function WebhookExplorerOverview({
                           <Zap className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-grey truncate">{event.name}</p>
-                            <p className="text-[10px] font-mono text-grey-500 truncate">{event.tag}</p>
+                            <p className="text-[10px] font-mono text-grey-600 truncate">{event.tag}</p>
                           </div>
                           {selectors.length > 1 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue/10 text-blue">

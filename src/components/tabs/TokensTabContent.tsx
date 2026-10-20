@@ -985,7 +985,7 @@ export default function TokensTabContent() {
                       </Button>
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-grey-500">
+                  <p className="mt-2 text-xs text-grey-600">
                     Set as <code className="bg-grey-100 px-1 rounded">DUCTAPE_WORKSPACE</code> in your MCP server env config to automatically scope CLI operations to this workspace.
                   </p>
                 </div>
@@ -1018,7 +1018,7 @@ export default function TokensTabContent() {
                 {!showScopeEditor ? (
                   <div className="bg-white rounded-lg border border-grey-300 p-3 text-sm">
                     {publishableKeyScope.length === 0 ? (
-                      <p className="text-grey-500">Default: no execution methods allowed. Add modules below and disallow specific methods to allow the rest.</p>
+                      <p className="text-grey-600">Default: no execution methods allowed. Add modules below and disallow specific methods to allow the rest.</p>
                     ) : (
                       <ul className="space-y-1.5">
                         {publishableKeyScope.map((entry, i) => {
@@ -1028,7 +1028,7 @@ export default function TokensTabContent() {
                           return (
                             <li key={i} className="flex items-baseline gap-2">
                               <span className="font-mono font-medium text-grey">{entry.module}</span>
-                              <span className="text-grey-500">:</span>
+                              <span className="text-grey-600">:</span>
                               <span className="text-grey-600">
                                 {disallowed.length === 0 ? "(none disallowed)" : `disallowed: ${disallowed.join(", ")}`}
                               </span>
@@ -1040,7 +1040,7 @@ export default function TokensTabContent() {
                   </div>
                 ) : (
                   <div className="bg-white rounded-lg border border-grey-300 p-3 space-y-3">
-                    <p className="text-xs text-grey-500">Methods listed here are disallowed for this key. All other execution methods for the module remain allowed. Add a module and select methods to disallow.</p>
+                    <p className="text-xs text-grey-600">Methods listed here are disallowed for this key. All other execution methods for the module remain allowed. Add a module and select methods to disallow.</p>
                     {scopeDraft.map((entry, i) => {
                       const methodsForModule = getMethodsForModule(entry.module);
                       const selectedMethods = Array.isArray(entry.methods) ? entry.methods : [];
@@ -1263,7 +1263,7 @@ const uploadResult = await ductape.storage.upload({
 console.log('Uploaded:', uploadResult);`}
                 </pre>
               </div>
-              <p className="mt-2 text-xs text-grey-500">
+              <p className="mt-2 text-xs text-grey-600">
                 Frontend: only <code className="bg-grey-100 px-1 rounded">publishableKey</code> (sends <code className="bg-grey-100 px-1 rounded">X-Publishable-Key</code>). Node: use <code className="bg-grey-100 px-1 rounded">accessKey</code> on the server. Scope limits what the publishable key can call.
               </p>
             </div>
@@ -1428,7 +1428,7 @@ const ductape = new Ductape({
             {!loading && tokens.length > 0 && (
               <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center">
                 <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-500" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-grey-600" />
                   <Input
                     value={secretSearch}
                     onChange={event => setSecretSearch(event.target.value)}
@@ -1476,7 +1476,7 @@ const ductape = new Ductape({
               </div>
             ) : filteredTokens.length === 0 ? (
               <div className="flex flex-col items-center rounded-lg border border-dashed border-grey-400 bg-grey-100/50 px-6 py-12 text-center">
-                <Search className="mb-3 h-6 w-6 text-grey-500" />
+                <Search className="mb-3 h-6 w-6 text-grey-600" />
                 <p className="text-sm font-medium text-grey">No matching secrets</p>
                 <p className="mt-1 text-xs text-grey-600">Try another search or clear the current filters.</p>
                 <Button type="button" variant="outline" size="sm" className="mt-4" onClick={clearSecretFilters}>Clear filters</Button>
@@ -1525,7 +1525,7 @@ const ductape = new Ductape({
                           {token.description && (
                             <p className="mt-1 text-xs text-grey-600">{token.description}</p>
                           )}
-                          <p className="mt-1 text-[10px] text-grey-500">
+                          <p className="mt-1 text-[10px] text-grey-600">
                             Created {new Date(token.created_at).toLocaleDateString()}
                           </p>
                           {(token.scope.length > 0 || token.envs.length > 0) && (
@@ -1541,7 +1541,7 @@ const ductape = new Ductape({
                                 </Badge>
                               ))}
                               {token.scope.length > 4 && (
-                                <span className="text-[10px] text-grey-500">+{token.scope.length - 4} scope</span>
+                                <span className="text-[10px] text-grey-600">+{token.scope.length - 4} scope</span>
                               )}
                             </div>
                           )}
@@ -1765,7 +1765,7 @@ const ductape = new Ductape({
 
               {/* Product Selection */}
               <div className="space-y-2">
-                <Label className="text-xs text-grey-500">Product</Label>
+                <Label className="text-xs text-grey-600">Product</Label>
                 <Select
                   value={selectedProductId}
                   onValueChange={(value) => {
@@ -1792,9 +1792,9 @@ const ductape = new Ductape({
               {/* Resource/App Selection */}
               {selectedProductId && (
                 <div className="space-y-2">
-                  <Label className="text-xs text-grey-500">Resources & Apps</Label>
+                  <Label className="text-xs text-grey-600">Resources & Apps</Label>
                   {loadingProductDetails ? (
-                    <div className="flex items-center gap-2 text-sm text-grey-500">
+                    <div className="flex items-center gap-2 text-sm text-grey-600">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading resources...
                     </div>
@@ -1823,7 +1823,7 @@ const ductape = new Ductape({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-grey-500 italic">
+                    <p className="text-sm text-grey-600 italic">
                       No apps found in this product. Add apps to define scopes.
                     </p>
                   )}
@@ -1833,7 +1833,7 @@ const ductape = new Ductape({
               {/* Selected Scopes Display */}
               {newToken.scope.length > 0 && (
                 <div className="bg-grey-50 rounded-lg p-3 border border-grey-200">
-                  <p className="text-xs text-grey-500 mb-2">Selected scopes:</p>
+                  <p className="text-xs text-grey-600 mb-2">Selected scopes:</p>
                   <div className="flex gap-1.5 flex-wrap">
                     {newToken.scope.map((scope) => (
                       <span

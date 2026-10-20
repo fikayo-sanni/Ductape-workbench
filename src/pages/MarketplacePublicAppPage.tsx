@@ -43,7 +43,7 @@ export default function MarketplacePublicAppPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-12rem)]">
         <div className="w-16 h-16 bg-grey-100 rounded-lg flex items-center justify-center mb-6">
-          <Globe className="h-8 w-8 text-grey-400" />
+          <Globe className="h-8 w-8 text-grey-600" />
         </div>
         <h2 className="text-xl font-bold text-grey">Application not found</h2>
         <p className="text-grey-600 text-sm mt-1">The app you're looking for doesn't exist.</p>

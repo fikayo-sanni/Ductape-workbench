@@ -275,7 +275,7 @@ export default function NewModelTabContent({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-3 w-3 text-grey-500" />
+                        <Info className="h-3 w-3 text-grey-600" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Reference this tag in your agent definitions</p>
@@ -366,7 +366,7 @@ export default function NewModelTabContent({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-3 w-3 text-grey-500" />
+                        <Info className="h-3 w-3 text-grey-600" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Controls randomness. Lower = more focused, higher = more creative</p>
@@ -383,7 +383,7 @@ export default function NewModelTabContent({
                 max={2}
                 step={0.1}
               />
-              <div className="flex justify-between text-xs text-grey-500 mt-1">
+              <div className="flex justify-between text-xs text-grey-600 mt-1">
                 <span>Focused (0)</span>
                 <span>Balanced (1)</span>
                 <span>Creative (2)</span>
@@ -501,7 +501,7 @@ export default function NewModelTabContent({
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-grey-500">
+            <div className="text-center py-8 text-grey-600">
               <p className="text-sm">No environments configured for this product</p>
               <p className="text-xs mt-1">Add environments to the product first</p>
             </div>

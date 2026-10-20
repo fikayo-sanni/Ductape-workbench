@@ -834,7 +834,7 @@ export default function AppTabContent({
               : 'The app data could not be retrieved.'}
           </p>
           {effectiveAppId && (
-            <p className="text-grey-500 text-sm mt-2">
+            <p className="text-grey-600 text-sm mt-2">
               App ID: {effectiveAppId}
             </p>
           )}
@@ -943,7 +943,7 @@ export default function AppTabContent({
                 <Folder className="h-4 w-4 text-primary flex-shrink-0" />
               )}
               <span className="truncate flex-1 text-left">{folder.name}</span>
-              <span className="text-xs text-grey-500">
+              <span className="text-xs text-grey-600">
                 {getTotalActionsCount(folder)}
               </span>
             </button>
@@ -1105,7 +1105,7 @@ export default function AppTabContent({
         {filteredRootActions.length === 0 &&
           filteredFolderTree.length === 0 && (
             <div className="text-center py-4">
-              <Zap className="h-6 w-6 text-grey-400 mx-auto mb-2" />
+              <Zap className="h-6 w-6 text-grey-600 mx-auto mb-2" />
               <p className="text-xs text-grey-600">
                 {searchQuery ? 'No matching actions' : 'No actions yet'}
               </p>
@@ -1143,7 +1143,7 @@ export default function AppTabContent({
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold text-grey">Environments</h1>
-                  <p className="text-sm text-grey-500">
+                  <p className="text-sm text-grey-600">
                     {envsLength}{' '}
                     {envsLength === 1 ? 'environment' : 'environments'}{' '}
                     configured
@@ -1206,7 +1206,7 @@ export default function AppTabContent({
                             {isActive ? 'Active' : 'Inactive'}
                           </span>
                         </div>
-                        <p className="text-xs text-grey-500 truncate">
+                        <p className="text-xs text-grey-600 truncate">
                           {env.slug}
                         </p>
 
@@ -1239,7 +1239,7 @@ export default function AppTabContent({
               <h3 className="text-xl font-semibold text-grey mb-2">
                 No environments yet
               </h3>
-              <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+              <p className="text-grey-600 text-center max-w-md mb-6 leading-relaxed">
                 Configure deployment environments for development, staging, and
                 production.
               </p>
@@ -1437,7 +1437,7 @@ export default function AppTabContent({
             {icon}
           </div>
           {isLoading ? (
-            <div className="flex items-center gap-1 text-xs text-grey-400">
+            <div className="flex items-center gap-1 text-xs text-grey-600">
               <Loader2 className="h-3 w-3 animate-spin" />
             </div>
           ) : (
@@ -1521,13 +1521,13 @@ export default function AppTabContent({
                       <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                       {currentApp?.tag}
                     </span>
-                    <span className="text-grey-400">•</span>
-                    <span className="text-grey-600 dark:text-grey-400 font-medium">
+                    <span className="text-grey-600">•</span>
+                    <span className="text-grey-600 dark:text-grey-600 font-medium">
                       {selectedVersionTag}
                     </span>
                     {currentApp?.status && (
                       <>
-                        <span className="text-grey-400">•</span>
+                        <span className="text-grey-600">•</span>
                         <span
                           className={cn(
                             'px-2 py-0.5 rounded-full text-xs font-semibold border',
@@ -1560,7 +1560,7 @@ export default function AppTabContent({
                     {/* Product Context - shown when app was opened from ProductTabContent */}
                     {isProductView && (
                       <>
-                        <span className="text-grey-400">•</span>
+                        <span className="text-grey-600">•</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-purple-500/10 text-purple-600">
                           <Box className="h-3 w-3" />
                           Product scope
@@ -1569,7 +1569,7 @@ export default function AppTabContent({
                     )}
                     {!isProductView && (
                       <>
-                        <span className="text-grey-400">•</span>
+                        <span className="text-grey-600">•</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 bg-grey-100 text-grey-600">
                           <Globe className="h-3 w-3" />
                           All products
@@ -1689,7 +1689,7 @@ export default function AppTabContent({
                 ))}
                 {(productEnvs || []).length === 0 && (
                   <div className="col-span-3 text-center py-8">
-                    <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                    <Globe className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                     <p className="text-sm text-grey-600">No product environments configured</p>
                   </div>
                 )}
@@ -1775,7 +1775,7 @@ export default function AppTabContent({
                   Requests by Method
                 </h2>
                 {isLoadingMetrics && (
-                  <Loader2 className="h-4 w-4 animate-spin text-grey-400" />
+                  <Loader2 className="h-4 w-4 animate-spin text-grey-600" />
                 )}
               </div>
               {isLoadingMetrics ? (
@@ -1832,7 +1832,7 @@ export default function AppTabContent({
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Activity className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <Activity className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                   <p className="text-sm text-grey-600">
                     No request data available
                   </p>
@@ -1847,7 +1847,7 @@ export default function AppTabContent({
                   Top Endpoints
                 </h2>
                 {isLoadingMetrics && (
-                  <Loader2 className="h-4 w-4 animate-spin text-grey-400" />
+                  <Loader2 className="h-4 w-4 animate-spin text-grey-600" />
                 )}
               </div>
               {isLoadingMetrics ? (
@@ -1895,7 +1895,7 @@ export default function AppTabContent({
                       </div>
                       <div className="flex flex-shrink-0 items-center gap-4 whitespace-nowrap text-xs text-grey-600">
                         <span>{endpoint.calls.toLocaleString()} calls</span>
-                        <span className="text-grey-400">|</span>
+                        <span className="text-grey-600">|</span>
                         <span>{endpoint.avgLatency}</span>
                       </div>
                     </div>
@@ -1903,7 +1903,7 @@ export default function AppTabContent({
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Zap className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <Zap className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                   <p className="text-sm text-grey-600">
                     No actions configured yet
                   </p>
@@ -1978,7 +1978,7 @@ export default function AppTabContent({
               ))}
               {((isProductView ? productEnvs : selectedVersion?.envs) || []).length === 0 && (
                 <div className="col-span-3 text-center py-8">
-                  <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+                  <Globe className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                   <p className="text-sm text-grey-600">
                     {isProductView
                       ? 'No product environments configured'
@@ -2148,7 +2148,7 @@ export default function AppTabContent({
                       ? setIsMobileNavOpen(false)
                       : setIsSidebarCollapsed(true)
                   }
-                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-600 hover:text-grey transition-colors"
                   title={isMobile ? 'Close menu' : 'Collapse sidebar'}
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -2316,14 +2316,14 @@ export default function AppTabContent({
             <div className="px-2 mt-3">
               {/* Actions Header */}
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-grey-500 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-grey-600 uppercase tracking-wider">
                   Actions
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={handleRefresh}
                     disabled={isSidebarRefreshing}
-                    className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100"
+                    className="p-1 text-grey-600 hover:text-primary transition-colors rounded hover:bg-grey-100"
                     title="Refresh"
                   >
                     <RefreshCw
@@ -2338,7 +2338,7 @@ export default function AppTabContent({
                       <DropdownMenuTrigger asChild>
                         <button
                           title="Create..."
-                          className="p-1 text-grey-500 hover:text-primary transition-colors rounded hover:bg-grey-100"
+                          className="p-1 text-grey-600 hover:text-primary transition-colors rounded hover:bg-grey-100"
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
@@ -2372,7 +2372,7 @@ export default function AppTabContent({
 
               {/* Search for actions */}
               <div className="relative mb-2">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-600" />
                 <Input
                   type="text"
                   placeholder="Search actions..."
@@ -2394,7 +2394,7 @@ export default function AppTabContent({
             <div className="px-2 mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
                 title="Expand sidebar"
               >
                 <PanelLeft className="h-4 w-4" />
@@ -2446,7 +2446,7 @@ export default function AppTabContent({
             </button>
             <div className="min-w-0 flex-1 truncate text-sm">
               <span className="font-medium text-grey">{currentApp?.app_name}</span>
-              <span className="text-grey-500"> / {mobileSectionLabel}</span>
+              <span className="text-grey-600"> / {mobileSectionLabel}</span>
             </div>
           </div>
         )}

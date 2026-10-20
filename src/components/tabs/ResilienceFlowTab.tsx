@@ -95,7 +95,7 @@ export default function ResilienceFlowTab({
             <Icon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-grey-500">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-grey-600">
               {meta.title} flow
             </p>
             <h1 className="text-base font-semibold text-grey truncate">
@@ -106,7 +106,7 @@ export default function ResilienceFlowTab({
         </div>
         {productEnvs.length > 0 ? (
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-            <span className="text-[10px] text-grey-500 uppercase tracking-wide mr-1 hidden sm:inline">
+            <span className="text-[10px] text-grey-600 uppercase tracking-wide mr-1 hidden sm:inline">
               Activity
             </span>
             {productEnvs.map((env) => (

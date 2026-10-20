@@ -76,8 +76,8 @@ export default function PricingSidebar() {
                 <span
                   className={cn(
                     "block text-xs truncate mt-0.5",
-                    isDisabled && "text-grey-500",
-                    !isDisabled && isActive ? "text-primary/80" : !isDisabled && "text-grey-500"
+                    isDisabled && "text-grey-600",
+                    !isDisabled && isActive ? "text-primary/80" : !isDisabled && "text-grey-600"
                   )}
                 >
                   {item.description}

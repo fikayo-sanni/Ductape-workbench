@@ -315,12 +315,12 @@ export default function DatabaseExplorerTab({ database }: DatabaseExplorerTabPro
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Database className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete database data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the database from your product to reload it.
           </p>
         </div>
@@ -3663,7 +3663,7 @@ const result = await ductape.database.transaction(
 
   const getValueDisplay = (value: any, rowIndex?: number, columnName?: string) => {
     if (value === null || value === undefined) {
-      return <span className="text-grey-400 italic">null</span>;
+      return <span className="text-grey-600 italic">null</span>;
     }
 
     if (typeof value === 'boolean') {
@@ -3731,7 +3731,7 @@ const result = await ductape.database.transaction(
             <div key={column} className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-grey-700">{column}</span>
-                <span className="text-xs text-grey-500 font-mono">
+                <span className="text-xs text-grey-600 font-mono">
                   {isArray ? `Array[${value.length}]` : `Object{${Object.keys(value).length}}`}
                 </span>
               </div>
@@ -3754,11 +3754,11 @@ const result = await ductape.database.transaction(
                         ) : typeof item === 'number' ? (
                           <span className="text-blue-600 font-mono text-sm">{item}</span>
                         ) : item === null ? (
-                          <span className="text-grey-400 italic text-sm">null</span>
+                          <span className="text-grey-600 italic text-sm">null</span>
                         ) : (
                           <span className="text-grey-700 text-sm">"{String(item)}"</span>
                         )}
-                        {idx < value.length - 1 && <span className="text-grey-500 font-mono">,</span>}
+                        {idx < value.length - 1 && <span className="text-grey-600 font-mono">,</span>}
                       </span>
                     ))}
                     <span className="text-grey-600 font-mono text-sm">]</span>
@@ -3797,7 +3797,7 @@ const result = await ductape.database.transaction(
                                 ) : typeof val === 'number' ? (
                                   <span className="text-blue-600 font-mono">{val}</span>
                                 ) : val === null ? (
-                                  <span className="text-grey-400 italic">null</span>
+                                  <span className="text-grey-600 italic">null</span>
                                 ) : (
                                   <span className="text-grey-700">{String(val)}</span>
                                 )}
@@ -3879,15 +3879,15 @@ const result = await ductape.database.transaction(
 
             {/* Progress indicator */}
             <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-600">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
                 </div>
               </div>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{database.env.slug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{database.env.slug}</span>
               </p>
             </div>
           </div>
@@ -3928,7 +3928,7 @@ const result = await ductape.database.transaction(
                 Unable to connect to
               </p>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
-                <Database className="h-4 w-4 text-grey-500" />
+                <Database className="h-4 w-4 text-grey-600" />
                 <span className="font-medium text-grey-800">{database.name}</span>
               </div>
             </div>
@@ -3966,8 +3966,8 @@ const result = await ductape.database.transaction(
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry Connection
               </Button>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{database.env.slug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{database.env.slug}</span>
               </p>
             </div>
           </div>
@@ -4034,7 +4034,7 @@ const result = await ductape.database.transaction(
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -4267,7 +4267,7 @@ const result = await ductape.database.transaction(
                 <div className="space-y-1">
                   {filteredActions.length === 0 ? (
                     <div className="px-2 py-4 text-center">
-                      <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
+                      <Bookmark className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                       <p className="text-xs text-grey">No saved actions yet</p>
                       <p className="text-xs text-grey mt-1">
                         Build a query and save it as an action
@@ -4342,7 +4342,7 @@ const result = await ductape.database.transaction(
           {isSidebarCollapsed ? (
             <button
               onClick={() => setIsSidebarCollapsed(false)}
-              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              className="w-full flex items-center justify-center p-2 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
               title="Expand sidebar"
             >
               <PanelLeft className="h-4 w-4" />
@@ -4379,7 +4379,7 @@ const result = await ductape.database.transaction(
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{tables.length}</div>
-                    <div className="text-xs text-grey-500">{isNoSQL ? 'Collections' : 'Tables'}</div>
+                    <div className="text-xs text-grey-600">{isNoSQL ? 'Collections' : 'Tables'}</div>
                   </div>
                 </div>
               </div>
@@ -4392,7 +4392,7 @@ const result = await ductape.database.transaction(
                     <div className="text-2xl font-bold text-grey">
                       {tables.reduce((acc, t) => acc + ('rowCount' in t && t.rowCount != null ? t.rowCount : 'documentCount' in t && t.documentCount != null ? t.documentCount : 0), 0).toLocaleString()}
                     </div>
-                    <div className="text-xs text-grey-500">Total {isNoSQL ? 'Documents' : 'Rows'}</div>
+                    <div className="text-xs text-grey-600">Total {isNoSQL ? 'Documents' : 'Rows'}</div>
                   </div>
                 </div>
               </div>
@@ -4403,7 +4403,7 @@ const result = await ductape.database.transaction(
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{savedActions.length}</div>
-                    <div className="text-xs text-grey-500">Saved Actions</div>
+                    <div className="text-xs text-grey-600">Saved Actions</div>
                   </div>
                 </div>
               </div>
@@ -4414,7 +4414,7 @@ const result = await ductape.database.transaction(
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey capitalize">{database.type || 'SQL'}</div>
-                    <div className="text-xs text-grey-500">Database Type</div>
+                    <div className="text-xs text-grey-600">Database Type</div>
                   </div>
                 </div>
               </div>
@@ -4502,7 +4502,7 @@ const result = await ductape.database.transaction(
                         <span className="font-medium text-grey">{table.name}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                    <div className="flex items-center gap-4 text-xs text-grey-600">
                       {('rowCount' in table && table.rowCount != null) || ('documentCount' in table && table.documentCount != null) ? (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
@@ -4560,7 +4560,7 @@ const result = await ductape.database.transaction(
                         </span>
                       </div>
                       {action.description && (
-                        <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                        <p className="text-xs text-grey-600 truncate">{action.description}</p>
                       )}
                     </button>
                   ))}
@@ -4612,7 +4612,7 @@ const result = await ductape.database.transaction(
 
                   {/* Search Bar */}
                   <div className="relative w-48">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-600" />
                     <Input
                       type="text"
                       placeholder="Search..."
@@ -4861,7 +4861,7 @@ const result = await ductape.database.transaction(
                 </div>
               ) : tableData.length === 0 ? (
                 <div className="bg-white rounded-lg border border-grey-400 p-12 text-center">
-                  <Table className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                  <Table className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                   <h3 className="text-lg font-semibold text-grey mb-2">No Data</h3>
                   <p className="text-sm text-grey-600 mb-4">
                     This {isNoSQL ? 'collection' : 'table'} doesn't have any data yet
@@ -5020,7 +5020,7 @@ const result = await ductape.database.transaction(
         {sidebarView === 'migrations' && !isNoSQL && !selectedMigration && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <GitBranch className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+              <GitBranch className="h-12 w-12 text-grey-600 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-grey mb-2">No Migration Selected</h3>
               <p className="text-sm text-grey-600">
                 Select a migration from the sidebar to view its details
@@ -5104,7 +5104,7 @@ const result = await ductape.database.transaction(
               /* Empty state when no query builder and no action selected */
               <div className="max-w-4xl mx-auto flex flex-col items-center justify-center h-full py-20">
                 <div className="text-center">
-                  <Zap className="h-16 w-16 text-grey-300 mx-auto mb-4" />
+                  <Zap className="h-16 w-16 text-grey-600 mx-auto mb-4" />
                   <h2 className="text-xl font-bold text-grey mb-2">Database Actions</h2>
                   <p className="text-sm text-grey mb-6 max-w-md">
                     Create reusable database queries with parameterized values.
@@ -5434,7 +5434,7 @@ const result = await ductape.database.transaction(
                                         <SelectItem key={col.name} value={col.name}>
                                           <span className="flex items-center gap-2">
                                             {col.name}
-                                            <span className="text-xs text-grey-400">({col.type})</span>
+                                            <span className="text-xs text-grey-600">({col.type})</span>
                                           </span>
                                         </SelectItem>
                                       ))
@@ -5547,7 +5547,7 @@ const result = await ductape.database.transaction(
                             + Add Condition
                           </Button>
                           {!queryBuilderTable && queryBuilderWhere.length === 0 && (
-                            <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                            <p className="text-xs text-grey-600 mt-1">Select a table first to add conditions</p>
                           )}
                         </div>
                       </>
@@ -5582,12 +5582,12 @@ const result = await ductape.database.transaction(
                                       <SelectItem key={col.name} value={col.name}>
                                         <span className="flex items-center gap-2">
                                           {col.name}
-                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                          <span className="text-xs text-grey-600">({col.type})</span>
                                         </span>
                                       </SelectItem>
                                     ))
                                   ) : (
-                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                    <div className="px-2 py-1.5 text-sm text-grey-600">Select a table first</div>
                                   )}
                                 </SelectContent>
                               </Select>
@@ -5665,7 +5665,7 @@ const result = await ductape.database.transaction(
                           + Add Field
                         </Button>
                         {!queryBuilderTable && queryBuilderData.length === 0 && (
-                          <p className="text-xs text-grey-400 mt-1">Select a table first to add fields</p>
+                          <p className="text-xs text-grey-600 mt-1">Select a table first to add fields</p>
                         )}
                       </div>
                     )}
@@ -5706,12 +5706,12 @@ const result = await ductape.database.transaction(
                                       <SelectItem key={col.name} value={col.name}>
                                         <span className="flex items-center gap-2">
                                           {col.name}
-                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                          <span className="text-xs text-grey-600">({col.type})</span>
                                         </span>
                                       </SelectItem>
                                     ))
                                   ) : (
-                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                    <div className="px-2 py-1.5 text-sm text-grey-600">Select a table first</div>
                                   )}
                                 </SelectContent>
                               </Select>
@@ -5815,7 +5815,7 @@ const result = await ductape.database.transaction(
                           + Add Condition
                         </Button>
                         {!queryBuilderTable && queryBuilderWhere.length === 0 && (
-                          <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                          <p className="text-xs text-grey-600 mt-1">Select a table first to add conditions</p>
                         )}
                       </div>
                     )}
@@ -5884,12 +5884,12 @@ const result = await ductape.database.transaction(
                                       <SelectItem key={col.name} value={col.name}>
                                         <span className="flex items-center gap-2">
                                           {col.name}
-                                          <span className="text-xs text-grey-400">({col.type})</span>
+                                          <span className="text-xs text-grey-600">({col.type})</span>
                                         </span>
                                       </SelectItem>
                                     ))
                                   ) : (
-                                    <div className="px-2 py-1.5 text-sm text-grey-400">Select a table first</div>
+                                    <div className="px-2 py-1.5 text-sm text-grey-600">Select a table first</div>
                                   )}
                                 </SelectContent>
                               </Select>
@@ -5993,7 +5993,7 @@ const result = await ductape.database.transaction(
                           + Add Condition
                         </Button>
                         {!queryBuilderTable && queryBuilderWhere.length === 0 && (
-                          <p className="text-xs text-grey-400 mt-1">Select a table first to add conditions</p>
+                          <p className="text-xs text-grey-600 mt-1">Select a table first to add conditions</p>
                         )}
                       </div>
                     )}
@@ -6672,7 +6672,7 @@ const result = await ductape.database.transaction(
               <div key={param.name}>
                 <Label className="text-xs text-grey mb-2 block">
                   {param.name}
-                  <span className="text-grey-400 font-normal ml-2">({param.type})</span>
+                  <span className="text-grey-600 font-normal ml-2">({param.type})</span>
                 </Label>
                 {param.type === 'boolean' ? (
                   <div className="flex items-center gap-2">
@@ -6750,7 +6750,7 @@ const result = await ductape.database.transaction(
                   {!tableSchema ? 'Loading schema...' : 'Schema loaded but no columns detected.'}
                 </p>
                 {tableSchema && (
-                  <p className="text-xs mt-1 text-grey-400">
+                  <p className="text-xs mt-1 text-grey-600">
                     Schema keys: {Object.keys(tableSchema).join(', ')}
                   </p>
                 )}
@@ -6764,7 +6764,7 @@ const result = await ductape.database.transaction(
                 <div key={col} className="space-y-2">
                   <Label htmlFor={col} className="text-sm font-medium">
                     {col}
-                    {isJsonType && <span className="text-xs text-grey-500 ml-1">(JSON)</span>}
+                    {isJsonType && <span className="text-xs text-grey-600 ml-1">(JSON)</span>}
                   </Label>
                   {isJsonType ? (
                     <>
@@ -6849,8 +6849,8 @@ const result = await ductape.database.transaction(
                 <div key={col} className="space-y-2">
                   <Label htmlFor={`edit-${col}`} className="text-sm font-medium">
                     {col}
-                    {isJsonType && <span className="text-xs text-grey-500 ml-1">(JSON)</span>}
-                    {isImmutableField && <span className="text-xs text-grey-500 ml-1">(read-only)</span>}
+                    {isJsonType && <span className="text-xs text-grey-600 ml-1">(JSON)</span>}
+                    {isImmutableField && <span className="text-xs text-grey-600 ml-1">(read-only)</span>}
                   </Label>
                   {isJsonType ? (
                     <>
@@ -7171,7 +7171,7 @@ const result = await ductape.database.transaction(
                 <li key={idx} className="text-sm text-grey-600 flex items-center gap-2">
                   <Columns className="h-3 w-3" />
                   <span className="font-mono">{col.name || `column_${idx + 1}`}</span>
-                  <span className="text-grey-500">({col.type})</span>
+                  <span className="text-grey-600">({col.type})</span>
                 </li>
               ))}
             </ul>
@@ -7435,7 +7435,7 @@ const result = await ductape.database.transaction(
                             col.includes('date') || col.includes('time') ? 'Datetime' : 'String'}
                     </p>
                   </div>
-                  <Trash2 className={`h-4 w-4 ${columnsToDelete.includes(col) ? 'text-red-600' : 'text-grey-400'}`} />
+                  <Trash2 className={`h-4 w-4 ${columnsToDelete.includes(col) ? 'text-red-600' : 'text-grey-600'}`} />
                 </label>
               ))}
             </div>
@@ -7759,9 +7759,9 @@ const result = await ductape.database.transaction(
                 </div>
               ) : (
                 <div className="text-center py-8 border border-dashed border-grey-300 rounded-lg">
-                  <Database className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                  <Database className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                   <p className="text-sm text-grey-600 mb-2">No indexes found</p>
-                  <p className="text-xs text-grey-500">Create an index to improve query performance</p>
+                  <p className="text-xs text-grey-600">Create an index to improve query performance</p>
                 </div>
               );
             })()}

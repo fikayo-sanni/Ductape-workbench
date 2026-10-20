@@ -558,7 +558,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -753,7 +753,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
           {isSidebarCollapsed ? (
             <button
               onClick={() => setIsSidebarCollapsed(false)}
-              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              className="w-full flex items-center justify-center p-2 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
               title="Expand sidebar"
             >
               <PanelLeft className="h-4 w-4" />
@@ -919,7 +919,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Runs</span>
-                    <LayoutGrid className="h-4 w-4 text-grey-400" />
+                    <LayoutGrid className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.total}</p>
                   <div className="mt-2 h-8">
@@ -931,7 +931,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Success Rate</span>
-                    <CheckCircle className="h-4 w-4 text-grey-400" />
+                    <CheckCircle className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className={cn(
                     'text-2xl font-bold',
@@ -941,24 +941,24 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                   )}>
                     {metrics.successRate.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-grey-500 mt-2">{metrics.completed} succeeded</p>
+                  <p className="text-xs text-grey-600 mt-2">{metrics.completed} succeeded</p>
                 </div>
 
                 {/* Active */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Active</span>
-                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-primary animate-spin' : 'text-grey-400')} />
+                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-primary animate-spin' : 'text-grey-600')} />
                   </div>
                   <p className="text-2xl font-bold text-primary">{metrics.running}</p>
-                  <p className="text-xs text-grey-500 mt-2">currently running</p>
+                  <p className="text-xs text-grey-600 mt-2">currently running</p>
                 </div>
 
                 {/* Errors */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Errors</span>
-                    <AlertCircle className="h-4 w-4 text-grey-400" />
+                    <AlertCircle className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-red">{metrics.failed + metrics.timeout}</p>
                   <div className="mt-2 h-8">
@@ -970,20 +970,20 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Avg Duration</span>
-                    <Timer className="h-4 w-4 text-grey-400" />
+                    <Timer className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{formatDuration(metrics.avgDuration)}</p>
-                  <p className="text-xs text-grey-500 mt-2">p50: {formatDuration(metrics.p50)}</p>
+                  <p className="text-xs text-grey-600 mt-2">p50: {formatDuration(metrics.p50)}</p>
                 </div>
 
                 {/* P99 Latency */}
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">P99 Latency</span>
-                    <TrendingUp className="h-4 w-4 text-grey-400" />
+                    <TrendingUp className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{formatDuration(metrics.p99)}</p>
-                  <p className="text-xs text-grey-500 mt-2">p95: {formatDuration(metrics.p95)}</p>
+                  <p className="text-xs text-grey-600 mt-2">p95: {formatDuration(metrics.p95)}</p>
                 </div>
               </div>
 
@@ -1081,12 +1081,12 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                           <div className={cn('w-2 h-2 rounded-full', statusConfig.dotColor)} />
                           <div>
                             <p className="text-sm font-medium text-grey">{formatTime(run.startedAt, false)}</p>
-                            <p className="text-xs text-grey-500 font-mono truncate max-w-[200px]" title={run.id}>{shortProcessId(run.id)}</p>
+                            <p className="text-xs text-grey-600 font-mono truncate max-w-[200px]" title={run.id}>{shortProcessId(run.id)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="text-xs text-grey-500">{completedSteps}/{run.steps.length} steps</span>
-                          <span className="text-xs text-grey-500">{formatTime(run.startedAt)}</span>
+                          <span className="text-xs text-grey-600">{completedSteps}/{run.steps.length} steps</span>
+                          <span className="text-xs text-grey-600">{formatTime(run.startedAt)}</span>
                         </div>
                       </div>
                     );
@@ -1248,7 +1248,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
 
                       {/* Arrow */}
                       <div className="flex justify-end">
-                        <ChevronRight className="h-4 w-4 text-grey-500" />
+                        <ChevronRight className="h-4 w-4 text-grey-600" />
                       </div>
                     </div>
                   );
@@ -1258,10 +1258,10 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
               {filteredRuns.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
-                    <Search className="h-6 w-6 text-grey-500" />
+                    <Search className="h-6 w-6 text-grey-600" />
                   </div>
                   <p className="text-grey font-medium">No runs found</p>
-                  <p className="text-grey-500 text-sm mt-1">Try adjusting your filters</p>
+                  <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
                 </div>
               )}
                 </div>

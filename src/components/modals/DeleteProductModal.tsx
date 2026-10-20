@@ -61,7 +61,7 @@ export default function DeleteProductModal({
             <p className="text-xs text-grey-600 mb-1">Product</p>
             <p className="text-sm font-medium text-grey">{productName}</p>
             {productTag ? (
-              <p className="text-xs text-grey-500 mt-1 font-mono break-all">{productTag}</p>
+              <p className="text-xs text-grey-600 mt-1 font-mono break-all">{productTag}</p>
             ) : null}
           </div>
 

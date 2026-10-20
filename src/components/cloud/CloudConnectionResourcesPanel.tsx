@@ -317,7 +317,7 @@ export default function CloudConnectionResourcesPanel({
         ) : !data?.length ? (
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
             <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mb-3">
-              <Inbox className="h-6 w-6 text-grey-500" />
+              <Inbox className="h-6 w-6 text-grey-600" />
             </div>
             <p className="text-sm font-medium text-grey">No resources found</p>
             <p className="text-xs text-grey-600 mt-1 max-w-sm">
@@ -364,7 +364,7 @@ export default function CloudConnectionResourcesPanel({
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       {idIsName ? (
-                        <span className="text-xs text-grey-500">—</span>
+                        <span className="text-xs text-grey-600">—</span>
                       ) : (
                         <code
                           className="text-xs font-mono text-grey-600 bg-grey-100/80 px-2 py-1 rounded inline-block max-w-full truncate align-middle"
@@ -397,7 +397,7 @@ export default function CloudConnectionResourcesPanel({
               ? `${filtered.length} of ${count} resources`
               : `${count} ${count === 1 ? 'resource' : 'resources'}`}
           </span>
-          <span className="font-mono text-grey-500">{activeService}</span>
+          <span className="font-mono text-grey-600">{activeService}</span>
         </div>
       )}
     </div>

@@ -127,9 +127,9 @@ export default function SelfHostedWorkspaceStep({
               </div>
             ) : workspaces.length === 0 ? (
               <div className="py-12 text-center">
-                <Users className="h-10 w-10 text-grey-400 mx-auto mb-3" />
+                <Users className="h-10 w-10 text-grey-600 mx-auto mb-3" />
                 <p className="text-grey-600 text-sm">No workspaces found on this instance.</p>
-                <p className="text-grey-500 text-xs mt-1">
+                <p className="text-grey-600 text-xs mt-1">
                   Switch to the Create tab to set up the first workspace.
                 </p>
               </div>

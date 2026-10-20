@@ -498,7 +498,7 @@ export default function WorkbenchHeader() {
   // Mobile workspace selector component
   const MobileWorkspaceSelector = () => (
     <div className="border-b border-grey-200 pb-3 mb-3">
-      <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+      <div className="text-xs font-semibold text-grey-600 mb-2 px-2">
         WORKSPACE
       </div>
       {workspacesStatus === 'pending' ? (
@@ -564,7 +564,7 @@ export default function WorkbenchHeader() {
           <MobileWorkspaceSelector />
 
           <div className="border-b border-grey-200 pb-3 mb-3">
-            <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+            <div className="text-xs font-semibold text-grey-600 mb-2 px-2">
               ACTIONS
             </div>
             <div className="space-y-1">
@@ -588,7 +588,7 @@ export default function WorkbenchHeader() {
 
           {user && (
             <div>
-              <div className="text-xs font-semibold text-grey-500 mb-2 px-2">
+              <div className="text-xs font-semibold text-grey-600 mb-2 px-2">
                 ACCOUNT
               </div>
               <div className="space-y-1">
@@ -658,7 +658,7 @@ export default function WorkbenchHeader() {
             Beta
           </span>
           {isSelfHosted() && appVersion() && (
-            <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-grey-100 text-grey-500 border border-grey-300">
+            <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-grey-100 text-grey-600 border border-grey-300">
               v{appVersion()}
             </span>
           )}

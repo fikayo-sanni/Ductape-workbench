@@ -70,7 +70,7 @@ export default function DeleteAppModal({
             <p className="text-xs text-grey-600 mb-1">App</p>
             <p className="text-sm font-medium text-grey">{appName}</p>
             {appTag ? (
-              <p className="text-xs text-grey-500 mt-1 font-mono break-all">{appTag}</p>
+              <p className="text-xs text-grey-600 mt-1 font-mono break-all">{appTag}</p>
             ) : null}
           </div>
 

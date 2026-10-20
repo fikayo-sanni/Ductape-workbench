@@ -157,7 +157,7 @@ export default function PartnershipDetailDialog({
                           <span className="text-xs font-medium text-grey">
                             {message.sender?.firstname} {message.sender?.lastname}
                           </span>
-                          <span className="text-xs text-grey-500">
+                          <span className="text-xs text-grey-600">
                             {new Date(message.created_at).toLocaleString()}
                           </span>
                         </div>
@@ -241,7 +241,7 @@ export default function PartnershipDetailDialog({
                           ) : isCurrent ? (
                             <Circle className="h-5 w-5 text-primary fill-primary" />
                           ) : (
-                            <Circle className="h-5 w-5 text-grey-400" />
+                            <Circle className="h-5 w-5 text-grey-600" />
                           )}
                         </div>
                         <div className="flex-1">
@@ -294,7 +294,7 @@ export default function PartnershipDetailDialog({
                 </div>
               ) : (
                 <div className="text-center py-8 text-grey-600">
-                  <Package className="h-12 w-12 mx-auto mb-3 text-grey-400" />
+                  <Package className="h-12 w-12 mx-auto mb-3 text-grey-600" />
                   <p>No deliverables yet</p>
                 </div>
               )}

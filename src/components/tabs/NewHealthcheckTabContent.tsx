@@ -880,7 +880,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                                           <p className="text-xs text-grey-600">{field.description}</p>
                                         )}
                                         
-                                          <p className="text-xs text-grey-500">
+                                          <p className="text-xs text-grey-600">
                                             {`Min: ${field.minLength}`}
                                             {' • '}
                                             {`Max: ${field.maxLength}`}

@@ -278,7 +278,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
               variant="ghost"
               size="sm"
               onClick={onCancel}
-              className="h-10 w-10 p-0 -ml-2 text-grey-500 hover:text-grey"
+              className="h-10 w-10 p-0 -ml-2 text-grey-600 hover:text-grey"
               title="Back"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -288,7 +288,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-grey">New webhook</h1>
-              <p className="text-sm text-grey-500 truncate">{app.app_name}</p>
+              <p className="text-sm text-grey-600 truncate">{app.app_name}</p>
             </div>
           </div>
         </div>
@@ -386,7 +386,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                   </div>
                   <div className="flex-1">
                     <span className="font-medium text-grey">{env.env_name || env.slug}</span>
-                    <span className="text-xs text-grey-500 ml-2 font-mono">{env.slug}</span>
+                    <span className="text-xs text-grey-600 ml-2 font-mono">{env.slug}</span>
                   </div>
                   {selectedEnvSlugs.includes(env.slug) && (
                     <div className="flex items-center gap-1 text-xs text-primary">
@@ -399,9 +399,9 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
             </div>
           ) : (
             <div className="text-center py-6 bg-grey-50 rounded-lg border border-dashed border-grey-300">
-              <Globe className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+              <Globe className="h-8 w-8 text-grey-600 mx-auto mb-2" />
               <p className="text-sm text-grey-600">No environments configured for this app</p>
-              <p className="text-xs text-grey-500 mt-1">Add environments to the app first</p>
+              <p className="text-xs text-grey-600 mt-1">Add environments to the app first</p>
             </div>
           )}
         </div>
@@ -425,9 +425,9 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
 
           {events.length === 0 ? (
             <div className="text-center py-6 bg-grey-50 rounded-lg border border-dashed border-grey-300">
-              <Zap className="h-8 w-8 text-grey-400 mx-auto mb-2" />
+              <Zap className="h-8 w-8 text-grey-600 mx-auto mb-2" />
               <p className="text-sm text-grey-600">No events defined yet</p>
-              <p className="text-xs text-grey-500 mt-1">Events can be added now or later</p>
+              <p className="text-xs text-grey-600 mt-1">Events can be added now or later</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -458,14 +458,14 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                             e.stopPropagation();
                             removeEvent(event.id);
                           }}
-                          className="h-7 w-7 p-0 text-grey-500 hover:text-red"
+                          className="h-7 w-7 p-0 text-grey-600 hover:text-red"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                         {event.isExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-grey-500" />
+                          <ChevronUp className="h-4 w-4 text-grey-600" />
                         ) : (
-                          <ChevronDown className="h-4 w-4 text-grey-500" />
+                          <ChevronDown className="h-4 w-4 text-grey-600" />
                         )}
                       </div>
                     </div>
@@ -500,7 +500,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                             }
                             className="mt-1 font-mono"
                           />
-                          <p className="text-xs text-grey-500 mt-1">
+                          <p className="text-xs text-grey-600 mt-1">
                             Full tag: <code className="text-primary">{tag}:{event.tag || 'event_tag'}</code>
                           </p>
                         </div>
@@ -561,7 +561,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                         {validation.isValid && validation.selectorOptions.length > 0 && (
                           <div>
                             <Label className="text-xs">Event Selectors</Label>
-                            <p className="text-xs text-grey-500 mb-2">
+                            <p className="text-xs text-grey-600 mb-2">
                               Select one or more fields that uniquely identify this event. These will be used to track what events are sent.
                             </p>
                             <div className="mt-1 border border-grey-300 rounded-lg max-h-48 overflow-y-auto">
@@ -598,7 +598,7 @@ export default function InlineWebhookForm({ app, onCancel, onSuccess }: InlineWe
                             </div>
                             {event.selectors.length > 0 && (
                               <div className="mt-2">
-                                <p className="text-xs text-grey-500 mb-1">
+                                <p className="text-xs text-grey-600 mb-1">
                                   Selected ({event.selectors.length}):
                                 </p>
                                 <div className="flex flex-wrap gap-1">
