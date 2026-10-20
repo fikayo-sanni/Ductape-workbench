@@ -87,7 +87,7 @@ export const formatLatency = (latencyMs: number | undefined): string | null => {
 
 // Get latency color based on value
 export const getLatencyColor = (latencyMs: number | undefined): string => {
-  if (latencyMs === undefined || latencyMs === null) return 'text-grey-500';
+  if (latencyMs === undefined || latencyMs === null) return 'text-grey-600';
   if (latencyMs < 200) return 'text-green'; // Fast
   if (latencyMs < 1000) return 'text-yellow-600'; // Moderate
   if (latencyMs < 3000) return 'text-orange-500'; // Slow

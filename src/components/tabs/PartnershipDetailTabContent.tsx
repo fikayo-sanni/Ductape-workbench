@@ -771,7 +771,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                         <span className="text-xs font-medium text-grey">
                           {message.sender?.firstname} {message.sender?.lastname}
                         </span>
-                        <span className="text-xs text-grey-500">
+                        <span className="text-xs text-grey-600">
                           {new Date(message.created_at).toLocaleString()}
                         </span>
                       </div>
@@ -820,7 +820,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                       <span className="max-w-[200px] truncate">{attachment}</span>
                       <button
                         onClick={() => handleRemoveAttachment(index)}
-                        className="text-grey-500 hover:text-red-500 transition-colors"
+                        className="text-grey-600 hover:text-red-500 transition-colors"
                         type="button"
                       >
                         <X className="h-3 w-3" />
@@ -935,7 +935,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                               <span className="text-sm font-medium text-grey-600">Step {index + 1}</span>
                               {isCompleted && <CheckCircle2 className="h-5 w-5 text-green" />}
                               {isCurrent && <Clock className="h-5 w-5 text-primary" />}
-                              {isPending && <Circle className="h-5 w-5 text-grey-400" />}
+                              {isPending && <Circle className="h-5 w-5 text-grey-600" />}
                             </div>
                             <Badge
                               variant="secondary"
@@ -1150,7 +1150,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
             ) : (
               <div className="bg-white rounded-lg border border-grey-400 shadow-sm p-12 text-center">
                 <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mb-4 mx-auto">
-                  <Key className="h-8 w-8 text-grey-400" />
+                  <Key className="h-8 w-8 text-grey-600" />
                 </div>
                 <h3 className="text-base font-semibold text-grey mb-2">No Deliverables Yet</h3>
                 <p className="text-sm text-grey-600 max-w-md mx-auto">
@@ -1506,7 +1506,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                   </div>
                   <div>
                     <h1 className="text-xl font-bold text-grey">Issues &amp; support</h1>
-                    <p className="text-sm text-grey-500">
+                    <p className="text-sm text-grey-600">
                       {issueStats.all}{' '}
                       {issueStats.all === 1 ? 'ticket' : 'tickets'} · filter by status below
                     </p>
@@ -1645,7 +1645,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
               {filteredIssues.length > 0 ? (
                 <>
-                  <p className="text-sm text-grey-500">
+                  <p className="text-sm text-grey-600">
                     Showing{' '}
                     <span className="font-medium text-grey">{filteredIssues.length}</span>{' '}
                     {filteredIssues.length === 1 ? 'ticket' : 'tickets'}
@@ -1717,7 +1717,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
                                   {issue.description}
                                 </p>
 
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grey-500">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-grey-600">
                                   <span>{created.toLocaleDateString(undefined, { dateStyle: 'medium' })}</span>
                                   <span>·</span>
                                   <span>
@@ -1730,7 +1730,7 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
 
                               <ChevronRight
                                 className={cn(
-                                  'mt-1 h-5 w-5 shrink-0 text-grey-400 transition-transform',
+                                  'mt-1 h-5 w-5 shrink-0 text-grey-600 transition-transform',
                                   isExpanded && 'rotate-90',
                                 )}
                                 aria-hidden
@@ -1771,12 +1771,12 @@ export default function PartnershipDetailTabContent({ tab }: PartnershipDetailTa
               ) : (
                 <div className="rounded-lg border border-grey-400 bg-white p-12 text-center shadow-sm">
                   <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-grey-100">
-                    <AlertCircle className="h-7 w-7 text-grey-400" aria-hidden />
+                    <AlertCircle className="h-7 w-7 text-grey-600" aria-hidden />
                   </div>
                   <h3 className="text-xl font-semibold text-grey">
                     {statusFilter === 'all' ? 'No tickets yet' : `No ${statusFilter.replace('_', ' ')} tickets`}
                   </h3>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-grey-500">
+                  <p className="mx-auto mt-2 max-w-md text-sm text-grey-600">
                     {statusFilter === 'all'
                       ? 'Create a ticket to track bugs, requests, or questions for this partnership.'
                       : 'Nothing matches this filter. Try another status or view all tickets.'}

@@ -199,7 +199,7 @@ function LicenseTab({ instanceStatus, onRefresh }: {
         </section>
       ) : (
         <section className="rounded-10px border border-grey-400 bg-white p-6 text-center space-y-3">
-          <Shield className="h-10 w-10 text-grey-400 mx-auto" />
+          <Shield className="h-10 w-10 text-grey-600 mx-auto" />
           <p className="text-grey font-semibold">No license activated</p>
           <p className="text-sm text-grey-600">
             Activate a license to unlock usage limits and access controls.{' '}

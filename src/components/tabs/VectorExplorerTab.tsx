@@ -363,12 +363,12 @@ export default function VectorExplorerTab({ vector: vectorProp }: VectorExplorer
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Boxes className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete vector data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the vector store from your product to reload it.
           </p>
         </div>
@@ -1967,7 +1967,7 @@ await ductape.init();`,
             </div>
             <div>
               <div className="text-2xl font-bold text-grey"><LoadingValue loading={isConnecting || isLoadingNamespaces}>{totalStats.totalVectors.toLocaleString()}</LoadingValue></div>
-              <div className="text-xs text-grey-500">Total Vectors</div>
+              <div className="text-xs text-grey-600">Total Vectors</div>
             </div>
           </div>
         </div>
@@ -1978,7 +1978,7 @@ await ductape.init();`,
             </div>
             <div>
               <div className="text-2xl font-bold text-grey"><LoadingValue loading={isConnecting || isLoadingNamespaces}>{totalStats.namespaceCount}</LoadingValue></div>
-              <div className="text-xs text-grey-500">Namespaces</div>
+              <div className="text-xs text-grey-600">Namespaces</div>
             </div>
           </div>
         </div>
@@ -1989,7 +1989,7 @@ await ductape.init();`,
             </div>
             <div>
               <div className="text-2xl font-bold text-grey">{totalStats.avgDimensions}</div>
-              <div className="text-xs text-grey-500">Avg Dimensions</div>
+              <div className="text-xs text-grey-600">Avg Dimensions</div>
             </div>
           </div>
         </div>
@@ -2000,7 +2000,7 @@ await ductape.init();`,
             </div>
             <div>
               <div className="text-2xl font-bold text-grey">{savedActions.length}</div>
-              <div className="text-xs text-grey-500">Saved Actions</div>
+              <div className="text-xs text-grey-600">Saved Actions</div>
             </div>
           </div>
         </div>
@@ -2093,7 +2093,7 @@ await ductape.init();`,
                 </div>
                 {renderNamespaceStatus(ns.status)}
               </div>
-              <div className="flex items-center gap-4 text-xs text-grey-500">
+              <div className="flex items-center gap-4 text-xs text-grey-600">
                 <span className="flex items-center gap-1">
                   <FileText className="h-3 w-3" />
                   {ns.vectorCount.toLocaleString()} vectors
@@ -2145,7 +2145,7 @@ await ductape.init();`,
                   </span>
                 </div>
                 {action.description && (
-                  <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                  <p className="text-xs text-grey-600 truncate">{action.description}</p>
                 )}
               </button>
             ))}
@@ -2188,7 +2188,7 @@ await ductape.init();`,
                 <Loader2 className="h-16 w-16 animate-spin text-primary relative" />
               </div>
               <p className="text-grey-600 mt-6 text-sm">Loading vectors...</p>
-              <p className="text-grey-500 mt-2 text-xs">This may take a moment</p>
+              <p className="text-grey-600 mt-2 text-xs">This may take a moment</p>
             </div>
           </div>
         </div>
@@ -2252,17 +2252,17 @@ await ductape.init();`,
                   <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
                 </div>
                 <p className="text-grey-600 font-medium">Loading vectors...</p>
-                <p className="text-grey-500 text-sm mt-1">Fetching data from {selectedNamespace.name}</p>
+                <p className="text-grey-600 text-sm mt-1">Fetching data from {selectedNamespace.name}</p>
               </div>
             </div>
           ) : displayVectors.length === 0 ? (
             <div className="flex items-center justify-center py-20 bg-white rounded-lg border border-grey-400">
               <div className="text-center max-w-sm">
                 <div className="w-16 h-16 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-4">
-                  <Database className="h-8 w-8 text-grey-400" />
+                  <Database className="h-8 w-8 text-grey-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-grey mb-2">No vectors found</h3>
-                <p className="text-grey-500 text-sm mb-4">This namespace doesn't contain any vectors yet, or they haven't been loaded.</p>
+                <p className="text-grey-600 text-sm mb-4">This namespace doesn't contain any vectors yet, or they haven't been loaded.</p>
                 <Button size="sm" onClick={handleExecuteQuery} className="gap-2">
                   <Play className="h-4 w-4" />
                   Load Vectors
@@ -2382,7 +2382,7 @@ await ductape.init();`,
                           <div className="space-y-1">
                             {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
                               <div key={key} className="flex items-center gap-2 text-xs">
-                                <span className="text-grey-500">{key}:</span>
+                                <span className="text-grey-600">{key}:</span>
                                 <span className="text-grey truncate">{String(value)}</span>
                               </div>
                             ))}
@@ -2539,21 +2539,21 @@ await ductape.init();`,
           </h3>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             <div className="flex flex-col col-span-2">
-              <span className="text-xs text-grey-500 mb-1">ID</span>
+              <span className="text-xs text-grey-600 mb-1">ID</span>
               <code className="text-sm text-grey dark:text-grey bg-slate-50 dark:bg-grey-400 px-2 py-1.5 rounded border border-grey-400 font-mono break-all">{selectedVector.id}</code>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs text-grey-500 mb-1">Namespace</span>
+              <span className="text-xs text-grey-600 mb-1">Namespace</span>
               <span className="text-sm text-grey px-2 py-1.5">{selectedNamespace?.name || 'default'}</span>
             </div>
             {selectedVector.score !== undefined && (
               <div className="flex flex-col">
-                <span className="text-xs text-grey-500 mb-1">Similarity Score</span>
+                <span className="text-xs text-grey-600 mb-1">Similarity Score</span>
                 <span className="text-sm text-blue-700 font-semibold px-2 py-1.5">{selectedVector.score.toFixed(4)}</span>
               </div>
             )}
             <div className="flex flex-col">
-              <span className="text-xs text-grey-500 mb-1">Has Vector Values</span>
+              <span className="text-xs text-grey-600 mb-1">Has Vector Values</span>
               <span className="text-sm text-grey px-2 py-1.5">{selectedVector.values ? 'Yes' : 'No'}</span>
             </div>
           </div>
@@ -2688,14 +2688,14 @@ await ductape.init();`,
                             <div className="flex items-center gap-2">
                               <span className={cn('text-xs px-1.5 py-0.5 rounded', config.color)}>{config.category}</span>
                               <span>{config.label}</span>
-                              {!isEnabled && <span className="text-xs text-grey-400 ml-1">(Coming soon)</span>}
+                              {!isEnabled && <span className="text-xs text-grey-600 ml-1">(Coming soon)</span>}
                             </div>
                           </SelectItem>
                         );
                       })}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-grey-500 mt-1">{VECTOR_OPERATIONS[queryBuilderOperation].description}</p>
+                  <p className="text-xs text-grey-600 mt-1">{VECTOR_OPERATIONS[queryBuilderOperation].description}</p>
                 </div>
 
                 {/* Namespace - show for most operations except info operations */}
@@ -2727,7 +2727,7 @@ await ductape.init();`,
                       min={1}
                       max={10000}
                     />
-                    <p className="text-xs text-grey-500 mt-1">Maximum number of vectors to return</p>
+                    <p className="text-xs text-grey-600 mt-1">Maximum number of vectors to return</p>
                   </div>
                 )}
 
@@ -2757,7 +2757,7 @@ await ductape.init();`,
                         list="vector-ids-list"
                       />
                       {isLoadingVectorIds && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-400" />
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-600" />
                       )}
                     </div>
                     {filteredVectorIds.length > 0 && queryBuilderSingleId && (
@@ -2776,7 +2776,7 @@ await ductape.init();`,
                         ))}
                       </div>
                     )}
-                    <p className="text-xs text-grey-500 mt-1">Check if this vector exists in the namespace</p>
+                    <p className="text-xs text-grey-600 mt-1">Check if this vector exists in the namespace</p>
                   </div>
                 )}
 
@@ -2794,7 +2794,7 @@ await ductape.init();`,
                         placeholder="Enter or select vector ID"
                       />
                       {isLoadingVectorIds && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-400" />
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-600" />
                       )}
                     </div>
                     {filteredVectorIds.length > 0 && vectorIdSearchQuery && (
@@ -2843,11 +2843,11 @@ await ductape.init();`,
                         placeholder="vec_001, vec_002, vec_003"
                         className="h-20"
                       />
-                      <p className="text-xs text-grey-500 mt-1">Comma-separated list of vector IDs</p>
+                      <p className="text-xs text-grey-600 mt-1">Comma-separated list of vector IDs</p>
                     </div>
                     {availableVectorIds.length > 0 && (
                       <div>
-                        <Label className="text-xs text-grey-600 dark:text-grey-400 mb-2 block">Or select from available vectors</Label>
+                        <Label className="text-xs text-grey-600 dark:text-grey-600 mb-2 block">Or select from available vectors</Label>
                         <div className="flex flex-wrap gap-1 max-h-24 overflow-auto border border-grey-200 dark:border-grey-700 rounded p-2 bg-grey-50 dark:bg-grey-900">
                           {availableVectorIds.slice(0, 50).map(id => (
                             <button
@@ -2920,7 +2920,7 @@ await ductape.init();`,
                           placeholder="Enter text to search for similar vectors..."
                           className="h-20"
                         />
-                        <p className="text-xs text-grey-500 mt-1">Text will be embedded and used for similarity search</p>
+                        <p className="text-xs text-grey-600 mt-1">Text will be embedded and used for similarity search</p>
                       </div>
                     )}
 
@@ -2933,7 +2933,7 @@ await ductape.init();`,
                           placeholder="[0.1, 0.2, 0.3, ...]"
                           className="h-20 font-mono text-sm"
                         />
-                        <p className="text-xs text-grey-500 mt-1">Enter embedding values as a JSON array</p>
+                        <p className="text-xs text-grey-600 mt-1">Enter embedding values as a JSON array</p>
                       </div>
                     )}
 
@@ -3023,7 +3023,7 @@ await ductape.init();`,
                           placeholder="Search or select vector to find similar vectors"
                         />
                         {isLoadingVectorIds && (
-                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-400" />
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-600" />
                         )}
                       </div>
                       {filteredVectorIds.length > 0 && vectorIdSearchQuery && (
@@ -3045,7 +3045,7 @@ await ductape.init();`,
                     </div>
                     {availableVectorIds.length > 0 && !vectorIdSearchQuery && (
                       <div>
-                        <Label className="text-xs text-grey-600 dark:text-grey-400 mb-2 block">Or select from available vectors</Label>
+                        <Label className="text-xs text-grey-600 dark:text-grey-600 mb-2 block">Or select from available vectors</Label>
                         <div className="flex flex-wrap gap-1 max-h-32 overflow-auto border border-grey-200 dark:border-grey-700 rounded p-2 bg-grey-50 dark:bg-grey-900">
                           {availableVectorIds.slice(0, 50).map(id => (
                             <button
@@ -3063,7 +3063,7 @@ await ductape.init();`,
                           ))}
                         </div>
                         {availableVectorIds.length > 50 && (
-                          <p className="text-xs text-grey-500 dark:text-grey-400 mt-1">Showing first 50 vectors. Use search to find specific vectors.</p>
+                          <p className="text-xs text-grey-600 dark:text-grey-600 mt-1">Showing first 50 vectors. Use search to find specific vectors.</p>
                         )}
                       </div>
                     )}
@@ -3127,7 +3127,7 @@ await ductape.init();`,
                         placeholder="[0.1, 0.2, 0.3, ...]"
                         className="h-20 font-mono text-sm"
                       />
-                      <p className="text-xs text-grey-500 mt-1">Embedding values as a JSON array</p>
+                      <p className="text-xs text-grey-600 mt-1">Embedding values as a JSON array</p>
                     </div>
 
                     <div>
@@ -3208,7 +3208,7 @@ await ductape.init();`,
 ]`}
                         className="h-40 font-mono text-sm"
                       />
-                      <p className="text-xs text-grey-500 mt-1">Array of vectors with id, values, and optional metadata</p>
+                      <p className="text-xs text-grey-600 mt-1">Array of vectors with id, values, and optional metadata</p>
                     </div>
                   </div>
                 )}
@@ -3228,7 +3228,7 @@ await ductape.init();`,
                           placeholder="Select vector to update"
                         />
                         {isLoadingVectorIds && (
-                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-400" />
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-grey-600" />
                         )}
                       </div>
                       {filteredVectorIds.length > 0 && vectorIdSearchQuery && (
@@ -3330,7 +3330,7 @@ await ductape.init();`,
                         placeholder="vec_001, vec_002, vec_003"
                         className="h-20"
                       />
-                      <p className="text-xs text-grey-500 mt-1">Comma-separated list of vector IDs</p>
+                      <p className="text-xs text-grey-600 mt-1">Comma-separated list of vector IDs</p>
                     </div>
                     {availableVectorIds.length > 0 && (
                       <div>
@@ -3385,7 +3385,7 @@ await ductape.init();`,
                         </Button>
                       </div>
                       {queryBuilderFilters.length === 0 && (
-                        <p className="text-sm text-grey-500 italic">Add at least one filter condition</p>
+                        <p className="text-sm text-grey-600 italic">Add at least one filter condition</p>
                       )}
                       {queryBuilderFilters.map((filter, idx) => (
                         <div key={idx} className="flex items-center gap-2 mb-2">
@@ -3758,7 +3758,7 @@ await ductape.init();`,
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-                  <p className="text-grey-500">Executing query...</p>
+                  <p className="text-grey-600">Executing query...</p>
                 </div>
               </div>
             ) : queryError ? (
@@ -3766,13 +3766,13 @@ await ductape.init();`,
                 <div className="text-center">
                   <AlertCircle className="h-8 w-8 text-red mx-auto mb-3" />
                   <p className="text-red font-medium mb-1">Query Failed</p>
-                  <p className="text-sm text-grey-500">{queryError}</p>
+                  <p className="text-sm text-grey-600">{queryError}</p>
                 </div>
               </div>
             ) : queryResult ? (
               <div className="space-y-4">
                 {/* Execution Info */}
-                <div className="flex items-center gap-4 text-sm text-grey-500">
+                <div className="flex items-center gap-4 text-sm text-grey-600">
                   <span className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
                     {queryResult.executionTime}ms
@@ -3839,7 +3839,7 @@ await ductape.init();`,
                       <p className="text-grey-600">
                         ID: <code className="bg-grey-100 px-2 py-1 rounded">{queryResult.vectorId}</code>
                       </p>
-                      <p className="text-grey-500 text-sm mt-1">
+                      <p className="text-grey-600 text-sm mt-1">
                         in namespace <code className="bg-grey-100 px-1 rounded text-xs">{queryResult.namespace}</code>
                       </p>
                     </div>
@@ -3866,7 +3866,7 @@ await ductape.init();`,
                             }}
                           >
                             <div className="flex items-center gap-2">
-                              <Database className="h-4 w-4 text-grey-500" />
+                              <Database className="h-4 w-4 text-grey-600" />
                               <span className="font-medium text-grey">{nsName}</span>
                             </div>
                           </div>
@@ -3886,7 +3886,7 @@ await ductape.init();`,
                     <div className="grid grid-cols-2 gap-4">
                       {queryResult.stats?.totalVectorCount !== undefined && (
                         <div className="bg-white rounded-lg border border-grey-300 p-4">
-                          <div className="text-sm text-grey-500 mb-1">Total Vectors</div>
+                          <div className="text-sm text-grey-600 mb-1">Total Vectors</div>
                           <div className="text-2xl font-bold text-grey">
                             {queryResult.stats.totalVectorCount.toLocaleString()}
                           </div>
@@ -3894,7 +3894,7 @@ await ductape.init();`,
                       )}
                       {queryResult.stats?.dimension !== undefined && (
                         <div className="bg-white rounded-lg border border-grey-300 p-4">
-                          <div className="text-sm text-grey-500 mb-1">Dimensions</div>
+                          <div className="text-sm text-grey-600 mb-1">Dimensions</div>
                           <div className="text-2xl font-bold text-grey">
                             {queryResult.stats.dimension}
                           </div>
@@ -3902,7 +3902,7 @@ await ductape.init();`,
                       )}
                       {queryResult.stats?.indexFullness !== undefined && (
                         <div className="bg-white rounded-lg border border-grey-300 p-4">
-                          <div className="text-sm text-grey-500 mb-1">Index Fullness</div>
+                          <div className="text-sm text-grey-600 mb-1">Index Fullness</div>
                           <div className="text-2xl font-bold text-grey">
                             {(queryResult.stats.indexFullness * 100).toFixed(1)}%
                           </div>
@@ -3916,7 +3916,7 @@ await ductape.init();`,
                       )}
                       {queryResult.stats?.namespaces && (
                         <div className="bg-white rounded-lg border border-grey-300 p-4">
-                          <div className="text-sm text-grey-500 mb-1">Namespaces</div>
+                          <div className="text-sm text-grey-600 mb-1">Namespaces</div>
                           <div className="text-2xl font-bold text-grey">
                             {Object.keys(queryResult.stats.namespaces).length}
                           </div>
@@ -3925,7 +3925,7 @@ await ductape.init();`,
                     </div>
                     {queryResult.stats?.namespaces && Object.keys(queryResult.stats.namespaces).length > 0 && (
                       <div className="bg-white rounded-lg border border-grey-300 p-4">
-                        <div className="text-sm text-grey-500 mb-3">Vectors per Namespace</div>
+                        <div className="text-sm text-grey-600 mb-3">Vectors per Namespace</div>
                         <div className="space-y-2">
                           {Object.entries(queryResult.stats.namespaces).map(([ns, data]: [string, any]) => (
                             <div key={ns} className="flex items-center justify-between">
@@ -4001,7 +4001,7 @@ await ductape.init();`,
                           <code key={id} className="block bg-grey-100 px-3 py-1 rounded text-sm">{id}</code>
                         ))}
                         {queryResult.upsertedIds?.length > 5 && (
-                          <p className="text-grey-500 text-sm">+{queryResult.upsertedIds.length - 5} more</p>
+                          <p className="text-grey-600 text-sm">+{queryResult.upsertedIds.length - 5} more</p>
                         )}
                       </div>
                     </div>
@@ -4021,7 +4021,7 @@ await ductape.init();`,
                       </p>
                       {queryResult.updatedMetadata && (
                         <div className="bg-white rounded-lg border border-grey-300 p-4 text-left inline-block">
-                          <div className="text-sm text-grey-500 mb-2">New Metadata:</div>
+                          <div className="text-sm text-grey-600 mb-2">New Metadata:</div>
                           <pre className="text-sm bg-grey-50 p-2 rounded overflow-auto max-w-md">
                             {JSON.stringify(queryResult.updatedMetadata, null, 2)}
                           </pre>
@@ -4044,16 +4044,16 @@ await ductape.init();`,
                       {queryResult.deletedIds && queryResult.deletedIds.length > 0 && (
                         <div className="mt-4 space-y-1">
                           {queryResult.deletedIds.slice(0, 5).map((id: string) => (
-                            <code key={id} className="block bg-grey-100 px-3 py-1 rounded text-sm line-through text-grey-500">{id}</code>
+                            <code key={id} className="block bg-grey-100 px-3 py-1 rounded text-sm line-through text-grey-600">{id}</code>
                           ))}
                           {queryResult.deletedIds.length > 5 && (
-                            <p className="text-grey-500 text-sm">+{queryResult.deletedIds.length - 5} more</p>
+                            <p className="text-grey-600 text-sm">+{queryResult.deletedIds.length - 5} more</p>
                           )}
                         </div>
                       )}
                       {queryResult.filter && (
                         <div className="mt-4 text-left inline-block">
-                          <div className="text-sm text-grey-500 mb-1">Filter used:</div>
+                          <div className="text-sm text-grey-600 mb-1">Filter used:</div>
                           <pre className="text-sm bg-grey-100 p-2 rounded">
                             {JSON.stringify(queryResult.filter, null, 2)}
                           </pre>
@@ -4075,7 +4075,7 @@ await ductape.init();`,
                         Namespace <code className="bg-grey-100 px-2 py-1 rounded">{queryResult.namespace}</code> has been cleared
                       </p>
                       {queryResult.deletedCount !== 'all' && (
-                        <p className="text-grey-500 mt-2">{queryResult.deletedCount} vectors removed</p>
+                        <p className="text-grey-600 mt-2">{queryResult.deletedCount} vectors removed</p>
                       )}
                     </div>
                   </div>
@@ -4096,7 +4096,7 @@ await ductape.init();`,
                       <tbody>
                         {queryResult.matches.map((vec: VectorRecord, idx: number) => (
                           <tr key={vec.id} className="border-b border-grey-400 hover:bg-grey-50">
-                            <td className="py-3 px-4 text-grey-500">{idx + 1}</td>
+                            <td className="py-3 px-4 text-grey-600">{idx + 1}</td>
                             <td className="py-3 px-4">
                               <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
                             </td>
@@ -4112,7 +4112,7 @@ await ductape.init();`,
                                   <span className="text-grey-600">{vec.score.toFixed(4)}</span>
                                 </div>
                               ) : (
-                                <span className="text-grey-400">—</span>
+                                <span className="text-grey-600">—</span>
                               )}
                             </td>
                             <td className="py-3 px-4 text-grey-600 truncate max-w-xs">
@@ -4143,7 +4143,7 @@ await ductape.init();`,
                           <div className="space-y-1">
                             {Object.entries(vec.metadata).slice(0, 3).map(([key, value]) => (
                               <div key={key} className="flex items-center gap-2 text-xs">
-                                <span className="text-grey-500">{key}:</span>
+                                <span className="text-grey-600">{key}:</span>
                                 <span className="text-grey truncate">{String(value)}</span>
                               </div>
                             ))}
@@ -4157,9 +4157,9 @@ await ductape.init();`,
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <Play className="h-12 w-12 text-grey-300 mx-auto mb-3" />
-                  <p className="text-grey-500 mb-1">No results yet</p>
-                  <p className="text-sm text-grey-400">Execute a query to see results</p>
+                  <Play className="h-12 w-12 text-grey-600 mx-auto mb-3" />
+                  <p className="text-grey-600 mb-1">No results yet</p>
+                  <p className="text-sm text-grey-600">Execute a query to see results</p>
                 </div>
               </div>
             )}
@@ -4202,14 +4202,14 @@ await ductape.init();`,
               <span className="font-semibold text-grey">Query Results</span>
               {queryResult && (
                 <>
-                  <span className="text-sm text-grey-500">{queryResult.executionTime}ms</span>
+                  <span className="text-sm text-grey-600">{queryResult.executionTime}ms</span>
                   <span className={cn(
                     'px-2 py-0.5 rounded text-xs',
                     VECTOR_OPERATIONS[queryResult.operation as VectorOperation]?.color || 'bg-grey-100 text-grey-600'
                   )}>
                     {VECTOR_OPERATIONS[queryResult.operation as VectorOperation]?.label || queryResult.operation}
                   </span>
-                  <span className="text-sm text-grey-500">{getResultSummary()}</span>
+                  <span className="text-sm text-grey-600">{getResultSummary()}</span>
                 </>
               )}
             </div>
@@ -4282,7 +4282,7 @@ await ductape.init();`,
                     <p className="text-xl text-grey-600">
                       ID: <code className="bg-grey-100 px-3 py-1 rounded">{queryResult.vectorId}</code>
                     </p>
-                    <p className="text-grey-500 mt-2">
+                    <p className="text-grey-600 mt-2">
                       in namespace <code className="bg-grey-100 px-2 py-0.5 rounded">{queryResult.namespace}</code>
                     </p>
                   </div>
@@ -4309,7 +4309,7 @@ await ductape.init();`,
                           }}
                         >
                           <div className="flex items-center gap-3">
-                            <Database className="h-5 w-5 text-grey-500" />
+                            <Database className="h-5 w-5 text-grey-600" />
                             <span className="font-medium text-grey">{nsName || '(default)'}</span>
                           </div>
                         </div>
@@ -4329,7 +4329,7 @@ await ductape.init();`,
                   <div className="grid grid-cols-3 gap-6">
                     {queryResult.stats?.totalVectorCount !== undefined && (
                       <div className="bg-white rounded-lg border border-grey-300 p-6">
-                        <div className="text-sm text-grey-500 mb-2">Total Vectors</div>
+                        <div className="text-sm text-grey-600 mb-2">Total Vectors</div>
                         <div className="text-3xl font-bold text-grey">
                           {queryResult.stats.totalVectorCount.toLocaleString()}
                         </div>
@@ -4337,7 +4337,7 @@ await ductape.init();`,
                     )}
                     {queryResult.stats?.dimension !== undefined && (
                       <div className="bg-white rounded-lg border border-grey-300 p-6">
-                        <div className="text-sm text-grey-500 mb-2">Dimensions</div>
+                        <div className="text-sm text-grey-600 mb-2">Dimensions</div>
                         <div className="text-3xl font-bold text-grey">
                           {queryResult.stats.dimension}
                         </div>
@@ -4345,7 +4345,7 @@ await ductape.init();`,
                     )}
                     {queryResult.stats?.indexFullness !== undefined && (
                       <div className="bg-white rounded-lg border border-grey-300 p-6">
-                        <div className="text-sm text-grey-500 mb-2">Index Fullness</div>
+                        <div className="text-sm text-grey-600 mb-2">Index Fullness</div>
                         <div className="text-3xl font-bold text-grey">
                           {(queryResult.stats.indexFullness * 100).toFixed(1)}%
                         </div>
@@ -4360,7 +4360,7 @@ await ductape.init();`,
                   </div>
                   {queryResult.stats?.namespaces && Object.keys(queryResult.stats.namespaces).length > 0 && (
                     <div className="bg-white rounded-lg border border-grey-300 p-6">
-                      <div className="text-sm text-grey-500 mb-4">Vectors per Namespace</div>
+                      <div className="text-sm text-grey-600 mb-4">Vectors per Namespace</div>
                       <div className="space-y-3">
                         {Object.entries(queryResult.stats.namespaces).map(([ns, data]: [string, any]) => (
                           <div key={ns} className="flex items-center justify-between py-2 border-b border-grey-100 last:border-0">
@@ -4436,7 +4436,7 @@ await ductape.init();`,
                         <code key={id} className="block bg-grey-100 px-4 py-2 rounded">{id}</code>
                       ))}
                       {queryResult.upsertedIds?.length > 10 && (
-                        <p className="text-grey-500">+{queryResult.upsertedIds.length - 10} more</p>
+                        <p className="text-grey-600">+{queryResult.upsertedIds.length - 10} more</p>
                       )}
                     </div>
                   </div>
@@ -4456,7 +4456,7 @@ await ductape.init();`,
                     </p>
                     {queryResult.updatedMetadata && (
                       <div className="bg-white rounded-lg border border-grey-300 p-6 text-left inline-block min-w-96">
-                        <div className="text-sm text-grey-500 mb-3">New Metadata:</div>
+                        <div className="text-sm text-grey-600 mb-3">New Metadata:</div>
                         <pre className="bg-grey-50 p-4 rounded overflow-auto text-sm">
                           {JSON.stringify(queryResult.updatedMetadata, null, 2)}
                         </pre>
@@ -4479,16 +4479,16 @@ await ductape.init();`,
                     {queryResult.deletedIds && queryResult.deletedIds.length > 0 && (
                       <div className="mt-6 space-y-2">
                         {queryResult.deletedIds.slice(0, 10).map((id: string) => (
-                          <code key={id} className="block bg-grey-100 px-4 py-2 rounded line-through text-grey-500">{id}</code>
+                          <code key={id} className="block bg-grey-100 px-4 py-2 rounded line-through text-grey-600">{id}</code>
                         ))}
                         {queryResult.deletedIds.length > 10 && (
-                          <p className="text-grey-500">+{queryResult.deletedIds.length - 10} more</p>
+                          <p className="text-grey-600">+{queryResult.deletedIds.length - 10} more</p>
                         )}
                       </div>
                     )}
                     {queryResult.filter && (
                       <div className="mt-6 text-left inline-block">
-                        <div className="text-sm text-grey-500 mb-2">Filter used:</div>
+                        <div className="text-sm text-grey-600 mb-2">Filter used:</div>
                         <pre className="bg-grey-100 p-4 rounded text-sm">
                           {JSON.stringify(queryResult.filter, null, 2)}
                         </pre>
@@ -4510,7 +4510,7 @@ await ductape.init();`,
                       Namespace <code className="bg-grey-100 px-3 py-1 rounded">{queryResult.namespace}</code> has been cleared
                     </p>
                     {queryResult.deletedCount !== 'all' && (
-                      <p className="text-grey-500 mt-3">{queryResult.deletedCount} vectors removed</p>
+                      <p className="text-grey-600 mt-3">{queryResult.deletedCount} vectors removed</p>
                     )}
                   </div>
                 </div>
@@ -4536,7 +4536,7 @@ await ductape.init();`,
                           className="border-b border-grey-400 hover:bg-grey-50 cursor-pointer"
                           onClick={() => handleSelectVector(vec)}
                         >
-                          <td className="py-3 px-4 text-grey-500">{idx + 1}</td>
+                          <td className="py-3 px-4 text-grey-600">{idx + 1}</td>
                           <td className="py-3 px-4">
                             <code className="text-sm bg-grey-100 px-2 py-1 rounded">{vec.id}</code>
                           </td>
@@ -4552,7 +4552,7 @@ await ductape.init();`,
                                 <span className="text-grey-600">{vec.score.toFixed(4)}</span>
                               </div>
                             ) : (
-                              <span className="text-grey-400">—</span>
+                              <span className="text-grey-600">—</span>
                             )}
                           </td>
                           <td className="py-3 px-4 text-grey-600">
@@ -4606,12 +4606,12 @@ await ductape.init();`,
                         <div className="space-y-1">
                           {Object.entries(vec.metadata).slice(0, 4).map(([key, value]) => (
                             <div key={key} className="flex items-center gap-2 text-sm">
-                              <span className="text-grey-500">{key}:</span>
+                              <span className="text-grey-600">{key}:</span>
                               <span className="text-grey truncate">{String(value)}</span>
                             </div>
                           ))}
                           {Object.keys(vec.metadata).length > 4 && (
-                            <div className="text-xs text-grey-500">+{Object.keys(vec.metadata).length - 4} more fields</div>
+                            <div className="text-xs text-grey-600">+{Object.keys(vec.metadata).length - 4} more fields</div>
                           )}
                         </div>
                       )}
@@ -4713,15 +4713,15 @@ await ductape.init();`,
 
             {/* Progress indicator */}
             <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-600">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
                 </div>
               </div>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{currentEnvSlug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{currentEnvSlug}</span>
               </p>
             </div>
           </div>
@@ -4760,7 +4760,7 @@ await ductape.init();`,
                 Unable to connect to
               </p>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
-                <Boxes className="h-4 w-4 text-grey-500" />
+                <Boxes className="h-4 w-4 text-grey-600" />
                 <span className="font-medium text-grey-800">{vector.name}</span>
               </div>
             </div>
@@ -4781,8 +4781,8 @@ await ductape.init();`,
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry Connection
               </Button>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{currentEnvSlug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{currentEnvSlug}</span>
               </p>
             </div>
           </div>
@@ -4830,7 +4830,7 @@ await ductape.init();`,
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
@@ -4925,7 +4925,7 @@ await ductape.init();`,
         {/* Sidebar Content Header - Only show when expanded */}
         {!isSidebarCollapsed && (
           <div className="px-3 pt-2 pb-1 flex items-center justify-between">
-            <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+            <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">
               {sidebarView === 'namespaces' ? 'Namespaces' : 'Saved Actions'}
             </span>
             <div className="flex gap-1">
@@ -4967,12 +4967,12 @@ await ductape.init();`,
                 </button>
               ))}
               {isLoadingNamespaces ? (
-                <div className="text-center py-8 text-grey-500">
+                <div className="text-center py-8 text-grey-600">
                   <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-primary" />
                   <p className="text-sm">Loading namespaces...</p>
                 </div>
               ) : filteredNamespaces.length === 0 && (
-                <div className="text-center py-8 text-grey-500">
+                <div className="text-center py-8 text-grey-600">
                   <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">{isConnected ? 'No namespaces found' : 'Connect to view namespaces'}</p>
                 </div>
@@ -5020,7 +5020,7 @@ await ductape.init();`,
                 </div>
               ))}
               {filteredActions.length === 0 && (
-                <div className="text-center py-8 text-grey-500">
+                <div className="text-center py-8 text-grey-600">
                   <Bookmark className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No saved actions</p>
                 </div>
@@ -5049,13 +5049,13 @@ await ductape.init();`,
                   )}
                 </div>
                 {isLoadingNamespaces && (
-                  <div className="flex items-center gap-1 text-grey-500">
+                  <div className="flex items-center gap-1 text-grey-600">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span>Loading...</span>
                   </div>
                 )}
               </div>
-              <div className="text-grey-500">
+              <div className="text-grey-600">
                 {totalStats.namespaceCount} namespace{totalStats.namespaceCount !== 1 ? 's' : ''} · {totalStats.totalVectors.toLocaleString()} vectors
               </div>
             </div>
@@ -5132,7 +5132,7 @@ await ductape.init();`,
                       />
                       <div className="flex-1 min-w-0">
                         <code className="text-xs text-grey-600">{val.path}</code>
-                        <div className="text-xs text-grey-500 truncate">
+                        <div className="text-xs text-grey-600 truncate">
                           Current: {JSON.stringify(val.value)}
                         </div>
                       </div>
@@ -5189,7 +5189,7 @@ await ductape.init();`,
                 <div key={param.name}>
                   <Label className="flex items-center gap-2">
                     <span>{param.name}</span>
-                    <span className="text-xs font-normal text-grey-500">({param.type})</span>
+                    <span className="text-xs font-normal text-grey-600">({param.type})</span>
                   </Label>
                   {param.type === 'boolean' ? (
                     <div className="mt-2 flex items-center gap-2">
@@ -5232,7 +5232,7 @@ await ductape.init();`,
                       className="mt-1"
                     />
                   )}
-                  <p className="text-xs text-grey-500 mt-1">Path: {param.path}</p>
+                  <p className="text-xs text-grey-600 mt-1">Path: {param.path}</p>
                 </div>
               ))}
             </div>

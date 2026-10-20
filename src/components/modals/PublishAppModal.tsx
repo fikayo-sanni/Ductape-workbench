@@ -387,14 +387,14 @@ export default function PublishAppModal({
               <div className="border border-grey-400 rounded-lg max-h-48 overflow-y-auto p-2">
                 {isLoadingDomains ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
+                    <Loader2 className="h-5 w-5 animate-spin text-grey-600" />
                   </div>
                 ) : domains.length > 0 ? (
                   <div className="space-y-1">
                     {rootDomains.map(domain => renderDomainItem(domain))}
                   </div>
                 ) : (
-                  <p className="text-sm text-grey-500 text-center py-4">
+                  <p className="text-sm text-grey-600 text-center py-4">
                     No categories available
                   </p>
                 )}

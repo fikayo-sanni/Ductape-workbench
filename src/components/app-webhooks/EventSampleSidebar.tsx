@@ -55,7 +55,7 @@ function EventDetailsFields({
       <div>
         <Label className="text-sm font-semibold text-grey-700 mb-2 block">Selectors</Label>
         {selectors.length === 0 ? (
-          <p className="text-sm text-grey-500">No selectors configured</p>
+          <p className="text-sm text-grey-600">No selectors configured</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {selectors.map((sel, idx) => (

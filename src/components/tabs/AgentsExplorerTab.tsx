@@ -321,7 +321,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
             <Input
               placeholder="Search..."
               value={searchQuery}
@@ -380,7 +380,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                     </span>
                   </div>
                   <p className="text-xs text-grey-600 mb-2 line-clamp-1">{ag.description}</p>
-                  <div className="flex items-center gap-3 text-xs text-grey-500">
+                  <div className="flex items-center gap-3 text-xs text-grey-600">
                     <span className="flex items-center gap-1">
                       <Brain className="h-3 w-3" />
                       {ag.model}
@@ -418,7 +418,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                       {sess.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-grey-500">
+                  <div className="flex items-center gap-3 text-xs text-grey-600">
                     <span className="flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
                       {sess.messageCount}
@@ -456,7 +456,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                       {mod.provider}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-grey-500">
+                  <div className="flex items-center gap-3 text-xs text-grey-600">
                     <span>{mod.model}</span>
                     <span>T: {mod.temperature}</span>
                   </div>
@@ -545,7 +545,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                     <p className="text-sm text-grey-600">{selectedAgent.description}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-grey-500" />
+                    <Tag className="h-4 w-4 text-grey-600" />
                     <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedAgent.tag}</code>
                   </div>
                 </div>
@@ -582,7 +582,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                       <div className="flex items-center gap-3">
                         {sess.status === 'completed' && <CheckCircle className="h-5 w-5 text-green" />}
                         {sess.status === 'active' && <Loader2 className="h-5 w-5 text-blue animate-spin" />}
-                        {sess.status === 'expired' && <XCircle className="h-5 w-5 text-grey-500" />}
+                        {sess.status === 'expired' && <XCircle className="h-5 w-5 text-grey-600" />}
                         <div>
                           <div className="font-medium text-sm text-grey">{sess.id}</div>
                           <div className="text-xs text-grey-600">{formatDate(sess.startedAt)}</div>
@@ -591,7 +591,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                       <div className="flex items-center gap-4 text-sm text-grey-600">
                         <span>{sess.messageCount} messages</span>
                         <span>{sess.toolCalls} tool calls</span>
-                        <ChevronRight className="h-4 w-4 text-grey-400" />
+                        <ChevronRight className="h-4 w-4 text-grey-600" />
                       </div>
                     </div>
                   ))}
@@ -653,7 +653,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
                     <p className="text-sm text-grey-600">{selectedModel.model}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-grey-500" />
+                    <Tag className="h-4 w-4 text-grey-600" />
                     <code className="text-sm bg-grey-100 px-2 py-1 rounded">{selectedModel.tag}</code>
                   </div>
                 </div>
@@ -705,7 +705,7 @@ export default function AgentsExplorerTab({ agent }: AgentsExplorerTabProps) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-grey-500">
+            <div className="flex flex-col items-center justify-center h-full text-grey-600">
               <Bot className="h-16 w-16 mb-4 opacity-50" />
               <p className="text-lg font-medium">Select an item</p>
               <p className="text-sm">Choose an agent, session, or model from the sidebar</p>

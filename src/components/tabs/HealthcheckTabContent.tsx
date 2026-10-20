@@ -28,7 +28,7 @@ function ResponseSection({
     <div>
       <h2 className="mb-3 text-sm font-semibold text-grey">{title}</h2>
       {value === undefined || value === null ? (
-        <p className="text-sm text-grey-500">{empty}</p>
+        <p className="text-sm text-grey-600">{empty}</p>
       ) : (
         <JsonViewer data={value} />
       )}
@@ -47,9 +47,9 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
     return (
       <div className="flex h-full items-center justify-center bg-grey-50/30">
         <div className="max-w-sm text-center">
-          <Heart className="mx-auto mb-3 h-10 w-10 text-grey-400" />
+          <Heart className="mx-auto mb-3 h-10 w-10 text-grey-600" />
           <p className="text-sm font-medium text-grey">Healthcheck data is unavailable</p>
-          <p className="mt-1 text-sm text-grey-500">
+          <p className="mt-1 text-sm text-grey-600">
             Close this tab and reopen the healthcheck to reload it.
           </p>
         </div>
@@ -79,7 +79,7 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold text-grey">{healthcheck.name}</h1>
-              <code className="font-mono text-sm text-grey-500">{healthcheck.tag}</code>
+              <code className="font-mono text-sm text-grey-600">{healthcheck.tag}</code>
               {healthcheck.description && (
                 <p className="mt-2 text-sm text-grey-600">{healthcheck.description}</p>
               )}
@@ -108,12 +108,12 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
         {environment ? (
           <>
             <div className="rounded-xl border border-grey-300 bg-white p-5 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-grey-500">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-grey-600">
                 {environment.slug} environment
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] uppercase text-grey-500">Last latency</p>
+                  <p className="text-[10px] uppercase text-grey-600">Last latency</p>
                   <p
                     className={cn(
                       'text-lg font-semibold tabular-nums',
@@ -124,24 +124,24 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-grey-500">Average</p>
+                  <p className="text-[10px] uppercase text-grey-600">Average</p>
                   <p className="text-lg font-semibold tabular-nums text-grey">
                     {environment.averageLatency || '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-grey-500">Checks</p>
+                  <p className="text-[10px] uppercase text-grey-600">Checks</p>
                   <p className="flex items-center gap-1 text-sm font-medium text-grey">
                     <Clock className="h-3.5 w-3.5" />
                     {reactive ? 'When something fails' : intervalLabel || 'On a schedule'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-grey-500">Retries</p>
+                  <p className="text-[10px] uppercase text-grey-600">Retries</p>
                   <p className="text-sm font-medium text-grey">{healthcheck.retries}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-[10px] uppercase text-grey-500">Last checked</p>
+                  <p className="text-[10px] uppercase text-grey-600">Last checked</p>
                   <p className="text-sm text-grey">{environment.lastChecked ? formatAgo(environment.lastChecked) : view.note ?? 'Not checked yet'}</p>
                 </div>
                 <div className="col-span-2">
@@ -176,7 +176,7 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
         ) : (
           <div className="rounded-xl border border-grey-300 bg-white p-8 text-center shadow-sm">
             <p className="text-sm font-medium text-grey">No environments configured</p>
-            <p className="mt-1 text-sm text-grey-500">
+            <p className="mt-1 text-sm text-grey-600">
               Add an environment to this healthcheck to start tracking status.
             </p>
           </div>

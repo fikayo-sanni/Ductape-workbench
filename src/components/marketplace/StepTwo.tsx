@@ -280,7 +280,7 @@ export default function StepTwo({ goToPreviousStep, handleFinish, app }: StepTwo
                     if (baseUrlVars.length === 0) return null;
                     return (
                       <div className="mt-3 pl-12 space-y-2 border-l-2 border-grey-200 dark:border-grey-700">
-                        <p className="text-xs font-medium text-grey-600 dark:text-grey-400 mt-1">Base URL variables</p>
+                        <p className="text-xs font-medium text-grey-600 dark:text-grey-600 mt-1">Base URL variables</p>
                         {baseUrlVars.map((v: { key: string }, vIdx: number) => (
                           <FormField
                             key={v.key}

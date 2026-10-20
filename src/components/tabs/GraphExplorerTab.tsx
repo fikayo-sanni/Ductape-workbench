@@ -299,12 +299,12 @@ export default function GraphExplorerTab({ graph }: GraphExplorerTabProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Share2 className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete graph data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the graph from your product to reload it.
           </p>
         </div>
@@ -2489,15 +2489,15 @@ await ductape.init();`,
 
             {/* Progress indicator */}
             <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-center gap-2 text-xs text-grey-500">
+              <div className="flex items-center justify-center gap-2 text-xs text-grey-600">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
                 </div>
               </div>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{graph.env.slug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{graph.env.slug}</span>
               </p>
             </div>
           </div>
@@ -2538,7 +2538,7 @@ await ductape.init();`,
                 Unable to connect to
               </p>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-grey-100 rounded-lg">
-                <Share2 className="h-4 w-4 text-grey-500" />
+                <Share2 className="h-4 w-4 text-grey-600" />
                 <span className="font-medium text-grey-800">{graph.name}</span>
               </div>
             </div>
@@ -2576,8 +2576,8 @@ await ductape.init();`,
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry Connection
               </Button>
-              <p className="text-xs text-grey-400">
-                Environment: <span className="font-medium text-grey-500">{graph.env.slug}</span>
+              <p className="text-xs text-grey-600">
+                Environment: <span className="font-medium text-grey-600">{graph.env.slug}</span>
               </p>
             </div>
           </div>
@@ -2646,7 +2646,7 @@ await ductape.init();`,
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -2789,20 +2789,20 @@ await ductape.init();`,
               {/* Loading States */}
               {(sidebarView === 'labels' && isLoadingLabels) && (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-                  <span className="ml-2 text-sm text-grey-500">Loading labels...</span>
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-600" />
+                  <span className="ml-2 text-sm text-grey-600">Loading labels...</span>
                 </div>
               )}
               {(sidebarView === 'relationships' && isLoadingRelTypes) && (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-                  <span className="ml-2 text-sm text-grey-500">Loading relationships...</span>
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-600" />
+                  <span className="ml-2 text-sm text-grey-600">Loading relationships...</span>
                 </div>
               )}
               {(sidebarView === 'actions' && isLoadingActions) && (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-grey-400" />
-                  <span className="ml-2 text-sm text-grey-500">Loading actions...</span>
+                  <Loader2 className="h-5 w-5 animate-spin text-grey-600" />
+                  <span className="ml-2 text-sm text-grey-600">Loading actions...</span>
                 </div>
               )}
 
@@ -2875,7 +2875,7 @@ await ductape.init();`,
                 <div className="space-y-1">
                   {filteredActions.length === 0 ? (
                     <div className="px-2 py-4 text-center">
-                      <Bookmark className="h-8 w-8 text-grey-300 mx-auto mb-2" />
+                      <Bookmark className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                       <p className="text-xs text-grey">No saved actions yet</p>
                       <p className="text-xs text-grey mt-1">
                         Write a query and click "Save as Action"
@@ -2947,7 +2947,7 @@ await ductape.init();`,
           <div className="flex-shrink-0 border-t border-grey-400 bg-grey-50 p-2">
             <button
               onClick={() => setIsSidebarCollapsed(false)}
-              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              className="w-full flex items-center justify-center p-2 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
               title="Expand sidebar"
             >
               <PanelLeft className="h-4 w-4" />
@@ -3244,7 +3244,7 @@ await ductape.init();`,
                                   <SelectItem key={prop.name} value={prop.name}>
                                     <span className="flex items-center gap-2">
                                       {prop.name}
-                                      <span className="text-xs text-grey-400">({prop.type})</span>
+                                      <span className="text-xs text-grey-600">({prop.type})</span>
                                     </span>
                                   </SelectItem>
                                 )) || (
@@ -3356,7 +3356,7 @@ await ductape.init();`,
                         + Add Condition
                       </Button>
                       {!queryBuilderLabel && queryBuilderWhere.length === 0 && (
-                        <p className="text-xs text-grey-400 mt-1">Select a label first to add conditions</p>
+                        <p className="text-xs text-grey-600 mt-1">Select a label first to add conditions</p>
                       )}
                     </div>
                   )}
@@ -3392,7 +3392,7 @@ await ductape.init();`,
                                     <SelectItem key={p.name} value={p.name}>
                                       <span className="flex items-center gap-2">
                                         {p.name}
-                                        <span className="text-xs text-grey-400">({p.type})</span>
+                                        <span className="text-xs text-grey-600">({p.type})</span>
                                       </span>
                                     </SelectItem>
                                   ))}
@@ -3495,7 +3495,7 @@ await ductape.init();`,
                         + Add Property
                       </Button>
                       {['createNode', 'mergeNode', 'updateNode'].includes(queryBuilderOperation) && !queryBuilderLabel && (
-                        <p className="text-xs text-grey-400 mt-1">Select a label first to add properties</p>
+                        <p className="text-xs text-grey-600 mt-1">Select a label first to add properties</p>
                       )}
                     </div>
                   )}
@@ -3769,7 +3769,7 @@ await ductape.init();`,
 
                   {/* Search Bar - Focus to expand query editor */}
                   <div className="relative w-48">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-600" />
                     <Input
                       type="text"
                       placeholder="Query..."
@@ -3850,7 +3850,7 @@ await ductape.init();`,
                       <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
                         {graph.type}
                       </span>
-                      <span className="text-xs text-grey-500 dark:text-grey-400">
+                      <span className="text-xs text-grey-600 dark:text-grey-600">
                         {getQueryLanguageName(graph.type)}
                       </span>
                     </div>
@@ -3885,7 +3885,7 @@ await ductape.init();`,
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsQueryEditorCollapsed(true)}
-                        className="gap-1.5 text-grey-500 hover:text-grey"
+                        className="gap-1.5 text-grey-600 hover:text-grey"
                         title="Collapse query editor"
                       >
                         <ChevronUp className="h-4 w-4" />
@@ -3895,7 +3895,7 @@ await ductape.init();`,
                   {/* Editor Body */}
                   <div className="relative">
                     {/* Line numbers gutter */}
-                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-grey-100 dark:bg-[#1a1a1a] border-r border-grey-300 dark:border-[#2a2a2a] flex flex-col pt-3 text-right pr-3 text-xs text-grey-400 dark:text-grey-600 font-mono select-none pointer-events-none overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-grey-100 dark:bg-[#1a1a1a] border-r border-grey-300 dark:border-[#2a2a2a] flex flex-col pt-3 text-right pr-3 text-xs text-grey-600 dark:text-grey-600 font-mono select-none pointer-events-none overflow-hidden">
                       {Array.from({ length: Math.max(10, queryInput.split('\n').length + 2) }, (_, i) => (
                         <div key={i} style={{ lineHeight: '1.6', height: '1.6em' }}>{i + 1}</div>
                       ))}
@@ -3921,11 +3921,11 @@ await ductape.init();`,
                       <span className="text-xs text-grey">
                         <span className="font-semibold text-grey">{smartRowCount.count}</span> {smartRowCount.type === 'relationships' ? 'relationships' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in <span className="font-semibold text-grey">{queryResult.executionTime}ms</span>
                         {'nodesIncluded' in smartRowCount && (
-                          <span className="text-grey-400 ml-1">(+{smartRowCount.nodesIncluded} nodes enriched)</span>
+                          <span className="text-grey-600 ml-1">(+{smartRowCount.nodesIncluded} nodes enriched)</span>
                         )}
                       </span>
                       {queryResult.statistics && (
-                        <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-300 border-l border-grey-400 dark:border-grey-600 pl-4">
+                        <div className="flex items-center gap-3 text-xs text-grey dark:text-grey-600 border-l border-grey-400 dark:border-grey-600 pl-4">
                           {queryResult.statistics.nodesCreated > 0 && (
                             <span><span className="font-medium text-green-600 dark:text-green-400">{queryResult.statistics.nodesCreated}</span> nodes+</span>
                           )}
@@ -3967,12 +3967,12 @@ await ductape.init();`,
               <div className="flex-shrink-0 bg-grey-50 dark:bg-[#1a1a1a] border-b border-grey-400 px-4 py-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Code className="h-4 w-4 text-grey-500" />
+                    <Code className="h-4 w-4 text-grey-600" />
                     <span className="text-sm font-medium text-grey">Query Results</span>
                     <span className={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getGraphTypeColor(graph.type))}>
                       {graph.type}
                     </span>
-                    <span className="text-xs text-grey-500">
+                    <span className="text-xs text-grey-600">
                       • {smartRowCount.count} {smartRowCount.type === 'relationships' ? 'rels' : smartRowCount.type === 'nodes' ? 'nodes' : 'rows'} in {queryResult.executionTime}ms
                     </span>
                   </div>
@@ -3995,7 +3995,7 @@ await ductape.init();`,
                       variant="ghost"
                       size="sm"
                       onClick={() => setIsQueryEditorCollapsed(false)}
-                      className="gap-1.5 h-7 text-grey-500 hover:text-grey"
+                      className="gap-1.5 h-7 text-grey-600 hover:text-grey"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
                       Edit
@@ -4014,7 +4014,7 @@ await ductape.init();`,
                   <div className="text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
                     <p className="text-sm font-medium text-grey">Executing query...</p>
-                    <p className="text-xs text-grey-500 mt-1">Fetching data from graph database</p>
+                    <p className="text-xs text-grey-600 mt-1">Fetching data from graph database</p>
                   </div>
                 </div>
               )}
@@ -4196,13 +4196,13 @@ await ductape.init();`,
                                                   {displayName}
                                                 </div>
                                                 {!selectedNode && nodeData.properties && Object.keys(nodeData.properties).length > 0 && (
-                                                  <div className="text-xs text-grey-500 max-w-[200px]">
+                                                  <div className="text-xs text-grey-600 max-w-[200px]">
                                                     {Object.entries(nodeData.properties)
                                                       .filter(([key]) => !['name', 'title', 'id'].includes(key))
                                                       .slice(0, 2)
                                                       .map(([key, val]) => (
                                                         <span key={key} className="mr-2">
-                                                          <span className="text-grey-400">{key}:</span> {String(val).substring(0, 20)}{String(val).length > 20 ? '...' : ''}
+                                                          <span className="text-grey-600">{key}:</span> {String(val).substring(0, 20)}{String(val).length > 20 ? '...' : ''}
                                                         </span>
                                                       ))}
                                                   </div>
@@ -4263,12 +4263,12 @@ await ductape.init();`,
                                                       ? <span className={cn('px-2 py-0.5 rounded text-xs', rel.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(rel.properties[prop])}</span>
                                                       : String(rel.properties[prop]).substring(0, 30) + (String(rel.properties[prop]).length > 30 ? '...' : '')
                                                 ) : (
-                                                  <span className="text-grey-400">—</span>
+                                                  <span className="text-grey-600">—</span>
                                                 )}
                                               </td>
                                             ))}
                                             {selectedNode && relProps.length > 2 && (
-                                              <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                              <td className="px-4 py-3 text-sm text-grey-600 align-top">
                                                 +{relProps.length - 2} more
                                               </td>
                                             )}
@@ -4290,7 +4290,7 @@ await ductape.init();`,
                                         </h4>
                                         <button
                                           onClick={() => setSelectedNode(null)}
-                                          className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                          className="text-grey-600 hover:text-grey p-1 hover:bg-grey-200 rounded"
                                         >
                                           <X className="h-4 w-4" />
                                         </button>
@@ -4338,7 +4338,7 @@ await ductape.init();`,
                                                 <div className="text-sm font-medium text-grey">
                                                   {selectedNode.startNodeData.properties?.name || selectedNode.startNodeData.properties?.title || selectedNode.startNodeData.id}
                                                 </div>
-                                                <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                                <div className="text-[10px] text-grey-600 mt-1">Click to view node details</div>
                                               </div>
                                             </div>
                                           )}
@@ -4365,7 +4365,7 @@ await ductape.init();`,
                                                 <div className="text-sm font-medium text-grey">
                                                   {selectedNode.endNodeData.properties?.name || selectedNode.endNodeData.properties?.title || selectedNode.endNodeData.id}
                                                 </div>
-                                                <div className="text-[10px] text-grey-400 mt-1">Click to view node details</div>
+                                                <div className="text-[10px] text-grey-600 mt-1">Click to view node details</div>
                                               </div>
                                             </div>
                                           )}
@@ -4402,7 +4402,7 @@ await ductape.init();`,
                                                 </div>
                                               ))}
                                               {Object.keys(selectedNode.properties || {}).length === 0 && (
-                                                <div className="text-xs text-grey-400 italic">No properties</div>
+                                                <div className="text-xs text-grey-600 italic">No properties</div>
                                               )}
                                             </div>
                                           </div>
@@ -4464,7 +4464,7 @@ await ductape.init();`,
                                                 </div>
                                               ))}
                                               {Object.keys(selectedNode.properties || {}).length === 0 && (
-                                                <div className="text-xs text-grey-400 italic">No properties</div>
+                                                <div className="text-xs text-grey-600 italic">No properties</div>
                                               )}
                                             </div>
                                           </div>
@@ -4547,12 +4547,12 @@ await ductape.init();`,
                                                       ? <span className={cn('px-2 py-0.5 rounded text-xs', node.properties[prop] ? 'bg-green/10 text-green' : 'bg-grey-100 text-grey')}>{String(node.properties[prop])}</span>
                                                       : String(node.properties[prop]).substring(0, 50) + (String(node.properties[prop]).length > 50 ? '...' : '')
                                                 ) : (
-                                                  <span className="text-grey-400">—</span>
+                                                  <span className="text-grey-600">—</span>
                                                 )}
                                               </td>
                                             ))}
                                             {selectedNode && nodeProps.length > 3 && (
-                                              <td className="px-4 py-3 text-sm text-grey-400 align-top">
+                                              <td className="px-4 py-3 text-sm text-grey-600 align-top">
                                                 +{nodeProps.length - 3} more
                                               </td>
                                             )}
@@ -4574,7 +4574,7 @@ await ductape.init();`,
                                         </h4>
                                         <button
                                           onClick={() => setSelectedNode(null)}
-                                          className="text-grey-400 hover:text-grey p-1 hover:bg-grey-200 rounded"
+                                          className="text-grey-600 hover:text-grey p-1 hover:bg-grey-200 rounded"
                                         >
                                           <X className="h-4 w-4" />
                                         </button>
@@ -4637,7 +4637,7 @@ await ductape.init();`,
                                             </div>
                                           ))}
                                           {Object.keys(selectedNode.properties || {}).length === 0 && (
-                                            <div className="text-xs text-grey-400 italic">No properties</div>
+                                            <div className="text-xs text-grey-600 italic">No properties</div>
                                           )}
                                         </div>
                                       </div>
@@ -4767,7 +4767,7 @@ await ductape.init();`,
                       {graphData.nodes.length === 0 ? (
                         <div className="flex-1 flex items-center justify-center">
                           <div className="text-center">
-                            <Network className="h-12 w-12 text-grey-300 mx-auto mb-3" />
+                            <Network className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                             <h4 className="text-sm font-medium text-grey mb-1">No Graph Data</h4>
                             <p className="text-xs text-grey">
                               Query results don't contain nodes or relationships to visualize
@@ -4913,7 +4913,7 @@ await ductape.init();`,
                                 <h4 className="text-sm font-semibold text-grey">Node Details</h4>
                                 <button
                                   onClick={() => setSelectedNode(null)}
-                                  className="text-grey-400 hover:text-grey"
+                                  className="text-grey-600 hover:text-grey"
                                 >
                                   ×
                                 </button>
@@ -4977,13 +4977,13 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingStatistics ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">
                         {sdkStatistics?.nodeCount?.toLocaleString() ?? '—'}
                       </div>
                     )}
-                    <div className="text-xs text-grey-500">Total Nodes</div>
+                    <div className="text-xs text-grey-600">Total Nodes</div>
                   </div>
                 </div>
               </div>
@@ -4994,13 +4994,13 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingStatistics ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">
                         {sdkStatistics?.relationshipCount?.toLocaleString() ?? '—'}
                       </div>
                     )}
-                    <div className="text-xs text-grey-500">Total Relationships</div>
+                    <div className="text-xs text-grey-600">Total Relationships</div>
                   </div>
                 </div>
               </div>
@@ -5011,11 +5011,11 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingLabels ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">{labels.length}</div>
                     )}
-                    <div className="text-xs text-grey-500">Node Labels</div>
+                    <div className="text-xs text-grey-600">Node Labels</div>
                   </div>
                 </div>
               </div>
@@ -5026,11 +5026,11 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingRelTypes ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">{relationshipTypes.length}</div>
                     )}
-                    <div className="text-xs text-grey-500">Relationship Types</div>
+                    <div className="text-xs text-grey-600">Relationship Types</div>
                   </div>
                 </div>
               </div>
@@ -5045,11 +5045,11 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingIndexes ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">{indexes.length}</div>
                     )}
-                    <div className="text-xs text-grey-500">Indexes</div>
+                    <div className="text-xs text-grey-600">Indexes</div>
                   </div>
                 </div>
               </div>
@@ -5060,11 +5060,11 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingConstraints ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">{constraints.length}</div>
                     )}
-                    <div className="text-xs text-grey-500">Constraints</div>
+                    <div className="text-xs text-grey-600">Constraints</div>
                   </div>
                 </div>
               </div>
@@ -5075,11 +5075,11 @@ await ductape.init();`,
                   </div>
                   <div>
                     {isLoadingActions ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-grey-400" />
+                      <Loader2 className="h-6 w-6 animate-spin text-grey-600" />
                     ) : (
                       <div className="text-2xl font-bold text-grey">{actions.length}</div>
                     )}
-                    <div className="text-xs text-grey-500">Saved Actions</div>
+                    <div className="text-xs text-grey-600">Saved Actions</div>
                   </div>
                 </div>
               </div>
@@ -5090,7 +5090,7 @@ await ductape.init();`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey capitalize">{graph.type || 'Neo4j'}</div>
-                    <div className="text-xs text-grey-500">Graph Type</div>
+                    <div className="text-xs text-grey-600">Graph Type</div>
                   </div>
                 </div>
               </div>
@@ -5174,7 +5174,7 @@ await ductape.init();`,
                         <span className="font-medium text-grey">{label.name}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                    <div className="flex items-center gap-4 text-xs text-grey-600">
                       <span className="flex items-center gap-1">
                         <Circle className="h-3 w-3" />
                         {label.count.toLocaleString()} nodes
@@ -5229,7 +5229,7 @@ await ductape.init();`,
                         <span className="font-medium text-grey">{relType.type}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-grey-500">
+                    <div className="flex items-center gap-4 text-xs text-grey-600">
                       <span className="flex items-center gap-1">
                         <GitBranch className="h-3 w-3" />
                         {relType.count?.toLocaleString() || 0} rels
@@ -5281,7 +5281,7 @@ await ductape.init();`,
                         </span>
                       </div>
                       {action.description && (
-                        <p className="text-xs text-grey-500 truncate">{action.description}</p>
+                        <p className="text-xs text-grey-600 truncate">{action.description}</p>
                       )}
                     </button>
                   ))}
@@ -5968,7 +5968,7 @@ await ductape.init();`,
               <div key={param.name}>
                 <Label className="text-xs text-grey mb-2 block">
                   {param.name}
-                  <span className="text-grey-400 font-normal ml-2">({param.type})</span>
+                  <span className="text-grey-600 font-normal ml-2">({param.type})</span>
                 </Label>
                 {param.type === 'boolean' ? (
                   <div className="flex items-center gap-2">

@@ -120,7 +120,7 @@ export default function StepThree({
             {appVariables.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <p className="text-grey-600 text-center">No variables are required for this application.</p>
-                <p className="text-grey-500 text-sm text-center">You can proceed to the next step.</p>
+                <p className="text-grey-600 text-sm text-center">You can proceed to the next step.</p>
               </div>
             ) : (
               <div className="space-y-6">

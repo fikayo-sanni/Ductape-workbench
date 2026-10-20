@@ -72,7 +72,7 @@ export default function SearchPartnersView({ searchQuery, setSearchQuery }: Sear
       <div className="flex-1 overflow-auto p-6">
         {briefs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <Search className="h-12 w-12 text-grey-400 mb-4" />
+            <Search className="h-12 w-12 text-grey-600 mb-4" />
             <h3 className="text-lg font-medium text-grey mb-2">
               {searchQuery ? 'No partners found' : 'Search for partners'}
             </h3>

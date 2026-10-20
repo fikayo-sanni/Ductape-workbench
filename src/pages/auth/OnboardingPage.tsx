@@ -395,7 +395,7 @@ function OnboardingFlow() {
                         'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold',
                         isComplete && 'border-primary bg-primary text-white',
                         isActive && 'border-primary bg-white text-primary ring-4 ring-primary/10',
-                        !isActive && !isComplete && 'border-grey-300 bg-white text-grey-500',
+                        !isActive && !isComplete && 'border-grey-300 bg-white text-grey-600',
                       )}
                     >
                       {isComplete ? <CheckCircle className="h-4 w-4" /> : index + 1}
@@ -412,7 +412,7 @@ function OnboardingFlow() {
                   <span
                     className={cn(
                       'text-xs font-semibold',
-                      isActive ? 'text-primary' : isComplete ? 'text-grey' : 'text-grey-500',
+                      isActive ? 'text-primary' : isComplete ? 'text-grey' : 'text-grey-600',
                     )}
                   >
                     {s.label}

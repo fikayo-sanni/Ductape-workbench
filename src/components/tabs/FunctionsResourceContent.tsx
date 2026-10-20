@@ -181,7 +181,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
         <>
           {count > 0 && view === 'definitions' ? (
             <div className="relative flex-1 sm:flex-initial">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-grey-500 sm:left-3 sm:h-4 sm:w-4" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-grey-600 sm:left-3 sm:h-4 sm:w-4" />
               <Input
                 aria-label="Search functions"
                 placeholder="Search..."
@@ -269,9 +269,9 @@ function CardMetrics({ fn, traffic }: { fn: FunctionView; traffic: TrafficState 
     <div className="mt-3 grid grid-cols-3 gap-2 border-t border-grey-300 pt-3" title={traffic.status === 'error' ? 'Traffic could not be loaded.' : undefined}>
       {cells.map(cell => (
         <div key={cell.label} className="min-w-0">
-          <p className="text-[10px] uppercase tracking-wide text-grey-500">{cell.label}</p>
+          <p className="text-[10px] uppercase tracking-wide text-grey-600">{cell.label}</p>
           <p className="truncate text-sm font-semibold text-grey">{cell.value}</p>
-          {cell.hint ? <p className={cn('truncate text-[10px]', cell.label === 'Traffic' && stats && stats.failures > 0 ? 'text-red' : 'text-grey-500')}>{cell.hint}</p> : null}
+          {cell.hint ? <p className={cn('truncate text-[10px]', cell.label === 'Traffic' && stats && stats.failures > 0 ? 'text-red' : 'text-grey-600')}>{cell.hint}</p> : null}
         </div>
       ))}
     </div>
@@ -297,7 +297,7 @@ function FunctionCard({ fn, traffic, onOpen }: { fn: FunctionView; traffic: Traf
             <h3 className="truncate text-xs font-medium text-grey sm:text-sm">{fn.name}</h3>
             {fn.version ? <Pill tone="info">v{fn.version}</Pill> : null}
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-grey-500 sm:text-xs">{fn.tag}</p>
+          <p className="mt-0.5 truncate text-[11px] text-grey-600 sm:text-xs">{fn.tag}</p>
         </div>
       </div>
       {fn.description ? <p className="mt-3 line-clamp-2 text-xs text-grey-600 sm:text-sm">{fn.description}</p> : null}
@@ -307,11 +307,11 @@ function FunctionCard({ fn, traffic, onOpen }: { fn: FunctionView; traffic: Traf
             {name}
           </span>
         ))}
-        {names.length > shown.length ? <span className="text-[11px] text-grey-500">+{names.length - shown.length} more</span> : null}
+        {names.length > shown.length ? <span className="text-[11px] text-grey-600">+{names.length - shown.length} more</span> : null}
         {names.length === 0 && fn.method ? <Pill>{fn.method}</Pill> : null}
       </div>
       {transports.length || fn.operations.length ? (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-grey-300 pt-3 text-[11px] text-grey-500">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-grey-300 pt-3 text-[11px] text-grey-600">
           <span>
             {fn.operations.length} {fn.operations.length === 1 ? 'operation' : 'operations'}
           </span>
@@ -329,9 +329,9 @@ function TrafficPanel({ fn, traffic, rangeId, onRange }: { fn: FunctionView; tra
   const stats: FunctionTraffic | null = traffic.status === 'ready' ? trafficFor(traffic.operations, fn.tag, traffic.windowMs) : null;
   const period = TRAFFIC_RANGES.find(item => item.id === rangeId)?.label.toLowerCase() ?? '';
   let body;
-  if (traffic.status === 'loading') body = <p className="py-6 text-center text-sm text-grey-500">Loading traffic...</p>;
-  else if (traffic.status === 'error') body = <p className="py-6 text-center text-sm text-grey-500">Traffic could not be loaded. Try Refresh.</p>;
-  else if (!stats) body = <p className="py-6 text-center text-sm text-grey-500">No calls were recorded for this function in the {period}.</p>;
+  if (traffic.status === 'loading') body = <p className="py-6 text-center text-sm text-grey-600">Loading traffic...</p>;
+  else if (traffic.status === 'error') body = <p className="py-6 text-center text-sm text-grey-600">Traffic could not be loaded. Try Refresh.</p>;
+  else if (!stats) body = <p className="py-6 text-center text-sm text-grey-600">No calls were recorded for this function in the {period}.</p>;
   else {
     body = (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -351,7 +351,7 @@ function TrafficPanel({ fn, traffic, rangeId, onRange }: { fn: FunctionView; tra
 }
 
 function FieldTable({ rows, emptyLabel }: { rows: FieldRow[]; emptyLabel: string }) {
-  if (!rows.length) return <p className="px-4 py-6 text-center text-xs text-grey-500 sm:text-sm">{emptyLabel}</p>;
+  if (!rows.length) return <p className="px-4 py-6 text-center text-xs text-grey-600 sm:text-sm">{emptyLabel}</p>;
   return (
     <DataTable head={['Field', 'Type', 'Notes']}>
       {rows.map((row, index) => (
@@ -361,7 +361,7 @@ function FieldTable({ rows, emptyLabel }: { rows: FieldRow[]; emptyLabel: string
             {row.required ? <span className="ml-2 text-[10px] font-medium uppercase tracking-wide text-red">required</span> : null}
           </td>
           <td className="whitespace-nowrap px-4 py-2.5 align-top text-xs text-grey-600 sm:text-sm">{row.type}</td>
-          <td className="px-4 py-2.5 align-top text-xs text-grey-500 sm:text-sm">{row.note || '-'}</td>
+          <td className="px-4 py-2.5 align-top text-xs text-grey-600 sm:text-sm">{row.note || '-'}</td>
         </tr>
       ))}
     </DataTable>
@@ -377,7 +377,7 @@ function SampleTable({ rows }: { rows: ValueRow[] }) {
             <span className="font-mono text-xs text-grey sm:text-sm">{row.name}</span>
           </td>
           <td className="whitespace-nowrap px-4 py-2.5 align-top text-xs text-grey-600 sm:text-sm">{row.type}</td>
-          <td className="break-all px-4 py-2.5 align-top font-mono text-xs text-grey-500">{row.example}</td>
+          <td className="break-all px-4 py-2.5 align-top font-mono text-xs text-grey-600">{row.example}</td>
         </tr>
       ))}
     </DataTable>
@@ -402,22 +402,22 @@ function FunctionDetail({
       <Panel title="About">
         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-4">
-            <dt className="text-xs text-grey-500">Description</dt>
+            <dt className="text-xs text-grey-600">Description</dt>
             <dd className="mt-1 text-grey">{fn.description || 'No description provided.'}</dd>
           </div>
           {fn.version ? (
             <div>
-              <dt className="text-xs text-grey-500">Version</dt>
+              <dt className="text-xs text-grey-600">Version</dt>
               <dd className="mt-1 text-grey">v{fn.version}</dd>
             </div>
           ) : null}
           <div>
-            <dt className="text-xs text-grey-500">Operations</dt>
+            <dt className="text-xs text-grey-600">Operations</dt>
             <dd className="mt-1 text-grey">{fn.operations.length || (fn.method ? 1 : 0)}</dd>
           </div>
           {transports.length ? (
             <div>
-              <dt className="text-xs text-grey-500">Reached over</dt>
+              <dt className="text-xs text-grey-600">Reached over</dt>
               <dd className="mt-1 flex flex-wrap gap-1.5">
                 {transports.map(type => (
                   <Pill key={type}>{TRANSPORT_LABELS[type] ?? type}</Pill>
@@ -427,7 +427,7 @@ function FunctionDetail({
           ) : null}
           {fn.envs.length ? (
             <div>
-              <dt className="text-xs text-grey-500">Environments</dt>
+              <dt className="text-xs text-grey-600">Environments</dt>
               <dd className="mt-1 flex flex-wrap gap-1.5">
                 {fn.envs.map(slug => (
                   <Pill key={slug}>{slug}</Pill>
@@ -466,11 +466,11 @@ function FunctionDetail({
         >
           <div className="grid divide-y divide-grey-300 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
             <div className="min-w-0">
-              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Takes</p>
+              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-600">Takes</p>
               <FieldTable rows={op.input} emptyLabel="Input schema not published." />
             </div>
             <div className="min-w-0">
-              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Returns</p>
+              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-600">Returns</p>
               <FieldTable rows={op.output} emptyLabel="Output schema not published." />
             </div>
           </div>
@@ -481,12 +481,12 @@ function FunctionDetail({
         <Panel title={fn.method ? `${fn.method} request` : 'Request'} flush>
           <div className={cn('grid', fn.responseSample.length && 'lg:grid-cols-2 lg:divide-x lg:divide-grey-300')}>
             <div className="min-w-0">
-              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Takes</p>
-              {fn.requestSample.length ? <SampleTable rows={fn.requestSample} /> : <p className="px-4 py-6 text-center text-xs text-grey-500 sm:text-sm">No request sample recorded.</p>}
+              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-600">Takes</p>
+              {fn.requestSample.length ? <SampleTable rows={fn.requestSample} /> : <p className="px-4 py-6 text-center text-xs text-grey-600 sm:text-sm">No request sample recorded.</p>}
             </div>
             {fn.responseSample.length ? (
               <div className="min-w-0">
-                <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-500">Returns</p>
+                <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-grey-600">Returns</p>
                 <SampleTable rows={fn.responseSample} />
               </div>
             ) : null}

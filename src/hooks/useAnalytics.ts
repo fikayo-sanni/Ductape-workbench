@@ -467,7 +467,7 @@ export function getTrendColorClass(
   positiveIsGood: boolean = true
 ): string {
   const direction = getTrendDirection(change);
-  if (direction === 'stable') return 'text-grey-500';
+  if (direction === 'stable') return 'text-grey-600';
   const isPositive = direction === 'up';
   const isGood = positiveIsGood ? isPositive : !isPositive;
   return isGood ? 'text-green' : 'text-red-500';

@@ -182,7 +182,7 @@ function UnavailableFeaturePanel({
     <div className="flex-1 flex items-center justify-center bg-grey-50/50 p-8">
       <div className="text-center max-w-md">
         <h2 className="text-lg font-semibold text-grey">{title}</h2>
-        <p className="text-sm text-grey-500 mt-2">{message}</p>
+        <p className="text-sm text-grey-600 mt-2">{message}</p>
       </div>
     </div>
   );

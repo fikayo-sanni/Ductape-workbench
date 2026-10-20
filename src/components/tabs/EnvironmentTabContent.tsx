@@ -145,7 +145,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
         {/* Empty State */}
         {envVariables.length === 0 && !environment.base_url && (
           <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
-            <Globe className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <Globe className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Variables Configured</h3>
             <p className="text-sm text-grey-600">
               This environment doesn't have any variables or base URL configured yet.

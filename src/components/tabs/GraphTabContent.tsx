@@ -73,12 +73,12 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Share2 className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete graph data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the graph from your product to reload it.
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Share2 className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600">Graph not found</p>
         </div>
       </div>
@@ -363,8 +363,8 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
                         {env.database && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
                             <div className="flex items-center gap-2 mb-1">
-                              <DatabaseIcon className="h-3 w-3 text-grey-500" />
-                              <p className="text-xs text-grey-500">Database</p>
+                              <DatabaseIcon className="h-3 w-3 text-grey-600" />
+                              <p className="text-xs text-grey-600">Database</p>
                             </div>
                             <p className="text-sm font-medium text-grey">{env.database}</p>
                           </div>
@@ -372,8 +372,8 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
                         {env.graphName && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
                             <div className="flex items-center gap-2 mb-1">
-                              <Network className="h-3 w-3 text-grey-500" />
-                              <p className="text-xs text-grey-500">Graph Name</p>
+                              <Network className="h-3 w-3 text-grey-600" />
+                              <p className="text-xs text-grey-600">Graph Name</p>
                             </div>
                             <p className="text-sm font-medium text-grey">{env.graphName}</p>
                           </div>
@@ -381,8 +381,8 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
                         {env.region && (
                           <div className="p-3 rounded-lg bg-grey-50 border border-grey-200">
                             <div className="flex items-center gap-2 mb-1">
-                              <Globe className="h-3 w-3 text-grey-500" />
-                              <p className="text-xs text-grey-500">Region</p>
+                              <Globe className="h-3 w-3 text-grey-600" />
+                              <p className="text-xs text-grey-600">Region</p>
                             </div>
                             <p className="text-sm font-medium text-grey">{env.region}</p>
                           </div>
@@ -394,7 +394,7 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
                     {env.iamAuth !== undefined && (
                       <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                         <div className="flex items-center gap-2">
-                          <CheckCircle className={cn("h-4 w-4", env.iamAuth ? "text-green" : "text-grey-400")} />
+                          <CheckCircle className={cn("h-4 w-4", env.iamAuth ? "text-green" : "text-grey-600")} />
                           <p className="text-sm font-medium text-grey">
                             IAM Authentication: {env.iamAuth ? 'Enabled' : 'Disabled'}
                           </p>
@@ -420,7 +420,7 @@ export default function GraphTabContent({ graph }: GraphTabContentProps) {
         {/* Empty State */}
         {(!displayData.envs || displayData.envs.length === 0) && (
           <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
-            <Share2 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <Share2 className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Configured</h3>
             <p className="text-sm text-grey-600">
               This graph database doesn't have any environment connections configured yet.

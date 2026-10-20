@@ -335,7 +335,7 @@ export default function SessionActivityTab({
                 </button>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-600 hover:text-grey transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -454,7 +454,7 @@ export default function SessionActivityTab({
             <div className="px-2 mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
                 title="Expand sidebar"
               >
                 <PanelLeft className="h-4 w-4" />
@@ -597,7 +597,7 @@ export default function SessionActivityTab({
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-grey truncate">{user.identifier}</span>
                               </div>
-                              <p className="text-xs text-grey-500 truncate max-w-[300px] font-mono">{user.ductape_user_id}</p>
+                              <p className="text-xs text-grey-600 truncate max-w-[300px] font-mono">{user.ductape_user_id}</p>
                             </div>
                           </div>
 
@@ -641,7 +641,7 @@ export default function SessionActivityTab({
 
                           {/* Arrow */}
                           <div className="flex justify-end">
-                            <ChevronRight className="h-4 w-4 text-grey-400" />
+                            <ChevronRight className="h-4 w-4 text-grey-600" />
                           </div>
                         </div>
                       );
@@ -651,10 +651,10 @@ export default function SessionActivityTab({
                   {filteredUsers.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                       <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
-                        <Search className="h-6 w-6 text-grey-500" />
+                        <Search className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey font-medium">No users found</p>
-                      <p className="text-grey-500 text-sm mt-1">Try adjusting your filters</p>
+                      <p className="text-grey-600 text-sm mt-1">Try adjusting your filters</p>
                     </div>
                   )}
                 </div>

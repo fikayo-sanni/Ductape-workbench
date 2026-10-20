@@ -18,12 +18,12 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <MessageSquare className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete messaging data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the messaging from your product to reload it.
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <MessageSquare className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600">Messaging not found</p>
         </div>
       </div>
@@ -299,7 +299,7 @@ export default function MessageBrokerTabContent({ messageBroker }: MessageBroker
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
-            <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <MessageSquare className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Configured</h3>
             <p className="text-sm text-grey-600">
               This message broker doesn't have any environment configurations yet.

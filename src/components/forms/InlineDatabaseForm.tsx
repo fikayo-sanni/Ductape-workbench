@@ -570,7 +570,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 variant="ghost"
                 size="sm"
                 onClick={onCancel}
-                className="text-grey-500 hover:text-grey -ml-2"
+                className="text-grey-600 hover:text-grey -ml-2"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -846,7 +846,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                             <button
                               type="button"
                               onClick={() => setShowPasswords({ ...showPasswords, [index]: !showPasswords[index] })}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey"
                             >
                               {showPasswords[index] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
@@ -898,7 +898,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                         <button
                           type="button"
                           onClick={() => setShowPasswords({ ...showPasswords, [index]: !showPasswords[index] })}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-400 hover:text-grey-600"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-600 hover:text-grey"
                         >
                           {showPasswords[index] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>

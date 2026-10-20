@@ -88,12 +88,12 @@ export default function MarketplaceSidebar({
         >
           {hasChildren ? (
             isExpanded ? (
-              <ChevronDown className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
+              <ChevronDown className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
             ) : (
-              <ChevronRight className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
+              <ChevronRight className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
             )
           ) : (
-            <Globe className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-400 group-hover:text-primary")} />
+            <Globe className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
           )}
           <span className="truncate text-sm tracking-tight">
             {getDomainDisplayName(domain.domain_name)}

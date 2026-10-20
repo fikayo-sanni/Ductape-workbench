@@ -327,9 +327,9 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
                             }
                           >
                             {showPassword.password ? (
-                              <EyeOff className="h-4 w-4 text-grey-500" />
+                              <EyeOff className="h-4 w-4 text-grey-600" />
                             ) : (
-                              <Eye className="h-4 w-4 text-grey-500" />
+                              <Eye className="h-4 w-4 text-grey-600" />
                             )}
                           </Button>
                         </div>
@@ -364,9 +364,9 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
                             }
                           >
                             {showPassword.confirmPassword ? (
-                              <EyeOff className="h-4 w-4 text-grey-500" />
+                              <EyeOff className="h-4 w-4 text-grey-600" />
                             ) : (
-                              <Eye className="h-4 w-4 text-grey-500" />
+                              <Eye className="h-4 w-4 text-grey-600" />
                             )}
                           </Button>
                         </div>
@@ -452,7 +452,7 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
               <div className="mt-6">
                 <div className="flex items-center">
                   <hr className="flex-grow border-t border-grey-200" />
-                  <span className="px-3 text-grey-500 text-sm font-medium">OR</span>
+                  <span className="px-3 text-grey-600 text-sm font-medium">OR</span>
                   <hr className="flex-grow border-t border-grey-200" />
                 </div>
 
@@ -539,7 +539,7 @@ export default function CreateAccountModal({ open, onClose, onSuccess }: CreateA
                 </button>
               </div>
 
-              <p className="text-xs text-grey-500 text-center">
+              <p className="text-xs text-grey-600 text-center">
                 The code expires in 5 minutes
               </p>
             </div>

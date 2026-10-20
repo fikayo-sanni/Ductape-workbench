@@ -441,7 +441,7 @@ export default function FeatureBuilderTab({
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                 <div className="text-center max-w-sm px-4">
                   <p className="text-sm text-grey-600">No steps defined yet.</p>
-                  <p className="text-xs text-grey-500 mt-1">
+                  <p className="text-xs text-grey-600 mt-1">
                     Click <strong>Edit flow</strong> to add steps from the palette.
                   </p>
                 </div>
@@ -510,7 +510,7 @@ export default function FeatureBuilderTab({
                 }
               }}
             />
-            <span className="text-[11px] text-grey-500">
+            <span className="text-[11px] text-grey-600">
               Connect steps from Start (layer 1 → feature input) or from parent steps (map from $Step output)
             </span>
           </div>

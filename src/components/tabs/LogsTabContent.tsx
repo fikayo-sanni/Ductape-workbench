@@ -217,7 +217,7 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
 
                   {/* Type with icon and label (e.g. feature_step -> "Step", secret -> "Secret") */}
                   <span className="text-xs text-grey-600 flex items-center gap-1.5 shrink-0">
-                    <TypeIcon className="h-3.5 w-3.5 flex-shrink-0 text-grey-500" />
+                    <TypeIcon className="h-3.5 w-3.5 flex-shrink-0 text-grey-600" />
                     <span>{getLogTypeLabel(componentType)}</span>
                   </span>
                 </div>

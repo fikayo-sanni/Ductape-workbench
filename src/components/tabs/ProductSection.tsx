@@ -47,7 +47,7 @@ export function SectionPage({
               </div>
               <div>
                 <h1 className="text-base font-bold text-grey sm:text-lg md:text-xl">{title}</h1>
-                {subtitle ? <p className="text-xs text-grey-500 sm:text-sm">{subtitle}</p> : null}
+                {subtitle ? <p className="text-xs text-grey-600 sm:text-sm">{subtitle}</p> : null}
               </div>
             </div>
             {actions ? <div className="flex items-center gap-2 sm:gap-3">{actions}</div> : null}
@@ -83,7 +83,7 @@ export function Panel({
         <div className="flex items-start justify-between gap-3 border-b border-grey-300 px-4 py-3 sm:px-5">
           <div className="min-w-0">
             {title ? <h2 className="text-sm font-semibold text-grey sm:text-base">{title}</h2> : null}
-            {description ? <p className="mt-0.5 text-xs text-grey-500">{description}</p> : null}
+            {description ? <p className="mt-0.5 text-xs text-grey-600">{description}</p> : null}
           </div>
           {action}
         </div>
@@ -121,14 +121,14 @@ export function StatTile({ label, value, hint, tone = 'neutral' }: { label: stri
     <div className="rounded-lg bg-grey-100 p-3 text-center sm:p-4">
       <p className={cn('text-xl font-bold sm:text-2xl md:text-3xl', TONES[tone].value)}>{value}</p>
       <p className="mt-0.5 text-[11px] text-grey-600 sm:text-xs md:text-sm">{label}</p>
-      {hint ? <p className="mt-0.5 text-[10px] text-grey-500 sm:text-xs">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-[10px] text-grey-600 sm:text-xs">{hint}</p> : null}
     </div>
   );
 }
 
 export function SectionLoading({ label = 'Loading...' }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-16 text-sm text-grey-500">
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-grey-600">
       <Loader2 className="h-4 w-4 animate-spin text-primary" />
       {label}
     </div>
@@ -154,7 +154,7 @@ export function SectionEmpty({
         <Icon className={cn('h-8 w-8 sm:h-10 sm:w-10', tint.text)} />
       </div>
       <h3 className="mb-1 text-base font-semibold text-grey sm:text-lg">{title}</h3>
-      <p className="mb-4 max-w-md text-xs leading-relaxed text-grey-500 sm:text-sm">{description}</p>
+      <p className="mb-4 max-w-md text-xs leading-relaxed text-grey-600 sm:text-sm">{description}</p>
       {action}
     </div>
   );
@@ -211,7 +211,7 @@ export function DataTable({ head, children, minWidth }: { head: string[]; childr
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm" style={minWidth ? { minWidth } : undefined}>
-        <thead className="border-b border-grey-300 bg-grey-100 text-xs uppercase tracking-wide text-grey-500">
+        <thead className="border-b border-grey-300 bg-grey-100 text-xs uppercase tracking-wide text-grey-600">
           <tr>
             {head.map(label => (
               <th key={label} className="whitespace-nowrap px-4 py-2.5 font-medium">

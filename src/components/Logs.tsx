@@ -558,9 +558,9 @@ export default function Logs() {
         <div className="bg-white rounded-lg border border-grey-400 shadow-sm overflow-hidden">
           {allLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <Inbox className="h-12 w-12 text-grey-400 mb-3" />
+              <Inbox className="h-12 w-12 text-grey-600 mb-3" />
               <p className="text-grey-600 font-medium">No logs found</p>
-              <p className="text-sm text-grey-500 mt-1">
+              <p className="text-sm text-grey-600 mt-1">
                 {activeFilterCount > 0
                   ? 'Try adjusting your filters or search terms'
                   : 'Logs will appear here as activity occurs'}

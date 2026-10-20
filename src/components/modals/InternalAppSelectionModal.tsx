@@ -131,7 +131,7 @@ export default function InternalAppSelectionModal({
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-grey-600" />
             <Input
               placeholder="Search apps..."
               value={searchTerm}
@@ -176,7 +176,7 @@ export default function InternalAppSelectionModal({
                         {app.tag || app.app_tag}
                       </p>
                       {app.description && (
-                        <p className="text-xs text-grey-500 mt-1 line-clamp-2">
+                        <p className="text-xs text-grey-600 mt-1 line-clamp-2">
                           {app.description}
                         </p>
                       )}
@@ -189,9 +189,9 @@ export default function InternalAppSelectionModal({
               ))
             ) : (
               <div className="text-center py-8">
-                <Grid3x3 className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <Grid3x3 className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                 <p className="text-sm text-grey-600 mb-2">No apps found</p>
-                <p className="text-xs text-grey-500">
+                <p className="text-xs text-grey-600">
                   {searchTerm ? 'Try adjusting your search terms' : 'Create your first app to get started'}
                 </p>
               </div>

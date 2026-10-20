@@ -46,9 +46,9 @@ function WebhookExplorerIncomplete() {
   return (
     <div className="h-full flex items-center justify-center bg-grey-100">
       <div className="text-center">
-        <Webhook className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+        <Webhook className="h-12 w-12 text-grey-600 mx-auto mb-3" />
         <p className="text-grey-600 mb-2">Incomplete webhook data</p>
-        <p className="text-sm text-grey-500">Close this tab and reopen the webhook from the app.</p>
+        <p className="text-sm text-grey-600">Close this tab and reopen the webhook from the app.</p>
       </div>
     </div>
   );

@@ -66,7 +66,7 @@ export function WebhookTabOverview({
                 <card.icon className="h-4 w-4" />
               </div>
               <p className="text-2xl font-bold text-grey tabular-nums">{card.value}</p>
-              <p className="text-xs text-grey-500 mt-0.5">{card.label}</p>
+              <p className="text-xs text-grey-600 mt-0.5">{card.label}</p>
             </div>
           ))}
         </div>
@@ -140,7 +140,7 @@ export function WebhookTabOverview({
               </button>
             </div>
             {events.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-grey-500 text-center">No events configured</p>
+              <p className="px-4 py-6 text-xs text-grey-600 text-center">No events configured</p>
             ) : (
               <ul className="divide-y divide-grey-100 max-h-64 overflow-y-auto">
                 {events.slice(0, 8).map((event) => (
@@ -153,7 +153,7 @@ export function WebhookTabOverview({
                       <Zap className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-grey truncate">{event.name}</p>
-                        <p className="text-[10px] font-mono text-grey-500">{event.tag}</p>
+                        <p className="text-[10px] font-mono text-grey-600">{event.tag}</p>
                       </div>
                     </button>
                   </li>

@@ -386,7 +386,7 @@ export default function InlineMessageBrokerForm({
               variant="ghost"
               size="sm"
               onClick={onCancel}
-              className="text-grey-500 hover:text-grey -ml-2"
+              className="text-grey-600 hover:text-grey -ml-2"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>

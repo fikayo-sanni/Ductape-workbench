@@ -92,12 +92,12 @@ export function WebhookExplorerSidebar({
             <>
               <div className="flex-1 min-w-0">
                 <h2 className="font-semibold text-grey text-sm truncate leading-tight">{webhookName}</h2>
-                <code className="text-[11px] text-grey-500 font-mono truncate block">{webhookTag}</code>
+                <code className="text-[11px] text-grey-600 font-mono truncate block">{webhookTag}</code>
               </div>
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded-md transition-colors"
+                className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded-md transition-colors"
                 title="Collapse"
               >
                 <PanelLeftClose className="h-4 w-4" />
@@ -122,7 +122,7 @@ export function WebhookExplorerSidebar({
                 {modeBadge.label}
               </span>
             )}
-            <span className="text-xs text-grey-500">
+            <span className="text-xs text-grey-600">
               {eventsCount} events · {envsCount} envs
             </span>
           </div>
@@ -141,14 +141,14 @@ export function WebhookExplorerSidebar({
               {appLogo ? (
                 <img src={appLogo} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Package className="h-3.5 w-3.5 text-grey-500" />
+                <Package className="h-3.5 w-3.5 text-grey-600" />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] uppercase tracking-wide text-grey-500">App</p>
+              <p className="text-[10px] uppercase tracking-wide text-grey-600">App</p>
               <p className="text-xs font-medium text-grey truncate">{appName}</p>
             </div>
-            <ExternalLink className="h-3 w-3 text-grey-400 group-hover:text-primary flex-shrink-0" />
+            <ExternalLink className="h-3 w-3 text-grey-600 group-hover:text-primary flex-shrink-0" />
           </button>
         </div>
       )}
@@ -211,7 +211,7 @@ export function WebhookExplorerSidebar({
               )}
             </div>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-500" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-600" />
               <Input
                 type="text"
                 placeholder="Filter events…"
@@ -223,7 +223,7 @@ export function WebhookExplorerSidebar({
           </div>
           <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0 space-y-1">
             {filteredEvents.length === 0 ? (
-              <p className="text-xs text-grey-500 text-center py-6 px-2">
+              <p className="text-xs text-grey-600 text-center py-6 px-2">
                 {searchQuery ? 'No matches' : 'No events yet'}
               </p>
             ) : (
@@ -246,16 +246,16 @@ export function WebhookExplorerSidebar({
                       <Zap
                         className={cn(
                           'h-3.5 w-3.5 mt-0.5 flex-shrink-0',
-                          isSelected ? 'text-amber-600' : 'text-grey-500'
+                          isSelected ? 'text-amber-600' : 'text-grey-600'
                         )}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-grey truncate">{event.name}</p>
-                        <p className="text-[10px] text-grey-500 font-mono truncate">
+                        <p className="text-[10px] text-grey-600 font-mono truncate">
                           {fullWebhookTag}:{event.tag}
                         </p>
                         {selectors.length > 0 && (
-                          <p className="text-[10px] text-grey-400 font-mono mt-0.5 truncate">
+                          <p className="text-[10px] text-grey-600 font-mono mt-0.5 truncate">
                             {formatSelector(selectors[0])}
                             {selectors.length > 1 ? ` +${selectors.length - 1}` : ''}
                           </p>

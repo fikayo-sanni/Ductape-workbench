@@ -1,4 +1,12 @@
 import { useState } from 'react';
+import { tabsToClose, unsavedCount, type CloseScope } from '@/utils/tabClosing';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Tab, TabType } from '@/types/tab';
 import { cn } from '@/lib/utils';
@@ -33,6 +41,7 @@ import {
   Boxes,
   Cloud,
   CalendarClock,
+  ChevronDown,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -91,7 +100,7 @@ const getTabIcon = (type: Tab['type']) => {
 };
 
 export default function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, setActiveView, setActiveIconSidebar, reorderTabs } =
+  const { tabs, activeTabId, setActiveTab, closeTab, closeTabs, setActiveView, setActiveIconSidebar, reorderTabs } =
     useWorkbenchStore();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -142,15 +151,26 @@ export default function TabBar() {
     setDragOverIndex(null);
   };
 
+  /** Closes the tabs a menu command covers, asking first when that would discard unsaved changes. */
+  const closeScope = (scope: CloseScope) => {
+    const ids = tabsToClose(tabs, activeTabId, scope);
+    if (ids.length === 0) return;
+    const unsaved = unsavedCount(tabs, ids);
+    if (unsaved > 0 && !window.confirm(`${unsaved} of these tabs ${unsaved === 1 ? 'has' : 'have'} unsaved changes. Close anyway?`)) {
+      return;
+    }
+    closeTabs(ids);
+  };
+
   if (tabs.length === 0) {
     return null;
   }
 
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+
   return (
-    <div
-      data-testid="tab-bar"
-      className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-center overflow-x-auto shadow-sm tab-bar-scroll"
-    >
+    <div data-testid="tab-bar" className="h-9 md:h-10 bg-white border-b border-grey-400 flex items-stretch shadow-sm">
+      <div className="flex-1 min-w-0 flex items-center overflow-x-auto tab-bar-scroll">
       {tabs.map((tab, index) => {
         const Icon = getTabIcon(tab.type);
         const isActive = activeTabId === tab.id;
@@ -206,6 +226,36 @@ export default function TabBar() {
           </div>
         );
       })}
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="h-full px-2 md:px-3 border-l border-grey-400 flex items-center justify-center flex-shrink-0 text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
+            title="Tab actions"
+            aria-label="Tab actions"
+            data-testid="tab-menu"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[190px]">
+          <DropdownMenuItem disabled={activeIndex < 0} onSelect={() => closeScope('active')}>
+            Close tab
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={tabs.length < 2 || activeIndex < 0} onSelect={() => closeScope('others')}>
+            Close other tabs
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={activeIndex < 0 || activeIndex === tabs.length - 1} onSelect={() => closeScope('right')}>
+            Close tabs to the right
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => closeScope('all')} data-testid="close-all-tabs">
+            Close all tabs
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

@@ -81,7 +81,7 @@ export function MappingValueSelect({
         <SelectContent>
           {Array.from(grouped.entries()).map(([group, items]) => (
             <SelectGroup key={group}>
-              <SelectLabel className="text-[10px] uppercase tracking-wide text-grey-500">
+              <SelectLabel className="text-[10px] uppercase tracking-wide text-grey-600">
                 {group}
               </SelectLabel>
               {items.map((opt) => (
@@ -92,7 +92,7 @@ export function MappingValueSelect({
             </SelectGroup>
           ))}
           <SelectGroup>
-            <SelectLabel className="text-[10px] uppercase tracking-wide text-grey-500">
+            <SelectLabel className="text-[10px] uppercase tracking-wide text-grey-600">
               Other
             </SelectLabel>
             <SelectItem value={MAPPING_LITERAL_ID} className="text-xs">

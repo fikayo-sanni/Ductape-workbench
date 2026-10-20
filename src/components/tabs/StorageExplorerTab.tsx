@@ -230,9 +230,9 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <HardDrive className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <HardDrive className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete storage data</p>
-          <p className="text-sm text-grey-500">Please close this tab and reopen the storage from the explorer.</p>
+          <p className="text-sm text-grey-600">Please close this tab and reopen the storage from the explorer.</p>
         </div>
       </div>
     );
@@ -810,7 +810,7 @@ export default function StorageExplorerTab({ tabId, storage }: StorageExplorerTa
     if (lowerType.includes('spreadsheet') || lowerType.includes('excel')) return <FileSpreadsheet className="h-4 w-4 text-green" />;
     if (lowerType.includes('zip') || lowerType.includes('rar') || lowerType.includes('tar')) return <FileArchive className="h-4 w-4 text-yellow" />;
     if (lowerType.includes('text') || lowerType.includes('csv')) return <FileText className="h-4 w-4 text-grey-600" />;
-    return <File className="h-4 w-4 text-grey-500" />;
+    return <File className="h-4 w-4 text-grey-600" />;
   }
 
   function getProviderColor(provider: string) {
@@ -1464,7 +1464,7 @@ console.log('Files by type:', stats.byType);`,
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -1541,7 +1541,7 @@ console.log('Files by type:', stats.byType);`,
               >
                 <LayoutDashboard className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'overview' ? 'text-purple-500' : 'text-grey-500'
+                  viewMode === 'overview' ? 'text-purple-500' : 'text-grey-600'
                 )} />
                 <div className="flex-1 min-w-0">
                   <div className={cn(
@@ -1550,7 +1550,7 @@ console.log('Files by type:', stats.byType);`,
                   )}>
                     Overview
                   </div>
-                  <div className="text-xs text-grey-500">
+                  <div className="text-xs text-grey-600">
                     Dashboard & Statistics
                   </div>
                 </div>
@@ -1608,7 +1608,7 @@ console.log('Files by type:', stats.byType);`,
                     >
                       <span className={cn(
                         'flex-shrink-0',
-                        isSelected ? 'text-purple-500' : 'text-grey-500'
+                        isSelected ? 'text-purple-500' : 'text-grey-600'
                       )}>
                         {fileType.icon}
                       </span>
@@ -1619,13 +1619,13 @@ console.log('Files by type:', stats.byType);`,
                         {fileType.label}
                       </span>
                       {(isLoading || isLoadingStats) ? (
-                        <span className="text-xs text-grey-400">
+                        <span className="text-xs text-grey-600">
                           <span className="inline-block w-4 h-3 bg-grey-200 rounded animate-pulse"></span>
                         </span>
                       ) : (
                         <span className={cn(
                           'text-xs',
-                          isSelected ? 'text-purple-500' : 'text-grey-500'
+                          isSelected ? 'text-purple-500' : 'text-grey-600'
                         )}>
                           {count}{showPlus && '+'}
                         </span>
@@ -1753,7 +1753,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.totalFiles}</div>
-                    <div className="text-xs text-grey-500">Total Files</div>
+                    <div className="text-xs text-grey-600">Total Files</div>
                   </div>
                 </div>
               </div>
@@ -1766,7 +1766,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{formatSize(storageMetrics.totalSize)}</div>
-                    <div className="text-xs text-grey-500">Total Storage</div>
+                    <div className="text-xs text-grey-600">Total Storage</div>
                   </div>
                 </div>
               </div>
@@ -1779,7 +1779,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{weeklyStats.totalOperations}</div>
-                    <div className="text-xs text-grey-500">Operations (7 days)</div>
+                    <div className="text-xs text-grey-600">Operations (7 days)</div>
                   </div>
                 </div>
               </div>
@@ -1792,7 +1792,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey capitalize">{storageProvider}</div>
-                    <div className="text-xs text-grey-500">Storage Provider</div>
+                    <div className="text-xs text-grey-600">Storage Provider</div>
                   </div>
                 </div>
               </div>
@@ -1807,7 +1807,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.imageCount}</div>
-                    <div className="text-xs text-grey-500">Images</div>
+                    <div className="text-xs text-grey-600">Images</div>
                   </div>
                 </div>
               </div>
@@ -1818,7 +1818,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.videoCount}</div>
-                    <div className="text-xs text-grey-500">Videos</div>
+                    <div className="text-xs text-grey-600">Videos</div>
                   </div>
                 </div>
               </div>
@@ -1829,7 +1829,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.documentCount}</div>
-                    <div className="text-xs text-grey-500">Documents</div>
+                    <div className="text-xs text-grey-600">Documents</div>
                   </div>
                 </div>
               </div>
@@ -1840,7 +1840,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.audioCount}</div>
-                    <div className="text-xs text-grey-500">Audio</div>
+                    <div className="text-xs text-grey-600">Audio</div>
                   </div>
                 </div>
               </div>
@@ -1851,7 +1851,7 @@ console.log('Files by type:', stats.byType);`,
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-grey">{storageMetrics.archiveCount}</div>
-                    <div className="text-xs text-grey-500">Archives</div>
+                    <div className="text-xs text-grey-600">Archives</div>
                   </div>
                 </div>
               </div>
@@ -1964,7 +1964,7 @@ console.log('Files by type:', stats.byType);`,
               </div>
               <div className="divide-y divide-border">
                 {files.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-grey-500 text-sm">
+                  <div className="px-5 py-8 text-center text-grey-600 text-sm">
                     {isLoading ? 'Loading files...' : 'No files found'}
                   </div>
                 ) : (
@@ -1984,10 +1984,10 @@ console.log('Files by type:', stats.byType);`,
                             {getFileIcon(mimeType)}
                             <div>
                               <p className="text-sm font-medium text-grey">{file.name}</p>
-                              <p className="text-xs text-grey-500">{formatSize(file.size || 0)} • {storageProvider.toUpperCase()}</p>
+                              <p className="text-xs text-grey-600">{formatSize(file.size || 0)} • {storageProvider.toUpperCase()}</p>
                             </div>
                           </div>
-                          <span className="text-xs text-grey-500">
+                          <span className="text-xs text-grey-600">
                             {file.lastModified ? format(new Date(file.lastModified), 'MMM dd, yyyy') : '-'}
                           </span>
                         </div>
@@ -2026,7 +2026,7 @@ console.log('Files by type:', stats.byType);`,
                     })()}
                   </span>
                   {hasActiveFilters && (
-                    <span className="text-xs text-grey-500">(filtered)</span>
+                    <span className="text-xs text-grey-600">(filtered)</span>
                   )}
                 </div>
                 {/* Load more button when filtered and more files exist */}
@@ -2070,7 +2070,7 @@ console.log('Files by type:', stats.byType);`,
               ) : filteredFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full">
                   <div className="w-16 h-16 rounded-full bg-border flex items-center justify-center mb-4">
-                    <FolderOpen className="h-8 w-8 text-grey-500" />
+                    <FolderOpen className="h-8 w-8 text-grey-600" />
                   </div>
                   <p className="text-grey font-medium">No files found in loaded results</p>
                   {/* Show helpful message when stats indicate files exist but aren't in loaded results */}
@@ -2089,7 +2089,7 @@ console.log('Files by type:', stats.byType);`,
                           <p className="text-grey-600 text-sm">
                             {expectedCount} {selectedFileType} file{expectedCount !== 1 ? 's' : ''} exist{expectedCount === 1 ? 's' : ''} in storage
                           </p>
-                          <p className="text-grey-500 text-xs mt-1">
+                          <p className="text-grey-600 text-xs mt-1">
                             {hasMore ? 'Scroll down to load more files, or' : 'The files may be in a different location, or'} try clearing the filter
                           </p>
                           {hasMore && (
@@ -2194,7 +2194,7 @@ console.log('Files by type:', stats.byType);`,
                 )}
               </div>
               {hasMore && !isLoadingMore && (
-                <span className="text-xs text-grey-500">Scroll to load more</span>
+                <span className="text-xs text-grey-600">Scroll to load more</span>
               )}
             </div>
           </div>

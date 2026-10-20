@@ -139,12 +139,12 @@ export default function JobTabContent({ job }: JobTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Clock className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Clock className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete job data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the job from your product to reload it.
           </p>
         </div>
@@ -320,7 +320,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
                   readOnly
                   className="pr-10"
                 />
-                <Clock className="h-4 w-4 text-grey-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <Clock className="h-4 w-4 text-grey-600 absolute right-3 top-1/2 -translate-y-1/2" />
               </div>
               <p className="text-xs text-grey-600 mt-1">
                 {displayData.schedule ? 'Automated job execution based on schedule' : 'Job runs manually when triggered'}
@@ -374,7 +374,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
                       <p className="text-sm text-grey-600">
                         <span className="font-medium text-grey">Database:</span> {componentData.db.name}
                         {componentData.db.tag && (
-                          <span className="ml-2 text-xs text-grey-500 font-mono">({componentData.db.tag})</span>
+                          <span className="ml-2 text-xs text-grey-600 font-mono">({componentData.db.tag})</span>
                         )}
                       </p>
                     </div>
@@ -396,7 +396,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
                       <p className="text-sm text-grey-600">
                         <span className="font-medium text-grey">App:</span> {componentData.app.name}
                         {componentData.app.tag && (
-                          <span className="ml-2 text-xs text-grey-500 font-mono">({componentData.app.tag})</span>
+                          <span className="ml-2 text-xs text-grey-600 font-mono">({componentData.app.tag})</span>
                         )}
                       </p>
                     </div>

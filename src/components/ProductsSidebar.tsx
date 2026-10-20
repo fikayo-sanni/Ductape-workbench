@@ -290,7 +290,7 @@ export default function ProductsSidebar() {
                         </h3>
                         <div className="flex items-center gap-1">
                           <p className="text-xs text-grey-600 truncate">{component.productName}</p>
-                          <span className="text-xs text-grey-400">•</span>
+                          <span className="text-xs text-grey-600">•</span>
                           <p className="text-xs text-grey-600 capitalize">{component.type.replace('-', ' ')}</p>
                         </div>
                       </div>

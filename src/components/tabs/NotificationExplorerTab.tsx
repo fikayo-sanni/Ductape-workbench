@@ -858,9 +858,9 @@ console.log('Result:', result);`;
             <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
             {notifiers.length === 0 ? (
               <div className="bg-white rounded-lg border border-grey-400 p-12 text-center shadow-sm">
-                <Bell className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+                <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                 <p className="text-grey-600 mb-2">No notifiers yet</p>
-                <p className="text-sm text-grey-500 mb-4">Create a notification from your product to get started.</p>
+                <p className="text-sm text-grey-600 mb-4">Create a notification from your product to get started.</p>
               </div>
             ) : (
               notifiers.map((notifier) => {
@@ -873,12 +873,12 @@ console.log('Result:', result);`;
                           <Bell className="h-5 w-5 text-blue-500" />
                         </div>
                         <h3 className="text-base font-semibold text-grey">{notifier.name}</h3>
-                        <span className="text-xs text-grey-500 font-mono">{notifier.tag}</span>
+                        <span className="text-xs text-grey-600 font-mono">{notifier.tag}</span>
                       </div>
                       <span className="text-sm text-grey-600">{notifier.messages?.length ?? 0} template{notifier.messages?.length !== 1 ? 's' : ''}</span>
                     </div>
                     {envs.length === 0 ? (
-                      <p className="text-sm text-grey-500">No environments configured</p>
+                      <p className="text-sm text-grey-600">No environments configured</p>
                     ) : (
                       <div className="space-y-2">
                         {envs.map((env: { slug: string; name?: string }) => (
@@ -945,7 +945,7 @@ console.log('Result:', result);`;
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+                  className="p-1.5 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -1055,7 +1055,7 @@ console.log('Result:', result);`;
           {isSidebarCollapsed ? (
             <button
               onClick={() => setIsSidebarCollapsed(false)}
-              className="w-full flex items-center justify-center p-2 text-grey-500 hover:text-grey hover:bg-grey-100 rounded transition-colors"
+              className="w-full flex items-center justify-center p-2 text-grey-600 hover:text-grey hover:bg-grey-100 rounded transition-colors"
               title="Expand sidebar"
             >
               <PanelLeft className="h-4 w-4" />
@@ -1084,7 +1084,7 @@ console.log('Result:', result);`;
                   <div className="flex items-center gap-2 mt-1">
                     <code className="text-sm text-grey-600 font-mono">{product.tag}</code>
                     {displayNotification && (
-                      <code className="text-sm text-grey-500 font-mono">{displayNotification.tag}</code>
+                      <code className="text-sm text-grey-600 font-mono">{displayNotification.tag}</code>
                     )}
                     <span className={cn(
                       'px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-500'
@@ -1130,7 +1130,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                     <Send className="h-5 w-5 text-blue-600" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalSent.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Sent (7 days)</div>
@@ -1142,7 +1142,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
                     <CheckCircle className="h-5 w-5 text-green" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalDelivered.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Delivered (7 days)</div>
@@ -1154,7 +1154,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
                     <XCircle className="h-5 w-5 text-red-600" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalFailed.toLocaleString()}</div>
                 <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
@@ -1166,7 +1166,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <BarChart3 className="h-5 w-5 text-purple-600" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className={cn(
                   "text-2xl font-bold mb-1",
@@ -1183,7 +1183,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
                     <Mail className="h-5 w-5 text-blue" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.email.sent}</div>
                 <div className="text-xs text-grey-600 font-medium">Emails Sent</div>
@@ -1195,7 +1195,7 @@ console.log('Result:', result);`;
                   <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <Smartphone className="h-5 w-5 text-purple-600" />
                   </div>
-                  <div className="text-xs font-medium text-grey-500">—</div>
+                  <div className="text-xs font-medium text-grey-600">—</div>
                 </div>
                 <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.push.sent}</div>
                 <div className="text-xs text-grey-600 font-medium">Push Notifications</div>
@@ -1240,7 +1240,7 @@ console.log('Result:', result);`;
                       <div key={item.channel} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-grey-500" />
+                            <Icon className="h-4 w-4 text-grey-600" />
                             <span className="text-grey-600 font-medium">{item.channel}</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1268,7 +1268,7 @@ console.log('Result:', result);`;
                 </div>
                 <div className="space-y-3">
                   {weeklyStats.topTemplates.length === 0 ? (
-                    <p className="text-sm text-grey-500 text-center py-4">No templates yet</p>
+                    <p className="text-sm text-grey-600 text-center py-4">No templates yet</p>
                   ) : (
                     weeklyStats.topTemplates.map((template, idx) => (
                       <div key={template.tag} className="flex items-center justify-between p-3 bg-grey-50 rounded-lg">
@@ -1278,13 +1278,13 @@ console.log('Result:', result);`;
                           </span>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-grey truncate">{template.name}</p>
-                            <p className="text-xs text-grey-500 truncate">{template.tag}</p>
+                            <p className="text-xs text-grey-600 truncate">{template.tag}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-right">
                           <div>
                             <p className="text-sm font-semibold text-grey">{template.sent}</p>
-                            <p className="text-xs text-grey-500">sent</p>
+                            <p className="text-xs text-grey-600">sent</p>
                           </div>
                           <div className={cn(
                             "text-xs font-semibold px-2 py-1 rounded",
@@ -1417,7 +1417,7 @@ console.log('Result:', result);`;
                     .slice(0, 10);
                   if (allMessages.length === 0) {
                     return (
-                      <div className="px-5 py-8 text-center text-sm text-grey-500">
+                      <div className="px-5 py-8 text-center text-sm text-grey-600">
                         No sent messages in the last 7 days
                       </div>
                     );
@@ -1433,10 +1433,10 @@ console.log('Result:', result);`;
                         </div>
                         <div>
                           <p className="text-sm font-medium text-grey font-mono">{tag}</p>
-                          <p className="text-xs text-grey-500">{count} sent (7d)</p>
+                          <p className="text-xs text-grey-600">{count} sent (7d)</p>
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-grey-400" />
+                      <ChevronRight className="h-4 w-4 text-grey-600" />
                     </div>
                   ));
                 })()}
@@ -1493,7 +1493,7 @@ console.log('Result:', result);`;
                   </div>
                 ) : activityRowsFromMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
-                    <Send className="h-12 w-12 text-grey-400 mb-3" />
+                    <Send className="h-12 w-12 text-grey-600 mb-3" />
                     <p className="text-grey font-medium">No sent messages yet</p>
                     <p className="text-grey-600 text-sm mt-1">Send notifications from your app to see them here</p>
                   </div>
@@ -1519,7 +1519,7 @@ console.log('Result:', result);`;
                                 <button
                                   type="button"
                                   onClick={() => setExpandedRowId((prev) => (prev === log._id ? null : log._id ?? null))}
-                                  className="p-1 rounded text-grey-500 hover:text-grey hover:bg-grey-100"
+                                  className="p-1 rounded text-grey-600 hover:text-grey hover:bg-grey-100"
                                   title={expandedRowId === log._id ? 'Collapse input/output' : 'View input/output'}
                                 >
                                   <ChevronRight className={cn('h-4 w-4 transition-transform', expandedRowId === log._id && 'rotate-90')} />
@@ -1547,7 +1547,7 @@ console.log('Result:', result);`;
                             <TableCell className="px-6 py-3 text-sm text-grey-600 max-w-[280px] truncate" title={log.message}>
                               {log.message || '—'}
                             </TableCell>
-                            <TableCell className="px-6 py-3 text-sm text-grey-500">
+                            <TableCell className="px-6 py-3 text-sm text-grey-600">
                               {log.timestamp ? format(new Date(log.timestamp), 'MMM d, HH:mm') : '—'}
                             </TableCell>
                             <TableCell className="px-6 py-3 text-right">
@@ -1570,7 +1570,7 @@ console.log('Result:', result);`;
                                 <div className="space-y-4">
                                   {log.input != null && (
                                     <div className="rounded-lg border border-border bg-white shadow-sm p-4">
-                                      <p className="text-xs font-medium text-grey-500 mb-2">Input</p>
+                                      <p className="text-xs font-medium text-grey-600 mb-2">Input</p>
                                       <pre className="p-4 rounded-md bg-grey-50 border border-border text-xs font-mono text-grey-700 leading-relaxed overflow-auto max-h-56 select-text">
                                         {JSON.stringify(log.input, null, 2)}
                                       </pre>
@@ -1578,7 +1578,7 @@ console.log('Result:', result);`;
                                   )}
                                   {log.output != null && (
                                     <div className="rounded-lg border border-border bg-white shadow-sm p-4">
-                                      <p className="text-xs font-medium text-grey-500 mb-2">Output</p>
+                                      <p className="text-xs font-medium text-grey-600 mb-2">Output</p>
                                       <pre className="p-4 rounded-md bg-grey-50 border border-border text-xs font-mono text-grey-700 leading-relaxed overflow-auto max-h-56 select-text">
                                         {typeof log.output === 'object' ? JSON.stringify(log.output, null, 2) : String(log.output)}
                                       </pre>

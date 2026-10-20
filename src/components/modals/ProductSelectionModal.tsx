@@ -108,7 +108,7 @@ export default function ProductSelectionModal({
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-8 text-grey-600">
-                <Package className="h-12 w-12 mx-auto mb-2 text-grey-400" />
+                <Package className="h-12 w-12 mx-auto mb-2 text-grey-600" />
                 <p>No products found</p>
               </div>
             ) : (

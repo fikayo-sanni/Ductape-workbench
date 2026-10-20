@@ -455,7 +455,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                   </div>
                   <button
                     onClick={() => copyToClipboard(run.id, 'Run ID')}
-                    className="text-grey-400 hover:text-grey-600 transition-colors"
+                    className="text-grey-600 hover:text-grey transition-colors"
                     title="Copy Run ID"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -465,7 +465,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                   {featureName && (
                     <div className="flex items-center gap-1.5 text-sm text-grey-600">
                       <span className="font-medium text-grey">{featureName}</span>
-                      {featureTag && <code className="text-xs text-grey-400 font-mono">{featureTag}</code>}
+                      {featureTag && <code className="text-xs text-grey-600 font-mono">{featureTag}</code>}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-grey-600">
@@ -504,7 +504,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="text-grey-400 hover:text-grey">
+                  <Button size="sm" variant="ghost" className="text-grey-600 hover:text-grey">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -528,11 +528,11 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <triggerConfig.icon className={cn('h-4 w-4', triggerConfig.color)} />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Trigger</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Trigger</span>
               </div>
               <p className={cn('text-sm font-semibold', triggerConfig.color)}>{triggerConfig.label}</p>
               {run.triggeredByUser && run.triggeredByUser !== 'system' && (
-                <p className="text-xs text-grey-400 mt-0.5">{run.triggeredByUser}</p>
+                <p className="text-xs text-grey-600 mt-0.5">{run.triggeredByUser}</p>
               )}
             </div>
 
@@ -540,13 +540,13 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <Layers className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Progress</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Progress</span>
               </div>
               <p className="text-sm font-semibold text-grey flex items-center gap-2">
                 {stepsLoading ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                    <span className="text-grey-500">Loading steps…</span>
+                    <span className="text-grey-600">Loading steps…</span>
                   </>
                 ) : (
                   `${completedSteps} / ${totalSteps} steps`
@@ -572,17 +572,17 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <Timer className="h-4 w-4 text-yellow" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Duration</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Duration</span>
               </div>
               <p className="text-sm font-semibold text-grey">{formatDuration(totalDuration)}</p>
-              <p className="text-xs text-grey-400 mt-0.5">Total execution time</p>
+              <p className="text-xs text-grey-600 mt-0.5">Total execution time</p>
             </div>
 
             {/* Tags */}
             <div className="bg-background-tertiary rounded-lg px-4 py-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <Zap className="h-4 w-4 text-green" />
-                <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">Tags</span>
+                <span className="text-xs font-medium text-grey-600 uppercase tracking-wide">Tags</span>
               </div>
               {run.tags && run.tags.length > 0 ? (
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
@@ -593,7 +593,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-grey-400">No tags</p>
+                <p className="text-sm text-grey-600">No tags</p>
               )}
             </div>
           </div>
@@ -629,7 +629,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                 </div>
                 <div>
                   <h3 className="font-semibold text-grey">Feature</h3>
-                  <p className="text-xs text-grey-500">
+                  <p className="text-xs text-grey-600">
                     {stepsLoading ? 'Loading…' : `${steps.length} step${steps.length === 1 ? '' : 's'} in execution order`}
                   </p>
                 </div>
@@ -643,12 +643,12 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                     Start
                   </div>
                   {steps.length > 0 && (
-                    <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                    <ChevronRight className="h-5 w-5 text-grey-600 mx-1 flex-shrink-0" aria-hidden />
                   )}
                 </div>
                 {/* Step nodes */}
                 {showStepsLoading ? (
-                  <div className="flex items-center gap-2 px-4 py-3 text-grey-500 text-sm">
+                  <div className="flex items-center gap-2 px-4 py-3 text-grey-600 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading steps…
                   </div>
@@ -673,7 +673,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                             stepStatus === 'failed' && 'bg-red/5 border-red/30 text-grey',
                             stepStatus === 'running' && 'bg-primary/5 border-primary/30 text-grey',
                             stepStatus === 'pending' && 'bg-grey-50 border-grey-300 text-grey-600',
-                            stepStatus === 'skipped' && 'bg-grey-50 border-grey-300 text-grey-500',
+                            stepStatus === 'skipped' && 'bg-grey-50 border-grey-300 text-grey-600',
                             stepStatus === 'retrying' && 'bg-yellow/5 border-yellow/30 text-grey',
                           )}
                           title={`${label} (${step.step_type ?? 'action'}) – ${stepConfig.label}. Click to scroll to details.`}
@@ -698,13 +698,13 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                             </div>
                             <span className="truncate font-medium text-sm">{label}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1 ml-8 text-xs text-grey-500">
+                          <div className="flex items-center gap-1.5 mt-1 ml-8 text-xs text-grey-600">
                             {getStepTypeIcon(step.step_type ?? 'action')}
                             <span className="capitalize">{step.step_type ?? 'action'}</span>
                           </div>
                         </button>
                         {index < steps.length - 1 && (
-                          <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                          <ChevronRight className="h-5 w-5 text-grey-600 mx-1 flex-shrink-0" aria-hidden />
                         )}
                       </div>
                     );
@@ -713,7 +713,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                 {/* End node */}
                 {!showStepsLoading && steps.length > 0 && (
                   <>
-                    <ChevronRight className="h-5 w-5 text-grey-400 mx-1 flex-shrink-0" aria-hidden />
+                    <ChevronRight className="h-5 w-5 text-grey-600 mx-1 flex-shrink-0" aria-hidden />
                     <div className="px-4 py-2.5 rounded-lg bg-grey-100 border border-grey-300 text-sm font-medium text-grey-600">
                       End
                     </div>
@@ -915,7 +915,7 @@ export default function FeatureRunTab({ tabId, run, featureName, featureTag, wor
                       <div className="flex items-center gap-3 w-28 justify-end">
                         <span className={cn(
                           'text-sm font-mono tabular-nums',
-                          step.status === 'pending' || step.status === 'skipped' ? 'text-grey-400' : 'text-grey-200'
+                          step.status === 'pending' || step.status === 'skipped' ? 'text-grey-600' : 'text-grey-200'
                         )}>
                           {step.status === 'running' && step.start != null
                             ? formatDuration(Date.now() - step.start)

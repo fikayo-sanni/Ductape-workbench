@@ -205,7 +205,7 @@ export function AppWebhooksList({
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold text-grey">Webhooks</h1>
-                  <p className="text-sm text-grey-500">
+                  <p className="text-sm text-grey-600">
                     {canRegister
                       ? `${count} webhook collections`
                       : `${count} ${count === 1 ? 'webhook' : 'webhooks'} configured`}
@@ -310,7 +310,7 @@ export function AppWebhooksList({
                                   type="button"
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0 text-grey-500 hover:text-red"
+                                  className="h-7 w-7 p-0 text-grey-600 hover:text-red"
                                   aria-label={`Delete webhook ${displayName}`}
                                   onClick={() => setWebhookToDelete(webhook)}
                                 >
@@ -349,7 +349,7 @@ export function AppWebhooksList({
                               )}
                             </div>
                           </div>
-                          <p className="text-xs text-grey-500 truncate">{webhook.tag}</p>
+                          <p className="text-xs text-grey-600 truncate">{webhook.tag}</p>
                           {webhook.description && (
                             <p className="text-xs text-grey-600 mt-1.5 line-clamp-2">
                               {webhook.description}
@@ -374,7 +374,7 @@ export function AppWebhooksList({
                                     <p className="text-xs font-medium text-grey truncate">
                                       {event.name}
                                     </p>
-                                    <p className="text-[11px] text-grey-500 font-mono truncate mt-0.5">
+                                    <p className="text-[11px] text-grey-600 font-mono truncate mt-0.5">
                                       {getFullEventTag(webhook.tag, event)}
                                     </p>
                                   </button>
@@ -383,7 +383,7 @@ export function AppWebhooksList({
                                       type="button"
                                       variant="ghost"
                                       size="sm"
-                                      className="h-auto px-3 rounded-none text-grey-500 hover:text-red hover:bg-grey-50"
+                                      className="h-auto px-3 rounded-none text-grey-600 hover:text-red hover:bg-grey-50"
                                       aria-label={`Delete event ${event.name}`}
                                       onClick={() =>
                                         setEventToDelete({ webhook, event })
@@ -417,7 +417,7 @@ export function AppWebhooksList({
                     {canRegister && productEnvs.length > 0 && (
                       <div className="border-t border-grey-300 px-4 py-3 bg-grey-50/50 space-y-2">
                         {loadingRegistrations ? (
-                          <p className="text-xs text-grey-500 flex items-center gap-1.5">
+                          <p className="text-xs text-grey-600 flex items-center gap-1.5">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             Checking registration status…
                           </p>
@@ -436,7 +436,7 @@ export function AppWebhooksList({
                               </>
                             ) : (
                               <>
-                                <AlertCircle className="h-3.5 w-3.5 text-grey-500 flex-shrink-0" />
+                                <AlertCircle className="h-3.5 w-3.5 text-grey-600 flex-shrink-0" />
                                 Not registered for this product yet
                               </>
                             )}
@@ -478,7 +478,7 @@ export function AppWebhooksList({
                 <div className="absolute top-1/2 -right-6 w-2 h-2 rounded-full bg-grey-200" />
               </div>
               <h3 className="text-xl font-semibold text-grey mb-2">No webhooks yet</h3>
-              <p className="text-grey-500 text-center max-w-md mb-6 leading-relaxed">
+              <p className="text-grey-600 text-center max-w-md mb-6 leading-relaxed">
                 Define webhooks and events so products can subscribe to real-time updates from
                 your app.
               </p>

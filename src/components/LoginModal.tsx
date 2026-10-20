@@ -411,7 +411,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               </button>
             </div>
 
-            <p className="text-xs text-grey-500 text-center">
+            <p className="text-xs text-grey-600 text-center">
               The code expires in 5 minutes
             </p>
           </div>

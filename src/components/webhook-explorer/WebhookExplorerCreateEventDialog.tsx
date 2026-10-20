@@ -97,7 +97,7 @@ export function WebhookExplorerCreateEventDialog({
               onChange={(e) => onEventTagChange(e.target.value)}
               className="mt-1.5 font-mono"
             />
-            <p className="text-xs text-grey-500 mt-1">
+            <p className="text-xs text-grey-600 mt-1">
               Full tag: <code className="text-primary">{webhookTag}:{eventTag || 'event_tag'}</code>
             </p>
           </div>

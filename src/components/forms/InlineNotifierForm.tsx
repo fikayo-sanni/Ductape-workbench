@@ -409,7 +409,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
               variant="ghost"
               size="sm"
               onClick={onCancel}
-              className="text-grey-500 hover:text-grey -ml-2"
+              className="text-grey-600 hover:text-grey -ml-2"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -446,7 +446,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
           {/* Step 1: Basic Information */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className={cn('h-5 w-5', isStep1Complete ? 'text-green' : 'text-grey-400')} />
+              <CheckCircle className={cn('h-5 w-5', isStep1Complete ? 'text-green' : 'text-grey-600')} />
               <h2 className="text-lg font-semibold text-grey">1. Basic Information</h2>
             </div>
 
@@ -538,7 +538,7 @@ export default function InlineNotifierForm({ product, onCancel, onSuccess }: Inl
           {/* Step 2: Select Notifier Types */}
           <div className="border-t border-grey-400 pt-6">
             <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className={cn('h-5 w-5', isStep2Complete ? 'text-green' : 'text-grey-400')} />
+              <CheckCircle className={cn('h-5 w-5', isStep2Complete ? 'text-green' : 'text-grey-600')} />
               <h2 className="text-lg font-semibold text-grey">2. Select Channels</h2>
             </div>
 

@@ -73,12 +73,12 @@ export default function VectorTabContent({ vector }: VectorTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Boxes className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete vector store data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the vector store from your product to reload it.
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function VectorTabContent({ vector }: VectorTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Boxes className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Boxes className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600">Vector store not found</p>
         </div>
       </div>
@@ -460,9 +460,9 @@ export default function VectorTabContent({ vector }: VectorTabContentProps) {
         {/* No environments message */}
         {(!displayData.envs || displayData.envs.length === 0) && (
           <div className="bg-white rounded-lg border border-grey-400 p-8 text-center">
-            <Server className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <Server className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <p className="text-grey-600 mb-2">No environments configured</p>
-            <p className="text-sm text-grey-500">
+            <p className="text-sm text-grey-600">
               This vector store doesn't have any environment connections set up yet.
             </p>
           </div>

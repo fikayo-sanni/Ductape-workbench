@@ -60,7 +60,7 @@ function JsonBlock({
           <Icon className="h-3.5 w-3.5" />
           {label}
         </div>
-        <p className="text-xs text-grey-500">No data</p>
+        <p className="text-xs text-grey-600">No data</p>
       </div>
     );
   }
@@ -99,7 +99,7 @@ export default function JobRunDetailExpanded({
 
   if (!currentWorkspaceId || !user?._id) {
     return (
-      <div className="p-4 text-grey-500 text-sm">
+      <div className="p-4 text-grey-600 text-sm">
         Select a workspace to view run details.
       </div>
     );
@@ -118,7 +118,7 @@ export default function JobRunDetailExpanded({
       <div className="flex flex-col items-center justify-center gap-3 p-6">
         <AlertCircle className="h-10 w-10 text-red" />
         <p className="text-grey font-medium text-sm">Failed to load run details</p>
-        <p className="text-grey-500 text-xs text-center max-w-md">
+        <p className="text-grey-600 text-xs text-center max-w-md">
           {(error as Error)?.message ?? 'Run not found.'}
         </p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -155,11 +155,11 @@ export default function JobRunDetailExpanded({
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="text-grey-500">Started</p>
+              <p className="text-grey-600">Started</p>
               <p className="font-mono text-grey">{formatTime(execution.started_at as string)}</p>
             </div>
             <div>
-              <p className="text-grey-500">Duration</p>
+              <p className="text-grey-600">Duration</p>
               <p className="font-mono text-grey">{formatDuration(execution.duration_ms)}</p>
             </div>
           </div>
@@ -190,7 +190,7 @@ export default function JobRunDetailExpanded({
           </div>
           <p className="text-xs text-grey font-mono">{execution.error}</p>
           {execution.error_code && (
-            <p className="text-xs text-grey-500 mt-1">Code: {execution.error_code}</p>
+            <p className="text-xs text-grey-600 mt-1">Code: {execution.error_code}</p>
           )}
         </div>
       )}
@@ -205,12 +205,12 @@ export default function JobRunDetailExpanded({
           <Tag className="h-3.5 w-3.5" />
           Identifiers
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-grey-500">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-grey-600">
           <div>
-            <span className="text-grey-400">_id</span> {String(execution._id ?? '—')}
+            <span className="text-grey-600">_id</span> {String(execution._id ?? '—')}
           </div>
           <div>
-            <span className="text-grey-400">job_id</span> {execution.job_id ?? '—'}
+            <span className="text-grey-600">job_id</span> {execution.job_id ?? '—'}
           </div>
         </div>
       </div>

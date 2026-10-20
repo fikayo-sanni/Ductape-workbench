@@ -255,7 +255,7 @@ export default function WebhookRegistrationPanel({
           </span>
         </div>
         {appEnvSlugs.length > 0 && (
-          <p className="text-xs text-grey-500 mt-2 flex items-center gap-1">
+          <p className="text-xs text-grey-600 mt-2 flex items-center gap-1">
             <Globe className="h-3 w-3" />
             App webhook envs: {appEnvSlugs.join(', ')}
           </p>
@@ -263,7 +263,7 @@ export default function WebhookRegistrationPanel({
       </div>
 
       {loadingConfig ? (
-        <div className="flex items-center justify-center py-10 text-grey-500 gap-2">
+        <div className="flex items-center justify-center py-10 text-grey-600 gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading registration status…
         </div>
@@ -296,7 +296,7 @@ export default function WebhookRegistrationPanel({
                       <p className="text-sm font-semibold text-grey">
                         {env.env_name || slug}
                       </p>
-                      <p className="text-[11px] font-mono text-grey-500">{slug}</p>
+                      <p className="text-[11px] font-mono text-grey-600">{slug}</p>
                     </div>
                   </div>
                   <span
@@ -357,7 +357,7 @@ export default function WebhookRegistrationPanel({
 
                 {proxyUrl && (
                   <div className="rounded-md border border-green/30 bg-white p-3 space-y-1.5">
-                    <Label className="text-[10px] uppercase tracking-wide text-grey-500">
+                    <Label className="text-[10px] uppercase tracking-wide text-grey-600">
                       Ductape proxy URL (third party)
                     </Label>
                     <div className="flex gap-2">
@@ -411,7 +411,7 @@ export default function WebhookRegistrationPanel({
       )}
 
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-grey-300">
-        <p className="text-xs text-grey-500">
+        <p className="text-xs text-grey-600">
           {envsWithUrl} of {productEnvs.length} environments have a consumer URL
         </p>
         <Button

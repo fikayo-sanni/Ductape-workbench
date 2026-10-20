@@ -1477,12 +1477,12 @@ println!("Action result: {:?}", result);`
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Zap className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Zap className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete action data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the action from your product to reload it.
           </p>
         </div>
@@ -1608,7 +1608,7 @@ println!("Action result: {:?}", result);`
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-grey truncate">{app?.app_name}</p>
-                  <p className="text-xs text-grey-500 truncate">{app?.tag}</p>
+                  <p className="text-xs text-grey-600 truncate">{app?.tag}</p>
                 </div>
                 {app?.status && (
                   <span className={cn(
@@ -1657,7 +1657,7 @@ println!("Action result: {:?}", result);`
                 </div>
               </div>
               {baseUrl && (
-                <span className="min-w-0 max-w-full truncate text-xs text-grey-500 font-mono">{baseUrl}</span>
+                <span className="min-w-0 max-w-full truncate text-xs text-grey-600 font-mono">{baseUrl}</span>
               )}
             </div>
           )}
@@ -1830,10 +1830,10 @@ println!("Action result: {:?}", result);`
                   {query.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <Hash className="h-6 w-6 text-grey-400" />
+                        <Hash className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No query parameters</p>
-                      <p className="text-sm text-grey-500">Add query parameters to your request</p>
+                      <p className="text-sm text-grey-600">Add query parameters to your request</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1865,7 +1865,7 @@ println!("Action result: {:?}", result);`
                               onClick={() => removeKeyValue(index, setQuery)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1898,10 +1898,10 @@ println!("Action result: {:?}", result);`
                   {params.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <Server className="h-6 w-6 text-grey-400" />
+                        <Server className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No path parameters</p>
-                      <p className="text-sm text-grey-500">Add path parameters like :id or :slug</p>
+                      <p className="text-sm text-grey-600">Add path parameters like :id or :slug</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1933,7 +1933,7 @@ println!("Action result: {:?}", result);`
                               onClick={() => removeKeyValue(index, setParams)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1967,10 +1967,10 @@ println!("Action result: {:?}", result);`
                   {headers.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 rounded-full bg-grey-100 flex items-center justify-center mx-auto mb-3">
-                        <Globe className="h-6 w-6 text-grey-400" />
+                        <Globe className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey-600 font-medium mb-1">No headers defined</p>
-                      <p className="text-sm text-grey-500">Add custom headers to your request</p>
+                      <p className="text-sm text-grey-600">Add custom headers to your request</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -2002,7 +2002,7 @@ println!("Action result: {:?}", result);`
                               onClick={() => removeKeyValue(index, setHeaders)}
                               variant="ghost"
                               size="sm"
-                              className="text-grey-400 hover:text-red hover:bg-red/10"
+                              className="text-grey-600 hover:text-red hover:bg-red/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -2061,14 +2061,14 @@ println!("Action result: {:?}", result);`
                       </span>
                       {response.time !== undefined && (
                         <>
-                          <span className="text-grey-300 mx-2">|</span>
+                          <span className="text-grey-600 mx-2">|</span>
                           <span className="text-sm font-medium text-grey-600">Time:</span>
                           <span className="text-sm text-grey-700">{response.time}ms</span>
                         </>
                       )}
                       {response.size !== undefined && (
                         <>
-                          <span className="text-grey-300 mx-2">|</span>
+                          <span className="text-grey-600 mx-2">|</span>
                           <span className="text-sm font-medium text-grey-600">Size:</span>
                           <span className="text-sm text-grey-700">{response.size} bytes</span>
                         </>

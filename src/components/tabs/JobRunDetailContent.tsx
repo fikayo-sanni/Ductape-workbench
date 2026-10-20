@@ -51,7 +51,7 @@ function JsonBlock({ data, label, icon: Icon }: { data: Record<string, unknown> 
           <Icon className="h-4 w-4" />
           {label}
         </div>
-        <p className="text-sm text-grey-500">No data</p>
+        <p className="text-sm text-grey-600">No data</p>
       </div>
     );
   }
@@ -85,7 +85,7 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
 
   if (!currentWorkspaceId || !user?._id) {
     return (
-      <div className="flex items-center justify-center p-12 text-grey-500 text-sm">
+      <div className="flex items-center justify-center p-12 text-grey-600 text-sm">
         Select a workspace to view run details.
       </div>
     );
@@ -104,7 +104,7 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
       <div className="flex flex-col items-center justify-center gap-4 p-12">
         <AlertCircle className="h-12 w-12 text-red" />
         <p className="text-grey font-medium">Failed to load run details</p>
-        <p className="text-grey-500 text-sm text-center max-w-md">
+        <p className="text-grey-600 text-sm text-center max-w-md">
           {(error as Error)?.message ?? 'Run not found.'}
         </p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -183,19 +183,19 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-grey-500 text-xs">Scheduled</p>
+              <p className="text-grey-600 text-xs">Scheduled</p>
               <p className="font-mono text-grey">{formatTime(execution.scheduled_at as string)}</p>
             </div>
             <div>
-              <p className="text-grey-500 text-xs">Started</p>
+              <p className="text-grey-600 text-xs">Started</p>
               <p className="font-mono text-grey">{formatTime(execution.started_at as string)}</p>
             </div>
             <div>
-              <p className="text-grey-500 text-xs">Completed</p>
+              <p className="text-grey-600 text-xs">Completed</p>
               <p className="font-mono text-grey">{formatTime(execution.completed_at as string)}</p>
             </div>
             <div>
-              <p className="text-grey-500 text-xs">Duration</p>
+              <p className="text-grey-600 text-xs">Duration</p>
               <p className="font-mono text-grey">{formatDuration(execution.duration_ms)}</p>
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
             </div>
             <p className="text-sm text-grey font-mono">{execution.error}</p>
             {execution.error_code && (
-              <p className="text-xs text-grey-500 mt-1">Code: {execution.error_code}</p>
+              <p className="text-xs text-grey-600 mt-1">Code: {execution.error_code}</p>
             )}
           </div>
         )}
@@ -227,12 +227,12 @@ export default function JobRunDetailContent({ executionId, productTag, productNa
             <Tag className="h-4 w-4" />
             Identifiers
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-grey-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono text-grey-600">
             <div>
-              <span className="text-grey-400">_id</span> {String(execution._id ?? '—')}
+              <span className="text-grey-600">_id</span> {String(execution._id ?? '—')}
             </div>
             <div>
-              <span className="text-grey-400">job_id</span> {execution.job_id ?? '—'}
+              <span className="text-grey-600">job_id</span> {execution.job_id ?? '—'}
             </div>
           </div>
         </div>

@@ -16,12 +16,12 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
     return (
       <div className="h-full flex items-center justify-center bg-grey-100">
         <div className="text-center">
-          <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <Layers className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete cache data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the cache from your product to reload it.
           </p>
         </div>
@@ -290,7 +290,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         {/* Empty State for no environments */}
         {environments.length === 0 && (
           <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
-            <Layers className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+            <Layers className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Available</h3>
             <p className="text-sm text-grey-600">
               Configure environments in your product to view cache values per environment.

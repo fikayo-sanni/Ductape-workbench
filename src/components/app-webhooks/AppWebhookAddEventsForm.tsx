@@ -236,7 +236,7 @@ export function AppWebhookAddEventsForm({
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-grey">Add events</h1>
-              <p className="text-sm text-grey-500 truncate">
+              <p className="text-sm text-grey-600 truncate">
                 {webhook.name || webhookTag}{' '}
                 <span className="font-mono text-xs">({webhookTag})</span>
               </p>
@@ -293,15 +293,15 @@ export function AppWebhookAddEventsForm({
                             e.stopPropagation();
                             removeEvent(event.id);
                           }}
-                          className="h-7 w-7 p-0 text-grey-500 hover:text-red"
+                          className="h-7 w-7 p-0 text-grey-600 hover:text-red"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                       {event.isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-grey-500" />
+                        <ChevronUp className="h-4 w-4 text-grey-600" />
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-grey-500" />
+                        <ChevronDown className="h-4 w-4 text-grey-600" />
                       )}
                     </div>
                   </div>
@@ -332,7 +332,7 @@ export function AppWebhookAddEventsForm({
                           }
                           className="mt-1 font-mono"
                         />
-                        <p className="text-xs text-grey-500 mt-1">
+                        <p className="text-xs text-grey-600 mt-1">
                           Full tag:{' '}
                           <code className="text-primary">
                             {webhookTag}:{event.tag || 'event_tag'}
@@ -389,7 +389,7 @@ export function AppWebhookAddEventsForm({
                       {validation.isValid && validation.selectorOptions.length > 0 && (
                         <div>
                           <Label className="text-xs">Event Selectors</Label>
-                          <p className="text-xs text-grey-500 mb-2">
+                          <p className="text-xs text-grey-600 mb-2">
                             Select fields that identify this event in the payload.
                           </p>
                           <div className="mt-1 border border-grey-300 rounded-lg max-h-48 overflow-y-auto">

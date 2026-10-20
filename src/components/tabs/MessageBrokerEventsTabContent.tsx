@@ -443,12 +443,12 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     return (
       <div className="h-full flex items-center justify-center bg-background-tertiary">
         <div className="text-center">
-          <MessageSquare className="h-12 w-12 text-grey-400 mx-auto mb-3" />
+          <MessageSquare className="h-12 w-12 text-grey-600 mx-auto mb-3" />
           <p className="text-grey-600 mb-2">Incomplete messaging data</p>
-          <p className="text-grey-500 text-sm mb-4">
+          <p className="text-grey-600 text-sm mb-4">
             This tab was restored from an older session with incomplete data.
           </p>
-          <p className="text-grey-500 text-sm">
+          <p className="text-grey-600 text-sm">
             Please close this tab and reopen the messaging from your product to reload it.
           </p>
         </div>
@@ -612,7 +612,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
   const getInstanceStatusConfig = (status: 'active' | 'inactive' | 'error') => {
     const configs: Record<string, { color: string; bg: string; border: string; label: string; dotColor: string }> = {
       active: { color: 'text-green', bg: 'bg-green/10', border: 'border-green/30', label: 'Active', dotColor: 'bg-green' },
-      inactive: { color: 'text-grey-500', bg: 'bg-grey-500/10', border: 'border-grey-500/30', label: 'Inactive', dotColor: 'bg-grey-500' },
+      inactive: { color: 'text-grey-600', bg: 'bg-grey-500/10', border: 'border-grey-500/30', label: 'Inactive', dotColor: 'bg-grey-500' },
       error: { color: 'text-red', bg: 'bg-red/10', border: 'border-red/30', label: 'Error', dotColor: 'bg-red' },
     };
     return configs[status] || configs.inactive;
@@ -663,7 +663,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 </button>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1.5 rounded hover:bg-grey-100 text-grey-500 hover:text-grey transition-colors"
+                  className="p-1.5 rounded hover:bg-grey-100 text-grey-600 hover:text-grey transition-colors"
                   title="Collapse sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
@@ -931,7 +931,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
             <div className="px-2 mt-4">
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-500 hover:bg-grey-100 hover:text-grey transition-colors"
+                className="w-full flex items-center justify-center p-2 rounded-lg text-grey-600 hover:bg-grey-100 hover:text-grey transition-colors"
                 title="Expand sidebar"
               >
                 <PanelLeft className="h-4 w-4" />
@@ -1162,7 +1162,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Total Messages</span>
-                    <Activity className="h-4 w-4 text-grey-400" />
+                    <Activity className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className="text-2xl font-bold text-grey">{metrics.total}</p>
                   <div className="mt-2 h-8">
@@ -1174,7 +1174,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-grey-600">Success Rate</span>
-                    <TrendingUp className="h-4 w-4 text-grey-400" />
+                    <TrendingUp className="h-4 w-4 text-grey-600" />
                   </div>
                   <p className={cn(
                     'text-2xl font-bold',
@@ -1184,7 +1184,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   )}>
                     {metrics.successRate.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-grey-500 mt-2">{metrics.success} succeeded</p>
+                  <p className="text-xs text-grey-600 mt-2">{metrics.success} succeeded</p>
                 </div>
 
                 {/* Successful */}
@@ -1194,7 +1194,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <CheckCircle2 className="h-4 w-4 text-green" />
                   </div>
                   <p className="text-2xl font-bold text-green">{metrics.success}</p>
-                  <p className="text-xs text-grey-500 mt-2">processed</p>
+                  <p className="text-xs text-grey-600 mt-2">processed</p>
                 </div>
 
                 {/* Failed */}
@@ -1216,7 +1216,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <Shield className="h-4 w-4 text-yellow-500" />
                   </div>
                   <p className="text-2xl font-bold text-yellow-500">{metrics.partial}</p>
-                  <p className="text-xs text-grey-500 mt-2">partially delivered</p>
+                  <p className="text-xs text-grey-600 mt-2">partially delivered</p>
                 </div>
 
                 {/* Dead Letters */}
@@ -1226,7 +1226,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <Trash2 className="h-4 w-4 text-orange-500" />
                   </div>
                   <p className="text-2xl font-bold text-orange-500">{metrics.deadLetterCount}</p>
-                  <p className="text-xs text-grey-500 mt-2">need attention</p>
+                  <p className="text-xs text-grey-600 mt-2">need attention</p>
                 </div>
               </div>
 
@@ -1305,15 +1305,15 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                       <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
                       <p className="text-grey font-medium">Loading messages...</p>
-                      <p className="text-grey-500 text-sm mt-1">Fetching broker activity</p>
+                      <p className="text-grey-600 text-sm mt-1">Fetching broker activity</p>
                     </div>
                   ) : (dashboardData?.recent_messages?.length || 0) === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                       <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center mb-4">
-                        <Inbox className="h-6 w-6 text-grey-500" />
+                        <Inbox className="h-6 w-6 text-grey-600" />
                       </div>
                       <p className="text-grey font-medium">No recent messages</p>
-                      <p className="text-grey-500 text-sm mt-1">Messages will appear once broker operations occur</p>
+                      <p className="text-grey-600 text-sm mt-1">Messages will appear once broker operations occur</p>
                     </div>
                   ) : (
                     dashboardData?.recent_messages?.slice(0, 5).map((message) => {
@@ -1331,12 +1331,12 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                           <div className={cn('w-2 h-2 rounded-full', statusConfig.dotColor)} />
                           <div>
                             <p className="text-sm font-medium text-grey">{message.event}</p>
-                            <p className="text-xs text-grey-500">{message.topic_tag}</p>
+                            <p className="text-xs text-grey-600">{message.topic_tag}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-xs text-green">{message.producer_tag}</span>
-                          <span className="text-xs text-grey-500">{getTimeAgo(new Date(message.produced_at))}</span>
+                          <span className="text-xs text-grey-600">{getTimeAgo(new Date(message.produced_at))}</span>
                         </div>
                       </div>
                     );
@@ -1352,9 +1352,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="px-6 py-4 border-b border-border flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-grey">Topics</h2>
-                    <p className="text-xs text-grey-500 mt-1">Configured topics and observed usage in this environment</p>
+                    <p className="text-xs text-grey-600 mt-1">Configured topics and observed usage in this environment</p>
                   </div>
-                  <span className="text-xs text-grey-500"><LoadingValue loading={dashboardLoading}>{topicSummaries.length}</LoadingValue> total</span>
+                  <span className="text-xs text-grey-600"><LoadingValue loading={dashboardLoading}>{topicSummaries.length}</LoadingValue> total</span>
                 </div>
                 <div className="grid grid-cols-[minmax(220px,1fr),110px,100px,100px,130px,90px] gap-4 px-6 py-3 bg-background-secondary border-b border-border text-xs font-medium text-grey-600 uppercase tracking-wider">
                   <div>Topic</div>
@@ -1373,9 +1373,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     ))
                   ) : topicSummaries.length === 0 ? (
                     <div className="py-16 text-center">
-                      <ListTree className="h-8 w-8 text-grey-400 mx-auto mb-3" />
+                      <ListTree className="h-8 w-8 text-grey-600 mx-auto mb-3" />
                       <p className="text-sm font-medium text-grey">No topics configured</p>
-                      <p className="text-xs text-grey-500 mt-1">Topics will appear here after they are added to this broker.</p>
+                      <p className="text-xs text-grey-600 mt-1">Topics will appear here after they are added to this broker.</p>
                     </div>
                   ) : topicSummaries.map(topic => (
                     <button
@@ -1388,8 +1388,8 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-grey truncate">{topic.name}</div>
-                        <div className="text-xs text-grey-500 font-mono truncate mt-0.5">{topic.tag}</div>
-                        {topic.description && <div className="text-xs text-grey-500 truncate mt-1">{topic.description}</div>}
+                        <div className="text-xs text-grey-600 font-mono truncate mt-0.5">{topic.tag}</div>
+                        {topic.description && <div className="text-xs text-grey-600 truncate mt-1">{topic.description}</div>}
                       </div>
                       <div className="text-sm tabular-nums text-grey">{topic.messages.toLocaleString()}</div>
                       <div>
@@ -1400,7 +1400,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                       </div>
                       <div className="text-sm tabular-nums text-grey">{topic.producers}</div>
                       <div className="text-sm tabular-nums text-grey">{topic.consumers}</div>
-                      <div className={cn('text-xs font-medium', topic.messages > 0 ? 'text-green' : 'text-grey-500')}>
+                      <div className={cn('text-xs font-medium', topic.messages > 0 ? 'text-green' : 'text-grey-600')}>
                         {topic.messages > 0 ? 'Active' : 'Idle'}
                       </div>
                     </button>
@@ -1431,7 +1431,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     </div>
                   ) : consumerInstances.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Users className="h-6 w-6 text-grey-500 mb-2" />
+                      <Users className="h-6 w-6 text-grey-600 mb-2" />
                       <p className="text-grey font-medium">No consumers found</p>
                     </div>
                   ) : (
@@ -1451,7 +1451,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                             <div className="min-w-0">
                               <span className="font-mono text-sm font-medium text-grey truncate block">{consumer.tag}</span>
                               {consumer.name && consumer.name !== consumer.tag && (
-                                <span className="text-xs text-grey-500">{consumer.name}</span>
+                                <span className="text-xs text-grey-600">{consumer.name}</span>
                               )}
                             </div>
                           </div>
@@ -1500,7 +1500,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     </div>
                   ) : producerInstances.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Send className="h-6 w-6 text-grey-500 mb-2" />
+                      <Send className="h-6 w-6 text-grey-600 mb-2" />
                       <p className="text-grey font-medium">No producers found</p>
                     </div>
                   ) : (
@@ -1520,7 +1520,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                             <div className="min-w-0">
                               <span className="font-mono text-sm font-medium text-grey truncate block">{producer.tag}</span>
                               {producer.name && producer.name !== producer.tag && (
-                                <span className="text-xs text-grey-500">{producer.name}</span>
+                                <span className="text-xs text-grey-600">{producer.name}</span>
                               )}
                             </div>
                           </div>
@@ -1568,7 +1568,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     </div>
                   ) : deadLettersList.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Trash2 className="h-6 w-6 text-grey-500 mb-2" />
+                      <Trash2 className="h-6 w-6 text-grey-600 mb-2" />
                       <p className="text-grey font-medium">No dead letters found</p>
                     </div>
                   ) : (
@@ -1581,7 +1581,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                           <AlertCircle className="h-4 w-4 text-red flex-shrink-0" />
                           <div className="min-w-0">
                             <span className="font-mono text-sm font-medium text-grey truncate block">{deadLetter.message_id}</span>
-                            <span className="text-xs text-grey-500">{deadLetter.original_message?.event || 'Unknown'}</span>
+                            <span className="text-xs text-grey-600">{deadLetter.original_message?.event || 'Unknown'}</span>
                           </div>
                         </div>
                         <div className="text-sm text-grey-600">{deadLetter.consumer_tag}</div>
@@ -1635,7 +1635,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-grey">{selectedConsumer.tag}</h2>
-                    <p className="text-sm text-grey-500">Topic: {selectedConsumer.topic}</p>
+                    <p className="text-sm text-grey-600">Topic: {selectedConsumer.topic}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-4">
@@ -1760,7 +1760,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     </div>
                   ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Inbox className="h-6 w-6 text-grey-500 mb-2" />
+                      <Inbox className="h-6 w-6 text-grey-600 mb-2" />
                       <p className="text-grey font-medium">No messages found</p>
                     </div>
                   ) : (
@@ -1792,7 +1792,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-xs text-grey-500 truncate font-mono">{message.message_id}</p>
+                                <p className="text-xs text-grey-600 truncate font-mono">{message.message_id}</p>
                               </div>
                             </div>
 
@@ -1827,9 +1827,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                             {/* Arrow */}
                             <div className="flex justify-end">
                               {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-grey-400" />
+                                <ChevronDown className="h-4 w-4 text-grey-600" />
                               ) : (
-                                <ChevronRight className="h-4 w-4 text-grey-400" />
+                                <ChevronRight className="h-4 w-4 text-grey-600" />
                               )}
                             </div>
                           </div>
@@ -1902,7 +1902,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                               </div>
                                             )}
                                             {delivery.consumed_at && (
-                                              <div className="mt-1 text-xs text-grey-500">
+                                              <div className="mt-1 text-xs text-grey-600">
                                                 Consumed at: {new Date(delivery.consumed_at).toLocaleString()}
                                               </div>
                                             )}
@@ -1981,7 +1981,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-grey">{selectedProducer.tag}</h2>
-                    <p className="text-sm text-grey-500">Topic: {selectedProducer.topic}</p>
+                    <p className="text-sm text-grey-600">Topic: {selectedProducer.topic}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-4">
@@ -2106,7 +2106,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     </div>
                   ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Inbox className="h-6 w-6 text-grey-500 mb-2" />
+                      <Inbox className="h-6 w-6 text-grey-600 mb-2" />
                       <p className="text-grey font-medium">No messages found</p>
                     </div>
                   ) : (
@@ -2138,7 +2138,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-xs text-grey-500 truncate font-mono">{message.message_id}</p>
+                                <p className="text-xs text-grey-600 truncate font-mono">{message.message_id}</p>
                               </div>
                             </div>
 
@@ -2173,9 +2173,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                             {/* Arrow */}
                             <div className="flex justify-end">
                               {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-grey-400" />
+                                <ChevronDown className="h-4 w-4 text-grey-600" />
                               ) : (
-                                <ChevronRight className="h-4 w-4 text-grey-400" />
+                                <ChevronRight className="h-4 w-4 text-grey-600" />
                               )}
                             </div>
                           </div>
@@ -2248,7 +2248,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                               </div>
                                             )}
                                             {delivery.consumed_at && (
-                                              <div className="mt-1 text-xs text-grey-500">
+                                              <div className="mt-1 text-xs text-grey-600">
                                                 Consumed at: {new Date(delivery.consumed_at).toLocaleString()}
                                               </div>
                                             )}
@@ -2444,11 +2444,11 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                       <div className="flex flex-col items-center justify-center py-16 text-center">
                         <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
                         <p className="text-grey font-medium">Loading messages...</p>
-                        <p className="text-grey-500 text-sm mt-1">Fetching broker activity</p>
+                        <p className="text-grey-600 text-sm mt-1">Fetching broker activity</p>
                       </div>
                     ) : filteredMessages.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <Inbox className="h-6 w-6 text-grey-500 mb-2" />
+                        <Inbox className="h-6 w-6 text-grey-600 mb-2" />
                         <p className="text-grey font-medium">No messages found</p>
                       </div>
                     ) : (
@@ -2480,7 +2480,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                       </div>
                                     )}
                                   </div>
-                                  <p className="text-xs text-grey-500 truncate font-mono">{message.message_id}</p>
+                                  <p className="text-xs text-grey-600 truncate font-mono">{message.message_id}</p>
                                 </div>
                               </div>
 
@@ -2517,9 +2517,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                               {/* Arrow */}
                               <div className="flex justify-end">
                                 {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-grey-400" />
+                                  <ChevronDown className="h-4 w-4 text-grey-600" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-grey-400" />
+                                  <ChevronRight className="h-4 w-4 text-grey-600" />
                                 )}
                               </div>
                             </div>
@@ -2592,7 +2592,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                                                 </div>
                                               )}
                                               {delivery.consumed_at && (
-                                                <div className="mt-1 text-xs text-grey-500">
+                                                <div className="mt-1 text-xs text-grey-600">
                                                   Consumed at: {new Date(delivery.consumed_at).toLocaleString()}
                                                 </div>
                                               )}

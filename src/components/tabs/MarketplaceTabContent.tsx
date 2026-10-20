@@ -255,7 +255,7 @@ export default function MarketplaceTabContent() {
             </div>
           ) : sortedApps.length === 0 ? (
             <div className="text-center py-12">
-              <Store className="h-12 w-12 text-grey-400 mx-auto mb-4" />
+              <Store className="h-12 w-12 text-grey-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-grey mb-2">No applications found</h3>
               <p className="text-grey-600">
                 {search ? 'Try adjusting your search terms' : 'No applications available in this category'}
