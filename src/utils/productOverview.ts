@@ -241,3 +241,48 @@ export function formatPercent(value: number | null): string {
   if (value === 100) return '100%';
   return `${value >= 99.95 ? 99.9 : Number(value.toFixed(value >= 10 ? 1 : 2))}%`;
 }
+
+export interface ProductLike {
+  _id?: string;
+  name?: string;
+  tag?: string;
+  healthchecks?: CheckLike[];
+}
+
+export type ProductHealth = { state: 'unwatched' | 'good' | 'warn' | 'bad'; summary: HealthSummary };
+
+/** One product's health for a card. A product with no health checks is "unwatched", which is not the same as healthy. */
+export function productHealth(product: ProductLike): ProductHealth {
+  const summary = summarizeHealth(product.healthchecks);
+  if (summary.total === 0) return { state: 'unwatched', summary };
+  return { state: summary.down > 0 ? 'bad' : summary.recovering > 0 ? 'warn' : 'good', summary };
+}
+
+export interface WorkspaceAttentionItem {
+  id: string;
+  severity: Severity;
+  title: string;
+  detail?: string;
+  productId: string;
+  productName: string;
+}
+
+/** Health problems across every product in the workspace, worst first. */
+export function workspaceAttention(products: ProductLike[] | undefined): WorkspaceAttentionItem[] {
+  const items: WorkspaceAttentionItem[] = [];
+  for (const product of products ?? []) {
+    const productName = String(product.name || product.tag || 'Product');
+    for (const problem of summarizeHealth(product.healthchecks).problems) {
+      const down = problem.label === 'Down' || problem.label === 'Unhealthy';
+      items.push({
+        id: `${product._id ?? product.tag}:${problem.check}:${problem.env}`,
+        severity: down ? 'bad' : 'warn',
+        title: `${problem.name} is ${problem.label.toLowerCase()}${problem.env ? ` in ${problem.env}` : ''}`,
+        detail: problem.note,
+        productId: String(product._id ?? ''),
+        productName,
+      });
+    }
+  }
+  return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
+}

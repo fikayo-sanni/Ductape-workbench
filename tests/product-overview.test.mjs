@@ -109,3 +109,26 @@ test('successRate and formatPercent', () => {
   assert.equal(formatPercent(98.43), '98.4%');
   assert.equal(formatPercent(5.123), '5.12%');
 });
+
+test('productHealth separates unwatched from healthy', () => {
+  const { productHealth, workspaceAttention } = overview;
+  assert.equal(productHealth({ name: 'A' }).state, 'unwatched');
+  assert.equal(productHealth({ healthchecks: [] }).state, 'unwatched');
+  assert.equal(productHealth({ healthchecks: [{ tag: 'a', envs: [{ slug: 'prd' }] }] }).state, 'good');
+  assert.equal(productHealth({ healthchecks: [{ tag: 'a', envs: [{ slug: 'prd', status: 'available', monitor_state: 'probing', lastChecked: 'x' }] }] }).state, 'warn');
+  assert.equal(productHealth({ healthchecks: [{ tag: 'a', envs: [{ slug: 'prd', status: 'unavailable' }] }] }).state, 'bad');
+});
+
+test('workspaceAttention lists problems from every product, worst first', () => {
+  const { workspaceAttention } = overview;
+  const items = plain(workspaceAttention([
+    { _id: '1', name: 'Shop', healthchecks: [{ tag: 'db', name: 'DB', envs: [{ slug: 'prd', status: 'available', monitor_state: 'probing', lastChecked: 'x' }] }] },
+    { _id: '2', name: 'Blog', healthchecks: [{ tag: 'api', name: 'API', envs: [{ slug: 'prd', status: 'unavailable' }] }] },
+    { _id: '3', name: 'Quiet', healthchecks: [{ tag: 'ok', envs: [{ slug: 'prd' }] }] },
+  ]));
+  assert.deepEqual(items.map(i => [i.productName, i.severity, i.title]), [
+    ['Blog', 'bad', 'API is unhealthy in prd'],
+    ['Shop', 'warn', 'DB is recovering in prd'],
+  ]);
+  assert.deepEqual(plain(workspaceAttention(undefined)), []);
+});

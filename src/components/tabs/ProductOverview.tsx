@@ -502,8 +502,17 @@ export default function ProductOverview({
             </Panel>
           </div>
 
-          <div className="space-y-4 sm:space-y-5">
-            <Panel title="Needs attention" description={attention.length ? `${attention.length} to look at` : undefined} flush={attention.length > 0}>
+          {/* On large screens this column is exactly as tall as Activity plus Busiest operations; what does not
+              fit scrolls inside its card. Stacked on small screens, so the lists just have a sensible maximum. */}
+          <div className="relative">
+            <div className="flex flex-col gap-4 sm:gap-5 lg:absolute lg:inset-0">
+            <Panel
+              title="Needs attention"
+              description={attention.length ? `${attention.length} to look at` : undefined}
+              flush={attention.length > 0}
+              className="flex min-h-0 flex-col lg:flex-1"
+              bodyClassName="min-h-0 max-h-80 flex-1 overflow-y-auto lg:max-h-none"
+            >
               {attention.length ? (
                 <ul className="divide-y divide-grey-300">
                   {attention.map(item => {
@@ -540,6 +549,8 @@ export default function ProductOverview({
 
             <Panel
               title="Environments"
+              className="flex min-h-0 flex-col lg:max-h-[45%] lg:flex-shrink-0"
+              bodyClassName="min-h-0 max-h-72 flex-1 overflow-y-auto lg:max-h-none"
               description={`${environments.length} ${environments.length === 1 ? 'environment' : 'environments'}`}
               action={
                 <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onAddEnvironment}>
@@ -589,6 +600,7 @@ export default function ProductOverview({
                 <EmptyNote title="No environments yet" body="Add dev, staging and production so the product has somewhere to run." />
               )}
             </Panel>
+            </div>
           </div>
         </div>
 

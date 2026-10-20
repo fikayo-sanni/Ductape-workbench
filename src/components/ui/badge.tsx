@@ -7,13 +7,12 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
+        // This app's palette has no shadcn tokens (foreground, secondary, destructive), so those classes
+        // produced no colour and the text fell back to black, which is unreadable in dark mode.
+        default: "border-transparent bg-primary text-white hover:bg-primary/80",
+        secondary: "border-transparent bg-grey-100 text-grey hover:bg-grey-100/80",
+        destructive: "border-transparent bg-red text-white hover:bg-red/80",
+        outline: "border-grey-400 text-grey",
       },
     },
     defaultVariants: {

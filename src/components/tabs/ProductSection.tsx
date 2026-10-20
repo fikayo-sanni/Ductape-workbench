@@ -68,6 +68,7 @@ export function Panel({
   children,
   flush,
   className,
+  bodyClassName,
 }: {
   title?: string;
   description?: ReactNode;
@@ -76,6 +77,8 @@ export function Panel({
   /** Remove body padding (for tables that run edge to edge). */
   flush?: boolean;
   className?: string;
+  /** Extra classes for the body, for example to make it scroll inside a fixed-height card. */
+  bodyClassName?: string;
 }) {
   return (
     <section className={cn('rounded-lg border border-grey-400 bg-white shadow-sm', className)}>
@@ -88,7 +91,7 @@ export function Panel({
           {action}
         </div>
       ) : null}
-      <div className={flush ? '' : 'p-4 sm:p-5'}>{children}</div>
+      <div className={cn(flush ? '' : 'p-4 sm:p-5', bodyClassName)}>{children}</div>
     </section>
   );
 }
