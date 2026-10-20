@@ -62,6 +62,7 @@ import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@/store/useAuth';
 import productServices from '@/services/productServices';
 import {MarkdownViewer} from '@/components/ui/markdown-editor';
+import ProductOverview from './ProductOverview';
 import AddAppModal from '@/components/modals/AddAppModal';
 import CreateEnvironmentModal from '@/components/modals/CreateEnvironmentModal';
 import UpdateProductEnvironmentModal from '@/components/modals/UpdateProductEnvironmentModal';
@@ -2222,406 +2223,54 @@ export default function ProductTabContent({
   };
 
   // Render overview dashboard (activity-focused)
-  const renderOverview = () => {
-    // Calculate some mock activity metrics (in real app, these would come from API)
-    const totalResources = [...resourceCategories, rateLimitsCategory].reduce(
-      (sum, cat) => sum + getResourceCount(cat),
-      0,
-    );
-    const activeEnvCount =
-      product?.envs?.filter((e: any) => e.active)?.length || 0;
-
-    return (
-      <div className="h-full overflow-auto p-3 sm:p-4 md:p-6">
-        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
-          {/* Product Header - Responsive */}
-          <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-              {/* Logo - Responsive sizing */}
-              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg bg-primary flex items-center justify-center text-white text-lg sm:text-xl font-semibold flex-shrink-0">
-                {product?.logo ? (
-                  <img
-                    src={product.logo}
-                    alt={product.name}
-                    className="w-full h-full rounded-lg object-cover"
-                  />
-                ) : (
-                  getInitials(String(product?.name))
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-grey break-words">
-                    {product?.name}
-                  </h1>
-                  {product?.status && (
-                    <span
-                      className={cn(
-                        'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border flex-shrink-0',
-                        product.status === 'active'
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                          : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-                      )}
-                    >
-                      {product.status}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs sm:text-sm text-grey-600 mb-2 sm:mb-3 break-all">
-                  {product?.tag}
-                </p>
-                {product?.description && (
-                  <div className="text-xs sm:text-sm text-grey-600">
-                    <MarkdownViewer content={product.description} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Dashboard Grid - Responsive */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Left Column - Activity Stats */}
-            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-              {/* Key Metrics - Responsive */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
-                  Overview
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
-                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
-                      {totalResources}
-                    </p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
-                      Total Resources
-                    </p>
-                  </div>
-                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
-                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green">
-                      {connectedApps.length}
-                    </p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
-                      Connected Apps
-                    </p>
-                  </div>
-                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
-                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-500">
-                      {product?.envs?.length || 0}
-                    </p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
-                      Environments
-                    </p>
-                  </div>
-                  <div className="text-center p-2 sm:p-3 rounded-lg bg-grey-50">
-                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-purple-500">
-                      {activeEnvCount}
-                    </p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
-                      Active Envs
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCategoryChange('deployments')}
-                    className="text-center p-2 sm:p-3 rounded-lg bg-grey-50 hover:bg-grey-100 transition-colors"
-                    data-testid="overview-deployments-tile"
-                  >
-                    <p className={cn('text-xl sm:text-2xl md:text-3xl font-bold', deploymentsKnown && deploymentStats.attention > 0 ? 'text-red' : 'text-teal-600')}>
-                      {deploymentsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-grey-600" /> : deploymentsKnown ? deploymentStats.total : '-'}
-                    </p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-grey-600">
-                      Deployments
-                    </p>
-                    {deploymentsKnown && deploymentStats.total > 0 ? (
-                      <p className="text-[9px] sm:text-[10px] text-grey-600">
-                        {deploymentStats.active} active
-                        {deploymentStats.inFlight > 0 ? `, ${deploymentStats.inFlight} in progress` : ''}
-                        {deploymentStats.attention > 0 ? `, ${deploymentStats.attention} need attention` : ''}
-                      </p>
-                    ) : null}
-                  </button>
-                </div>
-              </div>
-
-              {/* Recent Activity - Responsive */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
-                  Recent Activity
-                </h2>
-                <div className="space-y-2 sm:space-y-3">
-                  {/* Activity items */}
-                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green/10 flex items-center justify-center flex-shrink-0">
-                      <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-green" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-grey">
-                        Product initialized
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-grey-600">
-                        Ready for configuration
-                      </p>
-                    </div>
-                  </div>
-
-                  {connectedApps.length > 0 && (
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                        <Grid3x3 className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-grey">
-                          {connectedApps.length} app
-                          {connectedApps.length !== 1 ? 's' : ''} connected
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-grey-600">
-                          External integrations active
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {deploymentsKnown && (deploymentsQuery.data ?? []).slice(0, 3).map((d) => {
-                    const state = describeState(d.state);
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => handleCategoryChange('deployments')}
-                        className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50 hover:bg-grey-100 transition-colors text-left"
-                        data-testid="overview-deployment-activity"
-                      >
-                        <div
-                          className={cn(
-                            'w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                            state.tone === 'good' ? 'bg-green/10' : state.tone === 'bad' ? 'bg-red/10' : state.tone === 'warn' ? 'bg-orange/10' : 'bg-primary/10',
-                          )}
-                        >
-                          <Rocket
-                            className={cn(
-                              'h-3 w-3 sm:h-4 sm:w-4',
-                              state.tone === 'good' ? 'text-green' : state.tone === 'bad' ? 'text-red' : state.tone === 'warn' ? 'text-orange' : 'text-primary',
-                            )}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-medium text-grey truncate">
-                            {d.name} {d.version}: {state.label.toLowerCase()} in {d.env}
-                          </p>
-                          <p className="text-[10px] sm:text-xs text-grey-600">
-                            {new Date(d.updatedAt).toLocaleString()}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  {(product?.databases?.length || 0) > 0 && (
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-grey-50">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Database className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-grey">
-                          {product?.databases?.length} database
-                          {(product?.databases?.length || 0) !== 1 ? 's' : ''}{' '}
-                          configured
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-grey-600">
-                          Data layer ready
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column - Quick Actions & Environments */}
-            <div className="space-y-4 sm:space-y-6">
-              {/* Quick Actions - Responsive */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-                <h2 className="text-base sm:text-lg font-semibold text-grey mb-3 sm:mb-4">
-                  Quick Actions
-                </h2>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                    size="sm"
-                    onClick={() => setShowAddAppModal(true)}
-                  >
-                    <Grid3x3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Connect App</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                    size="sm"
-                    onClick={() => setShowCreateEnvModal(true)}
-                  >
-                    <Settings2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Add Environment</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                    size="sm"
-                    onClick={() => handleAddComponent('database')}
-                  >
-                    <Database className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Add Database</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                    size="sm"
-                    onClick={() => handleAddComponent('feature')}
-                  >
-                    <Workflow className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Create Feature</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                    size="sm"
-                    onClick={() => handleCategoryChange('deployments')}
-                  >
-                    <Rocket className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>View Deployments</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Environments - Responsive */}
-              <div className="bg-white rounded-lg border border-grey-400 p-4 sm:p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <h2 className="text-base sm:text-lg font-semibold text-grey">
-                      Environments
-                    </h2>
-                    <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-grey-100 text-grey-600">
-                      {product?.envs?.length || 0}
-                    </span>
-                  </div>
-                </div>
-
-                {(product?.envs?.length || 0) > 0 ? (
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {product?.envs?.slice(0, 4).map((env: any) => {
-                      const envSlug = env.slug?.toLowerCase() || '';
-                      const isProduction =
-                        envSlug.includes('prod') || envSlug === 'live';
-                      const isStaging =
-                        envSlug.includes('stag') || envSlug.includes('uat');
-
-                      return (
-                        <Button
-                          key={env._id}
-                          onClick={() => handleEditEnvironment(env)}
-                          variant="outline"
-                          className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg hover:bg-grey-50 transition-all group text-left"
-                        >
-                          {/* Status dot */}
-                          <div
-                            className={cn(
-                              'w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0',
-                              env.active
-                                ? 'bg-emerald-500'
-                                : 'bg-gray-300 dark:bg-gray-600',
-                            )}
-                          />
-
-                          {/* Name and slug */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                              <span className="text-xs sm:text-sm font-medium text-grey group-hover:text-primary transition-colors truncate">
-                                {env.name}
-                              </span>
-                              {isProduction && (
-                                <span className="px-1 py-0.5 rounded text-[8px] sm:text-[10px] font-medium bg-red/10 text-red flex-shrink-0">
-                                  PROD
-                                </span>
-                              )}
-                              {isStaging && (
-                                <span className="px-1 py-0.5 rounded text-[8px] sm:text-[10px] font-medium bg-orange-500/10 text-orange-600 flex-shrink-0">
-                                  STAGING
-                                </span>
-                              )}
-                            </div>
-                            {/* Slug badge */}
-                            <span className="inline-block mt-0.5 px-1 sm:px-1.5 py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium bg-grey-100 text-grey-600">
-                              {env.slug}
-                            </span>
-                          </div>
-
-                          {/* What is deployed here */}
-                          {deploymentsKnown && (deploymentsByEnv.get(env.slug)?.total ?? 0) > 0 ? (
-                            <span
-                              className={cn(
-                                'inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-medium flex-shrink-0',
-                                (deploymentsByEnv.get(env.slug)?.attention ?? 0) > 0 ? 'bg-red/10 text-red' : 'bg-grey-100 text-grey-600',
-                              )}
-                              title={`${deploymentsByEnv.get(env.slug)?.active ?? 0} active, ${deploymentsByEnv.get(env.slug)?.attention ?? 0} need attention`}
-                              data-testid="overview-env-deployments"
-                            >
-                              <Rocket className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                              {deploymentsByEnv.get(env.slug)?.total}
-                            </span>
-                          ) : null}
-
-                          {/* Status badge */}
-                          <span
-                            className={cn(
-                              'px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-semibold border flex-shrink-0',
-                              env.active
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                                : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-                            )}
-                          >
-                            {env.active ? 'Active' : 'Inactive'}
-                          </span>
-                        </Button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 sm:py-8 border-2 border-dashed border-grey-200 rounded-lg">
-                    <Settings2 className="h-6 w-6 sm:h-8 sm:w-8 text-grey-600 mx-auto mb-1 sm:mb-2" />
-                    <p className="text-xs sm:text-sm text-grey-600 mb-0.5 sm:mb-1">
-                      No environments yet
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-grey-600">
-                      Configure dev, staging, and production
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Danger zone */}
-          <div className="bg-white rounded-lg border border-red-200 p-4 sm:p-6 shadow-sm">
-            <h2 className="text-base sm:text-lg font-semibold text-red-600 mb-2">Danger zone</h2>
-            <p className="text-xs sm:text-sm text-grey-600 mb-4">
-              Permanently delete this product and all of its resources. This cannot be undone.
-            </p>
-            <Button
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 gap-2"
-              onClick={() => setShowDeleteProductModal(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete product
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const renderOverview = () => (
+    <ProductOverview
+      product={product}
+      categories={[...resourceCategories, rateLimitsCategory].map((category) => ({
+        id: category.id,
+        label: category.label,
+        icon: category.icon,
+        color: category.color,
+        bgColor: category.bgColor,
+        count: getResourceCount(category),
+      }))}
+      deployments={{
+        known: deploymentsKnown,
+        loading: deploymentsQuery.isLoading,
+        total: deploymentStats.total,
+        active: deploymentStats.active,
+        inFlight: deploymentStats.inFlight,
+        attention: deploymentStats.attention,
+        recent: (deploymentsQuery.data ?? []).slice(0, 3).map((d) => {
+          const state = describeState(d.state);
+          return {
+            id: d.id,
+            name: d.name,
+            version: d.version,
+            env: d.env,
+            label: state.label,
+            tone: state.tone,
+            updatedAt: d.updatedAt,
+          };
+        }),
+        byEnv: Object.fromEntries(
+          [...deploymentsByEnv.entries()].map(([slug, totals]) => [
+            slug,
+            { total: totals.total, active: totals.active, attention: totals.attention },
+          ]),
+        ),
+      }}
+      refreshing={isSidebarRefreshing}
+      onRefresh={handleRefresh}
+      onOpenCategory={(id) => handleCategoryChange(id as ResourceCategory)}
+      onConnectApp={() => setShowAddAppModal(true)}
+      onAddDatabase={() => handleAddComponent('database')}
+      onCreateFeature={() => handleAddComponent('feature')}
+      onAddEnvironment={() => setShowCreateEnvModal(true)}
+      onEditEnvironment={handleEditEnvironment}
+      onDeleteProduct={() => setShowDeleteProductModal(true)}
+    />
+  );
 
   // Environments config (not a resource, handled separately)
   const environmentsConfig: ResourceCategoryConfig = {

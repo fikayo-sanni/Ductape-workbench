@@ -67,7 +67,7 @@ const KIND_LABELS: Record<string, string> = {
   notification: 'Notifications',
 };
 
-const kindLabel = (type: unknown) => {
+export const kindLabel = (type: unknown) => {
   const key = String(type || 'unknown');
   return KIND_LABELS[key] ?? key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
 };
@@ -100,7 +100,7 @@ const percentile = (values: number[], ratio: number) => {
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
 };
 
-const operationOf = (row: any) => row?.function_tag || row?.feature_tag || row?.child_tag || row?.action || row?.parent_tag || row?.type || 'unknown';
+export const operationOf = (row: any) => row?.function_tag || row?.feature_tag || row?.child_tag || row?.action || row?.parent_tag || row?.type || 'unknown';
 
 const ms = (value: number | null | undefined) => (value == null ? '-' : `${Math.round(value)} ms`);
 
