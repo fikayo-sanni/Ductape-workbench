@@ -4,7 +4,7 @@ import { useAuth } from '@/store/useAuth';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Input } from './ui/input';
 import SidebarRefreshButton from './SidebarRefreshButton';
-import { Search, Loader2, Database, HardDrive, MessageSquare, Box, Shield, Timer, Workflow, Bell, Heart, Settings2, Layers, KeyRound } from 'lucide-react';
+import { Search, Loader2, Database, HardDrive, MessageSquare, Box, CalendarClock, Shield, Timer, Workflow, Bell, Heart, Settings2, Layers, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IProduct } from '@/types/product';
 import productServicesReal from '@/services/productServicesReal';
@@ -150,7 +150,7 @@ export default function ProductsSidebar() {
       storage: HardDrive,
       cache: Layers,
       'message-broker': MessageSquare,
-      job: Box,
+      job: CalendarClock,
       notification: Bell,
       feature: Workflow,
       fallback: Shield,

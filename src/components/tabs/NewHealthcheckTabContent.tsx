@@ -22,6 +22,13 @@ import appServices from '@/services/appServices';
 import { reconstructActionPayload } from '@/utils/payloadReconstruction';
 import { useTabState, getInitialTabState } from '@/hooks/useTabState';
 import { SearchableActionPicker } from '@/components/feature-builder';
+import {
+  DEFAULT_STRATEGY_FORM,
+  HEARTBEAT_OPTIONS,
+  RECHECK_OPTIONS,
+  strategyFields,
+  validateStrategy,
+} from '@/utils/healthcheckStrategy';
 
 interface NewHealthcheckTabContentProps {
   data?: any;
@@ -59,6 +66,7 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       tag: '',
       description: '',
       interval: String(DEFAULT_INTERVAL_SECONDS.app),
+      ...DEFAULT_STRATEGY_FORM,
       retries: 1,
       type: 'app', // Default type
       selectedApp: '',
@@ -294,6 +302,19 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       }
 
       const healthcheck = await ductape.apps.health.create(payload);
+      // The check is created with an interval (the creation call requires one); a reactive check then
+      // switches to waiting for failures. Interval checks need nothing more.
+      const fields = strategyFields(formData);
+      if (fields) {
+        await productServices.updateHealthcheckStrategy({
+          product_id: product._id,
+          tag: formData.tag,
+          fields,
+          workspace_id: product.workspace_id || currentWorkspaceId || '',
+          user_id: user?._id || '',
+          public_key: user?.public_key || '',
+        });
+      }
       return healthcheck;
     },
     onSuccess: (healthcheck) => {
@@ -322,8 +343,13 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       toast.error('Please enter a tag');
       return;
     }
-    if (!formData.interval || parseInt(formData.interval) < 1) {
+    if (formData.strategy === 'interval' && (!formData.interval || parseInt(formData.interval) < 1)) {
       toast.error('Please enter a valid interval (minimum 1 second)');
+      return;
+    }
+    const strategyProblem = validateStrategy(formData);
+    if (strategyProblem) {
+      toast.error(strategyProblem);
       return;
     }
 
@@ -360,8 +386,8 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
   const isFormComplete = useMemo(() => {
     const baseComplete = formData.name.trim() !== '' &&
                         formData.tag.trim() !== '' &&
-                        formData.interval &&
-                        parseInt(formData.interval) >= 1;
+                        (formData.strategy === 'reactive' || (formData.interval && parseInt(formData.interval) >= 1)) &&
+                        !validateStrategy(formData);
 
     if (!baseComplete) return false;
 
@@ -487,6 +513,76 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
               </div>
 
               <div>
+                <Label>When to check</Label>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {[
+                    {
+                      id: 'reactive',
+                      title: 'When something fails',
+                      body: 'Assumed healthy until an operation on this asset fails. Then it checks until the asset recovers, and sleeps again. Uses far less bandwidth.',
+                    },
+                    {
+                      id: 'interval',
+                      title: 'On a schedule',
+                      body: 'Checks every few seconds or minutes whether or not anything is wrong.',
+                    },
+                  ].map(option => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, strategy: option.id })}
+                      className={`rounded-lg border p-3 text-left transition-colors ${
+                        formData.strategy === option.id ? 'border-primary bg-primary/5' : 'border-grey-400 hover:border-grey-500'
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-grey">
+                        {option.title}
+                        {option.id === 'reactive' ? <span className="ml-2 text-xs font-normal text-primary">Recommended</span> : null}
+                      </p>
+                      <p className="mt-1 text-xs text-grey-600">{option.body}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {formData.strategy === 'reactive' ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label>Baseline check while healthy</Label>
+                    <Select value={formData.heartbeatMinutes} onValueChange={(value) => setFormData({ ...formData, heartbeatMinutes: value })}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HEARTBEAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-grey-600 mt-1">
+                      A slow check that catches problems nothing has called into yet.
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Recheck while it is down</Label>
+                    <Select value={formData.recheckSeconds} onValueChange={(value) => setFormData({ ...formData, recheckSeconds: value })}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RECHECK_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-grey-600 mt-1">
+                      Starts quicker and slows to this while the outage lasts.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+              <div>
                 <Label htmlFor="interval" className="required">
                   Check Interval (seconds)
                 </Label>
@@ -564,6 +660,9 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
                   </Button>
                 </div>
               </div>
+
+                </>
+              )}
 
               <div>
                 <Label htmlFor="retries">

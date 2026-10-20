@@ -28,6 +28,30 @@ const fetchProducts = async (data: {
   return response.data;
 };
 
+/**
+ * Saves how a healthcheck decides when to probe. The component update merges into the stored check, so
+ * only the strategy fields are sent.
+ */
+const updateHealthcheckStrategy = async (data: {
+  product_id: string;
+  tag: string;
+  fields: { mode: 'reactive'; heartbeat: number; recovery: { max: number } };
+  workspace_id: string;
+  user_id: string;
+  public_key: string;
+}): Promise<void> => {
+  const { product_id, tag, fields, workspace_id, user_id, public_key } = data;
+  await apiClient.put(`/integrations/v1/${product_id}`, {
+    component: 'healthcheck',
+    action: 'update',
+    tag,
+    ...fields,
+    workspace_id,
+    user_id,
+    public_key,
+  });
+};
+
 const fetchProduct = async (data: {
   product_id: string;
   user_id: string;
@@ -92,6 +116,7 @@ const deleteProduct = async (data: {
 };
 
 const productServices = {
+  updateHealthcheckStrategy,
   fetchProducts,
   fetchProduct,
   createProduct,

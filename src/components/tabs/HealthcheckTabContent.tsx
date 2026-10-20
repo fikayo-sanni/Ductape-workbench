@@ -5,6 +5,7 @@ import { JsonViewer } from '@/components/JsonViewer';
 import { cn } from '@/lib/utils';
 import { CheckEnvStatus, IHealthCheck } from '@/types/healthcheck';
 import { formatAgo, parseLatency } from '@/components/resilience/healthcheck-utils';
+import { describeStrategy, healthView } from '@/utils/healthcheckStrategy';
 
 interface HealthcheckTabContentProps {
   data?: IHealthCheck;
@@ -56,7 +57,11 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
     );
   }
 
-  const healthy = environment?.status === 'healthy' || environment?.status === 'available';
+  // Health is assumed until a failure says otherwise, so a check that has not run yet is healthy.
+  const view = healthView(environment);
+  const healthy = view.tone === 'good';
+  const reactive = healthcheck.mode === 'reactive';
+  const intervalLabel = healthcheck.checkIntervals || (healthcheck.interval ? `every ${Math.round(healthcheck.interval / 1000)} seconds` : undefined);
   const latency = parseLatency(environment?.lastLatency || '0ms');
 
   return (
@@ -85,12 +90,17 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
             (healthy ? (
               <Badge className="flex-shrink-0 border-green/20 bg-green/10 text-green">
                 <CheckCircle className="mr-1 h-3 w-3" />
-                Healthy
+                {view.label}
+              </Badge>
+            ) : view.tone === 'warn' ? (
+              <Badge className="flex-shrink-0 border-orange-200 bg-orange-50 text-orange-600">
+                <AlertTriangle className="mr-1 h-3 w-3" />
+                {view.label}
               </Badge>
             ) : (
               <Badge className="flex-shrink-0 border-red/20 bg-red/10 text-red">
                 <XCircle className="mr-1 h-3 w-3" />
-                Unhealthy
+                {view.label}
               </Badge>
             ))}
         </div>
@@ -120,10 +130,10 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-grey-500">Interval</p>
+                  <p className="text-[10px] uppercase text-grey-500">Checks</p>
                   <p className="flex items-center gap-1 text-sm font-medium text-grey">
                     <Clock className="h-3.5 w-3.5" />
-                    {healthcheck.checkIntervals}
+                    {reactive ? 'When something fails' : intervalLabel || 'On a schedule'}
                   </p>
                 </div>
                 <div>
@@ -132,7 +142,15 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
                 </div>
                 <div className="col-span-2">
                   <p className="text-[10px] uppercase text-grey-500">Last checked</p>
-                  <p className="text-sm text-grey">{formatAgo(environment.lastChecked)}</p>
+                  <p className="text-sm text-grey">{environment.lastChecked ? formatAgo(environment.lastChecked) : view.note ?? 'Not checked yet'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-grey-600">{describeStrategy(healthcheck, intervalLabel)}</p>
+                  {environment.monitor_state === 'probing' ? (
+                    <p className="mt-1 text-xs text-orange-600">
+                      Rechecking now{environment.probe_reason ? `. Triggered by: ${environment.probe_reason}` : ''}.
+                    </p>
+                  ) : null}
                 </div>
                 {!healthy && environment.lastAvailable && (
                   <div className="col-span-2 flex items-start gap-2 rounded-lg border border-orange-100 bg-orange-50 p-2 text-sm text-orange-600">

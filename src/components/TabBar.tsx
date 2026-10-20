@@ -15,7 +15,6 @@ import {
   Shield,
   BarChart3,
   Heart,
-  ListTree,
   LayoutDashboard,
   KeyRound,
   Lock,
@@ -33,6 +32,7 @@ import {
   Handshake,
   Boxes,
   Cloud,
+  CalendarClock,
 } from 'lucide-react';
 
 const getTabIcon = (type: Tab['type']) => {
@@ -70,9 +70,9 @@ const getTabIcon = (type: Tab['type']) => {
     'new-fallback': Shield,
     quota: BarChart3,
     'new-quota': BarChart3,
-    job: ListTree,
-    'job-run': ListTree,
-    'job-explorer': ListTree,
+    job: CalendarClock,
+    'job-run': CalendarClock,
+    'job-explorer': CalendarClock,
     'new-healthcheck': Heart,
     logs: FileText,
     dashboard: LayoutDashboard,
@@ -176,6 +176,21 @@ export default function TabBar() {
             )}
             onClick={() => handleTabClick(tab)}
           >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                closeTab(tab.id);
+              }}
+              className={cn(
+                'p-0.5 rounded hover:bg-grey-200 transition-opacity flex-shrink-0',
+                // Always there for the open tab and on touch screens; other tabs show it on hover.
+                isActive ? 'opacity-100' : 'md:opacity-0 md:group-hover:opacity-100'
+              )}
+              title="Close tab"
+              aria-label={`Close ${tab.title}`}
+            >
+              <X className="h-3 w-3 text-grey-600" />
+            </button>
             <Icon className={cn('h-3.5 w-3.5 flex-shrink-0', isActive ? 'text-primary' : 'text-grey-600')} />
             <span
               className={cn(
@@ -188,19 +203,6 @@ export default function TabBar() {
             {tab.isDirty && (
               <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-primary flex-shrink-0" title="Unsaved changes" />
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                closeTab(tab.id);
-              }}
-              className={cn(
-                'ml-1 p-0.5 rounded hover:bg-grey-200 transition-opacity flex-shrink-0',
-                'opacity-0 group-hover:opacity-100 md:opacity-0'
-              )}
-              title="Close tab"
-            >
-              <X className="h-3 w-3 text-grey-600" />
-            </button>
           </div>
         );
       })}

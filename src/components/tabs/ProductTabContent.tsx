@@ -6,7 +6,8 @@ import {
   Layers,
   MessageSquare,
   Settings2,
-  Box,
+  CalendarClock,
+  Braces,
   Plus,
   ExternalLink,
   Loader2,
@@ -188,7 +189,7 @@ const resourceCategories: ResourceCategoryConfig[] = [
   {
     id: 'jobs',
     label: 'Jobs',
-    icon: Box,
+    icon: CalendarClock,
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-600/10',
     dataKey: 'jobs',
@@ -203,7 +204,7 @@ const resourceCategories: ResourceCategoryConfig[] = [
     dataKey: 'features',
     componentType: 'feature',
   },
-  { id: 'functions', label: 'Functions', icon: Box, color: 'text-teal-600', bgColor: 'bg-teal-600/10', dataKey: 'functions', componentType: 'function' },
+  { id: 'functions', label: 'Functions', icon: Braces, color: 'text-teal-600', bgColor: 'bg-teal-600/10', dataKey: 'functions', componentType: 'function' },
   {
     id: 'intelligence',
     label: 'Intelligence',

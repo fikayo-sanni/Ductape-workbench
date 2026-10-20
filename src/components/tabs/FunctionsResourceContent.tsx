@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Box, Clock3, RefreshCw, Repeat2, Search } from 'lucide-react';
+import { ArrowLeft, Braces, Clock3, RefreshCw, Repeat2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -154,7 +154,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   if (selected) {
     return (
       <SectionPage
-        icon={Box}
+        icon={Braces}
         tint={TEAL}
         title={selected.name}
         subtitle={selected.tag}
@@ -173,7 +173,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   const count = functions.length;
   return (
     <SectionPage
-      icon={Box}
+      icon={Braces}
       tint={TEAL}
       title="Functions"
       subtitle={`${count} ${count === 1 ? 'function' : 'functions'} published from your code`}
@@ -213,7 +213,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
         <ProductObservabilityContent product={product} initialView="functions" embedded />
       ) : count === 0 ? (
         <SectionEmpty
-          icon={Box}
+          icon={Braces}
           tint={TEAL}
           title="No functions yet"
           description="Functions are defined in your application code and published here with ductape.functions.sync(). Once synced, each function shows up with its operations, inputs and outputs."
@@ -290,7 +290,7 @@ function FunctionCard({ fn, traffic, onOpen }: { fn: FunctionView; traffic: Traf
     >
       <div className="flex items-start gap-2 sm:gap-3">
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-teal-600/10 sm:h-10 sm:w-10">
-          <Box className="h-4 w-4 text-teal-600 sm:h-5 sm:w-5" />
+          <Braces className="h-4 w-4 text-teal-600 sm:h-5 sm:w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
