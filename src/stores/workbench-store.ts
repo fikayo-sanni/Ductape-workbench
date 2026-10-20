@@ -86,6 +86,8 @@ interface WorkbenchState {
   // Actions - Tabs
   openTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
+  /** Closes several tabs at once. If the active tab is among them, the nearest tab that stays becomes active. */
+  closeTabs: (tabIds: string[]) => void;
   clearAllTabs: () => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
@@ -327,6 +329,26 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         tabs: newTabs,
         activeTabId: newActiveTabId,
       };
+    }),
+
+  closeTabs: (tabIds) =>
+    set((state) => {
+      const closing = new Set(tabIds);
+      if (closing.size === 0) return {};
+      closing.forEach((id) => deleteTabState(id));
+      const newTabs = state.tabs.filter((t) => !closing.has(t.id));
+      let newActiveTabId = state.activeTabId;
+      if (state.activeTabId && closing.has(state.activeTabId)) {
+        if (newTabs.length === 0) {
+          newActiveTabId = null;
+        } else {
+          // Prefer the nearest remaining tab to the left of where the active tab was, else the first.
+          const activeIndex = state.tabs.findIndex((t) => t.id === state.activeTabId);
+          const leftOfActive = state.tabs.slice(0, activeIndex).reverse().find((t) => !closing.has(t.id));
+          newActiveTabId = (leftOfActive ?? newTabs[0]).id;
+        }
+      }
+      return { tabs: newTabs, activeTabId: newActiveTabId };
     }),
 
   clearAllTabs: () =>
