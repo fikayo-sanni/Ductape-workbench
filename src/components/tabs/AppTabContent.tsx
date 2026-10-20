@@ -1,3 +1,4 @@
+import LogoEditor from '@/components/LogoEditor';
 import {useState, useMemo, useEffect, useCallback, useRef} from 'react';
 import {IApp} from '@/types/app';
 import {
@@ -1494,17 +1495,40 @@ export default function AppTabContent({
           <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex min-w-0 items-start gap-3 md:gap-4">
-                <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
-                  {currentApp?.logo ? (
-                    <img
-                      src={currentApp?.logo}
-                      alt={currentApp?.app_name}
-                      className="w-full h-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <BarChart3 className="h-6 w-6 text-white" />
-                  )}
-                </div>
+                {isInternalApp && !isProductView ? (
+                  <LogoEditor
+                    logo={currentApp?.logo}
+                    subject="app"
+                    className="h-12 w-12 rounded-xl shadow-lg shadow-primary/20"
+                    fallbackClassName="bg-gradient-to-br from-primary to-primary/80"
+                    fallback={<BarChart3 className="h-6 w-6 text-white" />}
+                    onSave={async (logo) => {
+                      await appServices.updateApp({
+                        app_id: currentApp._id,
+                        user_id: user?._id || '',
+                        public_key: user?.public_key || '',
+                        component: 'app',
+                        payload: { logo },
+                      });
+                      await refetch();
+                      void queryClient.invalidateQueries({
+                        predicate: (query) => ['apps', 'app'].includes(String(query.queryKey[0])),
+                      });
+                    }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+                    {currentApp?.logo ? (
+                      <img
+                        src={currentApp?.logo}
+                        alt={currentApp?.app_name}
+                        className="w-full h-full rounded-xl object-cover"
+                      />
+                    ) : (
+                      <BarChart3 className="h-6 w-6 text-white" />
+                    )}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h1 className="text-xl md:text-2xl font-bold text-grey mb-2 break-words">
                     {isProductView
