@@ -230,7 +230,7 @@ export default function ProductOverview({
       <div className="mx-auto max-w-6xl space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
         {/* Header */}
         <section className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex min-w-0 items-start gap-3 sm:gap-4">
               <LogoEditor
                 logo={product?.logo}
@@ -269,7 +269,7 @@ export default function ProductOverview({
                 ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
               <Button variant="outline" size="sm" className="gap-2" onClick={onConnectApp}>
                 <Grid3x3 className="h-3.5 w-3.5" />
                 Connect app
@@ -356,7 +356,7 @@ export default function ProductOverview({
           {pulse.isLoading ? (
             <div className="space-y-3" aria-busy>
               <div className="h-16 animate-pulse rounded-xl bg-grey-100" />
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
                 {[0, 1, 2, 3, 4].map(i => (
                   <div key={i} className="h-24 animate-pulse rounded-xl bg-grey-100" />
                 ))}
@@ -392,7 +392,7 @@ export default function ProductOverview({
                 </button>
               ) : null}
 
-              <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5">
                 <Metric
                   icon={Activity}
                   label="Operations"
@@ -419,7 +419,7 @@ export default function ProductOverview({
                   icon={Gauge}
                   label="Throughput"
                   value={total ? formatThroughput(total / minutes) : '-'}
-                  hint="averaged over the period"
+                  hint="over the period"
                   onClick={() => onOpenCategory('observability')}
                 />
                 <Metric
@@ -435,8 +435,8 @@ export default function ProductOverview({
           )}
         </section>
 
-        <div className="grid gap-4 sm:gap-5 lg:grid-cols-3">
-          <div className="space-y-4 sm:space-y-5 lg:col-span-2">
+        <div className="grid gap-4 sm:gap-5 xl:grid-cols-3">
+          <div className="space-y-4 sm:space-y-5 xl:col-span-2">
             <Panel title="Activity" description="Successful and failed operations, per day." action={<Pill>{period.label}</Pill>}>
               {pulse.isLoading ? (
                 <div className="h-56 animate-pulse rounded-lg bg-grey-100" />
@@ -510,13 +510,13 @@ export default function ProductOverview({
           {/* On large screens this column is exactly as tall as Activity plus Busiest operations; what does not
               fit scrolls inside its card. Stacked on small screens, so the lists just have a sensible maximum. */}
           <div className="relative">
-            <div className="flex flex-col gap-4 sm:gap-5 lg:absolute lg:inset-0">
+            <div className="flex flex-col gap-4 sm:gap-5 xl:absolute xl:inset-0">
             <Panel
               title="Needs attention"
               description={attention.length ? `${attention.length} to look at` : undefined}
               flush={attention.length > 0}
-              className="flex min-h-0 flex-col lg:flex-1"
-              bodyClassName="min-h-0 max-h-80 flex-1 overflow-y-auto lg:max-h-none"
+              className="flex min-h-0 flex-col xl:flex-1"
+              bodyClassName="min-h-0 max-h-80 flex-1 overflow-y-auto xl:max-h-none"
             >
               {attention.length ? (
                 <ul className="divide-y divide-grey-300">
@@ -554,8 +554,8 @@ export default function ProductOverview({
 
             <Panel
               title="Environments"
-              className="flex min-h-0 flex-col lg:max-h-[45%] lg:flex-shrink-0"
-              bodyClassName="min-h-0 max-h-72 flex-1 overflow-y-auto lg:max-h-none"
+              className="flex min-h-0 flex-col xl:max-h-[45%] xl:flex-shrink-0"
+              bodyClassName="min-h-0 max-h-72 flex-1 overflow-y-auto xl:max-h-none"
               description={`${environments.length} ${environments.length === 1 ? 'environment' : 'environments'}`}
               action={
                 <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onAddEnvironment}>
@@ -612,7 +612,7 @@ export default function ProductOverview({
         {/* What is in the product */}
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-grey sm:text-base">What is in this product</h2>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-3">
             {groups.map(group => (
               <Panel key={group.id} title={group.title} description={group.description} flush>
                 <ul className="divide-y divide-grey-300">
