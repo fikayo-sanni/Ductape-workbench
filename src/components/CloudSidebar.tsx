@@ -22,6 +22,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   aws: 'AWS',
   gcp: 'GCP',
   azure: 'Azure',
+  cloudflare: 'Cloudflare',
   mongodb_atlas: 'Atlas',
   neo4j_aura: 'Aura',
 };
@@ -34,6 +35,8 @@ function providerBadgeClass(provider: string) {
       return 'bg-blue-500/10 text-blue-700';
     case 'azure':
       return 'bg-sky-500/10 text-sky-700';
+    case 'cloudflare':
+      return 'bg-amber-500/10 text-amber-700';
     case 'mongodb_atlas':
       return 'bg-emerald-500/10 text-emerald-700';
     case 'neo4j_aura':

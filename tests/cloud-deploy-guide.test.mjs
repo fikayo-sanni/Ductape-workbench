@@ -53,6 +53,103 @@ test('links open the right console page for the project', () => {
   assert.equal(gcpIamUrl('a b'), 'https://console.cloud.google.com/iam-admin/iam?project=a%20b', 'the project id is encoded');
 });
 
-test('only GCP has a deploy guide, because only GCP can deploy today', () => {
-  for (const provider of ['aws', 'azure', 'mongodb_atlas', 'neo4j_aura']) assert.equal(CLOUD_PROVIDER_GUIDES[provider].deployGuide, undefined, provider);
+test('GCP, AWS and Azure have a deploy guide, because those are the clouds that can deploy today', () => {
+  for (const provider of ['mongodb_atlas', 'neo4j_aura']) assert.equal(CLOUD_PROVIDER_GUIDES[provider].deployGuide, undefined, provider);
+  assert.ok(CLOUD_PROVIDER_GUIDES.gcp.deployGuide && CLOUD_PROVIDER_GUIDES.aws.deployGuide && CLOUD_PROVIDER_GUIDES.azure.deployGuide && CLOUD_PROVIDER_GUIDES.cloudflare.deployGuide);
+});
+
+test('the Cloudflare guide explains deploy setup honestly: two permissions, what is created, no cloud-level check, and the limits', () => {
+  const cf = CLOUD_PROVIDER_GUIDES.cloudflare.deployGuide;
+  assert.equal(cf.container, 'account');
+  assert.match(cf.safety, /never deletes anything/);
+  assert.match(cf.safety, /no cloud-level access check/);
+  assert.match(cf.safety, /not services/);
+  assert.match(cf.safety, /passes through the control plane in memory/);
+  assert.deepEqual(plain(cf.accountRoles.map((r) => r.roleName)), ['Account / Workers Scripts / Edit', 'Account / Workers KV Storage / Edit']);
+  assert.ok(cf.creates.some((c) => /ductape-releases/.test(c)) && cf.creates.some((c) => /preview address/.test(c)));
+  const commands = cf.steps.map((s) => s.command).filter(Boolean).join('\n');
+  assert.match(commands, /--account-id .*--api-token-env/);
+  assert.doesNotMatch(commands, /--api-token /, 'the token never goes on a command line');
+  assert.match(commands, /releases publish-worker/);
+  assert.deepEqual(plain(cf.steps.map((s) => s.attach).filter(Boolean)), ['accountRoles']);
+  assert.ok(cf.troubleshooting.some((t) => /100 versions/.test(t.problem)) && cf.troubleshooting.some((t) => /30 seconds of CPU/.test(t.fix)));
+  assert.ok(!/api_token|Bearer /.test(JSON.stringify(plain(cf))));
+});
+
+test('the Cloudflare guide names the same permissions and flags as the CLI guide', () => {
+  const cli = new URL('../../../sdk/cli/src/lib/cloud-connection.ts', import.meta.url);
+  if (!fs.existsSync(cli)) return;
+  const source = fs.readFileSync(cli, 'utf8');
+  const block = source.slice(source.indexOf('export const CLOUDFLARE_DEPLOY_ROLE_LIST'), source.indexOf('export const CLOUDFLARE_DEPLOY_CREATES'));
+  const cliRoles = [...block.matchAll(/role: '([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(plain(CLOUD_PROVIDER_GUIDES.cloudflare.deployGuide.accountRoles.map((r) => r.roleName)), cliRoles);
+  for (const flag of ['--deploy', '--account-id', '--api-token-env']) assert.ok(source.includes(flag), `${flag} is in the CLI`);
+});
+
+test('the Azure guide explains deploy setup: safety, what is created, the roles, the commands and the fixes', () => {
+  const azure = CLOUD_PROVIDER_GUIDES.azure.deployGuide;
+  assert.equal(azure.container, 'resource group');
+  assert.match(azure.safety, /never deletes anything/);
+  assert.match(azure.safety, /never registers resource providers/);
+  assert.ok(azure.creates.some((c) => /container app per deployed version/.test(c)) && azure.creates.some((c) => /Container Registry Tasks/.test(c)) && azure.creates.some((c) => /sign-in check/.test(c)) && azure.creates.some((c) => /app secret/.test(c)));
+  assert.ok(azure.accountRoles.some((r) => /Contributor/.test(r.roleName)) && azure.accountRoles.some((r) => /AcrPull/.test(r.roleName)));
+  assert.equal(azure.apis, undefined);
+  assert.equal(azure.roles, undefined);
+  const commands = azure.steps.map((s) => s.command).filter(Boolean).join('\n');
+  assert.match(commands, /connections create --provider azure .*--deploy --save-template/);
+  assert.match(commands, /az deployment group create/);
+  assert.match(commands, /--resource-group .*--registry-name .*--environment-name .*--runtime-identity-id/);
+  assert.match(commands, /--client-secret-env/);
+  assert.doesNotMatch(commands, /--client-secret /, 'the secret never goes on a command line');
+  assert.match(commands, /connections validate/);
+  assert.deepEqual(plain(azure.steps.map((s) => s.attach).filter(Boolean)), ['accountRoles']);
+  assert.ok(azure.troubleshooting.some((t) => /MissingSubscriptionRegistration/.test(t.problem)) && azure.troubleshooting.some((t) => /free-credit/.test(t.fix)));
+  assert.ok(!/BEGIN PRIVATE KEY|client_secret"\s*:/.test(JSON.stringify(plain(azure))));
+});
+
+test('the Azure guide names the same roles and flags as the CLI guide', () => {
+  const cli = new URL('../../../sdk/cli/src/lib/cloud-connection.ts', import.meta.url);
+  if (!fs.existsSync(cli)) return;
+  const source = fs.readFileSync(cli, 'utf8');
+  const block = source.slice(source.indexOf('export const AZURE_DEPLOY_ROLE_LIST'), source.indexOf('export const AZURE_DEPLOY_CREATES'));
+  const cliRoles = [...block.matchAll(/role: '([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(plain(CLOUD_PROVIDER_GUIDES.azure.deployGuide.accountRoles.map((r) => r.roleName)), cliRoles);
+  for (const flag of ['--deploy', '--save-template', '--resource-group', '--registry-name', '--environment-name', '--runtime-identity-id', '--client-secret-env']) assert.ok(source.includes(flag), `${flag} is in the CLI`);
+});
+
+test('the GCP guide attaches the APIs and roles to the right steps, not by position', () => {
+  assert.equal(guide.container, 'project');
+  assert.deepEqual(plain(guide.steps.map((s) => s.attach).filter(Boolean)), ['apis', 'roles']);
+  assert.equal(guide.steps[0].attach, 'apis');
+  assert.equal(guide.steps[1].attach, 'roles');
+});
+
+test('the AWS guide explains deploy setup: safety, what is created, the three roles, the commands and the fixes', () => {
+  const aws = CLOUD_PROVIDER_GUIDES.aws.deployGuide;
+  assert.equal(aws.container, 'account');
+  assert.match(aws.safety, /never deletes anything/);
+  assert.match(aws.safety, /dedicated account/);
+  assert.ok(aws.creates.some((c) => /ductape-source-<account id>/.test(c)) && aws.creates.some((c) => /ECR repository/.test(c)) && aws.creates.some((c) => /Lambda function/.test(c)) && aws.creates.some((c) => /IAM authentication/.test(c)) && aws.creates.some((c) => /Secrets Manager/.test(c)));
+  assert.deepEqual(plain(aws.accountRoles.map((r) => r.roleName)), ['DuctapeAccess', 'DuctapeFunctionRuntime', 'DuctapeBuild']);
+  assert.equal(aws.apis, undefined, 'AWS has no APIs to switch on');
+  assert.equal(aws.roles, undefined);
+  const commands = aws.steps.map((s) => s.command).filter(Boolean).join('\n');
+  assert.match(commands, /connections create --provider aws .*--deploy --save-template/);
+  assert.match(commands, /cloudformation deploy .*CAPABILITY_NAMED_IAM/);
+  assert.match(commands, /--runtime-role-arn .*--build-role-arn .*--default-region/);
+  assert.match(commands, /connections validate/);
+  assert.deepEqual(plain(aws.steps.map((s) => s.attach).filter(Boolean)), ['accountRoles']);
+  assert.ok(aws.troubleshooting.some((t) => /cannot be assumed by Lambda/.test(t.problem)));
+  assert.ok(aws.troubleshooting.some((t) => /InvokeFunctionUrl/.test(t.fix)) && aws.troubleshooting.some((t) => /PassRole/.test(t.problem)));
+  assert.ok(!/AKIA|secret_access_key|BEGIN PRIVATE KEY/.test(JSON.stringify(plain(aws))));
+});
+
+test('the AWS guide names the same roles and flags as the CLI guide', () => {
+  const cli = new URL('../../../sdk/cli/src/lib/cloud-connection.ts', import.meta.url);
+  if (!fs.existsSync(cli)) return;
+  const source = fs.readFileSync(cli, 'utf8');
+  const block = source.slice(source.indexOf('export const AWS_DEPLOY_ROLE_LIST'), source.indexOf('export const AWS_DEPLOY_CREATES'));
+  const cliRoles = [...block.matchAll(/role: '(Ductape[A-Za-z]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(plain(CLOUD_PROVIDER_GUIDES.aws.deployGuide.accountRoles.map((r) => r.roleName)), cliRoles);
+  for (const flag of ['--deploy', '--save-template', '--role-arn', '--runtime-role-arn', '--build-role-arn', '--default-region']) assert.ok(source.includes(flag), `${flag} is in the CLI`);
 });

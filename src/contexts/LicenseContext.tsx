@@ -6,6 +6,7 @@ interface LicenseLimits {
   max_users: number | null;
   max_workspaces: number | null;
   max_products: number | null;
+  max_apps?: number | null;
   max_api_requests_month: number | null;
   log_retention_days: number | null;
 }

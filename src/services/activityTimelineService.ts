@@ -1,4 +1,5 @@
 import {
+  fetchAppDashboard,
   fetchCacheDashboard,
   fetchDatabaseDashboard,
   fetchGraphDashboard,
@@ -121,9 +122,27 @@ async function fetchDashboardActivityTimeline(
   const { workspaceId, userId, publicKey, kind, productTag, componentTag, env, sessionTag, sessionUserId, range } =
     query;
 
-  if (!productTag) return null;
-
   const dates = dashboardDateQuery(range);
+
+  // An app's timeline comes from the same server figures as the overview cards, so the two always agree. Without a
+  // product it covers every product in scope.
+  if (kind === 'app') {
+    if (!query.appId) return null;
+    try {
+      const data = await fetchAppDashboard(workspaceId, userId, publicKey, {
+        app_id: query.appId,
+        ...(productTag && { product_tag: productTag }),
+        ...dates,
+      });
+      if (!data.activityTimeline) return null;
+      return mapDashboardTimeline(data.activityTimeline, data.latencyTimeline, data.outcomeTimeline ?? [], range.groupBy);
+    } catch (err) {
+      console.warn('[activityTimeline] app dashboard fetch failed, falling back to logs', err);
+      return null;
+    }
+  }
+
+  if (!productTag) return null;
 
   try {
     switch (kind) {

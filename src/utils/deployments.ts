@@ -10,14 +10,14 @@ export type DeploymentState =
 
 export interface IDeploymentTarget {
   kind: string;
-  connectionTag: string;
+  connection: string;
   region?: string;
 }
 
 export interface IDeployment {
   id: string;
   kind: DeployableKind;
-  productTag: string;
+  product: string;
   name: string;
   version: string;
   env: string;
@@ -92,6 +92,7 @@ const TARGET_LABEL: Record<string, string> = {
   cloud_run: 'Cloud Run',
   aws_lambda: 'AWS Lambda',
   aws_fargate: 'AWS Fargate',
+  aws_ecs_express: 'AWS ECS Express',
   azure_container_apps: 'Azure Container Apps',
   cloudflare_workers: 'Cloudflare Workers',
   vps: 'VPS',
@@ -99,7 +100,7 @@ const TARGET_LABEL: Record<string, string> = {
 
 export function describeTarget(target: IDeploymentTarget): string {
   const kind = TARGET_LABEL[target.kind] ?? target.kind;
-  return `${kind} · ${target.connectionTag}${target.region ? ` · ${target.region}` : ''}`;
+  return `${kind} · ${target.connection}${target.region ? ` · ${target.region}` : ''}`;
 }
 
 export function describePolicy(policy: IEnvironmentPolicy): { label: string; tone: Tone; detail: string } {
@@ -152,7 +153,7 @@ export function filterDeployments(deployments: IDeployment[], filters: IDeployme
   return deployments.filter((d) => {
     if (filters.kind && filters.kind !== 'all' && d.kind !== filters.kind) return false;
     if (filters.env && filters.env !== 'all' && d.env !== filters.env) return false;
-    if (needle && !`${d.name} ${d.version} ${d.resourceName} ${d.target.connectionTag}`.toLowerCase().includes(needle)) return false;
+    if (needle && !`${d.name} ${d.version} ${d.resourceName} ${d.target.connection}`.toLowerCase().includes(needle)) return false;
     return true;
   });
 }
@@ -216,16 +217,16 @@ export function deployErrorMessage(error: unknown): string {
 
 // ---- Builds -------------------------------------------------------------------------------------------------------------------
 
-export type BuildStatus = 'awaiting_upload' | 'building' | 'succeeded' | 'failed' | 'expired';
+export type BuildStatus = 'awaiting_upload' | 'building' | 'succeeded' | 'failed' | 'expired' | 'cancelled';
 
 /** A build of source code into an image in the customer's own cloud account. */
 export interface IBuild {
   id: string;
   kind: DeployableKind;
-  productTag: string;
+  product: string;
   name: string;
   version: string;
-  connectionTag: string;
+  connection: string;
   region: string;
   status: BuildStatus;
   builder: string;
@@ -244,6 +245,7 @@ const BUILD_LABEL: Record<BuildStatus, string> = {
   succeeded: 'Succeeded',
   failed: 'Failed',
   expired: 'Expired',
+  cancelled: 'Cancelled',
 };
 
 export function describeBuildStatus(status: string): { label: string; tone: Tone } {
@@ -251,7 +253,7 @@ export function describeBuildStatus(status: string): { label: string; tone: Tone
   const label = BUILD_LABEL[known] ?? status;
   if (known === 'succeeded') return { label, tone: 'good' };
   if (known === 'failed') return { label, tone: 'bad' };
-  if (known === 'expired') return { label, tone: 'warn' };
+  if (known === 'expired' || known === 'cancelled') return { label, tone: 'warn' };
   if (known === 'building') return { label, tone: 'info' };
   return { label, tone: 'neutral' };
 }
@@ -276,7 +278,7 @@ export function buildTotals(builds: IBuild[]): IBuildTotals {
 }
 
 /** Which providers Ductape Deploy can use today. Others cannot have anything deployed or built through them yet. */
-export const DEPLOY_PROVIDERS: ReadonlySet<string> = new Set(['gcp']);
+export const DEPLOY_PROVIDERS: ReadonlySet<string> = new Set(['gcp', 'aws', 'azure', 'cloudflare']);
 
 /** Whether a connection was created with the deploy scope, which a build or deploy through it needs. */
 export const hasDeployScope = (scopes: readonly string[] | undefined): boolean => Boolean(scopes?.includes('deploy'));

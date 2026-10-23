@@ -889,6 +889,13 @@ export interface AppDashboardMetrics {
     failureCount: number;
     totalCount: number;
   };
+
+  // The period these figures cover and the time series for it, from the same data
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  period?: { start: string; end: string };
+  activityTimeline?: Array<{ date: string; operations: number }>;
+  latencyTimeline?: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline?: Array<{ date: string; successful: number; failed: number }>;
 }
 
 export interface AppDashboardResponse {
@@ -906,130 +913,19 @@ export const fetchAppDashboard = async (
   public_key: string,
   query: AppDashboardQuery
 ): Promise<AppDashboardMetrics> => {
-  const { app_id, app_tag, product_tag, version, app_env, groupBy = 'day', start_date, end_date } = query;
-
-  // Calculate date range (default 7 days)
-  const today = new Date();
-  const weekAgo = new Date();
-  weekAgo.setDate(today.getDate() - 7);
-
-  const twoWeeksAgo = new Date();
-  twoWeeksAgo.setDate(today.getDate() - 14);
-
-  const basePayload = {
-    component: 'app',
-    app_id,
-    ...(app_tag && { parent_tag: app_tag }),
-    ...(product_tag && { product_tag }),
-    app_env,
-    version,
-    groupBy,
-    limit: 1000,
-  };
-
-  // Fetch current period data (logs table filtered by parent_tag = app tag when provided)
-  const currentResponse = await fetchLogs(
-    { workspace_id, user_id, public_key },
-    {
-      ...basePayload,
-      start_date: start_date || formatDate(weekAgo),
-      end_date: end_date || formatDate(today),
-    }
+  // The figures are aggregated on the server, over every log in the period. (They used to be worked out here from the
+  // first 1,000 raw logs, which undercounted any busy app and counted several log documents per call.)
+  const cleanedPayload = Object.fromEntries(
+    Object.entries({ user_id, public_key, ...query }).filter(
+      ([, value]) => value !== undefined && value !== null && value !== ''
+    )
   );
 
-  // Fetch previous period data for comparison
-  const previousResponse = await fetchLogs(
-    { workspace_id, user_id, public_key },
-    {
-      ...basePayload,
-      start_date: formatDate(twoWeeksAgo),
-      end_date: formatDate(weekAgo),
-    }
+  const response = await apiClient.get<{ data: AppDashboardMetrics }>(
+    `/log/v1/app/dashboard/${workspace_id}?${qs.stringify(cleanedPayload)}`
   );
 
-  const currentData = currentResponse.data;
-  const previousData = previousResponse.data;
-
-  // Process current period metrics from logs table
-  const currentLogs = currentData?.logs?.data || [];
-  const previousLogs = previousData?.logs?.data || [];
-
-  // Calculate totals
-  const currentTotals = calculateTotals(currentLogs);
-  const previousTotals = calculateTotals(previousLogs);
-
-  // Calculate success/error rates
-  const currentSuccessRate = currentTotals.totalCount > 0
-    ? (currentTotals.successCount / currentTotals.totalCount) * 100
-    : 100;
-  const previousSuccessRate = previousTotals.totalCount > 0
-    ? (previousTotals.successCount / previousTotals.totalCount) * 100
-    : 100;
-
-  const currentErrorRate = currentTotals.totalCount > 0
-    ? (currentTotals.failureCount / currentTotals.totalCount) * 100
-    : 0;
-  const previousErrorRate = previousTotals.totalCount > 0
-    ? (previousTotals.failureCount / previousTotals.totalCount) * 100
-    : 0;
-
-  // Calculate average latency
-  const currentAvgLatency = calculateAvgLatency(currentLogs);
-  const previousAvgLatency = calculateAvgLatency(previousLogs);
-
-  // Request by method – from logs
-  const requestsByMethod = calculateMethodDistribution(currentLogs);
-
-  // Request activity (last 7 days) – from logs when usageData is missing
-  const usageOverTime = currentData?.usageData?.requestsOverTime || [];
-  const dailyActivity = usageOverTime.length > 0
-    ? processDailyActivity(usageOverTime)
-    : processDailyActivityFromLogs(currentLogs);
-
-  // Top endpoints – from logs
-  const topEndpoints = calculateTopEndpoints(currentLogs);
-
-  // Count active endpoints and webhook events
-  const activeEndpointsCount = currentData?.metrics?.totalActions || 0;
-  const webhookEventsCount = currentLogs.filter((log: any) => log.type === 'webhook').length;
-  const previousWebhookCount = previousLogs.filter((log: any) => log.type === 'webhook').length;
-
-  return {
-    totalRequests: {
-      current: currentTotals.totalCount,
-      previous: previousTotals.totalCount,
-      change: calculateChange(currentTotals.totalCount, previousTotals.totalCount),
-    },
-    successRate: {
-      current: Math.round(currentSuccessRate * 10) / 10,
-      previous: Math.round(previousSuccessRate * 10) / 10,
-      change: calculateChange(currentSuccessRate, previousSuccessRate),
-    },
-    errorRate: {
-      current: Math.round(currentErrorRate * 10) / 10,
-      previous: Math.round(previousErrorRate * 10) / 10,
-      change: calculateChange(currentErrorRate, previousErrorRate),
-    },
-    avgLatency: {
-      current: Math.round(currentAvgLatency),
-      previous: Math.round(previousAvgLatency),
-      change: calculateChange(currentAvgLatency, previousAvgLatency),
-    },
-    activeEndpoints: {
-      current: activeEndpointsCount,
-      previous: activeEndpointsCount, // Static comparison
-      change: 0,
-    },
-    webhookEvents: {
-      current: webhookEventsCount,
-      previous: previousWebhookCount,
-      change: calculateChange(webhookEventsCount, previousWebhookCount),
-    },
-    requestsByMethod,
-    dailyActivity,
-    topEndpoints,
-    totals: currentTotals,
-  };
+  return response.data.data;
 };
 
 // Helper functions for dashboard calculations

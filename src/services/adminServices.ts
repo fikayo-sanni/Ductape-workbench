@@ -1,7 +1,7 @@
 import axios from 'axios';
 import apiClient from '@/config/axiosinstance';
 
-const CLOUD_API = 'https://api.ductape.app';
+const CLOUD_API = 'https://api.ductape.app/pricing/v1';
 
 function adminAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('admin_token');
@@ -19,6 +19,7 @@ export interface InstanceStatusResponse {
     max_users: number | null;
     max_workspaces: number | null;
     max_products: number | null;
+    max_apps?: number | null;
     max_api_requests_month: number | null;
     log_retention_days: number | null;
   } | null;

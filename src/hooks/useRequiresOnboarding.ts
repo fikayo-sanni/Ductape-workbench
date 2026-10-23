@@ -8,6 +8,7 @@ import {
 } from '@/services/workspaceServices';
 import pricingServices from '@/services/pricingServices';
 import { hasCompletedOnboarding, markOnboardingCompleted } from '@/utils/onboarding';
+import { isSelfHosted } from '@/helpers/env';
 export function useRequiresOnboarding() {
   const { user, currentWorkspaceId } = useAuth();
   const isAuthenticated = Boolean(user?._id && user?.public_key);
@@ -53,7 +54,8 @@ export function useRequiresOnboarding() {
         public_key: user!.public_key,
         workspace_id: workspaceId!,
       }),
-    enabled: isAuthenticated && Boolean(workspaceId),
+    // A self-hosted install has no billing plans, so there is no subscription to look up.
+    enabled: isAuthenticated && Boolean(workspaceId) && !isSelfHosted(),
     retry: false,
   });
 
@@ -89,7 +91,7 @@ export function useRequiresOnboarding() {
   const isLoading =
     workspacesLoading ||
     !workspacesFetched ||
-    (Boolean(workspaceId) && !subscriptionFetched && !subscriptionError);
+    (!isSelfHosted() && Boolean(workspaceId) && !subscriptionFetched && !subscriptionError);
 
   const needsPendingInvitesScreen =
     workspacesFetched &&
@@ -105,7 +107,8 @@ export function useRequiresOnboarding() {
     !workspacesError &&
     !needsPendingInvitesScreen &&
     (acceptedWorkspaces.length === 0 ||
-      (Boolean(workspaceId) && !subscriptionError && !hasSubscription));
+      // On a self-hosted install the licence entitles the instance; a workspace needs no subscription.
+      (!isSelfHosted() && Boolean(workspaceId) && !subscriptionError && !hasSubscription));
 
   return {
     isLoading,

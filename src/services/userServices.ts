@@ -79,6 +79,7 @@ export interface InstanceStatusResponse {
       max_users: number | null;
       max_workspaces: number | null;
       max_products: number | null;
+      max_apps?: number | null;
       max_api_requests_month: number | null;
       log_retention_days: number | null;
     } | null;
@@ -92,8 +93,8 @@ const fetchInstanceStatus = async (): Promise<InstanceStatusResponse> => {
   return response.data;
 };
 
-const activateInstance = async (licenseData: Record<string, unknown>): Promise<ActionResponse> => {
-  const response = await apiClient.post<ActionResponse>('/users/v1/instance-activate', licenseData);
+const activateInstance = async (data: { activation_code: string; instance_url: string }): Promise<ActionResponse> => {
+  const response = await apiClient.post<ActionResponse>('/users/v1/instance-activate', data);
   return response.data;
 };
 

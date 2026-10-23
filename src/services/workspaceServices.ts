@@ -1,4 +1,5 @@
 import apiClient from '@/config/axiosinstance';
+import { useAuth } from '@/store/useAuth';
 import {
   InviteMemberPayload,
   WorkspaceMembersResponse,
@@ -175,9 +176,11 @@ const createUploadUrl = async (data: {
   id: string;
 }): Promise<UploadUrlResponse> => {
   const {fileType, visibility, id} = data;
+  // A self-hosted install keeps files on its own disk and only lets signed-in people ask for an upload link.
+  const {user} = useAuth.getState();
   const response = await apiClient.post<UploadUrlResponse>(
     '/workspaces/v1/upload',
-    {fileType, visibility, id},
+    {fileType, visibility, id, user_id: user?._id, public_key: user?.public_key},
   );
   return response.data;
 };

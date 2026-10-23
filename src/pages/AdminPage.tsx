@@ -188,6 +188,12 @@ function LicenseTab({ instanceStatus, onRefresh }: {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-grey-600 mb-1">Max Apps</p>
+                  <p className="text-sm font-medium text-grey">
+                    {limits.max_apps ?? 'Unlimited'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-grey-600 mb-1">Max API Requests / Month</p>
                   <p className="text-sm font-medium text-grey">
                     {limits.max_api_requests_month ?? 'Unlimited'}

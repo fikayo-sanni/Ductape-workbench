@@ -11,12 +11,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BarChart3, Calendar, Layers, LineChart as LineChartIcon, Loader2 } from 'lucide-react';
+import { BarChart3, Layers, LineChart as LineChartIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { ActivityPeriodPreset } from '@/lib/activity-period';
+import { ActivityPeriodSelector } from '@/components/activity/ActivityPeriodSelector';
 import {
   useActivityTimeline,
   type UseActivityTimelineParams,
@@ -24,32 +23,53 @@ import {
 
 export type ActivityTimelineViewMode = 'volume' | 'latency' | 'outcomes';
 
-const PERIOD_OPTIONS: { id: ActivityPeriodPreset; label: string }[] = [
-  { id: '7d', label: '7 days' },
-  { id: '1m', label: '1 month' },
-  { id: '6m', label: '6 months' },
-  { id: 'custom', label: 'Custom' },
-];
-
 export interface ActivityTimelinePanelProps
   extends Omit<UseActivityTimelineParams, 'period' | 'customStart' | 'customEnd'> {
   title?: string;
   className?: string;
   /** Label for volume bars, e.g. "operations", "requests" */
   countLabel?: string;
+  /**
+   * Controlled period. When given, the panel shows this period and reports changes through onPeriodChange, so a page can
+   * keep the metrics above the panel on the same period. Without it the panel keeps its own.
+   */
+  period?: ActivityPeriodPreset;
+  customStart?: string;
+  customEnd?: string;
+  onPeriodChange?: (next: { period: ActivityPeriodPreset; customStart: string; customEnd: string }) => void;
+  /** Hide the panel's own period buttons (the page shows the selector elsewhere). */
+  hidePeriodControls?: boolean;
 }
 
 export function ActivityTimelinePanel({
   title = 'Activity timeline',
   className,
   countLabel = 'requests',
+  period: controlledPeriod,
+  customStart: controlledStart,
+  customEnd: controlledEnd,
+  onPeriodChange,
+  hidePeriodControls = false,
   ...timelineParams
 }: ActivityTimelinePanelProps) {
-  const [period, setPeriod] = useState<ActivityPeriodPreset>('7d');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const [ownPeriod, setOwnPeriod] = useState<ActivityPeriodPreset>('7d');
+  const [ownStart, setOwnStart] = useState('');
+  const [ownEnd, setOwnEnd] = useState('');
   const [viewMode, setViewMode] = useState<ActivityTimelineViewMode>('volume');
-  const [customOpen, setCustomOpen] = useState(false);
+
+  const controlled = controlledPeriod !== undefined;
+  const period = controlled ? controlledPeriod : ownPeriod;
+  const customStart = controlled ? controlledStart ?? '' : ownStart;
+  const customEnd = controlled ? controlledEnd ?? '' : ownEnd;
+  const changePeriod = (next: { period: ActivityPeriodPreset; customStart: string; customEnd: string }) => {
+    if (controlled) {
+      onPeriodChange?.(next);
+      return;
+    }
+    setOwnPeriod(next.period);
+    setOwnStart(next.customStart);
+    setOwnEnd(next.customEnd);
+  };
 
   const { data: points = [], isLoading, isFetching } = useActivityTimeline({
     ...timelineParams,
@@ -72,13 +92,6 @@ export function ActivityTimelinePanel({
   const hasLatency = points.some((p) => p.avgLatencyMs !== null);
   const hasOutcomes = points.some((p) => p.successful > 0 || p.failed > 0);
   const hasVolume = points.some((p) => p.count > 0);
-
-  const applyCustomRange = () => {
-    if (customStart && customEnd) {
-      setPeriod('custom');
-      setCustomOpen(false);
-    }
-  };
 
   const renderOutcomesChart = () => {
     if (!hasOutcomes) {
@@ -178,78 +191,14 @@ export function ActivityTimelinePanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-grey-300 overflow-hidden">
-            {PERIOD_OPTIONS.map((opt) =>
-              opt.id === 'custom' ? (
-                <Popover key={opt.id} open={customOpen} onOpenChange={setCustomOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        'rounded-none h-8 px-3 text-xs',
-                        period === 'custom' && 'bg-primary/10 text-primary',
-                      )}
-                    >
-                      <Calendar className="h-3.5 w-3.5 mr-1" />
-                      {period === 'custom' && customStart && customEnd
-                        ? 'Custom'
-                        : opt.label}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto" align="end">
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-grey">Custom range</p>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs text-grey-600">
-                          Start
-                          <Input
-                            type="date"
-                            value={customStart}
-                            onChange={(e) => setCustomStart(e.target.value)}
-                            className="mt-1"
-                          />
-                        </label>
-                        <label className="text-xs text-grey-600">
-                          End
-                          <Input
-                            type="date"
-                            value={customEnd}
-                            onChange={(e) => setCustomEnd(e.target.value)}
-                            className="mt-1"
-                          />
-                        </label>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="w-full"
-                        onClick={applyCustomRange}
-                        disabled={!customStart || !customEnd || customStart > customEnd}
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <Button
-                  key={opt.id}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'rounded-none h-8 px-3 text-xs',
-                    period === opt.id && 'bg-primary/10 text-primary',
-                  )}
-                  onClick={() => setPeriod(opt.id)}
-                >
-                  {opt.label}
-                </Button>
-              ),
-            )}
-          </div>
+          {!hidePeriodControls && (
+            <ActivityPeriodSelector
+              period={period}
+              customStart={customStart}
+              customEnd={customEnd}
+              onChange={changePeriod}
+            />
+          )}
 
           <div className="flex rounded-lg border border-grey-300 overflow-hidden">
             <Button

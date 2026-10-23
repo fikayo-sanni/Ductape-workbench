@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import toast from 'react-hot-toast';
 import { userServices } from '@/services/userServices';
-import licenseServices from '@/services/licenseServices';
 
 interface LicenseActivationStepProps {
   onActivated: () => void;
@@ -80,15 +79,12 @@ export default function LicenseActivationStep({ onActivated }: LicenseActivation
 
     setSubmitting(true);
     try {
-      const cloudRes = await licenseServices.activateLicense({
+      // This instance activates the licence with the hosted licence service itself and keeps what that service
+      // returns. Only the code and this instance's address are sent, never the limits.
+      await userServices.activateInstance({
         activation_code: code,
         instance_url: window.location.origin,
       });
-
-      const licenseData: Record<string, unknown> =
-        cloudRes.data && typeof cloudRes.data === 'object' ? cloudRes.data : {};
-
-      await userServices.activateInstance(licenseData);
       toast.success('License activated successfully.');
       onActivated();
     } catch (err: any) {

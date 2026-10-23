@@ -60,7 +60,8 @@ export default function HealthcheckTabContent({ data }: HealthcheckTabContentPro
   // Health is assumed until a failure says otherwise, so a check that has not run yet is healthy.
   const view = healthView(environment);
   const healthy = view.tone === 'good';
-  const reactive = healthcheck.mode === 'reactive';
+  // Reactive is the default: only an explicit interval is scheduled.
+  const reactive = healthcheck.mode !== 'interval';
   const intervalLabel = healthcheck.checkIntervals || (healthcheck.interval ? `every ${Math.round(healthcheck.interval / 1000)} seconds` : undefined);
   const latency = parseLatency(environment?.lastLatency || '0ms');
 

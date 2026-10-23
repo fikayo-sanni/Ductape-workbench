@@ -191,7 +191,12 @@ export interface BaseDashboardQuery {
  */
 export interface AppDashboardQuery extends BaseDashboardQuery {
   app_id: string;
+  /** App tag. The server resolves it from app_id; sent for older servers. */
+  app_tag?: string;
+  /** Narrow to one product. Without it the figures cover every product in scope. */
+  product_tag?: string;
   version?: string;
+  /** Narrow to one environment of the app. Left out, all environments count. */
   app_env?: string;
 }
 
@@ -281,6 +286,13 @@ export interface AppDashboardMetrics {
     failureCount: number;
     totalCount: number;
   };
+
+  // The period these figures cover and the time series for it, from the same data
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
+  period?: { start: string; end: string };
+  activityTimeline?: Array<{ date: string; operations: number }>;
+  latencyTimeline?: Array<{ date: string; avgLatencyMs: number | null; count: number }>;
+  outcomeTimeline?: Array<{ date: string; successful: number; failed: number }>;
 }
 
 /**

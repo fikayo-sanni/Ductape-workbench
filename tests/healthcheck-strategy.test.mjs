@@ -22,8 +22,8 @@ test('a new check defaults to reactive with a 15 minute baseline and a 1 minute 
   assert.deepEqual(plain(strategyFields(DEFAULT_STRATEGY_FORM)), { mode: 'reactive', heartbeat: 900000, recovery: { max: 60000 } });
 });
 
-test('an interval check saves no extra fields', () => {
-  assert.equal(strategyFields({ ...DEFAULT_STRATEGY_FORM, strategy: 'interval' }), null);
+test('an interval check saves an explicit interval mode, because no mode means reactive', () => {
+  assert.deepEqual(plain(strategyFields({ ...DEFAULT_STRATEGY_FORM, strategy: 'interval' })), { mode: 'interval' });
   assert.equal(validateStrategy({ ...DEFAULT_STRATEGY_FORM, strategy: 'interval', heartbeatMinutes: 'x' }), undefined);
 });
 
@@ -41,7 +41,8 @@ test('validateStrategy rejects blanks and nonsense', () => {
 });
 
 test('describeStrategy explains both modes', () => {
-  assert.equal(describeStrategy({}, 'every 2 minutes'), 'Checks on a schedule, every 2 minutes.');
+  assert.equal(describeStrategy({ mode: 'interval' }, 'every 2 minutes'), 'Checks on a schedule, every 2 minutes.');
+  assert.match(describeStrategy({}), /Assumed healthy until something fails/, 'a check with no mode is reactive');
   assert.match(describeStrategy({ mode: 'reactive' }), /Assumed healthy until something fails: a baseline check every 15 minutes, then rechecks at least every 1 minute/);
   assert.match(describeStrategy({ mode: 'reactive', heartbeat: 0, recovery: { max: 30000 } }), /no baseline check, then rechecks at least every 30 seconds/);
 });

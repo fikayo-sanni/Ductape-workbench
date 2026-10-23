@@ -1,4 +1,4 @@
-export type CloudProvider = 'aws' | 'gcp' | 'azure' | 'mongodb_atlas' | 'neo4j_aura';
+export type CloudProvider = 'aws' | 'gcp' | 'azure' | 'cloudflare' | 'mongodb_atlas' | 'neo4j_aura';
 
 export function isManagedDatabaseProvider(provider?: string): provider is 'mongodb_atlas' | 'neo4j_aura' {
   return provider === 'mongodb_atlas' || provider === 'neo4j_aura';
@@ -7,6 +7,7 @@ export function isManagedDatabaseProvider(provider?: string): provider is 'mongo
 export function defaultScopesForProvider(provider: CloudProvider): string[] {
   if (provider === 'mongodb_atlas') return ['database'];
   if (provider === 'neo4j_aura') return ['graph'];
+  if (provider === 'cloudflare') return ['deploy'];
   return ['storage', 'broker', 'database', 'graph', 'vector', 'notifications'];
 }
 
@@ -49,6 +50,7 @@ export const SERVICES_BY_PROVIDER: Record<
   ],
   mongodb_atlas: [{ service: 'atlas-cluster', label: 'Atlas clusters', scope: 'database' }],
   neo4j_aura: [{ service: 'aura-instance', label: 'Aura instances', scope: 'graph' }],
+  cloudflare: [],
 };
 
 /** SDK cloud APIs use connection tag; fall back to id for legacy tabs */

@@ -21,6 +21,11 @@ const PROVIDER_STYLES: Record<
     icon: 'text-sky-600',
     ring: 'ring-sky-500/25',
   },
+  cloudflare: {
+    box: 'bg-amber-500/10',
+    icon: 'text-amber-600',
+    ring: 'ring-amber-500/25',
+  },
   mongodb_atlas: {
     box: 'bg-emerald-500/10',
     icon: 'text-emerald-700',

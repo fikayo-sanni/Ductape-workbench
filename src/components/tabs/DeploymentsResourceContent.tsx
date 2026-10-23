@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Box, RefreshCw, Rocket, Search, Server } from 'lucide-react';
+import { ArrowLeft, Box, RefreshCw, Rocket, Search, Server, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchDeploymentJournal, type IDeployAuth } from '@/services/deployServices';
@@ -10,11 +10,27 @@ import {
   type DeployableKind, type IDeployment, type IJournalEntry,
 } from '@/utils/deployments';
 import { DataTable, Panel, Pill, SectionEmpty, SectionError, SectionLoading, SectionPage, SegmentedTabs, StatTile, StatusDot, type SectionTint } from './ProductSection';
+import { deploymentIntents, type DeploymentIntent } from '@/utils/deployControls';
+import { useDeployCapabilities } from '@/hooks/useDeployControls';
+import BuildsPanel from '@/components/deploy/BuildsPanel';
+import DeploymentPlanDialog from '@/components/deploy/DeploymentPlanDialog';
+import PlansPanel from '@/components/deploy/PlansPanel';
+import PolicyDialog from '@/components/deploy/PolicyDialog';
+import VersionsPanel from '@/components/deploy/VersionsPanel';
+import { ControlButton } from '@/components/deploy/controls';
 
 const TINT: SectionTint = { bg: 'bg-primary/10', text: 'text-primary' };
 const POLL_MS = 5000;
 
 type KindFilter = DeployableKind | 'all';
+type DeployView = 'deployments' | 'plans' | 'versions' | 'builds';
+
+const VIEWS: Array<{ id: DeployView; label: string }> = [
+  { id: 'deployments', label: 'Deployments' },
+  { id: 'plans', label: 'Plans' },
+  { id: 'versions', label: 'Versions' },
+  { id: 'builds', label: 'Builds' },
+];
 
 const when = (value: string | undefined): string => {
   if (!value) return '-';
@@ -49,6 +65,10 @@ export default function DeploymentsResourceContent({ product }: { product: any }
   const [env, setEnv] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<DeployView>('deployments');
+  const [reviewId, setReviewId] = useState<string | undefined>();
+  const [changing, setChanging] = useState<{ deployment: IDeployment; intent: DeploymentIntent } | null>(null);
+  const [policyFor, setPolicyFor] = useState<string | null>(null);
   const deployments = useProductDeployments(tag);
   const environments = useProductEnvironments(tag);
 
@@ -86,7 +106,11 @@ export default function DeploymentsResourceContent({ product }: { product: any }
           </>
         }
       >
-        <DeploymentDetail auth={auth} deployment={selected} />
+        <DeploymentDetail auth={auth} deployment={selected} onChange={(intent) => setChanging({ deployment: selected, intent })} />
+        <DeploymentPlanDialog
+          auth={auth} deployment={changing?.deployment ?? null} initialIntent={changing?.intent} onClose={() => setChanging(null)}
+          onCreated={(id) => { setChanging(null); setSelectedId(null); setView('plans'); setReviewId(id); }}
+        />
       </SectionPage>
     );
   }
@@ -104,7 +128,7 @@ export default function DeploymentsResourceContent({ product }: { product: any }
       subtitle="Functions and services running in your own cloud, by environment"
       actions={
         <>
-          {all.length > 0 ? (
+          {view === 'deployments' && all.length > 0 ? (
             <div className="relative flex-1 sm:flex-initial">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-grey-500 sm:left-3 sm:h-4 sm:w-4" />
               <Input
@@ -120,20 +144,29 @@ export default function DeploymentsResourceContent({ product }: { product: any }
         </>
       }
       toolbar={
-        all.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <SegmentedTabs
-              label="Kind"
-              value={kind}
-              onChange={setKind}
-              options={[{ id: 'all', label: 'All' }, { id: 'function', label: 'Functions' }, { id: 'service', label: 'Services' }]}
-            />
-            {envOptions.length > 2 ? <SegmentedTabs label="Environment" value={env} onChange={setEnv} options={envOptions} /> : null}
-          </div>
-        ) : undefined
+        <div className="flex flex-wrap items-center gap-3">
+          <SegmentedTabs label="Section" value={view} onChange={setView} options={VIEWS} />
+          {view === 'deployments' && all.length > 0 ? (
+            <>
+              <SegmentedTabs
+                label="Kind"
+                value={kind}
+                onChange={setKind}
+                options={[{ id: 'all', label: 'All' }, { id: 'function', label: 'Functions' }, { id: 'service', label: 'Services' }]}
+              />
+              {envOptions.length > 2 ? <SegmentedTabs label="Environment" value={env} onChange={setEnv} options={envOptions} /> : null}
+            </>
+          ) : null}
+        </div>
       }
     >
-      {loading ? (
+      {view === 'plans' && tag ? (
+        <PlansPanel productTag={tag} reviewId={reviewId} onReview={setReviewId} />
+      ) : view === 'versions' && tag ? (
+        <VersionsPanel productTag={tag} />
+      ) : view === 'builds' && tag ? (
+        <BuildsPanel productTag={tag} />
+      ) : loading ? (
         <SectionLoading label="Loading deployments..." />
       ) : failure ? (
         <SectionError onRetry={refresh}>{deployErrorMessage(failure)}</SectionError>
@@ -170,7 +203,19 @@ export default function DeploymentsResourceContent({ product }: { product: any }
                   description={
                     !group.known ? 'This product no longer has this environment.' : !group.active ? 'This environment is inactive, so nothing new can be applied to it.' : policy?.detail
                   }
-                  action={policy ? <Pill tone={policy.tone}>{policy.label}</Pill> : undefined}
+                  action={
+                    policy ? (
+                      <span className="flex items-center gap-2">
+                        <Pill tone={policy.tone}>{policy.label}</Pill>
+                        {group.known ? (
+                          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPolicyFor(group.slug)} aria-label={`Approval policy for ${group.slug}`}>
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Policy</span>
+                          </Button>
+                        ) : null}
+                      </span>
+                    ) : undefined
+                  }
                 >
                   {group.deployments.length === 0 ? (
                     <p className="px-4 py-6 text-center text-xs text-grey-500 sm:px-5">Nothing is deployed here.</p>
@@ -203,6 +248,12 @@ export default function DeploymentsResourceContent({ product }: { product: any }
           )}
         </>
       )}
+      {auth && tag && policyFor ? (
+        <PolicyDialog
+          auth={auth} productTag={tag} env={policyFor} open onClose={() => setPolicyFor(null)}
+          current={(environments.data ?? []).find((e) => e.slug === policyFor)?.policy}
+        />
+      ) : null}
     </SectionPage>
   );
 }
@@ -216,15 +267,36 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function DeploymentDetail({ auth, deployment }: { auth: IDeployAuth; deployment: IDeployment }) {
+function DeploymentDetail({ auth, deployment, onChange }: { auth: IDeployAuth; deployment: IDeployment; onChange: (intent: DeploymentIntent) => void }) {
+  const caps = useDeployCapabilities();
   const journal = useQuery({
     queryKey: ['deployment-journal', auth.workspaceId, deployment.id, deployment.revision],
     queryFn: () => fetchDeploymentJournal(auth, deployment.id),
     refetchInterval: isInFlight(deployment.state) ? POLL_MS : false,
   });
   const lastGood = deployment.lastGoodReleaseHash && deployment.lastGoodReleaseHash !== deployment.releaseHash ? deployment.lastGoodReleaseHash : undefined;
+  const intents = deploymentIntents(deployment, caps.data);
   return (
     <>
+      <Panel title="Change this deployment" description="Each change is a plan you review and approve first. Nothing happens in your cloud until you apply it.">
+        {/* When one reason holds them all back, it is said once rather than under every button. */}
+        {(() => {
+          const reasons = new Set(intents.filter((i) => !i.enabled).map((i) => i.reason));
+          const sharedReason = intents.every((i) => !i.enabled) && reasons.size === 1 ? [...reasons][0] : undefined;
+          return (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-start gap-3">
+                {intents.map((option) => (
+                  <ControlButton key={option.intent} control={option} showReason={!sharedReason} variant="outline" size="sm" onClick={() => onChange(option.intent)}>
+                    {option.label}
+                  </ControlButton>
+                ))}
+              </div>
+              {sharedReason ? <p className="text-xs text-grey-500">{sharedReason}</p> : null}
+            </div>
+          );
+        })()}
+      </Panel>
       <Panel title="Overview">
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Fact label="State"><StatePill state={deployment.state} /></Fact>

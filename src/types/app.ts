@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode } from "react";
+import type { OriginSummary } from "@/services/remoteMarketplaceServices";
 
 interface RetryPolicy {
   tag: string;
@@ -83,6 +84,8 @@ export interface IApp {
   status?: string;
   active: boolean;
   domains?: string[];
+  /** Present on apps imported from the hosted marketplace (self-hosted instances). */
+  origin?: OriginSummary;
 }
 
 export interface IAppVersion {

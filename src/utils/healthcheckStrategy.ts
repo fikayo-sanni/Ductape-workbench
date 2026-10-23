@@ -50,15 +50,16 @@ export function validateStrategy(form: StrategyForm): string | undefined {
   return undefined;
 }
 
-export interface StrategyFields {
-  mode: 'reactive';
-  heartbeat: number;
-  recovery: { max: number };
-}
+export type StrategyFields =
+  | { mode: 'interval' }
+  | { mode: 'reactive'; heartbeat: number; recovery: { max: number } };
 
-/** The fields to save for a reactive check. Interval checks save nothing extra: no mode means interval. */
-export function strategyFields(form: StrategyForm): StrategyFields | null {
-  if (form.strategy !== 'reactive') return null;
+/**
+ * The fields to save for a check's strategy. A scheduled check saves `mode: 'interval'` explicitly, because a check with
+ * no mode is reactive.
+ */
+export function strategyFields(form: StrategyForm): StrategyFields {
+  if (form.strategy !== 'reactive') return { mode: 'interval' };
   return {
     mode: 'reactive',
     heartbeat: Number(form.heartbeatMinutes) * 60_000,
@@ -79,7 +80,8 @@ const minutes = (ms: number) => {
 
 /** One sentence describing how a stored check decides when to probe. */
 export function describeStrategy(check: StoredCheck, intervalLabel?: string): string {
-  if (check.mode !== 'reactive') return intervalLabel ? `Checks on a schedule, ${intervalLabel}.` : 'Checks on a schedule.';
+  // Only an explicit interval is scheduled; no mode means reactive.
+  if (check.mode === 'interval') return intervalLabel ? `Checks on a schedule, ${intervalLabel}.` : 'Checks on a schedule.';
   const heartbeat = check.heartbeat ?? 15 * 60_000;
   const baseline = heartbeat > 0 ? `a baseline check every ${minutes(heartbeat)}` : 'no baseline check';
   const recheck = check.recovery?.max ?? 60_000;

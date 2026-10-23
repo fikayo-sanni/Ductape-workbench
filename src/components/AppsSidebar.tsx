@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { IApp } from '@/types/app';
 import appServicesReal from '@/services/appServicesReal';
 import toast from 'react-hot-toast';
+import { ImportedBadge } from '@/components/marketplace/ImportedAppPanel';
 
 export default function AppsSidebar() {
   const { user, currentWorkspaceId } = useAuth();
@@ -165,6 +166,7 @@ export default function AppsSidebar() {
             <h3 className="text-sm font-medium text-grey truncate">
               {app.app_name}
             </h3>
+            {app.origin && <ImportedBadge origin={app.origin} />}
             {app.status && (
               <span
                 className={cn(

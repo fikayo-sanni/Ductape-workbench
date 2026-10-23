@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const CLOUD_API = 'https://api.ductape.app';
+// The hosted licence service is mounted under the pricing service.
+const CLOUD_API = 'https://api.ductape.app/pricing/v1';
 
 const licenseServices = {
   activateLicense: (data: { activation_code: string; instance_url: string }) =>

@@ -21,8 +21,6 @@ import {
   Radio,
   PanelLeftClose,
   PanelLeft,
-  TrendingUp,
-  TrendingDown,
   Activity,
   Clock,
   BarChart3,
@@ -74,6 +72,8 @@ import DeleteAppModal from '@/components/modals/DeleteAppModal';
 import EditAppConnectionModal from '@/components/modals/EditAppConnectionModal';
 import {useQuery, useQueryClient, useMutation} from '@tanstack/react-query';
 import {useAppDashboard} from '@/hooks/useAnalytics';
+import {ActivityPeriodSelector} from '@/components/activity/ActivityPeriodSelector';
+import {resolveActivityPeriod, type ActivityPeriodPreset} from '@/lib/activity-period';
 import toast from 'react-hot-toast';
 import appServices from '@/services/appServices';
 import productServices from '@/services/productServices';
@@ -89,6 +89,8 @@ import WebhookImportModal from '@/components/webhooks/WebhookImportModal';
 import type { WebhookViewMode } from './WebhookTabContent';
 import { AppWebhookAddEventsForm } from '@/components/app-webhooks/AppWebhookAddEventsForm';
 import { AppWebhooksList } from '@/components/app-webhooks/AppWebhooksList';
+import ImportedAppPanel, { LOCKED_APP_MESSAGE } from '@/components/marketplace/ImportedAppPanel';
+import { useAppOrigin } from '@/hooks/useAppOrigin';
 
 interface AppTabContentProps {
   /** Workbench tab id — required when rendered inside TabContent so fetches update the correct tab */
@@ -342,6 +344,13 @@ export default function AppTabContent({
   // Use currentApp to ensure we have workspace_id after data is fetched (e.g., after page refresh)
   const isInternalApp = currentApp?.workspace_id === currentWorkspaceId;
 
+  // Apps imported from the hosted marketplace (self-hosted only) belong to their publisher: they can be
+  // updated or uninstalled, but not edited, published or extended.
+  const origin = useAppOrigin(currentApp?._id, (currentApp as IApp | undefined)?.origin);
+  const isImported = !!origin;
+  const isLockedApp = !!origin?.locked;
+  const canEditApp = isInternalApp && !isLockedApp;
+
   // Product-connected view (opened from a product's Connected Apps) vs general app view
   const productTag = (currentApp as { productTag?: string })?.productTag;
   const productName = (currentApp as { productName?: string })?.productName;
@@ -416,7 +425,7 @@ export default function AppTabContent({
 
   const webhookPageMode: WebhookViewMode = isProductView
     ? 'product'
-    : isInternalApp
+    : canEditApp
       ? 'internal'
       : 'readonly';
 
@@ -506,20 +515,36 @@ export default function AppTabContent({
     0,
   ) ?? (selectedVersion as any)?.events_count ?? (currentApp as any)?.events_count ?? 0;
 
-  // Fetch app dashboard analytics
-  // Product view: logs where product_tag + parent_tag (app tag)
-  // General view: logs where parent_tag = app tag only
+  // One period for the overview: the cards and the timeline below them both follow it.
+  const [overviewPeriod, setOverviewPeriod] = useState<{
+    period: ActivityPeriodPreset;
+    customStart: string;
+    customEnd: string;
+  }>({period: '7d', customStart: '', customEnd: ''});
+  const overviewRange = useMemo(
+    () =>
+      resolveActivityPeriod(
+        overviewPeriod.period,
+        overviewPeriod.customStart,
+        overviewPeriod.customEnd,
+      ),
+    [overviewPeriod],
+  );
+
+  // App dashboard figures, aggregated on the server for the period.
+  //  - General view (no product): every product in this workspace that uses the app, for the whole period.
+  //  - Product view: only that product's requests and webhook events.
+  // Not narrowed to a version or environment: those are not log fields, and the figures are for the app as a whole.
   const {data: dashboardMetrics, isLoading: isLoadingMetrics} = useAppDashboard(
     {
       app_id: currentApp?._id || '',
-      app_tag: (currentApp as any)?.tag,
       product_tag: isProductView ? productTag : undefined,
-      version: selectedVersionTag || undefined,
-      app_env: selectedVersion?.envs?.find((e: any) => e.active)?.slug,
-      groupBy: 'day',
+      groupBy: overviewRange.groupBy,
+      start_date: overviewRange.startDate,
+      end_date: overviewRange.endDate,
       enabled: !!currentApp?._id,
-      staleTime: 1000 * 60 * 5, // 5 minutes cache
-      refetchInterval: 1000 * 60 * 2, // Refresh every 2 minutes
+      staleTime: 1000 * 60,
+      refetchInterval: 1000 * 60 * 2,
     },
   );
 
@@ -531,7 +556,7 @@ export default function AppTabContent({
   const hasPublicVersion = (currentApp?.versions || []).some(
     (v) => v.status === 'public',
   );
-  const canDeleteApp = isInternalApp && !isProductView && !hasPublicVersion;
+  const canDeleteApp = isInternalApp && !isProductView && (isImported || !hasPublicVersion);
 
   const deleteAppMutation = useMutation({
     mutationFn: () =>
@@ -547,7 +572,7 @@ export default function AppTabContent({
       queryClient.invalidateQueries({
         queryKey: ['workspace-apps', currentWorkspaceId],
       });
-      toast.success('App deleted');
+      toast.success(isImported ? 'App uninstalled' : 'App deleted');
       setShowDeleteAppModal(false);
       if (tabId) closeTab(tabId);
     },
@@ -662,10 +687,10 @@ export default function AppTabContent({
       (selectedVersion?.actions && selectedVersion.actions.length > 0) ||
       (currentApp?.actions_count && currentApp?.actions_count > 0);
 
-    if (isInternalApp && selectedVersion && !hasActions) {
+    if (canEditApp && selectedVersion && !hasActions) {
       setShowAppCreatedModal(true);
     }
-  }, [isInternalApp, selectedVersion, currentApp?.actions_count]);
+  }, [canEditApp, selectedVersion, currentApp?.actions_count]);
 
   // Expand folders that contain matching actions when searching
   useEffect(() => {
@@ -949,8 +974,8 @@ export default function AppTabContent({
               </span>
             </button>
 
-            {/* Folder context menu - only for internal apps */}
-            {isInternalApp && (
+            {/* Folder context menu - only for editable internal apps */}
+            {canEditApp && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -1110,7 +1135,7 @@ export default function AppTabContent({
               <p className="text-xs text-grey-600">
                 {searchQuery ? 'No matching actions' : 'No actions yet'}
               </p>
-              {isInternalApp && !searchQuery && (
+              {canEditApp && !searchQuery && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1152,7 +1177,7 @@ export default function AppTabContent({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {isInternalApp && (
+                {canEditApp && (
                   <Button
                     onClick={() => setShowCreateEnvModal(true)}
                     className="gap-2 shadow-sm"
@@ -1178,10 +1203,17 @@ export default function AppTabContent({
                   <div
                     key={env._id || env.slug}
                     onClick={() => {
+                      if (isLockedApp) return;
                       setEditingEnv(env);
                       setShowUpdateEnvModal(true);
                     }}
-                    className="bg-white rounded-lg border border-grey-400 p-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+                    title={isLockedApp ? LOCKED_APP_MESSAGE : undefined}
+                    className={cn(
+                      'bg-white rounded-lg border border-grey-400 p-4 transition-all',
+                      isLockedApp
+                        ? 'cursor-default'
+                        : 'hover:border-primary hover:shadow-md cursor-pointer',
+                    )}
                   >
                     <div className="flex items-start gap-3">
                       {/* Icon */}
@@ -1244,7 +1276,7 @@ export default function AppTabContent({
                 Configure deployment environments for development, staging, and
                 production.
               </p>
-              {isInternalApp && (
+              {canEditApp && (
                 <Button
                   onClick={() => setShowCreateEnvModal(true)}
                   className="gap-2 shadow-sm"
@@ -1381,7 +1413,7 @@ export default function AppTabContent({
       : {
           // Fallback values while loading or when no data
           totalRequests: {current: 0, previous: 0, change: 0},
-          successRate: {current: 100, previous: 100, change: 0},
+          successRate: {current: 0, previous: 0, change: 0},
           avgLatency: {current: '0ms', previous: '0ms', change: 0},
           errorRate: {current: 0, previous: 0, change: 0},
           activeEndpoints: {
@@ -1424,7 +1456,6 @@ export default function AppTabContent({
     const renderMetricCard = (
       title: string,
       value: string | number,
-      change: number,
       icon: React.ReactNode,
       iconBg: string,
       suffix?: string,
@@ -1437,20 +1468,9 @@ export default function AppTabContent({
           >
             {icon}
           </div>
-          {isLoading ? (
+          {isLoading && (
             <div className="flex items-center gap-1 text-xs text-grey-600">
               <Loader2 className="h-3 w-3 animate-spin" />
-            </div>
-          ) : (
-            <div
-              className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-green' : 'text-red-500'}`}
-            >
-              {change >= 0 ? (
-                <TrendingUp className="h-3 w-3" />
-              ) : (
-                <TrendingDown className="h-3 w-3" />
-              )}
-              {Math.abs(change).toFixed(1)}%
             </div>
           )}
         </div>
@@ -1495,7 +1515,7 @@ export default function AppTabContent({
           <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex min-w-0 items-start gap-3 md:gap-4">
-                {isInternalApp && !isProductView ? (
+                {canEditApp && !isProductView ? (
                   <LogoEditor
                     logo={currentApp?.logo}
                     subject="app"
@@ -1623,7 +1643,7 @@ export default function AppTabContent({
                     </SelectContent>
                   </Select>
                 )}
-                {selectedVersion && isInternalApp && isVersionUnpublished && (
+                {selectedVersion && canEditApp && isVersionUnpublished && (
                   <Button
                     onClick={() => setShowPublishModal(true)}
                     size="sm"
@@ -1641,7 +1661,7 @@ export default function AppTabContent({
                     Publish
                   </Button>
                 )}
-                {selectedVersion && selectedVersion.status === 'public' && (
+                {selectedVersion && selectedVersion.status === 'public' && !isImported && (
                   <Button
                     onClick={() => {
                       const url = `${window.location.origin}/marketplace/app/${currentApp?.tag}`;
@@ -1684,6 +1704,16 @@ export default function AppTabContent({
             </div>
           </div>
 
+          {origin && currentApp?._id && (
+            <ImportedAppPanel
+              appId={String(currentApp._id)}
+              origin={origin}
+              onChanged={async () => {
+                await refetch();
+              }}
+            />
+          )}
+
           {isProductView && (
             <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -1721,12 +1751,27 @@ export default function AppTabContent({
             </div>
           )}
 
+          {/* Period and scope for the figures below */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-grey-600">
+              {isProductView
+                ? `Requests and webhook events from ${productDisplayName ?? 'this product'}`
+                : 'Requests and webhook events from every product in this workspace'}
+              {` \u00b7 ${overviewRange.label}`}
+            </p>
+            <ActivityPeriodSelector
+              period={overviewPeriod.period}
+              customStart={overviewPeriod.customStart}
+              customEnd={overviewPeriod.customEnd}
+              onChange={setOverviewPeriod}
+            />
+          </div>
+
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {renderMetricCard(
               'Total Requests',
               apiAnalytics.totalRequests.current.toLocaleString(),
-              apiAnalytics.totalRequests.change,
               <Activity className="h-5 w-5 text-blue-600" />,
               'bg-blue-500/10',
               undefined,
@@ -1735,7 +1780,6 @@ export default function AppTabContent({
             {renderMetricCard(
               'Success Rate',
               apiAnalytics.successRate.current.toFixed(1),
-              apiAnalytics.successRate.change,
               <CheckCircle className="h-5 w-5 text-green" />,
               'bg-green/10',
               '%',
@@ -1744,7 +1788,6 @@ export default function AppTabContent({
             {renderMetricCard(
               'Avg Latency',
               apiAnalytics.avgLatency.current,
-              apiAnalytics.avgLatency.change,
               <Clock className="h-5 w-5 text-orange-600" />,
               'bg-orange-500/10',
               undefined,
@@ -1753,7 +1796,6 @@ export default function AppTabContent({
             {renderMetricCard(
               'Error Rate',
               apiAnalytics.errorRate.current.toFixed(1),
-              apiAnalytics.errorRate.change,
               <XCircle className="h-5 w-5 text-red-500" />,
               'bg-red-500/10',
               '%',
@@ -1762,7 +1804,6 @@ export default function AppTabContent({
             {renderMetricCard(
               'Active Endpoints',
               actionsCount,
-              0,
               <Zap className="h-5 w-5 text-primary" />,
               'bg-primary/10',
               undefined,
@@ -1771,7 +1812,6 @@ export default function AppTabContent({
             {renderMetricCard(
               'Webhook Events',
               apiAnalytics.webhookEvents.current.toLocaleString(),
-              apiAnalytics.webhookEvents.change,
               <Webhook className="h-5 w-5 text-purple-600" />,
               'bg-purple-500/10',
               undefined,
@@ -1787,6 +1827,11 @@ export default function AppTabContent({
             componentTag={(currentApp as { tag?: string })?.tag}
             env={selectedVersion?.envs?.find((e: { active?: boolean }) => e.active)?.slug}
             countLabel="requests"
+            period={overviewPeriod.period}
+            customStart={overviewPeriod.customStart}
+            customEnd={overviewPeriod.customEnd}
+            onPeriodChange={setOverviewPeriod}
+            hidePeriodControls
             enabled={!!effectiveAppId || !!(currentApp as { tag?: string })?.tag}
             className="bg-white dark:bg-background border-grey-300 dark:border-grey-400"
           />
@@ -1931,7 +1976,7 @@ export default function AppTabContent({
                   <p className="text-sm text-grey-600">
                     No actions configured yet
                   </p>
-                  {isInternalApp && (
+                  {canEditApp && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -1965,10 +2010,10 @@ export default function AppTabContent({
                   key={env.slug}
                   className={cn(
                     'p-4 bg-white dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg transition-colors',
-                    !isProductView && 'hover:border-primary/50 cursor-pointer',
+                    !isProductView && !isLockedApp && 'hover:border-primary/50 cursor-pointer',
                   )}
                   onClick={() => {
-                    if (isProductView) return;
+                    if (isProductView || isLockedApp) return;
                     setEditingEnv(env);
                     setShowUpdateEnvModal(true);
                   }}
@@ -2008,7 +2053,7 @@ export default function AppTabContent({
                       ? 'No product environments configured'
                       : 'No environments configured'}
                   </p>
-                  {isInternalApp && !isProductView && (
+                  {canEditApp && !isProductView && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -2036,7 +2081,7 @@ export default function AppTabContent({
                   {isProductView
                     ? 'Select an action from the sidebar to test endpoints using this product\'s credentials and environment.'
                     : 'Select an action from the sidebar to test API endpoints. Use the tabs to switch between Actions, Webhooks, and Environments.'}
-                  {isInternalApp && !isProductView &&
+                  {canEditApp && !isProductView &&
                     ' Click the + button to create new resources.'}
                 </p>
               </div>
@@ -2049,10 +2094,11 @@ export default function AppTabContent({
                 Danger zone
               </h2>
               <p className="text-xs sm:text-sm text-grey-600 mb-4">
-                Permanently delete this app and all of its versions, actions, and webhooks.
-                This cannot be undone.
+                {isImported
+                  ? 'Uninstall this app from your workspace. Products that use it will lose access. You can import it again from the hosted marketplace.'
+                  : 'Permanently delete this app and all of its versions, actions, and webhooks. This cannot be undone.'}
               </p>
-              {hasPublicVersion && (
+              {hasPublicVersion && !isImported && (
                 <p className="text-xs sm:text-sm text-amber-700 mb-4">
                   Public apps cannot be deleted. Unpublish or remove all public versions first.
                 </p>
@@ -2064,7 +2110,7 @@ export default function AppTabContent({
                 onClick={() => setShowDeleteAppModal(true)}
               >
                 <Trash2 className="h-4 w-4" />
-                Delete app
+                {isImported ? 'Uninstall' : 'Delete app'}
               </Button>
             </div>
           )}
@@ -2357,7 +2403,7 @@ export default function AppTabContent({
                       )}
                     />
                   </button>
-                  {isInternalApp && (
+                  {canEditApp && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
@@ -2666,6 +2712,7 @@ export default function AppTabContent({
           appTag={currentApp.tag}
           isDeleting={deleteAppMutation.isPending}
           disabled={!canDeleteApp}
+          uninstall={isImported}
           disabledReason={
             hasPublicVersion
               ? 'This app has a public version and cannot be deleted.'

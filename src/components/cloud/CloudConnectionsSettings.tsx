@@ -40,6 +40,8 @@ import ManagedDatabaseNetworkingPanel from '@/components/cloud/ManagedDatabaseNe
 import DuctapeApiProxyIpsPanel from '@/components/cloud/DuctapeApiProxyIpsPanel';
 import { CLOUD_PROVIDER_GUIDES, type CloudProvider } from '@/components/cloud/cloudSetupGuide';
 import CloudProviderIcon from '@/components/cloud/CloudProviderIcon';
+import { AccessGapsPanel, DeployFieldsPanel, FargateFieldsPanel, SetupFilesPanel } from '@/components/cloud/DeployConnectionPanels';
+import { deployBody, describeAccessGaps, expressBody, fargateBody, hasDeployScope, readDeployValues, readExpressValues, readFargateValues, type IAccessGaps } from '@/utils/deployConnection';
 
 type Provider = CloudProvider;
 
@@ -173,12 +175,17 @@ export default function CloudConnectionsSettings({
   const [azureClientSecret, setAzureClientSecret] = useState('');
   const [azureDefaultLocation, setAzureDefaultLocation] = useState('eastus');
   const [azureConnectionString, setAzureConnectionString] = useState('');
+  const [cloudflareAccountId, setCloudflareAccountId] = useState('');
+  const [cloudflareToken, setCloudflareToken] = useState('');
   const [atlasPublicKey, setAtlasPublicKey] = useState('');
   const [atlasPrivateKey, setAtlasPrivateKey] = useState('');
   const [auraClientId, setAuraClientId] = useState('');
   const [auraClientSecret, setAuraClientSecret] = useState('');
   const [auraInstanceId, setAuraInstanceId] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [accessGaps, setAccessGaps] = useState<IAccessGaps | undefined>();
+  const [deployValues, setDeployValues] = useState<Record<string, string>>({});
+  const [deployErrors, setDeployErrors] = useState<Record<string, string>>({});
 
   const closeCloudConnectionTab = () => {
     const id = setupConnectionId || resolvedId;
@@ -299,6 +306,8 @@ export default function CloudConnectionsSettings({
       typeof meta.last_validation_error === 'string' ? meta.last_validation_error : undefined;
     if (metaErr) setValidationError(metaErr);
     if (typeof meta.role_arn === 'string') setRoleArn(meta.role_arn);
+    if (typeof meta.account_id === 'string') setCloudflareAccountId(meta.account_id);
+    setDeployValues((current) => ({ ...readDeployValues(typeof fc.provider === 'string' ? fc.provider : undefined, meta), ...readFargateValues(typeof fc.provider === 'string' ? fc.provider : undefined, meta), ...readExpressValues(typeof fc.provider === 'string' ? fc.provider : undefined, meta), ...Object.fromEntries(Object.entries(current).filter(([, v]) => v)) }));
     if (typeof meta.project_id === 'string') setProjectId(meta.project_id);
     if (typeof meta.tenant_id === 'string') setAzureTenantId(meta.tenant_id);
     if (typeof meta.subscription_id === 'string') {
@@ -321,7 +330,25 @@ export default function CloudConnectionsSettings({
       const id = setupConnectionId || resolvedId;
       const activeProvider = resolvedProvider;
       const body: Record<string, string> = {};
+      // A connection made for deploys also carries where Ductape works. Checked here with the server's own rules, so a typo is
+      // caught before the round trip. Empty fields are left out, so saving never wipes what is already stored.
+      if (hasDeployScope(connection?.scopes)) {
+        const checked = deployBody(activeProvider, deployValues, true);
+        const fargate = fargateBody(activeProvider, deployValues);
+        const express = expressBody(activeProvider, deployValues);
+        const errors = { ...checked.errors, ...fargate.errors, ...express.errors };
+        setDeployErrors(errors);
+        const first = Object.values(errors)[0];
+        if (first) throw new Error(first);
+        Object.assign(body, checked.body, fargate.body, express.body);
+      }
       if (activeProvider === 'aws') body.role_arn = roleArn.trim();
+      if (activeProvider === 'cloudflare') {
+        const accountId = cloudflareAccountId.trim();
+        if (!/^[a-fA-F0-9]{32}$/.test(accountId)) throw new Error('The account id is 32 characters, shown in Workers & Pages in the Cloudflare dashboard.');
+        body.account_id = accountId;
+        if (cloudflareToken.trim()) body.api_token = cloudflareToken.trim();
+      }
       if (activeProvider === 'gcp') {
         body.project_id = projectId.trim();
         body.service_account_json = serviceAccountJson.trim();
@@ -374,6 +401,7 @@ export default function CloudConnectionsSettings({
           const validation = (await sdkProxy.cloud.connections.validate(cloudRef)) as {
             valid?: boolean;
             message?: string;
+            deploy?: Record<string, unknown>;
           };
           logCloud('Validate connection — response', {
             durationMs: Date.now() - validateStart,
@@ -381,6 +409,7 @@ export default function CloudConnectionsSettings({
           });
           if (validation?.valid === false) {
             const msg = validation.message || 'Validation failed';
+            setAccessGaps(describeAccessGaps(resolvedProvider, validation as never));
             setValidationError(msg);
             toast.error(msg);
             queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
@@ -390,6 +419,7 @@ export default function CloudConnectionsSettings({
             return;
           }
           setValidationError('');
+          setAccessGaps(undefined);
         } catch (e) {
           logCloudError('Validate connection — failed', e, {
             durationMs: Date.now() - validateStart,
@@ -426,8 +456,18 @@ export default function CloudConnectionsSettings({
       if (!sdkProxy || !cloudRef) throw new Error('No connection');
       return sdkProxy.cloud.connections.validate(cloudRef);
     },
-    onSuccess: () => {
-      toast.success('Connection validated');
+    onSuccess: (result) => {
+      // A failed validation comes back as an answer, not an error. It is shown as the failure it is, with what is missing.
+      const outcome = result as { valid?: boolean; message?: string } | undefined;
+      if (outcome?.valid === false) {
+        toast.error(outcome.message || 'Validation failed');
+        setValidationError(outcome.message || 'Validation failed');
+        setAccessGaps(describeAccessGaps(resolvedProvider, outcome as never));
+      } else {
+        toast.success('Connection validated');
+        setValidationError('');
+        setAccessGaps(undefined);
+      }
       queryClient.invalidateQueries({ queryKey: cloudConnectionsQueryKey(currentWorkspaceId) });
       queryClient.invalidateQueries({
         queryKey: cloudConnectionQueryKey(currentWorkspaceId, cloudRef, cloudRef),
@@ -465,6 +505,9 @@ export default function CloudConnectionsSettings({
 
   if (connection && wantsSetup) {
     const setupLive = liveConnection || connection;
+    const isDeployConnection = hasDeployScope(setupLive.scopes);
+    const deploySetup = ((fetchedConnection as { deploy_setup?: Record<string, unknown> } | null)?.deploy_setup
+      ?? (connection.setupPayload as { deploy_setup?: Record<string, unknown> } | undefined)?.deploy_setup);
     return (
       <div className="h-full flex flex-col min-h-0 overflow-hidden">
         <div className="bg-white border-b border-grey-400 px-6 py-5 shrink-0">
@@ -513,10 +556,14 @@ export default function CloudConnectionsSettings({
                 ductapeCallerArn={ductapeCallerArn}
               />
             ) : (
-              <div className="rounded-lg border border-red/30 bg-red/5 p-4">
-                <p className="text-sm font-semibold text-grey">Validation failed</p>
-                <p className="text-sm text-grey-600 mt-1 leading-relaxed">{validationError}</p>
-              </div>
+              accessGaps ? (
+                <AccessGapsPanel gaps={accessGaps} />
+              ) : (
+                <div className="rounded-lg border border-red/30 bg-red/5 p-4">
+                  <p className="text-sm font-semibold text-grey">Validation failed</p>
+                  <p className="text-sm text-grey-600 mt-1 leading-relaxed">{validationError}</p>
+                </div>
+              )
             )
           ) : null}
           {setupInstructions ? (
@@ -526,13 +573,14 @@ export default function CloudConnectionsSettings({
           ) : null}
           <CloudSetupGuidePanel
             provider={activeProvider}
-            compact={activeProvider === 'aws'}
+            compact={activeProvider === 'aws' && !isDeployConnection}
             gcpProjectId={activeProvider === 'gcp' ? projectId : undefined}
           />
+          {isDeployConnection ? <SetupFilesPanel provider={activeProvider} setup={deploySetup} /> : null}
           {isManagedDatabaseProvider(activeProvider) && sdkProxy ? (
             <DuctapeApiProxyIpsPanel sdkProxy={sdkProxy} variant="setup" />
           ) : null}
-          {showAwsTrustPolicy ? (
+          {showAwsTrustPolicy && !isDeployConnection ? (
             <div className="space-y-4">
               <AwsIamUserPolicySection
                 roleArn={roleArn}
@@ -706,6 +754,37 @@ export default function CloudConnectionsSettings({
           </>
         )}
 
+        {activeProvider === 'cloudflare' && (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cf-account-id">Account ID</Label>
+              <Input
+                id="cf-account-id"
+                className="mt-2 font-mono text-sm"
+                placeholder="32 characters"
+                value={cloudflareAccountId}
+                onChange={(e) => setCloudflareAccountId(e.target.value)}
+              />
+              <p className="text-xs text-grey-600 mt-2">Shown in Workers &amp; Pages in the Cloudflare dashboard.</p>
+            </div>
+            <div>
+              <Label htmlFor="cf-api-token">API token</Label>
+              <Input
+                id="cf-api-token"
+                type="password"
+                autoComplete="off"
+                className="mt-2 font-mono text-sm"
+                placeholder="Leave empty to keep the stored token"
+                value={cloudflareToken}
+                onChange={(e) => setCloudflareToken(e.target.value)}
+              />
+              <p className="text-xs text-grey-600 mt-2">
+                With Account / Workers Scripts / Edit and Account / Workers KV Storage / Edit. It is stored as a workspace secret and never shown again.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeProvider === 'azure' && (
           <div className="space-y-4">
             <div>
@@ -851,12 +930,37 @@ export default function CloudConnectionsSettings({
           </div>
         )}
 
+        {hasDeployScope((liveConnection || connection)?.scopes) ? (
+          <DeployFieldsPanel
+            provider={activeProvider}
+            values={deployValues}
+            errors={deployErrors}
+            onChange={(key, value) => { setDeployValues((current) => ({ ...current, [key]: value })); setDeployErrors((current) => ({ ...current, [key]: '' })); }}
+          />
+        ) : null}
+        {hasDeployScope((liveConnection || connection)?.scopes) ? (
+          <FargateFieldsPanel
+            provider={activeProvider}
+            values={deployValues}
+            errors={deployErrors}
+            onChange={(key, value) => { setDeployValues((current) => ({ ...current, [key]: value })); setDeployErrors((current) => ({ ...current, [key]: '' })); }}
+            onFill={(filled) => { setDeployValues((current) => ({ ...current, ...filled })); setDeployErrors({}); }}
+          />
+        ) : null}
+
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-grey-400">
           <Button
             onClick={() => completeMutation.mutate()}
             disabled={
               completing ||
               (activeProvider === 'aws' && !roleArn.trim()) ||
+              (activeProvider === 'cloudflare' &&
+                (!/^[a-fA-F0-9]{32}$/.test(cloudflareAccountId.trim()) ||
+                  (!cloudflareToken.trim() &&
+                    !Boolean(
+                      (fetchedConnection as { metadata?: { has_api_token?: boolean } } | null)
+                        ?.metadata?.has_api_token,
+                    )))) ||
               (activeProvider === 'gcp' &&
                 (!projectId.trim() ||
                   (!serviceAccountJson.trim() &&

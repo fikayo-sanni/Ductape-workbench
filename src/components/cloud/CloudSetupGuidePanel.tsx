@@ -166,7 +166,7 @@ export default function CloudSetupGuidePanel({
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-grey mb-1">What a deploy leaves in your project</p>
+            <p className="text-xs font-semibold text-grey mb-1">What a deploy leaves in your {guide.deployGuide.container}</p>
             <ul className="text-xs text-grey-600 space-y-1 list-disc pl-4">
               {guide.deployGuide.creates.map((item) => (
                 <li key={item}>{item}</li>
@@ -181,7 +181,10 @@ export default function CloudSetupGuidePanel({
                 <div className="min-w-0">
                   <span className="font-medium text-grey">{step.title}</span>
                   <p className="mt-0.5 leading-relaxed break-words">{step.body}</p>
-                  {i === 0 ? (
+                  {step.command ? (
+                    <pre className="mt-2 text-xs font-mono text-grey bg-white/80 px-2 py-1.5 rounded border border-blue-500/20 whitespace-pre-wrap break-all">{step.command}</pre>
+                  ) : null}
+                  {step.attach === 'apis' && guide.deployGuide!.apis ? (
                     <ul className="mt-2 space-y-2">
                       {guide.deployGuide!.apis.map((api) => (
                         <li key={api.serviceId} className="text-xs">
@@ -200,7 +203,7 @@ export default function CloudSetupGuidePanel({
                       ))}
                     </ul>
                   ) : null}
-                  {i === 1 ? (
+                  {step.attach === 'roles' && guide.deployGuide!.roles ? (
                     <div className="mt-2 space-y-2">
                       <a
                         href={gcpIamUrl(gcpProjectId)}
@@ -220,6 +223,16 @@ export default function CloudSetupGuidePanel({
                         ))}
                       </ul>
                     </div>
+                  ) : null}
+                  {step.attach === 'accountRoles' && guide.deployGuide!.accountRoles ? (
+                    <ul className="mt-2 text-xs space-y-1.5">
+                      {guide.deployGuide!.accountRoles.map((role) => (
+                        <li key={role.roleName} className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                          <code className="font-mono text-grey bg-white/80 px-1.5 py-0.5 rounded border border-blue-500/20 shrink-0">{role.roleName}</code>
+                          <span>{role.purpose}</span>
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                 </div>
               </li>

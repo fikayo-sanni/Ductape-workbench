@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import apiClient from "@/config/axiosinstance";
 import { IProduct } from "@/types/product";
+import type { StrategyFields } from "@/utils/healthcheckStrategy";
 
 export interface ProductsResponse {
   data: IProduct[];
@@ -35,7 +36,7 @@ const fetchProducts = async (data: {
 const updateHealthcheckStrategy = async (data: {
   product_id: string;
   tag: string;
-  fields: { mode: 'reactive'; heartbeat: number; recovery: { max: number } };
+  fields: StrategyFields;
   workspace_id: string;
   user_id: string;
   public_key: string;

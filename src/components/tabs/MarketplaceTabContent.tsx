@@ -28,8 +28,11 @@ import MarketplaceSidebar, { type MarketplaceViewMode } from '@/components/marke
 import MarketplaceSubmissionsView from '@/components/marketplace/MarketplaceSubmissionsView';
 import AppIntegrationModal from '@/components/marketplace/AppIntegrationModal';
 import { IntegrationProvider } from '@/context/integration-context';
+import { isSelfHosted } from '@/helpers/env';
+import { cn } from '@/lib/utils';
+import HostedMarketplaceView from '@/components/marketplace/HostedMarketplaceView';
 
-export default function MarketplaceTabContent() {
+function InstanceMarketplaceView() {
   const { openTab } = useWorkbenchStore();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
@@ -293,6 +296,54 @@ export default function MarketplaceTabContent() {
           />
         </IntegrationProvider>
       )}
+    </div>
+  );
+}
+
+type MarketplaceSource = 'instance' | 'hosted';
+
+const SOURCES: Array<{ id: MarketplaceSource; label: string }> = [
+  { id: 'instance', label: 'This instance' },
+  { id: 'hosted', label: 'Hosted marketplace' },
+];
+
+/**
+ * On self-hosted instances the marketplace has two sources: apps published on this instance, and the hosted
+ * Ductape marketplace (import only). The hosted cloud only has its own marketplace, so nothing changes there.
+ */
+export default function MarketplaceTabContent() {
+  const [source, setSource] = useState<MarketplaceSource>('instance');
+
+  if (!isSelfHosted()) return <InstanceMarketplaceView />;
+
+  return (
+    <div className="h-full flex flex-col bg-grey-100">
+      <div className="bg-white border-b border-grey-400 px-4 py-2 flex items-center">
+        <div className="flex border border-grey-400 rounded-md" role="tablist" aria-label="Marketplace source">
+          {SOURCES.map((item, index) => (
+            <Button
+              key={item.id}
+              role="tab"
+              aria-selected={source === item.id}
+              variant={source === item.id ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSource(item.id)}
+              className={cn(index === 0 ? 'rounded-r-none' : 'rounded-l-none')}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 flex flex-col">
+        {source === 'instance' ? (
+          <div className="flex-1 min-h-0">
+            <InstanceMarketplaceView />
+          </div>
+        ) : (
+          <HostedMarketplaceView />
+        )}
+      </div>
     </div>
   );
 }

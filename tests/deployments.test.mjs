@@ -19,9 +19,9 @@ const {
 } = load('../src/utils/deployments.ts');
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
-const target = { kind: 'cloud_run', connectionTag: 'gcp-main', region: 'europe-west2' };
+const target = { kind: 'cloud_run', connection: 'gcp-main', region: 'europe-west2' };
 const dep = (over) => ({
-  id: 'd', kind: 'function', productTag: 'buydeck', name: 'reserve-stock', version: '1.0.0', env: 'stg', target, resourceName: 'r', releaseHash: `sha256:${'a'.repeat(64)}`,
+  id: 'd', kind: 'function', product: 'buydeck', name: 'reserve-stock', version: '1.0.0', env: 'stg', target, resourceName: 'r', releaseHash: `sha256:${'a'.repeat(64)}`,
   trafficPercent: 100, state: 'active', revision: 1, updatedAt: '2026-10-01T00:00:00Z', ...over,
 });
 const policy = (requireHumanApproval, allowAgentApply = false) => ({ requireHumanApproval, allowAgentApply, source: 'default' });
@@ -56,8 +56,8 @@ test('traffic, targets and hashes read cleanly', () => {
   assert.equal(formatTraffic(0), '0%');
   assert.equal(formatTraffic(Number.NaN), '-');
   assert.equal(describeTarget(target), 'Cloud Run · gcp-main · europe-west2');
-  assert.equal(describeTarget({ kind: 'aws_lambda', connectionTag: 'aws-1' }), 'AWS Lambda · aws-1');
-  assert.equal(describeTarget({ kind: 'novel', connectionTag: 'x' }), 'novel · x');
+  assert.equal(describeTarget({ kind: 'aws_lambda', connection: 'aws-1' }), 'AWS Lambda · aws-1');
+  assert.equal(describeTarget({ kind: 'novel', connection: 'x' }), 'novel · x');
   assert.equal(shortHash(`sha256:${'ab12'.repeat(16)}`), 'ab12ab12ab12');
   assert.equal(shortHash(undefined), '-');
 });
@@ -118,12 +118,13 @@ test('errors say what the server said, or that the server has no deploy support'
   assert.equal(deployErrorMessage(undefined), 'The deployments could not be loaded.');
 });
 
-const build = (status, over = {}) => ({ id: 'b', kind: 'function', productTag: 'p', name: 'n', version: '1.0.0', connectionTag: 'gcp-main', region: 'europe-west2', status, builder: 'dockerfile', imageRepository: 'r', createdAt: 'x', updatedAt: 'x', ...over });
+const build = (status, over = {}) => ({ id: 'b', kind: 'function', product: 'p', name: 'n', version: '1.0.0', connection: 'gcp-main', region: 'europe-west2', status, builder: 'dockerfile', imageRepository: 'r', createdAt: 'x', updatedAt: 'x', ...over });
 
 test('build statuses carry a label and a colour, and running ones are known', () => {
   assert.deepEqual(plain(describeBuildStatus('succeeded')), { label: 'Succeeded', tone: 'good' });
   assert.deepEqual(plain(describeBuildStatus('failed')), { label: 'Failed', tone: 'bad' });
   assert.deepEqual(plain(describeBuildStatus('expired')), { label: 'Expired', tone: 'warn' });
+  assert.deepEqual(plain(describeBuildStatus('cancelled')), { label: 'Cancelled', tone: 'warn' });
   assert.deepEqual(plain(describeBuildStatus('building')), { label: 'Building', tone: 'info' });
   assert.deepEqual(plain(describeBuildStatus('awaiting_upload')), { label: 'Waiting for source', tone: 'neutral' });
   assert.deepEqual(plain(describeBuildStatus('queued_somewhere')), { label: 'queued_somewhere', tone: 'neutral' }, 'an unknown status is shown as it came');
@@ -138,11 +139,11 @@ test('build totals count what is running and what failed', () => {
   assert.deepEqual(plain(buildTotals([])), { total: 0, inFlight: 0, succeeded: 0, failed: 0 });
 });
 
-test('a connection can deploy only with the deploy scope, and only GCP can deploy today', () => {
+test('a connection can deploy only with the deploy scope, and only GCP, AWS, Azure and Cloudflare can deploy today', () => {
   assert.equal(hasDeployScope(['storage', 'deploy']), true);
   assert.equal(hasDeployScope(['storage', 'broker']), false);
   assert.equal(hasDeployScope([]), false);
   assert.equal(hasDeployScope(undefined), false);
-  assert.equal(DEPLOY_PROVIDERS.has('gcp'), true);
-  for (const provider of ['aws', 'azure', 'mongodb_atlas', 'neo4j_aura']) assert.equal(DEPLOY_PROVIDERS.has(provider), false, provider);
+  for (const provider of ['gcp', 'aws', 'azure', 'cloudflare']) assert.equal(DEPLOY_PROVIDERS.has(provider), true, provider);
+  for (const provider of ['mongodb_atlas', 'neo4j_aura']) assert.equal(DEPLOY_PROVIDERS.has(provider), false, provider);
 });

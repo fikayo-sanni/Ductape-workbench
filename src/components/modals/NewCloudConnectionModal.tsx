@@ -28,6 +28,7 @@ import { defaultScopesForProvider } from '@/components/cloud/cloudConnection.con
 import { cloudTabTitle } from '@/components/cloud/CloudConnectionTagBadge';
 import { tagFromDisplayName } from '@/utils/cloudConnectionTag';
 import { cloudConnectionsQueryKey } from '@/utils/cloudConnectionQueryKeys';
+import { isDeployProvider, scopesFor } from '@/utils/deployConnection';
 
 type Provider = CloudProvider;
 
@@ -60,9 +61,11 @@ export default function NewCloudConnectionModal({
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
   const [tagManuallyEdited, setTagManuallyEdited] = useState(false);
+  const [forDeploy, setForDeploy] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setForDeploy(false);
       setProvider('aws');
       setDisplayName('');
       setTag('');
@@ -85,7 +88,7 @@ export default function NewCloudConnectionModal({
         name: displayName.trim(),
         tag: tag.trim(),
         description: description.trim(),
-        scopes: defaultScopesForProvider(provider),
+        scopes: scopesFor(provider, forDeploy, defaultScopesForProvider(provider)),
       });
     },
     onSuccess: (setup: Record<string, unknown>) => {
@@ -144,12 +147,30 @@ export default function NewCloudConnectionModal({
                 <SelectItem value="aws">Amazon Web Services</SelectItem>
                 <SelectItem value="gcp">Google Cloud</SelectItem>
                 <SelectItem value="azure">Microsoft Azure</SelectItem>
+                <SelectItem value="cloudflare">Cloudflare (Workers)</SelectItem>
                 <SelectItem value="mongodb_atlas">MongoDB Atlas</SelectItem>
                 <SelectItem value="neo4j_aura">Neo4j Aura</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-grey-600 mt-1">{CLOUD_PROVIDER_GUIDES[provider].description}</p>
           </div>
+
+          {provider === 'cloudflare' ? (
+            <p className="rounded-md border border-grey-300 p-3 text-xs text-grey-600">
+              A Cloudflare connection is for deploying Workers only. It carries the deploy scope and cannot manage storage or databases.
+            </p>
+          ) : isDeployProvider(provider) ? (
+            <label className="flex items-start gap-3 rounded-md border border-grey-300 p-3 text-sm">
+              <input type="checkbox" className="mt-1" checked={forDeploy} onChange={(e) => setForDeploy(e.target.checked)} />
+              <span>
+                <span className="block font-medium text-grey">Use this connection to deploy code with Ductape</span>
+                <span className="block text-xs text-grey-600">
+                  Lets Ductape build your source and run it in your own account. A deploy connection is only for that: it has its own roles and
+                  setup steps, and cannot manage storage or databases. Make a separate connection for those.
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           <div>
             <Label htmlFor="modal-cloud-name">Display name</Label>

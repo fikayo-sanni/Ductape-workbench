@@ -20,6 +20,8 @@ interface DeleteAppModalProps {
   isDeleting?: boolean;
   disabled?: boolean;
   disabledReason?: string;
+  /** The app was imported from the hosted marketplace: removing it uninstalls it. */
+  uninstall?: boolean;
 }
 
 export default function DeleteAppModal({
@@ -31,6 +33,7 @@ export default function DeleteAppModal({
   isDeleting = false,
   disabled = false,
   disabledReason,
+  uninstall = false,
 }: DeleteAppModalProps) {
   const [confirmInput, setConfirmInput] = useState('');
 
@@ -51,11 +54,20 @@ export default function DeleteAppModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-grey">
             <AlertTriangle className="h-5 w-5 text-red-500" />
-            Delete app
+            {uninstall ? 'Uninstall app' : 'Delete app'}
           </DialogTitle>
           <DialogDescription className="text-sm text-grey-600 pt-1">
-            <strong className="text-red-600">Warning:</strong> This permanently deletes the app,
-            its versions, actions, and webhooks. This action cannot be undone.
+            {uninstall ? (
+              <>
+                <strong className="text-red-600">Warning:</strong> This removes the imported app from
+                your workspace. You can import it again from the hosted marketplace.
+              </>
+            ) : (
+              <>
+                <strong className="text-red-600">Warning:</strong> This permanently deletes the app,
+                its versions, actions, and webhooks. This action cannot be undone.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -104,12 +116,12 @@ export default function DeleteAppModal({
             {isDeleting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Deleting...
+                {uninstall ? 'Uninstalling...' : 'Deleting...'}
               </>
             ) : (
               <>
                 <Trash2 className="h-4 w-4" />
-                Delete app
+                {uninstall ? 'Uninstall' : 'Delete app'}
               </>
             )}
           </Button>

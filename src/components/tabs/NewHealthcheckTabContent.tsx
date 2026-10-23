@@ -302,19 +302,17 @@ export default function NewHealthcheckTabContent({ data, tabId }: NewHealthcheck
       }
 
       const healthcheck = await ductape.apps.health.create(payload);
-      // The check is created with an interval (the creation call requires one); a reactive check then
-      // switches to waiting for failures. Interval checks need nothing more.
+      // The check is created with an interval (the creation call requires one); the strategy is then saved over it:
+      // reactive settings, or an explicit `interval` mode, since a check with no mode is reactive.
       const fields = strategyFields(formData);
-      if (fields) {
-        await productServices.updateHealthcheckStrategy({
-          product_id: product._id,
-          tag: formData.tag,
-          fields,
-          workspace_id: product.workspace_id || currentWorkspaceId || '',
-          user_id: user?._id || '',
-          public_key: user?.public_key || '',
-        });
-      }
+      await productServices.updateHealthcheckStrategy({
+        product_id: product._id,
+        tag: formData.tag,
+        fields,
+        workspace_id: product.workspace_id || currentWorkspaceId || '',
+        user_id: user?._id || '',
+        public_key: user?.public_key || '',
+      });
       return healthcheck;
     },
     onSuccess: (healthcheck) => {

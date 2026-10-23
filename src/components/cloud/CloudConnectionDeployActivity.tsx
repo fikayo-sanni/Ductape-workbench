@@ -26,7 +26,7 @@ function DeploymentRow({ d }: { d: IDeployment }) {
         <div className="font-medium text-grey">{d.name}</div>
         <KindLabel kind={d.kind} />
       </td>
-      <td className="px-4 py-3 text-xs text-grey-600 break-all">{d.productTag}</td>
+      <td className="px-4 py-3 text-xs text-grey-600 break-all">{d.product}</td>
       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{d.version}</td>
       <td className="whitespace-nowrap px-4 py-3 text-xs">{d.env}</td>
       <td className="px-4 py-3">
@@ -49,7 +49,7 @@ function BuildRow({ b }: { b: IBuild }) {
         <div className="font-medium text-grey">{b.name}</div>
         <KindLabel kind={b.kind} />
       </td>
-      <td className="px-4 py-3 text-xs text-grey-600 break-all">{b.productTag}</td>
+      <td className="px-4 py-3 text-xs text-grey-600 break-all">{b.product}</td>
       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{b.version}</td>
       <td className="px-4 py-3">
         <Pill tone={status.tone}>
