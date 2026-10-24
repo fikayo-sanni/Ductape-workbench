@@ -413,18 +413,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* The state of every system: use, errors, latency and alerts */}
-        <PlatformHealth
-          workspaceId={currentWorkspaceId || ''}
-          userId={user?._id || ''}
-          publicKey={user?.public_key || ''}
-          timeRange={selectedTimeRange}
-          productTag={selectedProductId !== 'all' ? productList.find(item => String(item._id) === selectedProductId)?.tag : undefined}
-          appId={selectedAppId !== 'all' ? selectedAppId : undefined}
-          rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'}
-          inventory={resourceUsage}
-        />
-
         {/* Workspace status */}
         <div className={cn('flex items-start gap-3 rounded-xl border p-4', bannerStyle[banner.tone])}>
           {banner.tone === 'good' ? (
@@ -611,6 +599,18 @@ export default function Dashboard() {
             )}
           </Panel>
         </div>
+
+        {/* The state of every system: use, errors, latency and alerts */}
+        <PlatformHealth
+          workspaceId={currentWorkspaceId || ''}
+          userId={user?._id || ''}
+          publicKey={user?.public_key || ''}
+          timeRange={selectedTimeRange}
+          productTag={selectedProductId !== 'all' ? productList.find(item => String(item._id) === selectedProductId)?.tag : undefined}
+          appId={selectedAppId !== 'all' ? selectedAppId : undefined}
+          rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'}
+          inventory={resourceUsage}
+        />
       </div>
     </div>
   );
