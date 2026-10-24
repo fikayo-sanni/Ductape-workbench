@@ -98,6 +98,9 @@ const TARGET_LABEL: Record<string, string> = {
   vps: 'VPS',
 };
 
+/** A target kind as a person reads it: aws_fargate is "AWS Fargate". A kind with no name here is shown as it came. */
+export const targetLabel = (kind: string): string => TARGET_LABEL[kind] ?? kind;
+
 export function describeTarget(target: IDeploymentTarget): string {
   const kind = TARGET_LABEL[target.kind] ?? target.kind;
   return `${kind} · ${target.connection}${target.region ? ` · ${target.region}` : ''}`;

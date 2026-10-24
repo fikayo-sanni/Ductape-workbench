@@ -40,6 +40,7 @@ import {useWorkbenchStore} from '@/stores/workbench-store';
 import {Panel, Pill, type Tone} from '@/components/tabs/ProductSection';
 import {productHealth, workspaceAttention, type Severity} from '@/utils/productOverview';
 import PlatformHealth from '@/components/dashboard/PlatformHealth';
+import InfraSummary from '@/components/dashboard/InfraSummary';
 
 export default function Dashboard() {
   const {currentWorkspaceId, user} = useAuth();
@@ -257,7 +258,6 @@ export default function Dashboard() {
     Database: 'bg-pink-500',
     Queue: 'bg-orange-500',
     Feature: 'bg-cyan-500',
-    Other: 'bg-grey-500',
   };
 
   const banner = (() => {
@@ -599,6 +599,9 @@ export default function Dashboard() {
             )}
           </Panel>
         </div>
+
+        {/* What is deployed, and which clouds are connected */}
+        <InfraSummary />
 
         {/* The state of every system: use, errors, latency and alerts */}
         <PlatformHealth

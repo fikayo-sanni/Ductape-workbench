@@ -32,6 +32,19 @@ export async function fetchProductDeployments(auth: IDeployAuth, productTag: str
   return data.data ?? [];
 }
 
+/** Every deployment in the workspace, newest change first. The server returns the latest 200. */
+export const WORKSPACE_DEPLOYMENTS_LIMIT = 200;
+export async function fetchWorkspaceDeployments(auth: IDeployAuth): Promise<IDeployment[]> {
+  const { data } = await apiClient.get<{ data: IDeployment[] }>(`${BASE}/deployments?${params(auth)}`);
+  return data.data ?? [];
+}
+
+/** Every build in the workspace, newest first. The server returns the latest 100. */
+export async function fetchWorkspaceBuilds(auth: IDeployAuth): Promise<IBuild[]> {
+  const { data } = await apiClient.get<{ data: IBuild[] }>(`${BASE}/builds?${params(auth)}`);
+  return data.data ?? [];
+}
+
 /** The product's environments with how each is governed. */
 export async function fetchProductEnvironments(auth: IDeployAuth, productTag: string): Promise<IProductEnvironment[]> {
   const { data } = await apiClient.get<{ data: IProductEnvironment[] }>(`${BASE}/products/${encodeURIComponent(productTag)}/environments?${params(auth)}`);
