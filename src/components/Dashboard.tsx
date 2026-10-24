@@ -1,7 +1,5 @@
 import {
   Activity,
-  TrendingUp,
-  TrendingDown,
   Package,
   Grid3x3,
   Zap,
@@ -41,6 +39,9 @@ import {Panel, Pill, type Tone} from '@/components/tabs/ProductSection';
 import {productHealth, workspaceAttention, type Severity} from '@/utils/productOverview';
 import PlatformHealth from '@/components/dashboard/PlatformHealth';
 import InfraSummary from '@/components/dashboard/InfraSummary';
+import ActivityGantt from '@/components/dashboard/ActivityGantt';
+import {usePlatformHealth} from '@/hooks/usePlatformHealth';
+import {formatDuration, productLatency} from '@/utils/platformHealth';
 
 export default function Dashboard() {
   const {currentWorkspaceId, user} = useAuth();
@@ -113,6 +114,19 @@ export default function Dashboard() {
       }),
     enabled: !!currentWorkspaceId && !!user?._id && !!user?.public_key,
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // The state of every system for this period. The product cards, the activity chart and the health sections all read it.
+  const selectedProductTag = selectedProductId !== 'all'
+    ? (productsData?.data ?? []).find((item: any) => String(item._id) === selectedProductId)?.tag
+    : undefined;
+  const platformHealth = usePlatformHealth({
+    workspaceId: currentWorkspaceId || '',
+    userId: user?._id || '',
+    publicKey: user?.public_key || '',
+    timeRange: selectedTimeRange,
+    productTag: selectedProductTag,
+    appId: selectedAppId !== 'all' ? selectedAppId : undefined,
   });
 
   // Update last updated time
@@ -226,24 +240,8 @@ export default function Dashboard() {
     );
   }
 
-  // Show error state
-  if (error || !dashboardData) {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-grey-100 p-4 sm:p-6 w-full">
-        <div className="max-w-7xl mx-auto flex items-center justify-center py-16">
-          <div className="text-center">
-            <AlertTriangle className="h-8 w-8 mx-auto text-red mb-4" />
-            <p className="text-sm sm:text-base text-grey-600">
-              Failed to load dashboard data
-            </p>
-            <p className="text-xs sm:text-sm text-grey-600 mt-2">
-              {error instanceof Error ? error.message : 'Unknown error'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // The workspace totals failing is said in a notice below, not by replacing the whole page, so the sections that read other data still show.
+  const totalsFailed = Boolean(error) || !dashboardData;
 
   const productList: any[] = productsData?.data ?? [];
   const attention = workspaceAttention(productList);
@@ -413,6 +411,16 @@ export default function Dashboard() {
           </div>
         )}
 
+        {totalsFailed ? (
+          <div className="flex items-start gap-3 rounded-xl border border-orange/30 bg-orange/5 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-orange" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-grey">Some workspace totals could not be loaded</p>
+              <p className="mt-0.5 text-xs text-grey-600 sm:text-sm">{error instanceof Error ? error.message : 'The totals at the top show zero for now.'} Everything else on this page is read separately and is shown below.</p>
+            </div>
+          </div>
+        ) : null}
+
         {/* Workspace status */}
         <div className={cn('flex items-start gap-3 rounded-xl border p-4', bannerStyle[banner.tone])}>
           {banner.tone === 'good' ? (
@@ -432,22 +440,11 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {stats.map(item => {
             const Icon = item.icon;
-            const TrendIcon = item.trend === 'up' ? TrendingUp : TrendingDown;
             return (
               <div key={item.title} className="bg-white rounded-xl border border-grey-400 p-3 sm:p-4 shadow-sm">
                 <div className="flex items-start justify-between mb-2 sm:mb-3">
                   <div className={cn('w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center', item.bgColor)}>
                     <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', item.color)} />
-                  </div>
-                  <div
-                    className={cn(
-                      'flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 sm:px-2 sm:py-1 rounded',
-                      item.trend === 'up' ? 'text-green bg-green/10' : 'text-red bg-red/10',
-                    )}
-                    title={`Compared with the previous ${timeRanges.find(range => range.value === selectedTimeRange)?.label.replace('Last ', '').toLowerCase()}`}
-                  >
-                    <TrendIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                    {item.change}
                   </div>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-grey mb-0.5 tabular-nums">{item.value}</h3>
@@ -519,6 +516,7 @@ export default function Dashboard() {
               {productList.map((product: any) => {
                 const health = productHealth(product);
                 const usage = usageByName.get(product.name);
+                const latency = productLatency(platformHealth.data?.products ?? [], product.tag);
                 const resourceTotal = [product.apps, product.databases, product.storage, product.caches, product.messageBrokers, product.features, product.functions, product.jobs, product.notifications, product.sessions]
                   .reduce((sum: number, list: any) => sum + (Array.isArray(list) ? list.filter((item: any) => item?.deleted !== true).length : 0), 0);
                 return (
@@ -558,6 +556,16 @@ export default function Dashboard() {
                         <dt className="text-[11px] text-grey-600">Envs active</dt>
                       </div>
                     </dl>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 border-t border-grey-300 pt-3 text-center">
+                      <div>
+                        <dd className="text-sm font-semibold tabular-nums text-grey">{formatDuration(latency?.avgLatencyMs)}</dd>
+                        <dt className="text-[11px] text-grey-600">Avg latency</dt>
+                      </div>
+                      <div>
+                        <dd className="text-sm font-semibold tabular-nums text-grey">{formatDuration(latency?.p95LatencyMs)}</dd>
+                        <dt className="text-[11px] text-grey-600">p95 latency</dt>
+                      </div>
+                    </dl>
                   </button>
                 );
               })}
@@ -572,8 +580,8 @@ export default function Dashboard() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
-          {/* Activity by type */}
-          <Panel title="Activity by type" className="lg:col-span-3" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
+          {/* Activity by type: a Gantt chart from the health read; the list below is shown only until that read is available */}
+          {platformHealth.data ? <ActivityGantt health={platformHealth.data} rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'} /> : <Panel title="Activity by type" className="lg:col-span-3" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
             {activityByType.length > 0 ? (
               <div className="space-y-3">
                 {activityByType.map((activity, index) => (
@@ -597,7 +605,7 @@ export default function Dashboard() {
                 <p className="mt-1 px-4 text-center text-xs text-grey-600">The breakdown appears here once something runs.</p>
               </div>
             )}
-          </Panel>
+          </Panel>}
         </div>
 
         {/* What is deployed, and which clouds are connected */}

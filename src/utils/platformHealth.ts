@@ -21,10 +21,12 @@ export interface IPeriodStats {
 }
 
 export interface IBreakdownRow {
+  /** An operation or a product. For a product, '' is the workspace itself: requests not tied to any product. */
   name: string;
   calls: number;
   failures: number;
   errorRatePercent: number;
+  avgLatencyMs: number | null;
   p95LatencyMs: number | null;
   cost: number;
 }
@@ -246,4 +248,95 @@ export function usageDetail(system: Pick<ISystemHealth, 'id' | 'current'>): stri
   }
   if (current.overageCalls > 0) parts.push(`${formatCount(current.overageCalls)} over plan`);
   return parts.join(' · ');
+}
+
+/** What a product is called in a list. The workspace itself (requests tied to no product) is "Workspace". */
+export const WORKSPACE_PRODUCT_LABEL = 'Workspace';
+export const productDisplayName = (name: string): string => (name === '' ? WORKSPACE_PRODUCT_LABEL : name);
+
+/** A product's tag as the logs hold it can lack the workspace prefix the product's own tag has ("ws:shop" and "shop"). */
+const bareTag = (tag: string): string => tag.slice(tag.lastIndexOf(':') + 1);
+
+/** One product's own latency and error numbers for the period, or undefined when it made no calls. */
+export function productLatency(rows: IBreakdownRow[], productTag: string | undefined): IBreakdownRow | undefined {
+  if (!productTag) return undefined;
+  return rows.find((row) => row.name !== '' && row.name === productTag) ?? rows.find((row) => row.name !== '' && bareTag(row.name) === bareTag(productTag));
+}
+
+export interface IGanttSpan {
+  /** First and last bucket of a run of buckets with activity, as positions in the window. */
+  from: number;
+  to: number;
+  start: string;
+  end: string;
+  calls: number;
+  failures: number;
+}
+
+export interface IGanttCell { index: number; count: number; failures: number; /** 0 to 1, how busy this bucket was compared with the row's busiest. */ intensity: number; failing: boolean }
+
+export interface IGanttRow {
+  id: string;
+  label: string;
+  types: string[];
+  total: number;
+  failures: number;
+  /** Share of all calls, 0 to 100. */
+  share: number;
+  cells: IGanttCell[];
+  spans: IGanttSpan[];
+}
+
+/** A bucket's failure share at which it is drawn as failing: the same line the error-rate warning uses. */
+export const GANTT_FAILING_PERCENT = 5;
+
+/**
+ * The activity of each system over the window as a Gantt chart: one row per system, the window across, and a bar for each unbroken
+ * run of buckets in which it was used. Systems with no calls are left out. Busiest first.
+ */
+export function ganttRows(systems: ISystemHealth[], totalCalls: number): IGanttRow[] {
+  return systems
+    .filter((system) => system.current.total > 0)
+    .map((system) => {
+      const peak = Math.max(...system.timeline.map((point) => point.count), 1);
+      const cells: IGanttCell[] = system.timeline.map((point, index) => ({
+        index, count: point.count, failures: point.failures,
+        intensity: point.count === 0 ? 0 : Math.max(point.count / peak, 0.25),
+        failing: point.count > 0 && (point.failures / point.count) * 100 >= GANTT_FAILING_PERCENT,
+      }));
+      const spans: IGanttSpan[] = [];
+      let open: IGanttSpan | undefined;
+      cells.forEach((cell, index) => {
+        if (cell.count > 0) {
+          const date = system.timeline[index].date;
+          if (!open) { open = { from: index, to: index, start: date, end: date, calls: 0, failures: 0 }; spans.push(open); }
+          open.to = index; open.end = date; open.calls += cell.count; open.failures += cell.failures;
+        } else {
+          open = undefined;
+        }
+      });
+      return {
+        id: system.id, label: system.label, types: system.types, total: system.current.total, failures: system.current.failures,
+        share: shareOfCalls(system.current.total, totalCalls), cells, spans,
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A bucket's start as a label: "14:00" for an hour, "Oct 24" for a day or a week. */
+export function bucketLabel(iso: string, bucket: 'hour' | 'day' | 'week'): string {
+  const date = new Date(iso);
+  if (bucket === 'hour') return `${String(date.getUTCHours()).padStart(2, '0')}:00`;
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
+/** Evenly spaced marks along the window's top: the position of each bucket to label, and its text. At most `max`. */
+export function ganttAxis(timeline: ITimelinePoint[], bucket: 'hour' | 'day' | 'week', max = 6): Array<{ index: number; label: string }> {
+  if (timeline.length === 0) return [];
+  const marks = Math.min(max, timeline.length);
+  const picked = new Set<number>();
+  for (let i = 0; i < marks; i += 1) picked.add(marks === 1 ? 0 : Math.round((i * (timeline.length - 1)) / (marks - 1)));
+  return [...picked].sort((a, b) => a - b).map((index) => ({ index, label: bucketLabel(timeline[index].date, bucket) }));
 }

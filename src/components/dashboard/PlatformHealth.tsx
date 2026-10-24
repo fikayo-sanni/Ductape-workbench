@@ -1,14 +1,13 @@
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Gauge, HeartPulse, Loader2, Minus, RefreshCw, ScrollText, XCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Gauge, HeartPulse, Loader2, RefreshCw, ScrollText, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Panel, Pill, type Tone } from '@/components/tabs/ProductSection';
-import { fetchPlatformHealth } from '@/services/logsServices';
+import { usePlatformHealth } from '@/hooks/usePlatformHealth';
 import ResourceUsage, { ProductUsage } from '@/components/dashboard/ResourceUsage';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import {
-  SEVERITY_LABEL, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, countStatuses, deltaOf, formatCount, formatDuration, formatPercent, logsFilterFor,
-  orderSystems, sparkBars, summarize, timeAgo, type IDelta, type IHealthAlert, type IInventoryItem, type IPlatformHealth, type ISystemHealth,
+  SEVERITY_LABEL, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, countStatuses, formatCount, formatDuration, formatPercent, logsFilterFor,
+  orderSystems, sparkBars, summarize, timeAgo, type IHealthAlert, type IInventoryItem, type IPlatformHealth, type ISystemHealth,
 } from '@/utils/platformHealth';
 
 const bannerStyle: Record<Tone, string> = {
@@ -19,27 +18,11 @@ const bannerStyle: Record<Tone, string> = {
   neutral: 'border-grey-400 bg-grey-100',
 };
 const barColor: Record<ISystemHealth['status'], string> = { healthy: 'bg-primary/60', degraded: 'bg-orange/70', down: 'bg-red/70', idle: 'bg-grey-400' };
-const deltaColor: Record<IDelta['tone'], string> = { good: 'text-green', bad: 'text-red', warn: 'text-orange', info: 'text-primary', neutral: 'text-grey-600' };
-
-function Delta({ delta, title }: { delta: IDelta; title: string }) {
-  if (delta.direction === 'none') return null;
-  const Icon = delta.direction === 'up' ? ArrowUpRight : delta.direction === 'down' ? ArrowDownRight : Minus;
-  return (
-    <span className={cn('inline-flex items-center gap-0.5 text-[11px] font-medium', deltaColor[delta.tone])} title={title}>
-      <Icon className="h-3 w-3" />
-      {delta.text}
-    </span>
-  );
-}
-
-function Tile({ label, value, sub, delta, deltaTitle }: { label: string; value: string; sub?: string; delta?: IDelta; deltaTitle?: string }) {
+function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-grey-400 bg-white p-3 shadow-sm sm:p-4">
       <p className="text-xs text-grey-600 sm:text-sm">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <p className="text-xl font-bold tabular-nums text-grey sm:text-2xl">{value}</p>
-        {delta && deltaTitle ? <Delta delta={delta} title={deltaTitle} /> : null}
-      </div>
+      <p className="mt-1 text-xl font-bold tabular-nums text-grey sm:text-2xl">{value}</p>
       {sub ? <p className="mt-0.5 text-[11px] text-grey-600 sm:text-xs">{sub}</p> : null}
     </div>
   );
@@ -73,17 +56,14 @@ function SystemCard({ system, onOpen }: { system: ISystemHealth; onOpen: (system
         <div>
           <p className="text-lg font-bold tabular-nums text-grey">{formatCount(current.total)}</p>
           <p className="text-[11px] text-grey-600">calls</p>
-          <Delta delta={deltaOf(current.total, previous.total, 'count')} title="Calls compared with the period before" />
         </div>
         <div>
           <p className={cn('text-lg font-bold tabular-nums', failing ? 'text-red' : 'text-grey')}>{formatPercent(current.errorRatePercent)}</p>
           <p className="text-[11px] text-grey-600">errors</p>
-          <Delta delta={deltaOf(current.errorRatePercent, previous.total > 0 ? previous.errorRatePercent : null, 'rate')} title="Error rate compared with the period before" />
         </div>
         <div>
           <p className="text-lg font-bold tabular-nums text-grey">{formatDuration(current.p95LatencyMs)}</p>
           <p className="text-[11px] text-grey-600">p95</p>
-          <Delta delta={deltaOf(current.p95LatencyMs, previous.p95LatencyMs, 'latency')} title="The slowest 5% of calls, compared with the period before" />
         </div>
       </div>
       <div className="mt-3"><Spark system={system} /></div>
@@ -140,12 +120,7 @@ export interface PlatformHealthProps {
 
 export default function PlatformHealth({ workspaceId, userId, publicKey, timeRange, productTag, appId, rangeLabel, inventory = [] }: PlatformHealthProps) {
   const { setLogsFilters, openLogsTab, setActiveIconSidebar } = useWorkbenchStore();
-  const { data, isLoading, error, refetch, isFetching } = useQuery<IPlatformHealth>({
-    queryKey: ['platform-health', workspaceId, timeRange, productTag, appId],
-    queryFn: () => fetchPlatformHealth(workspaceId, userId, publicKey, { time_range: timeRange, product_tag: productTag, app_id: appId }),
-    enabled: !!workspaceId && !!userId && !!publicKey,
-    refetchInterval: 30_000,
-  });
+  const { data, isLoading, error, refetch, isFetching } = usePlatformHealth({ workspaceId, userId, publicKey, timeRange, productTag, appId });
 
   const openLogs = (system: ISystemHealth | undefined, failuresOnly: boolean) => {
     setLogsFilters({ ...logsFilterFor(system, failuresOnly), timeRange, product: productTag ?? 'all', app: appId ?? 'all', searchTerm: '', startDate: '', endDate: '' });
@@ -200,9 +175,9 @@ export default function PlatformHealth({ workspaceId, userId, publicKey, timeRan
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Tile label="Calls" value={formatCount(current.total)} delta={deltaOf(current.total, previous.total, 'count')} deltaTitle="Compared with the period before" sub={`${formatCount(current.failures)} failed`} />
-        <Tile label="Error rate" value={formatPercent(current.errorRatePercent)} delta={deltaOf(current.errorRatePercent, previous.total > 0 ? previous.errorRatePercent : null, 'rate')} deltaTitle="Compared with the period before" sub={`${formatCount(previous.failures)} failed before`} />
-        <Tile label="p95 latency" value={formatDuration(current.p95LatencyMs)} delta={deltaOf(current.p95LatencyMs, previous.p95LatencyMs, 'latency')} deltaTitle="The slowest 5% of calls, compared with the period before" sub={`p50 ${formatDuration(current.p50LatencyMs)} · p99 ${formatDuration(current.p99LatencyMs)}`} />
+        <Tile label="Calls" value={formatCount(current.total)} sub={`${formatCount(current.failures)} failed`} />
+        <Tile label="Error rate" value={formatPercent(current.errorRatePercent)} sub={`${formatCount(previous.failures)} failed before`} />
+        <Tile label="p95 latency" value={formatDuration(current.p95LatencyMs)} sub={`p50 ${formatDuration(current.p50LatencyMs)} · p99 ${formatDuration(current.p99LatencyMs)}`} />
         <Tile label="Systems" value={`${counts.healthy + counts.degraded + counts.down} active`} sub={`${counts.healthy} healthy · ${counts.degraded} degraded · ${counts.down} failing`} />
       </div>
 

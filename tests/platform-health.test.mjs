@@ -143,3 +143,58 @@ test('each system says the one extra thing worth knowing about its use', () => {
   assert.equal(h.usageDetail({ id: 'storage', current: stats({ storageBytes: 2048, overageCalls: 1200 }) }), '2 KB written · 1,200 over plan');
   assert.equal(h.usageDetail({ id: 'actions', current: stats() }), '');
 });
+
+const row = (name, over = {}) => ({ name, calls: 10, failures: 0, errorRatePercent: 0, avgLatencyMs: 50, p95LatencyMs: 90, cost: 0, ...over });
+
+test('a product with no product is the workspace', () => {
+  assert.equal(h.productDisplayName(''), 'Workspace');
+  assert.equal(h.productDisplayName('shop'), 'shop');
+  assert.equal(h.productDisplayName('none'), 'none', 'a product that happens to be called none is just that');
+});
+
+test('a product finds its own latency, with or without the workspace prefix, and the workspace is never a product', () => {
+  const rows = [row('shop', { avgLatencyMs: 40 }), row('', { avgLatencyMs: 999 }), row('billing')];
+  assert.equal(h.productLatency(rows, 'shop').avgLatencyMs, 40);
+  assert.equal(h.productLatency(rows, 'ductape:shop').avgLatencyMs, 40, 'the product tag carries the workspace prefix and the logs may not');
+  assert.equal(h.productLatency([row('ductape:shop')], 'shop').name, 'ductape:shop');
+  assert.equal(h.productLatency(rows, 'ghost'), undefined, 'a product that made no calls has no numbers, not zeros');
+  assert.equal(h.productLatency(rows, ''), undefined);
+  assert.equal(h.productLatency(rows, undefined), undefined);
+});
+
+const point = (date, count, failures = 0) => ({ date, count, failures, avgLatencyMs: null });
+const sys = (id, label, timeline, total) => ({ id, label, types: [id], status: 'healthy', current: stats({ total: total ?? timeline.reduce((n, p) => n + p.count, 0), failures: timeline.reduce((n, p) => n + p.failures, 0) }), previous: stats(), timeline, topErrors: [], topOperations: [], topProducts: [] });
+
+test('activity over time becomes one bar per unbroken run of use, in the busiest systems first', () => {
+  const days = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'].map((d) => `${d}T00:00:00.000Z`);
+  const rows = h.ganttRows([
+    sys('jobs', 'Jobs', days.map((d) => point(d, 0))),
+    sys('actions', 'Actions', [point(days[0], 10), point(days[1], 30, 3), point(days[2], 0), point(days[3], 0), point(days[4], 5), point(days[5], 5)]),
+    sys('storage', 'Storage', days.map((d) => point(d, 100))),
+  ], 650);
+  assert.deepEqual(plain(rows.map((r) => r.id)), ['storage', 'actions'], 'a system with no calls is left out; the busiest is first');
+  const actions = rows[1];
+  assert.deepEqual(plain(actions.spans.map((s) => [s.from, s.to, s.calls, s.failures])), [[0, 1, 40, 3], [4, 5, 10, 0]], 'a gap of idle buckets splits the bar in two');
+  assert.deepEqual(plain([actions.spans[0].start, actions.spans[0].end]), [days[0], days[1]]);
+  assert.equal(rows[0].spans.length, 1, 'constant use is one long bar');
+  assert.equal(Math.round(rows[0].share), 92, 'share is of all calls: 600 of 650');
+});
+
+test('a busy bucket is drawn stronger than a quiet one, and a bucket that mostly fails is marked', () => {
+  const d = (n) => `2026-10-2${n}T00:00:00.000Z`;
+  const [r] = h.ganttRows([sys('a', 'A', [point(d(0), 100), point(d(1), 10), point(d(2), 1), point(d(3), 0), point(d(4), 20, 2), point(d(5), 20, 1)])], 1000);
+  assert.deepEqual(plain(r.cells.map((c) => c.intensity)), [1, 0.25, 0.25, 0, 0.25, 0.25], 'never fainter than a quarter while there was activity, and nothing for none');
+  assert.deepEqual(plain(r.cells.map((c) => c.failing)), [false, false, false, false, true, true], '10% failing is marked, and 5% (1 of 20) is the line, so it is marked too');
+});
+
+test('the axis has at most six evenly spaced labels, named by hour or by day', () => {
+  const hours = Array.from({ length: 25 }, (_, i) => point(new Date(Date.UTC(2026, 9, 24, i % 24)).toISOString(), 1));
+  const axis = h.ganttAxis(hours, 'hour');
+  assert.equal(axis.length, 6);
+  assert.deepEqual([axis[0].index, axis[5].index], [0, 24], 'the first and the last are always labelled');
+  assert.equal(axis[0].label, '00:00');
+  assert.equal(h.bucketLabel('2026-10-24T00:00:00.000Z', 'day'), 'Oct 24');
+  assert.deepEqual(plain(h.ganttAxis([], 'day')), []);
+  assert.equal(h.ganttAxis([point('2026-10-24T00:00:00.000Z', 1)], 'day').length, 1);
+  assert.equal(h.ganttAxis(hours.slice(0, 3), 'hour').length, 3, 'a short window is labelled at every bucket');
+});
