@@ -435,8 +435,9 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         title: 'Dashboard',
       };
 
+      // The dashboard is always the first tab, like it is the first item in the sidebar.
       return {
-        tabs: [...state.tabs, newDashboardTab],
+        tabs: [newDashboardTab, ...state.tabs],
         activeTabId: newDashboardTab.id,
       };
     }),

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import IconSidebar from './IconSidebar';
 import WorkbenchHeader from './WorkbenchHeader';
@@ -29,6 +30,16 @@ function WorkbenchShell() {
   } = useWorkbenchStore();
 
   const { items: navItems, navigate, isActive } = useIconSidebarNavigation(setActiveView);
+  const hasHydrated = useWorkbenchStore((state) => state._hasHydrated);
+
+  // Opening the workbench shows the dashboard, whatever was open when it was last closed. Those tabs stay open behind it.
+  // Waits for the saved tabs to load so the dashboard is not replaced by them, and runs once per page load.
+  const openedDashboard = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated || openedDashboard.current) return;
+    openedDashboard.current = true;
+    navigate('dashboard');
+  }, [hasHydrated, navigate]);
   const primaryNavItems = navItems.filter((item) => item.section === 'primary');
   const secondaryNavItems = navItems.filter((item) => item.section === 'secondary');
 

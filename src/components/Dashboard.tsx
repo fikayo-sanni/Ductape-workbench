@@ -39,6 +39,7 @@ import {Button} from '@/components/ui/button';
 import {useWorkbenchStore} from '@/stores/workbench-store';
 import {Panel, Pill, type Tone} from '@/components/tabs/ProductSection';
 import {productHealth, workspaceAttention, type Severity} from '@/utils/productOverview';
+import PlatformHealth from '@/components/dashboard/PlatformHealth';
 
 export default function Dashboard() {
   const {currentWorkspaceId, user} = useAuth();
@@ -412,6 +413,18 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* The state of every system: use, errors, latency and alerts */}
+        <PlatformHealth
+          workspaceId={currentWorkspaceId || ''}
+          userId={user?._id || ''}
+          publicKey={user?.public_key || ''}
+          timeRange={selectedTimeRange}
+          productTag={selectedProductId !== 'all' ? productList.find(item => String(item._id) === selectedProductId)?.tag : undefined}
+          appId={selectedAppId !== 'all' ? selectedAppId : undefined}
+          rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'}
+          inventory={resourceUsage}
+        />
+
         {/* Workspace status */}
         <div className={cn('flex items-start gap-3 rounded-xl border p-4', bannerStyle[banner.tone])}>
           {banner.tone === 'good' ? (
@@ -572,7 +585,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Activity by type */}
-          <Panel title="Activity by type" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
+          <Panel title="Activity by type" className="lg:col-span-3" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
             {activityByType.length > 0 ? (
               <div className="space-y-3">
                 {activityByType.map((activity, index) => (
@@ -594,41 +607,6 @@ export default function Dashboard() {
                 <BarChart3 className="mb-2 h-10 w-10 text-grey-600" />
                 <p className="text-sm font-medium text-grey-600">No activity data</p>
                 <p className="mt-1 px-4 text-center text-xs text-grey-600">The breakdown appears here once something runs.</p>
-              </div>
-            )}
-          </Panel>
-
-          {/* Resource usage */}
-          <Panel title="Resource usage" className="lg:col-span-2" action={<Database className="h-4 w-4 text-grey-600" />}>
-            {resourceUsage.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {resourceUsage.map(resource => {
-                  const IconComponent =
-                    resource.type?.toLowerCase() === 'storage' ? HardDrive : resource.type?.toLowerCase() === 'cache' ? Layers : resource.type?.toLowerCase() === 'queue' ? MessageSquare : Database;
-                  return (
-                    <div key={resource.name} className="rounded-lg border border-grey-400 p-3 transition-colors hover:border-primary sm:p-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <IconComponent className="h-4 w-4 text-grey-600 sm:h-5 sm:w-5" />
-                        <span
-                          className={cn(
-                            'h-2 w-2 rounded-full',
-                            resource.status === 'healthy' && 'bg-green',
-                            resource.status === 'warning' && 'bg-yellow',
-                            resource.status === 'error' && 'bg-red',
-                          )}
-                        />
-                      </div>
-                      <p className="text-xl font-bold tabular-nums text-grey sm:text-2xl">{resource.count}</p>
-                      <p className="truncate text-xs text-grey-600 sm:text-sm">{resource.name}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8">
-                <Database className="mb-2 h-10 w-10 text-grey-600" />
-                <p className="text-sm font-medium text-grey-600">No resource data available</p>
-                <p className="mt-1 px-4 text-center text-xs text-grey-600">Resource totals appear here once products have resources.</p>
               </div>
             )}
           </Panel>

@@ -1,6 +1,7 @@
 import qs from 'qs';
 import apiClient from '@/config/axiosinstance';
 import { FetchLogsData, FetchLogsOptions, LogsResponse } from '@/types/logs';
+import type { IPlatformHealth } from '@/utils/platformHealth';
 
 const formatDate = (date: Date) => {
   return date.toISOString().split('T')[0]; // "YYYY-MM-DD"
@@ -1420,3 +1421,22 @@ const logsServices = {
 };
 
 export default logsServices;
+
+export interface PlatformHealthQuery {
+  time_range?: string;
+  product_tag?: string;
+  env?: string;
+  app_id?: string;
+}
+
+/** The state of every system on the platform for the workspace: use, errors, latency, trend, alerts and the latest failures. */
+export const fetchPlatformHealth = async (
+  workspace_id: string,
+  user_id: string,
+  public_key: string,
+  query: PlatformHealthQuery = {},
+): Promise<IPlatformHealth> => {
+  const queryString = qs.stringify(Object.fromEntries(Object.entries({ user_id, public_key, ...query }).filter(([, value]) => value !== undefined && value !== '')));
+  const response = await apiClient.get<{ data: IPlatformHealth }>(`/log/v1/platform-health/${workspace_id}?${queryString}`);
+  return response.data.data;
+};
