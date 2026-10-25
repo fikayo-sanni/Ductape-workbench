@@ -15,10 +15,12 @@ test('the dashboard is the first item in the icon sidebar and the logs are the s
   assert.ok(items.length >= 10, 'every other item is still there');
 });
 
-test('opening the workbench shows the dashboard once the saved tabs have loaded', () => {
-  assert.match(layout, /state\._hasHydrated/);
+test('the workbench lands on the dashboard on opening, after a workspace switch and after a fresh login', () => {
+  assert.match(layout, /state\._hasHydrated/, 'only once the saved tabs have loaded');
   assert.match(layout, /navigate\('dashboard'\)/);
-  assert.match(layout, /openedDashboard\.current/, 'it happens once per page load, not on every change');
+  assert.match(layout, /landingKey\(user\?\._id, currentWorkspaceId\)/, 'keyed on the person and the workspace, so a change of either lands again');
+  assert.match(layout, /shouldOpenDashboard\(shownFor\.current/);
+  assert.match(layout, /landing === null\) \{ shownFor\.current = null/, 'signing out resets it, so the next login lands again');
 });
 
 test('the dashboard tab is placed before every other tab', () => {

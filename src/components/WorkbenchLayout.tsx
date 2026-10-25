@@ -18,6 +18,8 @@ import PricingSidebar from './tabs/PricingSidebar';
 import RequireAuth from '@/components/auth/RequireAuth';
 import RequireOnboarded from '@/components/auth/RequireOnboarded';
 import { useIconSidebarNavigation } from '@/hooks/useIconSidebarNavigation';
+import { useAuth } from '@/store/useAuth';
+import { landingKey, shouldOpenDashboard } from '@/utils/dashboardLanding';
 
 function WorkbenchShell() {
   const {
@@ -32,14 +34,18 @@ function WorkbenchShell() {
   const { items: navItems, navigate, isActive } = useIconSidebarNavigation(setActiveView);
   const hasHydrated = useWorkbenchStore((state) => state._hasHydrated);
 
-  // Opening the workbench shows the dashboard, whatever was open when it was last closed. Those tabs stay open behind it.
-  // Waits for the saved tabs to load so the dashboard is not replaced by them, and runs once per page load.
-  const openedDashboard = useRef(false);
+  // The workbench shows the dashboard on opening, after switching workspace and after a fresh login, whatever was open before. Tabs from
+  // before stay open behind it unless the switch cleared them. Waits for the saved tabs to load so they do not replace it.
+  const { user, currentWorkspaceId } = useAuth();
+  const landing = landingKey(user?._id, currentWorkspaceId);
+  const shownFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!hasHydrated || openedDashboard.current) return;
-    openedDashboard.current = true;
+    if (landing === null) { shownFor.current = null; return; }
+    if (!shouldOpenDashboard(shownFor.current, landing, hasHydrated)) return;
+    shownFor.current = landing;
     navigate('dashboard');
-  }, [hasHydrated, navigate]);
+  }, [landing, hasHydrated, navigate]);
+
   const primaryNavItems = navItems.filter((item) => item.section === 'primary');
   const secondaryNavItems = navItems.filter((item) => item.section === 'secondary');
 
