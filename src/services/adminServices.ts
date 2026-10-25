@@ -26,6 +26,28 @@ export interface InstanceStatusResponse {
   userCount: number;
   expires_at: string | null;
   read_only: boolean;
+  telemetry?: InstanceTelemetryStatus;
+}
+
+export interface InstanceTelemetryStatus {
+  enabled: boolean;
+  /** DUCTAPE_TELEMETRY=off in the environment: reporting cannot be turned on from here. */
+  locked_off: boolean;
+  reported_at: string | null;
+  /** Exactly what is sent when reporting is on. */
+  preview: {
+    platform_version: string;
+    users: number;
+    workspaces: number;
+    products: number;
+    apps: number;
+    imported_apps: number;
+  };
+}
+
+export async function setInstanceTelemetry(params: { enabled: boolean; user_id: string; public_key: string }): Promise<InstanceTelemetryStatus> {
+  const response = await apiClient.put<{ status: boolean; data: InstanceTelemetryStatus }>('/users/v1/instance-telemetry', params);
+  return response.data.data;
 }
 
 export async function getInstanceStatus(): Promise<InstanceStatusResponse> {

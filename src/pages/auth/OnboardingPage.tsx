@@ -21,6 +21,7 @@ import workspaceServices from '@/services/workspaceServices';
 import pricingServices from '@/services/pricingServices';
 import BillingsInfo from '@/components/billing-form';
 import OnboardingPlanCard, { OnboardingPlanSummary } from '@/components/auth/OnboardingPlanCard';
+import type { BillingCycle } from '@/types/pricing';
 import OnboardingKeysStep from '@/components/auth/OnboardingKeysStep';
 import { BillingPlan } from '@/types/pricing';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -114,6 +115,9 @@ function OnboardingFlow() {
     () => existingWorkspaceId || sessionStorage.getItem('onboardingWorkspaceId') || '',
   );
   const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
+    () => (sessionStorage.getItem('onboardingBillingCycle') === 'annual' ? 'annual' : 'monthly'),
+  );
   const [workspaceForm, setWorkspaceForm] = useState({ workspace_name: '', description: '' });
 
   const { data: plansResponse, isLoading: plansLoading } = useQuery({
@@ -143,6 +147,11 @@ function OnboardingFlow() {
     () => filterOnboardingPlans(plansResponse?.data ?? [], isAdminWorkspace),
     [plansResponse?.data, isAdminWorkspace],
   );
+
+  // Yearly billing is offered only when the pricing service says plans can be paid for yearly, which it does by sending each plan's
+  // annual discount. A server that does not know about yearly billing leaves the choice out, so it is never sent a field it rejects.
+  const yearlyAvailable = plans.some((plan) => typeof plan.annualDiscountPercent === 'number');
+  const yearlyDiscount = plans.find((plan) => typeof plan.annualDiscountPercent === 'number' && plan.monthlyPrice > 0)?.annualDiscountPercent ?? 10;
 
   const resolvedPlan = useMemo(() => {
     if (selectedPlan) return selectedPlan;
@@ -266,7 +275,12 @@ function OnboardingFlow() {
         await pricingServices.createSubscription({
           user_id: user._id,
           public_key: user.public_key,
-          payload: { plan_id: planId, workspace_id: wsId },
+          payload: {
+            plan_id: planId,
+            workspace_id: wsId,
+            // Annual is charged once, up front, against the card saved in the previous step.
+            ...(sessionStorage.getItem('onboardingBillingCycle') === 'annual' ? { billingCycle: 'annual' as const } : {}),
+          },
         });
         completeOnboarding();
       } catch (error) {
@@ -578,11 +592,34 @@ function OnboardingFlow() {
               <Loader className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
+            <>
+            {yearlyAvailable ? (
+            <div className="mb-4 inline-flex rounded-lg border border-grey-400 bg-grey-100 p-0.5" role="group" aria-label="Billing period">
+              {(['monthly', 'annual'] as BillingCycle[]).map((cycle) => (
+                <button
+                  key={cycle}
+                  type="button"
+                  aria-pressed={billingCycle === cycle}
+                  onClick={() => {
+                    // Only a choice made while yearly was on offer is remembered for the payment step, which runs after a redirect.
+                    setBillingCycle(cycle);
+                    sessionStorage.setItem('onboardingBillingCycle', cycle);
+                  }}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    billingCycle === cycle ? 'bg-primary text-white' : 'text-grey-600 hover:text-grey'
+                  }`}
+                >
+                  {cycle === 'monthly' ? 'Monthly' : `Yearly, save ${yearlyDiscount}%`}
+                </button>
+              ))}
+            </div>
+            ) : null}
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
               {plans.map((plan) => (
                 <OnboardingPlanCard
                   key={plan._id}
                   plan={plan}
+                  billingCycle={yearlyAvailable ? billingCycle : 'monthly'}
                   selected={selectedPlan?._id === plan._id}
                   onSelect={() => {
                     setSelectedPlan(plan);
@@ -591,6 +628,7 @@ function OnboardingFlow() {
                 />
               ))}
             </div>
+            </>
           )}
         </section>
       )}

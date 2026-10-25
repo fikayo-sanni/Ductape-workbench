@@ -3,6 +3,8 @@ import { fetchCapabilities, fetchPlans, fetchWorkspaceBuilds, fetchWorkspaceDepl
 import { useCloudConnectionsForDeploy } from '@/hooks/useDeployControls';
 import { useDeployAuth } from '@/hooks/useProductDeployments';
 import { isInFlight } from '@/utils/deployments';
+import { deploymentsIndicator, type ITabIndicator } from '@/utils/dashboardTabs';
+import { summarizeConnections, summarizeDeployments } from '@/utils/infraSummary';
 
 const POLL_MS = 5000;
 
@@ -24,4 +26,23 @@ export function useInfraSummaryData() {
   const capabilities = useQuery({ queryKey: ['deploy-capabilities', auth?.workspaceId], queryFn: () => fetchCapabilities(auth!), enabled: Boolean(auth), staleTime: 60_000 });
   const connections = useCloudConnectionsForDeploy(true);
   return { deployments, plans, builds, capabilities, connections };
+}
+
+/** How the Deployments & Cloud tab is doing, for the dashboard's tab bar, read from the same queries the tab itself uses. */
+export function useDeploymentsIndicator(): ITabIndicator {
+  const { deployments, plans, builds, capabilities, connections } = useInfraSummaryData();
+  const caps = capabilities.data && typeof capabilities.data === 'object' && !Array.isArray(capabilities.data) && 'stepUp' in capabilities.data ? capabilities.data : undefined;
+  const deployList = Array.isArray(deployments.data) ? deployments.data : [];
+  const deploy = summarizeDeployments(deployList, Array.isArray(plans.data) ? plans.data : [], Array.isArray(builds.data) ? builds.data : []);
+  const cloud = summarizeConnections(Array.isArray(connections.data) ? connections.data : [], caps, deployList);
+  return deploymentsIndicator({
+    deploymentsFailing: deploy.attention,
+    failedBuilds: deploy.builds.failed,
+    blockedPlans: deploy.plansBlocked,
+    plansAwaitingApproval: deploy.plansAwaitingApproval,
+    deployments: deploy.total,
+    connections: cloud.total,
+    connectionsBroken: cloud.rows.filter((row) => row.statusTone === 'bad').length,
+    connectionsPending: cloud.rows.filter((row) => row.statusTone === 'warn').length,
+  });
 }

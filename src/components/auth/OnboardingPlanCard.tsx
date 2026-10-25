@@ -1,6 +1,6 @@
 import { CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { BillingPlan } from '@/types/pricing';
+import { annualTotal, isAnnualEligible, type BillingCycle, type BillingPlan } from '@/types/pricing';
 
 function formatLimit(value: number | null | undefined): string {
   if (value == null) return 'Unlimited';
@@ -81,9 +81,15 @@ interface OnboardingPlanCardProps {
   plan: BillingPlan;
   selected: boolean;
   onSelect: () => void;
+  billingCycle?: BillingCycle;
 }
 
-export default function OnboardingPlanCard({ plan, selected, onSelect }: OnboardingPlanCardProps) {
+const money = (value: number) =>
+  `$${value.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 })}`;
+
+export default function OnboardingPlanCard({ plan, selected, onSelect, billingCycle = 'monthly' }: OnboardingPlanCardProps) {
+  const yearly = billingCycle === 'annual' && isAnnualEligible(plan);
+  const yearlyTotal = yearly ? annualTotal(plan) : 0;
   const showOverage =
     !plan.isPayAsYouGo &&
     plan.usagePricing &&
@@ -114,9 +120,12 @@ export default function OnboardingPlanCard({ plan, selected, onSelect }: Onboard
       </div>
 
       <div className="flex items-baseline gap-1 mt-3">
-        <span className="text-4xl font-bold text-grey">{planPriceLabel(plan)}</span>
+        <span className="text-4xl font-bold text-grey">{yearly ? money(yearlyTotal / 12) : planPriceLabel(plan)}</span>
         {plan.monthlyPrice > 0 ? <span className="text-sm text-grey-600">/month</span> : null}
       </div>
+      {yearly ? (
+        <p className="mt-1 text-xs text-grey-600">{money(yearlyTotal)} billed once a year</p>
+      ) : null}
 
       {plan.description ? (
         <p className="text-sm text-grey-600 mt-3 leading-relaxed">{plan.description}</p>

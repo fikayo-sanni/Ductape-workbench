@@ -17,6 +17,7 @@ import {
   ChevronRight,
   RefreshCw,
   HeartPulse,
+  Rocket,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
@@ -40,9 +41,30 @@ import {productHealth, workspaceAttention, type Severity} from '@/utils/productO
 import PlatformHealth from '@/components/dashboard/PlatformHealth';
 import InfraSummary from '@/components/dashboard/InfraSummary';
 import ActivityGantt from '@/components/dashboard/ActivityGantt';
+import MetricsOverview from '@/components/dashboard/MetricsOverview';
+import DashboardTabs from '@/components/dashboard/DashboardTabs';
+import DeliveryMetrics from '@/components/dashboard/DeliveryMetrics';
 import SectionBoundary from '@/components/dashboard/SectionBoundary';
 import {usePlatformHealth} from '@/hooks/usePlatformHealth';
+import {useDeploymentsIndicator} from '@/hooks/useInfraSummary';
+import {healthIndicator, metricsIndicator} from '@/utils/dashboardTabs';
 import {formatDuration, productLatency} from '@/utils/platformHealth';
+
+type DashboardTab = 'metrics' | 'deployments' | 'health';
+const TAB_STORAGE_KEY = 'workbench-dashboard-tab';
+const DASHBOARD_TABS: Array<{ id: DashboardTab; label: string; icon: typeof BarChart3 }> = [
+  { id: 'metrics', label: 'Metrics', icon: BarChart3 },
+  { id: 'deployments', label: 'Deployments & Cloud', icon: Rocket },
+  { id: 'health', label: 'Platform Health', icon: HeartPulse },
+];
+function readSavedTab(): DashboardTab {
+  try {
+    const saved = localStorage.getItem(TAB_STORAGE_KEY);
+    return saved === 'deployments' || saved === 'health' ? saved : 'metrics';
+  } catch {
+    return 'metrics';
+  }
+}
 
 export default function Dashboard() {
   const {currentWorkspaceId, user} = useAuth();
@@ -54,6 +76,11 @@ export default function Dashboard() {
   const [selectedProductId, setSelectedProductId] = useState<string>('all');
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('7d');
   const [showFilters, setShowFilters] = useState(false);
+  const [tab, setTab] = useState<DashboardTab>(readSavedTab);
+  const chooseTab = (next: DashboardTab) => {
+    setTab(next);
+    try { localStorage.setItem(TAB_STORAGE_KEY, next); } catch { /* the choice just is not remembered */ }
+  };
 
   // Time range options
   const timeRanges = [
@@ -129,6 +156,9 @@ export default function Dashboard() {
     productTag: selectedProductTag,
     appId: selectedAppId !== 'all' ? selectedAppId : undefined,
   });
+
+  // How the Deployments & Cloud tab is doing, for the tab bar. A hook, so it is read before any early return.
+  const deploymentsTab = useDeploymentsIndicator();
 
   // Update last updated time
   useEffect(() => {
@@ -246,6 +276,11 @@ export default function Dashboard() {
 
   const productList: any[] = productsData?.data ?? [];
   const attention = workspaceAttention(productList);
+  const tabItems = [
+    { ...DASHBOARD_TABS[0], indicator: metricsIndicator(platformHealth.data ? platformHealth.data.overall.current.total : null) },
+    { ...DASHBOARD_TABS[1], indicator: deploymentsTab },
+    { ...DASHBOARD_TABS[2], indicator: healthIndicator({ systems: platformHealth.data?.systems ?? null, attention }) },
+  ];
   const watchedProducts = productList.filter(product => productHealth(product).state !== 'unwatched').length;
   const usageByName = new Map(topProducts.map(product => [product.name, product]));
   const typeColors: Record<string, string> = {
@@ -437,6 +472,11 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <DashboardTabs tabs={tabItems} selected={tab} onSelect={chooseTab} />
+
+        {tab === 'metrics' && (
+          <div className="space-y-4 sm:space-y-5" role="tabpanel" id="dashboard-panel-metrics" aria-labelledby="dashboard-tab-metrics">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {stats.map(item => {
@@ -455,59 +495,21 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Timeline, and what needs attention beside it at the same height */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
-          <ActivityTimelinePanel
-            title="Activity timeline"
-            kind="workspace"
-            countLabel="activities"
-            enabled={!!currentWorkspaceId}
-            className="lg:col-span-2 border-grey-400"
-          />
-          <div className="relative">
-            <div className="flex flex-col lg:absolute lg:inset-0">
-              <Panel
-                title="Needs attention"
-                description={attention.length ? `${attention.length} to look at` : undefined}
-                flush={attention.length > 0}
-                className="flex min-h-0 flex-col lg:flex-1"
-                bodyClassName="min-h-0 max-h-80 flex-1 overflow-y-auto lg:max-h-none"
-              >
-                {attention.length ? (
-                  <ul className="divide-y divide-grey-300">
-                    {attention.map(item => (
-                      <li key={item.id}>
-                        <button type="button" onClick={() => openProductById(item.productId)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-grey-100 sm:px-5">
-                          <span className={cn('mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', severityStyle[item.severity].tile)}>
-                            <AlertTriangle className={cn('h-4 w-4', severityStyle[item.severity].text)} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium text-grey">{item.title}</span>
-                            <span className="mt-0.5 block text-xs text-grey-600">
-                              {item.productName}
-                              {item.detail ? `. ${item.detail}` : ''}
-                            </span>
-                          </span>
-                          <ChevronRight className="mt-1 h-4 w-4 flex-shrink-0 text-grey-600" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10">
-                      <CheckCircle2 className="h-4 w-4 text-green" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-grey">All clear</p>
-                      <p className="mt-0.5 text-xs text-grey-600">No health check is failing in any product.</p>
-                    </div>
-                  </div>
-                )}
-              </Panel>
-            </div>
-          </div>
-        </div>
+        {/* Usage this period: calls, success, latency, and what moved since the period before */}
+        {platformHealth.data ? (
+          <SectionBoundary title="Usage this period"><MetricsOverview health={platformHealth.data} rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'} /></SectionBoundary>
+        ) : platformHealth.isLoading ? (
+          <Panel title="Usage this period"><p className="flex items-center gap-2 text-sm text-grey-600"><Loader2 className="h-4 w-4 animate-spin text-primary" />Reading usage...</p></Panel>
+        ) : null}
+
+        {/* Timeline */}
+        <ActivityTimelinePanel
+          title="Activity timeline"
+          kind="workspace"
+          countLabel="activities"
+          enabled={!!currentWorkspaceId}
+          className="border-grey-400"
+        />
 
         {/* Products */}
         <section>
@@ -608,9 +610,59 @@ export default function Dashboard() {
             )}
           </Panel>}
         </div>
+          </div>
+        )}
 
+        {tab === 'deployments' && (
+          <div className="space-y-4 sm:space-y-5" role="tabpanel" id="dashboard-panel-deployments" aria-labelledby="dashboard-tab-deployments">
         {/* What is deployed, and which clouds are connected */}
         <SectionBoundary title="Deployments and cloud connections"><InfraSummary /></SectionBoundary>
+            <DeliveryMetrics />
+          </div>
+        )}
+
+        {tab === 'health' && (
+          <div className="space-y-4 sm:space-y-5" role="tabpanel" id="dashboard-panel-health" aria-labelledby="dashboard-tab-health">
+        {/* Needs attention */}
+        <Panel
+          title="Needs attention"
+          description={attention.length ? `${attention.length} to look at` : undefined}
+          flush={attention.length > 0}
+          className="flex min-h-0 flex-col"
+          bodyClassName="min-h-0 max-h-80 overflow-y-auto"
+        >
+          {attention.length ? (
+            <ul className="divide-y divide-grey-300">
+              {attention.map(item => (
+                <li key={item.id}>
+                  <button type="button" onClick={() => openProductById(item.productId)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-grey-100 sm:px-5">
+                    <span className={cn('mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', severityStyle[item.severity].tile)}>
+                      <AlertTriangle className={cn('h-4 w-4', severityStyle[item.severity].text)} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-grey">{item.title}</span>
+                      <span className="mt-0.5 block text-xs text-grey-600">
+                        {item.productName}
+                        {item.detail ? `. ${item.detail}` : ''}
+                      </span>
+                    </span>
+                    <ChevronRight className="mt-1 h-4 w-4 flex-shrink-0 text-grey-600" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex items-start gap-3">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10">
+                <CheckCircle2 className="h-4 w-4 text-green" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-grey">All clear</p>
+                <p className="mt-0.5 text-xs text-grey-600">No health check is failing in any product.</p>
+              </div>
+            </div>
+          )}
+        </Panel>
 
         {/* The state of every system: use, errors, latency and alerts */}
         <SectionBoundary title="Platform health">
@@ -625,6 +677,8 @@ export default function Dashboard() {
             inventory={resourceUsage}
           />
         </SectionBoundary>
+          </div>
+        )}
       </div>
     </div>
   );
