@@ -1,7 +1,7 @@
 import qs from 'qs';
 import apiClient from '@/config/axiosinstance';
 import { FetchLogsData, FetchLogsOptions, LogsResponse } from '@/types/logs';
-import type { IPlatformHealth } from '@/utils/platformHealth';
+import { isPlatformHealth, type IPlatformHealth } from '@/utils/platformHealth';
 
 const formatDate = (date: Date) => {
   return date.toISOString().split('T')[0]; // "YYYY-MM-DD"
@@ -1438,5 +1438,7 @@ export const fetchPlatformHealth = async (
 ): Promise<IPlatformHealth> => {
   const queryString = qs.stringify(Object.fromEntries(Object.entries({ user_id, public_key, ...query }).filter(([, value]) => value !== undefined && value !== '')));
   const response = await apiClient.get<{ data: IPlatformHealth }>(`/log/v1/platform-health/${workspace_id}?${queryString}`);
-  return response.data.data;
+  const report = response.data.data;
+  if (!isPlatformHealth(report)) throw new Error('The server did not answer with a health report. It may be an older version without this read.');
+  return report;
 };

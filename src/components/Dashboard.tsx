@@ -40,6 +40,7 @@ import {productHealth, workspaceAttention, type Severity} from '@/utils/productO
 import PlatformHealth from '@/components/dashboard/PlatformHealth';
 import InfraSummary from '@/components/dashboard/InfraSummary';
 import ActivityGantt from '@/components/dashboard/ActivityGantt';
+import SectionBoundary from '@/components/dashboard/SectionBoundary';
 import {usePlatformHealth} from '@/hooks/usePlatformHealth';
 import {formatDuration, productLatency} from '@/utils/platformHealth';
 
@@ -581,7 +582,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Activity by type: a Gantt chart from the health read; the list below is shown only until that read is available */}
-          {platformHealth.data ? <ActivityGantt health={platformHealth.data} rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'} /> : <Panel title="Activity by type" className="lg:col-span-3" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
+          {platformHealth.data ? <div className="lg:col-span-3"><SectionBoundary title="Activity by type"><ActivityGantt health={platformHealth.data} rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'} /></SectionBoundary></div> : <Panel title="Activity by type" className="lg:col-span-3" action={<BarChart3 className="h-4 w-4 text-grey-600" />}>
             {activityByType.length > 0 ? (
               <div className="space-y-3">
                 {activityByType.map((activity, index) => (
@@ -609,19 +610,21 @@ export default function Dashboard() {
         </div>
 
         {/* What is deployed, and which clouds are connected */}
-        <InfraSummary />
+        <SectionBoundary title="Deployments and cloud connections"><InfraSummary /></SectionBoundary>
 
         {/* The state of every system: use, errors, latency and alerts */}
-        <PlatformHealth
-          workspaceId={currentWorkspaceId || ''}
-          userId={user?._id || ''}
-          publicKey={user?.public_key || ''}
-          timeRange={selectedTimeRange}
-          productTag={selectedProductId !== 'all' ? productList.find(item => String(item._id) === selectedProductId)?.tag : undefined}
-          appId={selectedAppId !== 'all' ? selectedAppId : undefined}
-          rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'}
-          inventory={resourceUsage}
-        />
+        <SectionBoundary title="Platform health">
+          <PlatformHealth
+            workspaceId={currentWorkspaceId || ''}
+            userId={user?._id || ''}
+            publicKey={user?.public_key || ''}
+            timeRange={selectedTimeRange}
+            productTag={selectedProductId !== 'all' ? productList.find(item => String(item._id) === selectedProductId)?.tag : undefined}
+            appId={selectedAppId !== 'all' ? selectedAppId : undefined}
+            rangeLabel={timeRanges.find(range => range.value === selectedTimeRange)?.label ?? 'Last 7 days'}
+            inventory={resourceUsage}
+          />
+        </SectionBoundary>
       </div>
     </div>
   );

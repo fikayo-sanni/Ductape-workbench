@@ -55,10 +55,12 @@ function DeploymentRow({ deployment }: { deployment: IDeployment }) {
 /** What is deployed and how it is doing, and which cloud accounts are connected and ready to deploy through. */
 export default function InfraSummary() {
   const { deployments, plans, builds, capabilities, connections } = useInfraSummaryData();
-  const deployList = deployments.data ?? [];
-  const deploy = summarizeDeployments(deployList, plans.data ?? [], builds.data ?? []);
-  const cloud = summarizeConnections(connections.data ?? [], capabilities.data, deployList);
-  const notices = capabilityNotices(capabilities.data);
+  // What the server says it can do is used only when it looks like that; anything else is treated as not known.
+  const caps = capabilities.data && typeof capabilities.data === 'object' && !Array.isArray(capabilities.data) && 'stepUp' in capabilities.data ? capabilities.data : undefined;
+  const deployList = Array.isArray(deployments.data) ? deployments.data : [];
+  const deploy = summarizeDeployments(deployList, Array.isArray(plans.data) ? plans.data : [], Array.isArray(builds.data) ? builds.data : []);
+  const cloud = summarizeConnections(Array.isArray(connections.data) ? connections.data : [], caps, deployList);
+  const notices = capabilityNotices(caps);
   const capped = deployList.length >= WORKSPACE_DEPLOYMENTS_LIMIT;
 
   return (

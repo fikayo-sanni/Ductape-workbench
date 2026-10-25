@@ -340,3 +340,16 @@ export function ganttAxis(timeline: ITimelinePoint[], bucket: 'hour' | 'day' | '
   for (let i = 0; i < marks; i += 1) picked.add(marks === 1 ? 0 : Math.round((i * (timeline.length - 1)) / (marks - 1)));
   return [...picked].sort((a, b) => a - b).map((index) => ({ index, label: bucketLabel(timeline[index].date, bucket) }));
 }
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isStats = (value: unknown): boolean => isObject(value) && typeof value.total === 'number' && typeof value.failures === 'number';
+
+/** Whether what the server sent is a health report this page can draw. Anything else is an error, never drawn half way. */
+export function isPlatformHealth(value: unknown): value is IPlatformHealth {
+  if (!isObject(value)) return false;
+  const { window: range, overall, systems, alerts, recentErrors, products } = value;
+  return isObject(range) && typeof range.bucket === 'string'
+    && isObject(overall) && isStats(overall.current) && isStats(overall.previous)
+    && Array.isArray(systems) && systems.every((system) => isObject(system) && isStats(system.current) && isStats(system.previous) && Array.isArray(system.timeline))
+    && Array.isArray(alerts) && Array.isArray(recentErrors) && Array.isArray(products);
+}

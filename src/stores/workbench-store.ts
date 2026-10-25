@@ -19,7 +19,6 @@ interface WorkbenchState {
   billingView: BillingView;
   setBillingView: (view: BillingView) => void;
   // Hydration state
-  _hasHydrated: boolean;
 
   // Workspaces
   workspaces: Workspace[];
@@ -119,7 +118,6 @@ export const useWorkbenchStore = create<WorkbenchState>()(
   persist(
     (set) => ({
   // Initial State
-  _hasHydrated: false,
   workspaces: [],
   currentWorkspaceId: null,
   projects: [],
@@ -763,9 +761,8 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         activeTabId: state.activeTabId,
         chatbotSidebarOpen: state.chatbotSidebarOpen,
       }),
-      onRehydrateStorage: () => () => {
-        useWorkbenchStore.setState({ _hasHydrated: true });
-      },
+      // No rehydration callback here on purpose. The saved tabs load while this store is still being created, so a callback that
+      // refers to `useWorkbenchStore` throws, and zustand then never reports that hydration finished. Ask `persist.hasHydrated()`.
     }
   )
 );

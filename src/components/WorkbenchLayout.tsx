@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import IconSidebar from './IconSidebar';
 import WorkbenchHeader from './WorkbenchHeader';
@@ -32,7 +32,11 @@ function WorkbenchShell() {
   } = useWorkbenchStore();
 
   const { items: navItems, navigate, isActive } = useIconSidebarNavigation(setActiveView);
-  const hasHydrated = useWorkbenchStore((state) => state._hasHydrated);
+  // Whether the saved tabs have loaded, from the store's own record of it.
+  const hasHydrated = useSyncExternalStore(
+    (listener) => useWorkbenchStore.persist.onFinishHydration(listener),
+    () => useWorkbenchStore.persist.hasHydrated(),
+  );
 
   // The workbench shows the dashboard on opening, after switching workspace and after a fresh login, whatever was open before. Tabs from
   // before stay open behind it unless the switch cleared them. Waits for the saved tabs to load so they do not replace it.

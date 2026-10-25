@@ -16,7 +16,7 @@ test('the dashboard is the first item in the icon sidebar and the logs are the s
 });
 
 test('the workbench lands on the dashboard on opening, after a workspace switch and after a fresh login', () => {
-  assert.match(layout, /state\._hasHydrated/, 'only once the saved tabs have loaded');
+  assert.match(layout, /hasHydrated/, 'only once the saved tabs have loaded');
   assert.match(layout, /navigate\('dashboard'\)/);
   assert.match(layout, /landingKey\(user\?\._id, currentWorkspaceId\)/, 'keyed on the person and the workspace, so a change of either lands again');
   assert.match(layout, /shouldOpenDashboard\(shownFor\.current/);
@@ -25,4 +25,13 @@ test('the workbench lands on the dashboard on opening, after a workspace switch 
 
 test('the dashboard tab is placed before every other tab', () => {
   assert.match(store, /tabs: \[newDashboardTab, \.\.\.state\.tabs\]/);
+});
+
+test('the saved-tabs flag cannot be broken by a callback that refers to the store while it is being created', () => {
+  // A rehydration callback that calls useWorkbenchStore.setState runs while the store is still being created, throws, and stops zustand
+  // ever reporting that hydration finished, so the dashboard never opened on login or after a workspace switch.
+  assert.doesNotMatch(store, /onRehydrateStorage/);
+  assert.doesNotMatch(store, /_hasHydrated/);
+  assert.match(layout, /useWorkbenchStore\.persist\.hasHydrated\(\)/, 'the layout asks zustand itself');
+  assert.match(layout, /useWorkbenchStore\.persist\.onFinishHydration/);
 });

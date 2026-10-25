@@ -198,3 +198,23 @@ test('the axis has at most six evenly spaced labels, named by hour or by day', (
   assert.equal(h.ganttAxis([point('2026-10-24T00:00:00.000Z', 1)], 'day').length, 1);
   assert.equal(h.ganttAxis(hours.slice(0, 3), 'hour').length, 3, 'a short window is labelled at every bucket');
 });
+
+const validHealth = () => ({
+  window: { start: 'a', end: 'b', previousStart: 'c', bucket: 'hour' }, generatedAt: 'x', overall: { current: stats(), previous: stats() },
+  products: [], systems: [{ ...sys('actions', 'Actions', []), current: stats({ total: 1 }) }], alerts: [], recentErrors: [],
+});
+
+test('only a real health report is drawn; anything else is an error and never half drawn', () => {
+  assert.equal(h.isPlatformHealth(validHealth()), true);
+  assert.equal(h.isPlatformHealth([]), false, 'an empty list is not a report');
+  assert.equal(h.isPlatformHealth(null), false);
+  assert.equal(h.isPlatformHealth({}), false);
+  assert.equal(h.isPlatformHealth('ok'), false);
+  assert.equal(h.isPlatformHealth({ ...validHealth(), systems: undefined }), false);
+  assert.equal(h.isPlatformHealth({ ...validHealth(), overall: { current: stats() } }), false, 'both periods are needed');
+  assert.equal(h.isPlatformHealth({ ...validHealth(), window: {} }), false);
+  assert.equal(h.isPlatformHealth({ ...validHealth(), systems: [{ id: 'a' }] }), false, 'a system without its numbers');
+  const noTimeline = validHealth(); delete noTimeline.systems[0].timeline;
+  assert.equal(h.isPlatformHealth(noTimeline), false);
+  assert.equal(h.isPlatformHealth({ ...validHealth(), systems: [] }), true, 'no systems is a valid, quiet report');
+});
