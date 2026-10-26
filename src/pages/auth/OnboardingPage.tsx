@@ -148,10 +148,11 @@ function OnboardingFlow() {
     [plansResponse?.data, isAdminWorkspace],
   );
 
-  // Yearly billing is offered only when the pricing service says plans can be paid for yearly, which it does by sending each plan's
-  // annual discount. A server that does not know about yearly billing leaves the choice out, so it is never sent a field it rejects.
-  const yearlyAvailable = plans.some((plan) => typeof plan.annualDiscountPercent === 'number');
-  const yearlyDiscount = plans.find((plan) => typeof plan.annualDiscountPercent === 'number' && plan.monthlyPrice > 0)?.annualDiscountPercent ?? 10;
+  // Yearly billing is offered only when a plan says it is on. The pricing service switches it on per plan once the services that carry
+  // the choice are live, so a server that is not ready never receives a field it would reject.
+  const yearlyPlans = plans.filter((plan) => plan.annualBillingEnabled === true);
+  const yearlyAvailable = yearlyPlans.length > 0;
+  const yearlyDiscount = yearlyPlans.find((plan) => plan.monthlyPrice > 0)?.annualDiscountPercent ?? 10;
 
   const resolvedPlan = useMemo(() => {
     if (selectedPlan) return selectedPlan;

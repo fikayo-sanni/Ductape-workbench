@@ -24,14 +24,17 @@ interface DeploymentsInput {
   connectionsBroken: number;
   /** Cloud connections whose setup is not finished. */
   connectionsPending: number;
+  /** Something the tab shows could not be read, so what it says may be incomplete. */
+  loadFailed?: boolean;
 }
 
-/** Deployments & Cloud: red for something failed or broken, amber for something waiting on a person, green when all is well, grey when there is nothing yet. */
+/** Deployments & Cloud: red for something failed or broken, amber for something waiting on a person or data that could not be read, green when all is well, grey when there is nothing yet. */
 export function deploymentsIndicator(input: DeploymentsInput): ITabIndicator {
   const bad = input.deploymentsFailing + input.failedBuilds + input.blockedPlans + input.connectionsBroken;
   if (bad > 0) return { tone: 'bad', count: bad, label: `${plural(bad, 'issue', 'issues')} to fix` };
   const warn = input.plansAwaitingApproval + input.connectionsPending;
   if (warn > 0) return { tone: 'warn', count: warn, label: `${warn} waiting on you` };
+  if (input.loadFailed) return { tone: 'warn', count: 0, label: 'Could not load everything' };
   if (input.deployments > 0 || input.connections > 0) return { tone: 'good', count: 0, label: 'All running' };
   return { tone: 'neutral', count: 0, label: 'Nothing deployed yet' };
 }
@@ -41,6 +44,8 @@ interface HealthInput {
   systems: Array<{ status: 'healthy' | 'degraded' | 'down' | 'idle' }> | null;
   /** The health checks that need attention, by how bad they are. */
   attention: Array<{ severity: 'bad' | 'warn' | string }>;
+  /** The health read failed, so the status is not known. */
+  loadFailed?: boolean;
 }
 
 /** Platform Health: red when a system is failing or a health check is down, amber for degraded systems and warnings, green when every active system is healthy. */
@@ -54,6 +59,7 @@ export function healthIndicator(input: HealthInput): ITabIndicator {
   if (bad > 0) return { tone: 'bad', count: bad, label: down > 0 ? `${plural(down, 'system', 'systems')} failing` : `${plural(checksDown, 'check', 'checks')} down` };
   const warn = degraded + checksWarn;
   if (warn > 0) return { tone: 'warn', count: warn, label: degraded > 0 ? `${degraded} degraded` : `${plural(checksWarn, 'check', 'checks')} to look at` };
+  if (input.loadFailed) return { tone: 'warn', count: 0, label: 'Could not read status' };
   if (input.systems === null) return { tone: 'neutral', count: 0, label: 'Reading status' };
   const active = input.systems.filter((system) => system.status !== 'idle').length;
   return active > 0 ? { tone: 'good', count: 0, label: 'Everything healthy' } : { tone: 'neutral', count: 0, label: 'No activity yet' };

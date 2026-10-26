@@ -28,6 +28,10 @@ export function useInfraSummaryData() {
   return { deployments, plans, builds, capabilities, connections };
 }
 
+/** A read that failed. A server that has no such endpoint (404) is not a failure: Deploy is not on every server. */
+const readFailed = (query: { isError: boolean; error: unknown }): boolean =>
+  query.isError && (query.error as { response?: { status?: number } } | null)?.response?.status !== 404;
+
 /** How the Deployments & Cloud tab is doing, for the dashboard's tab bar, read from the same queries the tab itself uses. */
 export function useDeploymentsIndicator(): ITabIndicator {
   const { deployments, plans, builds, capabilities, connections } = useInfraSummaryData();
@@ -44,5 +48,6 @@ export function useDeploymentsIndicator(): ITabIndicator {
     connections: cloud.total,
     connectionsBroken: cloud.rows.filter((row) => row.statusTone === 'bad').length,
     connectionsPending: cloud.rows.filter((row) => row.statusTone === 'warn').length,
+    loadFailed: [deployments, plans, builds, connections].some(readFailed),
   });
 }

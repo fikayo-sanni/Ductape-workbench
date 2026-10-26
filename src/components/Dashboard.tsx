@@ -279,7 +279,7 @@ export default function Dashboard() {
   const tabItems = [
     { ...DASHBOARD_TABS[0], indicator: metricsIndicator(platformHealth.data ? platformHealth.data.overall.current.total : null) },
     { ...DASHBOARD_TABS[1], indicator: deploymentsTab },
-    { ...DASHBOARD_TABS[2], indicator: healthIndicator({ systems: platformHealth.data?.systems ?? null, attention }) },
+    { ...DASHBOARD_TABS[2], indicator: healthIndicator({ systems: platformHealth.data?.systems ?? null, attention, loadFailed: platformHealth.isError }) },
   ];
   const watchedProducts = productList.filter(product => productHealth(product).state !== 'unwatched').length;
   const usageByName = new Map(topProducts.map(product => [product.name, product]));

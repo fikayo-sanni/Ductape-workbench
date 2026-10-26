@@ -180,3 +180,34 @@ test('the Metrics tab says how much happened, never that something is wrong', ()
   assert.equal(tabs.metricsIndicator(1).label, '1 call this period');
   assert.equal(tabs.metricsIndicator(5).tone, 'neutral');
 });
+
+test('a tab whose data could not be read says so in amber, but never hides a real problem or a healthy state it did read', () => {
+  assert.deepEqual(plain(tabs.deploymentsIndicator({ ...dep0, loadFailed: true })), { tone: 'warn', count: 0, label: 'Could not load everything' });
+  assert.equal(tabs.deploymentsIndicator({ ...dep0, deployments: 2, loadFailed: true }).tone, 'warn', 'incomplete data is not "all running"');
+  assert.equal(tabs.deploymentsIndicator({ ...dep0, deploymentsFailing: 1, loadFailed: true }).tone, 'bad', 'a real failure outranks it');
+  assert.deepEqual(plain(tabs.healthIndicator({ systems: null, attention: [], loadFailed: true })), { tone: 'warn', count: 0, label: 'Could not read status' });
+  assert.equal(tabs.healthIndicator({ systems: [{ status: 'down' }], attention: [], loadFailed: true }).tone, 'bad');
+});
+
+const offerMod = load('../src/utils/yearlyOffer.ts');
+const paidPlan = { monthlyPrice: 99, annualDiscountPercent: 10, annualBillingEnabled: true };
+
+test('a workspace paying monthly on a paid plan is offered yearly, with the real saving', () => {
+  const offer = plain(offerMod.yearlyOffer(paidPlan, { billingCycle: 'monthly', status: 'active' }));
+  assert.deepEqual(offer, { monthly: 99, yearlyTotal: 1069.2, saving: 118.8, discountPercent: 10 });
+  assert.ok(offerMod.yearlyOffer(paidPlan, { status: 'active' }), 'a subscription from before billing cycles existed counts as monthly');
+});
+
+test('no offer where it does not apply', () => {
+  const active = { billingCycle: 'monthly', status: 'active' };
+  assert.equal(offerMod.yearlyOffer(paidPlan, { ...active, billingCycle: 'annual' }), null, 'already yearly');
+  assert.equal(offerMod.yearlyOffer(paidPlan, { ...active, cancelAtPeriodEnd: true }), null, 'cancelled');
+  assert.equal(offerMod.yearlyOffer(paidPlan, { ...active, status: 'overdue' }), null, 'not in good standing');
+  assert.equal(offerMod.yearlyOffer({ monthlyPrice: 0, annualDiscountPercent: 10, annualBillingEnabled: true }, active), null, 'free plan');
+  assert.equal(offerMod.yearlyOffer({ ...paidPlan, isEnterprise: true }, active), null, 'enterprise is by contract');
+  assert.equal(offerMod.yearlyOffer({ ...paidPlan, isPayAsYouGo: true }, active), null, 'pay as you go has no fixed price');
+  assert.equal(offerMod.yearlyOffer({ monthlyPrice: 99 }, active), null, 'a server that does not know yearly billing sends nothing about it');
+  assert.equal(offerMod.yearlyOffer({ ...paidPlan, annualBillingEnabled: false }, active), null, 'the plan has yearly billing switched off');
+  assert.equal(offerMod.yearlyOffer(null, active), null);
+  assert.equal(offerMod.yearlyOffer(paidPlan, null), null);
+});

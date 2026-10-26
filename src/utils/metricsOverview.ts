@@ -71,7 +71,7 @@ export function periodTiles({ current, previous }: { current: IPeriodStats; prev
   const success = successRate(current);
   const previousSuccess = successRate(previous);
   const tiles: IMetricTile[] = [
-    { id: 'calls', label: 'Calls', value: formatCount(current.total), sub: `${formatCount(previous.total)} the period before`, delta: deltaOf(current.total, previous.total, 'count') },
+    { id: 'calls', label: 'Calls', value: formatCount(current.total), sub: `${formatCount(previous.total)} in the period before`, delta: deltaOf(current.total, previous.total, 'count') },
     {
       id: 'success',
       label: 'Success rate',
