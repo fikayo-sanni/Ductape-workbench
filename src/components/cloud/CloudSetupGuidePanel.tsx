@@ -218,7 +218,9 @@ export default function CloudSetupGuidePanel({
                         {guide.deployGuide!.roles.map((role) => (
                           <li key={role.roleId} className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
                             <code className="font-mono text-grey bg-white/80 px-1.5 py-0.5 rounded border border-blue-500/20 shrink-0">{role.roleId}</code>
-                            <span><span className="text-grey font-medium">{role.roleName}</span>{' — '}{role.purpose}</span>
+                            <div className="min-w-0"><span className="text-grey font-medium">{role.roleName}</span>{' — '}{role.purpose}
+                              {role.permissions?.length ? <div className="mt-1 text-grey-600"><span className="font-medium">Permissions checked:</span><ul className="mt-1 space-y-0.5">{role.permissions.map((permission) => <li key={permission}><code className="break-all">{permission}</code></li>)}</ul></div> : null}
+                            </div>
                           </li>
                         ))}
                       </ul>
