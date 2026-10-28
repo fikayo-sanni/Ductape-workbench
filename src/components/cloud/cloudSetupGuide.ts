@@ -49,7 +49,7 @@ export type CloudDeployGuide = {
   /** APIs to switch on first (Google). */
   apis?: Array<{ apiLabel: string; serviceId: string; purpose: string }>;
   /** Roles to grant (Google). */
-  roles?: Array<{ roleName: string; roleId: string; purpose: string }>;
+  roles?: Array<{ roleName: string; roleId: string; purpose: string; permissions?: string[] }>;
   /** The roles a person creates (AWS) or assigns (Azure), named as the setup names them. */
   accountRoles?: Array<{ roleName: string; purpose: string }>;
   /** A step can carry the list it refers to: the APIs, the roles to grant, or the roles to create. */
@@ -326,7 +326,7 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
       },
       {
         title: 'Grant IAM roles on your project',
-        body: 'On the service account → Permissions → Grant access, add the IAM roles listed below for the same features you enabled APIs for. Storage Admin is required when the connection includes Storage scope.',
+        body: 'Open IAM & Admin → IAM for your project, find the Ductape service account principal, and edit its roles. Add the roles below for the features you enabled. Storage Admin is required for Storage scope. For deployments, also follow the deployment guide below: Secret Manager Admin and Service Account User are required alongside the other deployment roles.',
       },
       {
         title: 'Create a JSON key',
@@ -365,14 +365,15 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
         { roleName: 'Cloud Run Admin', roleId: 'roles/run.admin', purpose: 'Create and update Cloud Run services, move traffic, and let the service account call them' },
         { roleName: 'Cloud Build Editor', roleId: 'roles/cloudbuild.builds.editor', purpose: 'Start source builds and read their result' },
         { roleName: 'Artifact Registry Administrator', roleId: 'roles/artifactregistry.admin', purpose: 'Create the image repository and read built images' },
-        { roleName: 'Secret Manager Admin', roleId: 'roles/secretmanager.admin', purpose: 'Create each deployment\'s signing-key secret and let the runtime account read it' },
+        { roleName: 'Secret Manager Admin', roleId: 'roles/secretmanager.admin', purpose: 'Manage deployment secrets and grant the runtime account access. Required by deployment validation, including service deployments.', permissions: ['secretmanager.secrets.create', 'secretmanager.secrets.get', 'secretmanager.secrets.getIamPolicy', 'secretmanager.secrets.setIamPolicy', 'secretmanager.versions.add', 'secretmanager.versions.access'] },
         { roleName: 'Storage Admin', roleId: 'roles/storage.admin', purpose: 'Create the source staging bucket and read uploaded source' },
-        { roleName: 'Service Account User', roleId: 'roles/iam.serviceAccountUser', purpose: 'Deploy a service that runs as the runtime service account' },
+        { roleName: 'Service Account User', roleId: 'roles/iam.serviceAccountUser', purpose: 'Allow the Ductape service account to deploy code as the runtime service account.', permissions: ['iam.serviceAccounts.actAs'] },
         { roleName: 'Browser', roleId: 'roles/browser', purpose: 'Read the project to find its number' },
       ],
       steps: [
         { attach: 'apis' as const, title: 'Enable the seven APIs', body: 'Open each API below and press Enable. A switched-off API makes a deploy fail with "has not been used in project … or it is disabled", and a freshly enabled one can take a minute or two to switch on.' },
         { attach: 'roles' as const, title: 'Grant the seven roles', body: 'In IAM, grant the roles below to the service account you created above, on the project. The account needs all seven at once: some IAM screens replace the roles an account already has instead of adding to them, so afterwards open the account and check it lists all seven. Validation names any role still missing.' },
+        { title: 'Upgrade an existing resource connection', body: 'An active storage or database connection may still lack deployment permissions. Grant all seven deployment roles to the same service account principal in project IAM, preserving its existing roles. In particular, add Secret Manager Admin (roles/secretmanager.admin) and Service Account User (roles/iam.serviceAccountUser). Add deploy to the connection scopes while keeping its existing scopes, then validate again. For a connection currently scoped to database and storage, the CLI command is: ductape cloud connections update <tag> --scopes database,storage,deploy. Adapt that list to preserve every scope your connection already has.' },
         { title: 'Create a deploy connection', body: 'Tick "Use this connection to deploy code with Ductape" when you create the connection, or from a terminal: ductape cloud connections create --provider gcp --name "<name>" --tag <tag> --deploy. Then: ductape cloud connections complete <tag> --service-account-file <path to the key file>, and optionally --runtime-service-account <email> for the account your services run as. The key stays on your disk and is never printed or pasted.' },
         { title: 'Validate', body: 'Run ductape cloud connections validate <tag>. A failure lists exactly which permissions are missing and which roles grant them. Grant those, wait a minute, and validate again.' },
         { title: 'Build and deploy', body: 'Once the connection is active, build with ductape deploy builds create, plan and apply, and watch the result under Deployments in the product.' },
