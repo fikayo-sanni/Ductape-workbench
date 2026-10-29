@@ -39,6 +39,7 @@ export type TabType =
   | 'webhook-explorer'
   | 'auth'
   | 'logs'
+  | 'work'
   | 'dashboard'
   | 'tokens'
   | 'teams'

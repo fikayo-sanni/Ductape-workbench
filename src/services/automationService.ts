@@ -380,6 +380,11 @@ export class AutomationService {
         canFillForms: false,
         canTriggerActions: false,
       },
+      work: {
+        canInspectForms: false,
+        canFillForms: false,
+        canTriggerActions: false,
+      },
       dashboard: {
         canInspectForms: false,
         canFillForms: false,
@@ -852,6 +857,7 @@ export class AutomationService {
       'webhook-explorer': 'Webhook Explorer',
       auth: 'Auth',
       logs: 'Logs',
+      work: 'Work',
       dashboard: 'Dashboard',
       tokens: 'Tokens',
       teams: 'Teams',

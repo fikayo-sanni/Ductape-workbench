@@ -10,7 +10,7 @@ import {
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { Tab, TabType } from '@/types/tab';
 import { cn } from '@/lib/utils';
-import {
+import { KanbanSquare,
   X,
   FileText,
   Grid3x3,
@@ -84,6 +84,7 @@ const getTabIcon = (type: Tab['type']) => {
     'job-explorer': CalendarClock,
     'new-healthcheck': Heart,
     logs: FileText,
+    work: KanbanSquare,
     dashboard: LayoutDashboard,
     tokens: Lock,
     teams: Users,

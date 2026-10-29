@@ -45,7 +45,7 @@ interface WorkbenchState {
   activeTab: 'params' | 'headers' | 'body' | 'auth';
   responseTab: 'response' | 'headers' | 'code';
   activeView: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'marketplace' | 'partnership' | 'pricing';
-  activeIconSidebar: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'pricing' | null;
+  activeIconSidebar: 'cloud' | 'products' | 'apps' | 'environments' | 'dashboard' | 'logs' | 'work' | 'tokens' | 'teams' | 'partnership' | 'marketplace' | 'pricing' | null;
 
   cloudAddConnectionModalOpen: boolean;
 
@@ -92,6 +92,7 @@ interface WorkbenchState {
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   openLogsTab: () => void;
+  openWorkTab: () => void;
   openDashboardTab: () => void;
   openTokensTab: () => void;
   openTeamsTab: () => void;
@@ -414,6 +415,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         tabs: [...state.tabs, newLogsTab],
         activeTabId: newLogsTab.id,
       };
+    }),
+
+  openWorkTab: () =>
+    set((state) => {
+      const existing = state.tabs.find((t) => t.type === 'work');
+      if (existing) return { activeTabId: existing.id };
+      const tab: Tab = { id: `work-${Date.now()}`, type: 'work', title: 'Work' };
+      return { tabs: [...state.tabs, tab], activeTabId: tab.id };
     }),
 
   openDashboardTab: () =>

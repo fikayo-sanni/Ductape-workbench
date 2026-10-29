@@ -1,6 +1,7 @@
 import {
   Cloud,
   Grid3x3,
+  KanbanSquare,
   // Handshake, // Partnerships is temporarily hidden from the Workbench sidebar.
   LayoutDashboard,
   Lock,
@@ -27,6 +28,7 @@ export type SidebarView =
 export type IconSidebarNavId =
   | SidebarView
   | 'logs'
+  | 'work'
   | 'tokens'
   | 'teams';
 
@@ -41,6 +43,7 @@ export type IconSidebarNavItem = {
 export const ICON_SIDEBAR_NAV_ITEMS: IconSidebarNavItem[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', section: 'primary' },
   { id: 'logs', icon: SquareTerminal, label: 'Logs', section: 'primary' },
+  { id: 'work', icon: KanbanSquare, label: 'Work', section: 'primary' },
   { id: 'cloud', icon: Cloud, label: 'Cloud', section: 'primary' },
   { id: 'products', icon: Package, label: 'Products', section: 'primary' },
   { id: 'apps', icon: Grid3x3, label: 'Apps', section: 'primary' },
@@ -56,6 +59,7 @@ export const ICON_SIDEBAR_NAV_ITEMS: IconSidebarNavItem[] = [
 export function useIconSidebarNavigation(onViewChange: (view: SidebarView) => void) {
   const {
     openLogsTab,
+    openWorkTab,
     openDashboardTab,
     openTokensTab,
     openTeamsTab,
@@ -85,6 +89,12 @@ export function useIconSidebarNavigation(onViewChange: (view: SidebarView) => vo
 
     if (id === 'logs') {
       openLogsTab();
+      if (!sidebarCollapsed) toggleSidebar();
+      return;
+    }
+
+    if (id === 'work') {
+      openWorkTab();
       if (!sidebarCollapsed) toggleSidebar();
       return;
     }

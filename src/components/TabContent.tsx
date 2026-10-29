@@ -7,6 +7,7 @@ import ResponsePanel from './ResponsePanel';
 import ProductTabContent from './tabs/ProductTabContent';
 import AppTabContent from './tabs/AppTabContent';
 import Logs from './Logs';
+import WorkTabContent from './work/WorkTabContent';
 import Dashboard from './Dashboard';
 import TokensTabContent from './tabs/TokensTabContent';
 import TeamsTabContent from './tabs/TeamsTabContent';
@@ -323,6 +324,9 @@ export default function TabContent() {
 
       case 'logs':
         return <Logs key={tab.id} />;
+
+      case 'work':
+        return <WorkTabContent key={tab.id} />;
 
       case 'dashboard':
         return <Dashboard key={tab.id} />;
