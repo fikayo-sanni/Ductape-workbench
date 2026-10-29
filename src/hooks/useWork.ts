@@ -3,6 +3,7 @@ import { useAuth } from '@/store/useAuth';
 import { pollInterval } from '@/utils/workStream';
 import {
   fetchWorkApprovals,
+  fetchWorkRules,
   fetchWorkContext,
   fetchWorkDependencies,
   fetchWorkItems,
@@ -74,5 +75,15 @@ export function useWorkApprovals(product?: string, live = false) {
     queryFn: () => fetchWorkApprovals(auth!, product),
     enabled: Boolean(auth),
     refetchInterval: pollInterval(live),
+  });
+}
+
+/** The rules that open work in one product. */
+export function useWorkRules(product: string | undefined) {
+  const auth = useWorkAuth();
+  return useQuery({
+    queryKey: ['work', 'rules', auth?.workspaceId, product],
+    queryFn: () => fetchWorkRules(auth!, product!),
+    enabled: Boolean(auth && product),
   });
 }

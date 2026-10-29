@@ -150,3 +150,62 @@ export async function pauseAgent(auth: IWorkAuth, agentId: string, reason: strin
 export async function resumeAgent(auth: IWorkAuth, agentId: string): Promise<void> {
   await apiClient.post(`${BASE}/agents/${encodeURIComponent(agentId)}/resume`, body(auth));
 }
+
+/** What a rule can watch: the kinds of product component whose failures the SDK logs. */
+export const RULE_KINDS = [
+  { kind: 'job', label: 'Job', component: 'job' },
+  { kind: 'feature', label: 'Feature', component: 'feature' },
+  { kind: 'app', label: 'App actions', component: 'app' },
+  { kind: 'database', label: 'Database', component: 'database' },
+  { kind: 'event', label: 'Event broker', component: 'event' },
+  { kind: 'notification', label: 'Notifications', component: 'notification' },
+  { kind: 'storage', label: 'Storage', component: 'storage' },
+  { kind: 'cache', label: 'Cache', component: 'cache' },
+  { kind: 'function', label: 'Function', component: 'function' },
+  { kind: 'healthcheck', label: 'Healthcheck', component: 'healthcheck' },
+  { kind: 'webhook', label: 'Webhook', component: null },
+] as const;
+export type RuleKind = (typeof RULE_KINDS)[number]['kind'];
+
+export interface IWorkRule {
+  id: string;
+  product: string;
+  name: string;
+  enabled: boolean;
+  watch: { kind: RuleKind; tag: string; env: string | null };
+  threshold: { failures: number; within_minutes: number };
+  item: { priority: IWorkItem['priority']; critical: boolean; labels: string[] };
+  description: string;
+  open_item_id: string | null;
+  last_fired_at: string | null;
+  fired_count: number;
+  created_by: string;
+  created_at: string;
+}
+
+export interface INewWorkRule {
+  product: string;
+  name: string;
+  watch: { kind: RuleKind; tag: string; env?: string | null };
+  threshold: { failures: number; within_minutes: number };
+  item: { priority: IWorkItem['priority']; critical: boolean };
+}
+
+export async function fetchWorkRules(auth: IWorkAuth, product: string): Promise<IWorkRule[]> {
+  const { data } = await apiClient.get<{ data: IWorkRule[] }>(`${BASE}/rules?${params(auth, { product })}`);
+  return data.data;
+}
+
+export async function createWorkRule(auth: IWorkAuth, input: INewWorkRule): Promise<IWorkRule> {
+  const { data } = await apiClient.post<{ data: IWorkRule }>(`${BASE}/rules`, body(auth, input as unknown as Record<string, unknown>));
+  return data.data;
+}
+
+export async function updateWorkRule(auth: IWorkAuth, id: string, patch: Partial<INewWorkRule> & { enabled?: boolean }): Promise<IWorkRule> {
+  const { data } = await apiClient.patch<{ data: IWorkRule }>(`${BASE}/rules/${encodeURIComponent(id)}`, body(auth, patch as Record<string, unknown>));
+  return data.data;
+}
+
+export async function deleteWorkRule(auth: IWorkAuth, id: string): Promise<void> {
+  await apiClient.delete(`${BASE}/rules/${encodeURIComponent(id)}`, { data: body(auth) });
+}

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Bot, CheckCircle2, ShieldCheck, Circle, KanbanSquare, Loader2, Network, Plus } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, ShieldCheck, Zap, Circle, KanbanSquare, Loader2, Network, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useWorkApprovals, useWorkAuth, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
+import { useWorkApprovals, useWorkAuth, useWorkRules, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
 import { workErrorMessage } from '@/services/workServices';
 import { useWorkStream } from '@/hooks/useWorkStream';
 import { agentDirectory, defaultProduct, splitSessions, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
@@ -10,11 +10,12 @@ import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
+import WorkRules from './WorkRules';
 import WorkGraph from './WorkGraph';
 import WorkItemDrawer from './WorkItemDrawer';
 import NewWorkItemDialog from './NewWorkItemDialog';
 
-type View = 'board' | 'graph' | 'agents' | 'approvals';
+type View = 'board' | 'graph' | 'agents' | 'approvals' | 'rules';
 
 const toneText: Record<Tone, string> = { good: 'text-green', warn: 'text-orange', bad: 'text-red', neutral: 'text-grey-600' };
 
@@ -74,6 +75,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
   const items = useWorkItems(product, live);
   // In a product's own tab, what waits in that product; in the workspace Work tab, what waits anywhere.
   const approvals = useWorkApprovals(fixedProduct, live);
+  const rules = useWorkRules(product);
   const sessions = useWorkSessions(product, live);
   const deps = useWorkDependencies(view === 'graph' ? product : undefined, live);
   const current = products.data?.find((p) => p.tag === product);
@@ -108,6 +110,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
     { id: 'graph', label: 'Plan graph', icon: Network, count: plans.length },
     { id: 'agents', label: 'Agents', icon: Bot, count: splitSessions(allSessions).live.length },
     { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: approvals.data?.items.length },
+    { id: 'rules', label: 'Rules', icon: Zap, count: rules.data?.filter((r) => r.enabled).length },
   ];
   const openFrom = (ref: string, itemProduct: string) => {
     if (!fixedProduct && itemProduct !== product) {
@@ -210,6 +213,8 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
             ) : (
               <div className="rounded-xl border border-grey-400 bg-white p-8 text-center text-sm text-grey-600">No plans yet. An agent publishes one with ductape_work_publish_plan, or a person with ductape work plan publish.</div>
             )
+          ) : view === 'rules' && current ? (
+            <WorkRules product={current} items={allItems} onOpen={setOpenRef} />
           ) : view === 'approvals' ? (
             <WorkApprovals product={fixedProduct} meId={auth?.userId} onOpen={openFrom} />
           ) : (

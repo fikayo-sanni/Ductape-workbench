@@ -22,6 +22,7 @@ export function describeEvent(e: IWorkEvent): string {
     case 'commit': return `Commit ${d.sha}${d.message ? `: ${d.message}` : ''}`;
     case 'pull_request': return `Pull request ${d.url}`;
     case 'components_changed': return `Ductape components: ${d.components?.join(', ')}`;
+    case 'rule_fired': return `Opened by the rule "${d.rule}": ${d.failures} failures in ${d.within_minutes} minutes`;
     case 'approved': return d.note ? `Approved: ${d.note}` : 'Approved';
     case 'changes_requested': return `Sent back: ${d.note}`;
     case 'artifact_added': return `Delivered ${d.artifacts?.map((a: any) => `${String(a.kind).replace('_', ' ')} ${a.ref}`).join(', ')}`;
@@ -34,6 +35,10 @@ export function describeEvent(e: IWorkEvent): string {
     default: return e.type.replace(/_/g, ' ');
   }
 }
+
+/** What a rule did on work it opened: it acts as the person who set it up, but it was the rule. */
+const byRule = (item: { source: string }, e: IWorkEvent) =>
+  item.source === 'rule' && (e.type === 'created' || e.type === 'rule_fired' || (e.type === 'note' && String(e.data?.text ?? '').startsWith('Still failing')));
 
 const EVENT_ICON: Record<string, typeof GitCommit> = { commit: GitCommit, pull_request: GitPullRequest };
 
@@ -233,7 +238,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
               const Icon = EVENT_ICON[e.type];
               return (
                 <li key={e.id} className="text-xs">
-                  <span className="text-grey-600">{ago(e.at)} · {e.actor.type === 'agent' ? agentLabel(agents.get(e.actor.agent_id ?? ''), meId) : e.actor.user_id === meId ? 'you' : 'a person'}</span>
+                  <span className="text-grey-600">{ago(e.at)} · {byRule(item, e) ? 'a rule' : e.actor.type === 'agent' ? agentLabel(agents.get(e.actor.agent_id ?? ''), meId) : e.actor.user_id === meId ? 'you' : 'a person'}</span>
                   <p className="flex items-start gap-1 break-words text-grey">{Icon ? <Icon className="mt-0.5 h-3 w-3 flex-shrink-0" /> : null}{describeEvent(e)}</p>
                 </li>
               );
