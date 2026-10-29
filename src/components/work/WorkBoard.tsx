@@ -11,7 +11,12 @@ interface IHolder {
 /** Which session holds each item, from the open sessions' claims. */
 export function holdersByItem(sessions: IWorkSession[]): Map<string, IHolder> {
   const out = new Map<string, IHolder>();
-  for (const s of sessions) for (const w of s.working_on) out.set(w.item_id, { client: s.agent?.client ?? null, expiresAt: w.expires_at });
+  for (const s of sessions) {
+    for (const w of s.working_on) {
+      // A lease that has run out is not shown as live, even before the server has closed it.
+      if (Date.parse(w.expires_at) > Date.now()) out.set(w.item_id, { client: s.agent?.client ?? null, expiresAt: w.expires_at });
+    }
+  }
   return out;
 }
 
@@ -45,6 +50,9 @@ function Card({ item, holder, agentClients, onOpen }: { item: IWorkItem; holder?
           <AlertTriangle className="h-3 w-3" /> No Ductape components named
         </div>
       )}
+      {item.artifacts?.length ? (
+        <div className="mb-2 text-[11px] text-grey-600">{item.artifacts.length} delivered</div>
+      ) : null}
       <div className="flex items-center justify-between">
         <AssigneeBadge assignee={item.assignee} client={client} live={Boolean(holder)} />
         {holder ? <span className="text-[11px] tabular-nums text-grey-600">{leaseLeft(holder.expiresAt)}</span> : null}

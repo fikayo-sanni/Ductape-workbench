@@ -20,6 +20,18 @@ export interface IWorkComponent {
   planned?: boolean;
 }
 
+export type ArtifactKind = 'commit' | 'pull_request' | 'component' | 'release' | 'deployment' | 'document' | 'test_report' | 'build' | 'file' | 'link';
+
+export interface IWorkArtifact {
+  kind: ArtifactKind;
+  ref: string;
+  url: string | null;
+  title: string | null;
+  meta: Record<string, string | number | boolean> | null;
+  at: string;
+  by: { type: 'user' | 'agent'; user_id: string; agent_id: string | null } | null;
+}
+
 export interface IWorkItem {
   id: string;
   ref: string;
@@ -36,6 +48,8 @@ export interface IWorkItem {
   labels: string[];
   paths: string[];
   components: IWorkComponent[];
+  /** What the work delivered. */
+  artifacts?: IWorkArtifact[];
   critical: boolean;
   source: string;
   plan_key: string | null;
@@ -243,4 +257,88 @@ export function layoutGraph(items: IWorkItem[], edges: Array<{ from: string; to:
       rows.set(col, row + 1);
       return { id: i.id, ref: i.ref, title: i.title, status: i.status, x: col * cell.w, y: row * cell.h };
     });
+}
+
+/** Counters for a product's Work entry: work not finished, and how much of it needs a person. */
+export function workTotals(items: IWorkItem[]): { open: number; attention: number } {
+  const work = items.filter((i) => i.kind !== 'epic' && i.status !== 'done' && i.status !== 'cancelled');
+  return { open: work.length, attention: work.filter((i) => i.status === 'blocked' || i.status === 'awaiting_approval').length };
+}
+
+/** Ids of everything under an item: its subtasks, theirs, and so on. */
+export function descendantIds(items: IWorkItem[], rootId: string): Set<string> {
+  const children = new Map<string, string[]>();
+  for (const i of items) if (i.parent_id) children.set(i.parent_id, [...(children.get(i.parent_id) ?? []), i.id]);
+  const out = new Set<string>();
+  const stack = [...(children.get(rootId) ?? [])];
+  while (stack.length) {
+    const id = stack.pop() as string;
+    if (out.has(id)) continue;
+    out.add(id);
+    stack.push(...(children.get(id) ?? []));
+  }
+  return out;
+}
+
+export interface IEpicSummary {
+  epic: IWorkItem;
+  total: number;
+  done: number;
+  working: number;
+  attention: number;
+  /** Done out of everything not cancelled, 0 to 1. */
+  progress: number;
+}
+
+/** Every epic with how far its work has got, unfinished epics first, then by most work left. */
+export function epicSummaries(items: IWorkItem[]): IEpicSummary[] {
+  return items
+    .filter((i) => i.kind === 'epic' && i.status !== 'cancelled')
+    .map((epic) => {
+      const ids = descendantIds(items, epic.id);
+      const work = items.filter((i) => ids.has(i.id) && i.kind !== 'epic' && i.status !== 'cancelled');
+      const done = work.filter((i) => i.status === 'done').length;
+      return {
+        epic,
+        total: work.length,
+        done,
+        working: work.filter((i) => ['claimed', 'in_progress', 'in_review'].includes(i.status)).length,
+        attention: work.filter((i) => i.status === 'blocked' || i.status === 'awaiting_approval').length,
+        progress: work.length ? done / work.length : 0,
+      };
+    })
+    .sort((a, b) => Number(a.total > 0 && a.done === a.total) - Number(b.total > 0 && b.done === b.total) || (b.total - b.done) - (a.total - a.done));
+}
+
+const ARTIFACT_ORDER: ArtifactKind[] = ['component', 'release', 'deployment', 'pull_request', 'commit', 'test_report', 'build', 'document', 'file', 'link'];
+export const ARTIFACT_LABEL: Record<ArtifactKind, string> = {
+  component: 'Ductape components',
+  release: 'Releases',
+  deployment: 'Deployments',
+  pull_request: 'Pull requests',
+  commit: 'Commits',
+  test_report: 'Test reports',
+  build: 'Builds',
+  document: 'Documents',
+  file: 'Files',
+  link: 'Links',
+};
+
+/**
+ * What a piece of work delivered, grouped by kind in the order a reader cares about: the product's components first,
+ * then what shipped, then the code, then the evidence. For an epic, pass its own artifacts and those of all its work;
+ * each entry keeps the ref of the item that produced it.
+ */
+export function groupArtifacts(sources: Array<{ ref: string; artifacts?: IWorkArtifact[] }>): Array<{ kind: ArtifactKind; label: string; entries: Array<IWorkArtifact & { from: string }> }> {
+  const byKind = new Map<ArtifactKind, Array<IWorkArtifact & { from: string }>>();
+  const seen = new Set<string>();
+  for (const s of sources) {
+    for (const a of s.artifacts ?? []) {
+      const key = `${a.kind}|${a.ref}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      byKind.set(a.kind, [...(byKind.get(a.kind) ?? []), { ...a, from: s.ref }]);
+    }
+  }
+  return ARTIFACT_ORDER.filter((k) => byKind.has(k)).map((kind) => ({ kind, label: ARTIFACT_LABEL[kind], entries: byKind.get(kind)! }));
 }

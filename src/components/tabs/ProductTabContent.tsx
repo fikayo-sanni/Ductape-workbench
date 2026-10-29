@@ -37,6 +37,7 @@ import {
   FileText,
   Trash2,
   Menu,
+  KanbanSquare,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {useIsMobile} from '@/hooks/useIsMobile';
@@ -82,6 +83,9 @@ import ProductObservabilityContent from './ProductObservabilityContent';
 import RateLimitMonitoring from './RateLimitMonitoring';
 import FunctionsResourceContent from './FunctionsResourceContent';
 import DeploymentsResourceContent from './DeploymentsResourceContent';
+import WorkTabContent from '../work/WorkTabContent';
+import { useWorkItems } from '@/hooks/useWork';
+import { workTotals } from '@/utils/workBoard';
 import {useProductDeployments} from '@/hooks/useProductDeployments';
 import {totals as deploymentTotals, describeState} from '@/utils/deployments';
 
@@ -96,6 +100,7 @@ type ResourceCategory =
   | 'overview'
   | 'observability'
   | 'deployments'
+  | 'work'
   | 'apps'
   | 'environments'
   | 'databases'
@@ -305,7 +310,7 @@ export default function ProductTabContent({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const collapsed = isSidebarCollapsed && !isMobile;
   const mobileSectionLabel =
-    ({overview: 'Overview', environments: 'Environments', observability: 'Observability', deployments: 'Deployments'} as Record<string, string>)[activeCategory] ||
+    ({overview: 'Overview', environments: 'Environments', observability: 'Observability', deployments: 'Deployments', work: 'Work'} as Record<string, string>)[activeCategory] ||
     [...resourceCategories, rateLimitsCategory].find((c) => c.id === activeCategory)?.label ||
     'Overview';
   // Which notification card is expanded to show templates inline (tag or null)
@@ -411,6 +416,10 @@ export default function ProductTabContent({
   const deploymentStats = deploymentTotals(deploymentsQuery.data ?? []);
   // No counter when the server cannot say (for example it has no deploy support), rather than a misleading 0.
   const deploymentsKnown = !deploymentsQuery.isError && deploymentsQuery.data !== undefined;
+  // Counters for the Work entry. Shares its query with the Work section's board.
+  const workQuery = useWorkItems(product?.tag);
+  const workStats = workTotals(workQuery.data?.items ?? []);
+  const workKnown = !workQuery.isError && workQuery.data !== undefined;
   // Counts per environment slug, for the Environments card on the Overview.
   const deploymentsByEnv = new Map<string, ReturnType<typeof deploymentTotals>>();
   for (const slug of new Set((deploymentsQuery.data ?? []).map((d) => d.env))) {
@@ -2388,6 +2397,9 @@ export default function ProductTabContent({
     if (activeCategory === 'deployments') {
       return <DeploymentsResourceContent key={product?.tag} product={product} />;
     }
+    if (activeCategory === 'work') {
+      return <WorkTabContent key={product?.tag} fixedProduct={product?.tag} />;
+    }
     if (activeCategory === 'rateLimits') {
       return <RateLimitMonitoring key={product?.tag} product={product} onRefresh={() => void refetch()} />;
     }
@@ -2600,6 +2612,36 @@ export default function ProductTabContent({
               </button>
             </div>
 
+            {/* What people and coding agents are planning, doing and finishing in this product. */}
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => handleCategoryChange('work')}
+                data-testid="product-nav-work"
+                className={cn(
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
+                  activeCategory === 'work' ? 'bg-primary/10 text-primary font-medium' : 'text-grey hover:bg-grey-100',
+                )}
+              >
+                <KanbanSquare className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'work' ? 'text-primary' : 'text-grey-600')} />
+                <span className="flex-1 text-left">Work</span>
+                {workKnown ? (
+                  <>
+                    {workStats.attention > 0 ? (
+                      <span className="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center bg-orange/10 text-orange" title={`${workStats.attention} blocked or waiting for approval`}>
+                        {workStats.attention}
+                      </span>
+                    ) : null}
+                    <span
+                      className={cn('text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded min-w-[18px] sm:min-w-[20px] text-center', activeCategory === 'work' ? 'bg-primary/20 text-primary' : 'bg-grey-100 text-grey-600')}
+                      title={`${workStats.open} open`}
+                    >
+                      {workStats.open}
+                    </span>
+                  </>
+                ) : null}
+              </button>
+            </div>
+
             {/* Rate limits sit next to observability: both are about how the product is behaving. */}
             <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
               <button
@@ -2803,6 +2845,25 @@ export default function ProductTabContent({
                     )}
                   >
                     {deploymentStats.total > 9 ? '9+' : deploymentStats.total}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+
+            {/* Collapsed: Work */}
+            <div className="px-1 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => {
+                  handleCategoryChange('work');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn('w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative', activeCategory === 'work' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100')}
+                title={workKnown ? `Work (${workStats.open} open${workStats.attention ? `, ${workStats.attention} need a person` : ''})` : 'Work'}
+              >
+                <KanbanSquare className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'work' ? 'text-primary' : 'text-grey-600')} />
+                {workKnown && workStats.open > 0 ? (
+                  <span className={cn('absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium', workStats.attention > 0 ? 'bg-orange' : 'bg-primary')}>
+                    {workStats.open > 9 ? '9+' : workStats.open}
                   </span>
                 ) : null}
               </button>

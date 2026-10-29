@@ -11,13 +11,15 @@ import { componentLabel, type IWorkComponent, type IWorkItem, type IWorkProduct 
  * Creates a work item in the selected product. The person picks the product's Ductape components the work uses, and
  * may add ones the work will create (planned); the server checks every one against the product.
  */
-export default function NewWorkItemDialog({ product, onClose, onCreated }: { product: IWorkProduct; onClose: () => void; onCreated: (ref: string) => void }) {
+export default function NewWorkItemDialog({ product, epics = [], defaultParent = null, onClose, onCreated }: { product: IWorkProduct; epics?: IWorkItem[]; defaultParent?: string | null; onClose: () => void; onCreated: (ref: string) => void }) {
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [priority, setPriority] = useState<IWorkItem['priority']>('medium');
   const [critical, setCritical] = useState(false);
+  const [kind, setKind] = useState<'task' | 'epic'>('task');
+  const [parent, setParent] = useState<string>(epics.find((e) => e.id === defaultParent)?.ref ?? '');
   const [picked, setPicked] = useState<IWorkComponent[]>([]);
   const [plannedType, setPlannedType] = useState('feature');
   const [plannedTag, setPlannedTag] = useState('');
@@ -27,7 +29,7 @@ export default function NewWorkItemDialog({ product, onClose, onCreated }: { pro
   const toggle = (c: IWorkComponent) => setPicked((prev) => (has(c) ? prev.filter((p) => !(p.type === c.type && p.tag === c.tag)) : [...prev, { ...c, planned: false }]));
 
   const create = useMutation({
-    mutationFn: () => createWorkItem(auth!, { title: title.trim(), body: body.trim() || undefined, product: product.tag, priority, critical, components: picked }),
+    mutationFn: () => createWorkItem(auth!, { title: title.trim(), body: body.trim() || undefined, product: product.tag, priority, critical, components: picked, kind, parent: parent || undefined }),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: ['work'] });
       toast.success(`${item.ref} created`);
@@ -86,7 +88,23 @@ export default function NewWorkItemDialog({ product, onClose, onCreated }: { pro
               <p className="mt-1.5 text-[11px] text-grey-600">Planned: {picked.filter((p) => p.planned).map(componentLabel).join(', ')}. It must exist in the product before the work can be completed.</p>
             ) : null}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-grey">
+              Kind
+              <select value={kind} onChange={(e) => setKind(e.target.value as 'task' | 'epic')} className="rounded-md border border-grey-400 px-2 py-1 text-sm">
+                <option value="task">Task</option>
+                <option value="epic">Epic</option>
+              </select>
+            </label>
+            {epics.length ? (
+              <label className="flex items-center gap-2 text-sm text-grey">
+                Part of
+                <select value={parent} onChange={(e) => setParent(e.target.value)} className="max-w-[200px] rounded-md border border-grey-400 px-2 py-1 text-sm">
+                  <option value="">No epic</option>
+                  {epics.map((e) => <option key={e.id} value={e.ref}>{e.ref} {e.title}</option>)}
+                </select>
+              </label>
+            ) : null}
             <label className="flex items-center gap-2 text-sm text-grey">
               Priority
               <select value={priority} onChange={(e) => setPriority(e.target.value as IWorkItem['priority'])} className="rounded-md border border-grey-400 px-2 py-1 text-sm">

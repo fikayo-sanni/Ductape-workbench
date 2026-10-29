@@ -5,7 +5,7 @@ import { Bot, GitCommit, GitPullRequest, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWorkAuth, useWorkContext } from '@/hooks/useWork';
 import { completeWorkItem, releaseWorkItem, updateWorkItem, workErrorMessage, type IWorkEvent } from '@/services/workServices';
-import { ago, clientName, leaseLeft, sortComponents, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
+import { ago, clientName, descendantIds, groupArtifacts, leaseLeft, sortComponents, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
 import { ComponentChip, PriorityChip, StatusChip, statusLabel } from './WorkChips';
 
 /** One line of an item's history, in words. */
@@ -22,6 +22,7 @@ export function describeEvent(e: IWorkEvent): string {
     case 'commit': return `Commit ${d.sha}${d.message ? `: ${d.message}` : ''}`;
     case 'pull_request': return `Pull request ${d.url}`;
     case 'components_changed': return `Ductape components: ${d.components?.join(', ')}`;
+    case 'artifact_added': return `Delivered ${d.artifacts?.map((a: any) => `${String(a.kind).replace('_', ' ')} ${a.ref}`).join(', ')}`;
     case 'completed': return `Completed${d.outcome ? `: ${d.outcome}` : ''}`;
     case 'blocked': return `Blocked: ${d.reason}${d.blocker ? ` (waits on ${d.blocker})` : ''}`;
     case 'unblocked': return 'Ready: everything it waited on is done';
@@ -35,7 +36,7 @@ export function describeEvent(e: IWorkEvent): string {
 const EVENT_ICON: Record<string, typeof GitCommit> = { commit: GitCommit, pull_request: GitPullRequest };
 
 /** An item, its Ductape components, what it waits on, who holds it and what happened, with the changes a person makes. */
-export default function WorkItemDrawer({ itemRef, live = false, product, agentClients, onClose, onOpen }: { itemRef: string; live?: boolean; product?: IWorkProduct; agentClients: Map<string, string>; onClose: () => void; onOpen: (ref: string) => void }) {
+export default function WorkItemDrawer({ itemRef, live = false, product, epics = [], allItems = [], agentClients, onClose, onOpen }: { itemRef: string; live?: boolean; product?: IWorkProduct; epics?: IWorkItem[]; allItems?: IWorkItem[]; agentClients: Map<string, string>; onClose: () => void; onOpen: (ref: string) => void }) {
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useWorkContext(itemRef, live);
@@ -65,7 +66,13 @@ export default function WorkItemDrawer({ itemRef, live = false, product, agentCl
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-1.5">
             <span className="font-mono text-xs font-semibold text-grey-600">{item.ref}</span>
-            <StatusChip status={item.status} />
+            {item.kind === 'epic' ? (
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                epic · {(() => { const ids = descendantIds(allItems, item.id); const work = allItems.filter((i) => ids.has(i.id) && i.kind !== 'epic' && i.status !== 'cancelled'); return `${work.filter((i) => i.status === 'done').length}/${work.length} done`; })()}
+              </span>
+            ) : (
+              <StatusChip status={item.status} />
+            )}
             <PriorityChip priority={item.priority} />
             {item.critical ? <span className="rounded bg-orange/10 px-1.5 py-0.5 text-[11px] font-medium text-orange">critical</span> : null}
           </div>
@@ -133,6 +140,39 @@ export default function WorkItemDrawer({ itemRef, live = false, product, agentCl
           </section>
         ) : null}
 
+        {(() => {
+          // An epic delivers what its work delivered; any other item, what it delivered itself.
+          const under = item.kind === 'epic' ? descendantIds(allItems, item.id) : new Set<string>();
+          const sources = [{ ref: item.ref, artifacts: item.artifacts }, ...allItems.filter((i) => under.has(i.id)).map((i) => ({ ref: i.ref, artifacts: i.artifacts }))];
+          const groups = groupArtifacts(sources);
+          return (
+            <section data-testid="work-delivered">
+              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-grey-600">{item.kind === 'epic' ? 'Delivered across this epic' : 'Delivered'}</h3>
+              {groups.length ? (
+                <div className="space-y-2">
+                  {groups.map((g) => (
+                    <div key={g.kind}>
+                      <p className="text-[11px] font-medium text-grey-600">{g.label}</p>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {g.entries.map((a) => (
+                          <li key={`${a.kind}|${a.ref}`} className="flex items-baseline gap-1.5 text-xs text-grey">
+                            {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="font-mono text-primary hover:underline">{a.ref.length > 48 ? `${a.ref.slice(0, 45)}...` : a.ref}</a> : <span className="font-mono">{a.ref}</span>}
+                            {a.title ? <span className="truncate">{a.title}</span> : null}
+                            {a.meta ? <span className="text-grey-600">{Object.entries(a.meta).map(([k, v]) => `${k} ${v}`).join(', ')}</span> : null}
+                            {a.from !== item.ref ? <button className="ml-auto flex-shrink-0 text-[11px] text-primary hover:underline" onClick={() => onOpen(a.from)}>{a.from}</button> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-grey-600">Nothing delivered yet.</p>
+              )}
+            </section>
+          );
+        })()}
+
         {item.outcome ? <section><h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-grey-600">Outcome</h3><p className="text-sm text-grey">{item.outcome}</p></section> : null}
 
         <section>
@@ -175,6 +215,18 @@ export default function WorkItemDrawer({ itemRef, live = false, product, agentCl
           >
             {['urgent', 'high', 'medium', 'low'].map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
+          {item.kind !== 'epic' && epics.length ? (
+            <select
+              aria-label="Epic"
+              value={epics.find((e) => e.id === item.parent_id)?.ref ?? ''}
+              disabled={act.isPending}
+              onChange={(e) => act.mutate(() => updateWorkItem(auth!, item.ref, { parent: e.target.value || null }))}
+              className="max-w-[180px] rounded-md border border-grey-400 bg-white px-2 py-1.5 text-sm"
+            >
+              <option value="">No epic</option>
+              {epics.map((e) => <option key={e.id} value={e.ref}>{e.ref} {e.title}</option>)}
+            </select>
+          ) : null}
           {item.status !== 'done' ? (
             <Button variant="outline" size="sm" disabled={act.isPending} onClick={() => act.mutate(() => updateWorkItem(auth!, item.ref, { critical: !item.critical }))}>
               {item.critical ? 'Not critical' : 'Mark critical'}

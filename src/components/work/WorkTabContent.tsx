@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { useWorkAuth, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
 import { workErrorMessage } from '@/services/workServices';
 import { useWorkStream } from '@/hooks/useWorkStream';
-import { defaultProduct, summarise, type Tone } from '@/utils/workBoard';
+import { defaultProduct, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
+import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
 import WorkGraph from './WorkGraph';
@@ -50,19 +51,22 @@ function Stat({ label, value, tone = 'neutral', icon: Icon }: { label: string; v
  * The Work area: what people and coding agents are planning, doing and finishing in one product, live. Work is always
  * shown per product, because every work item belongs to one product and is built from that product's Ductape components.
  */
-export default function WorkTabContent() {
+export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string } = {}) {
   const auth = useWorkAuth();
   const products = useWorkProducts();
-  const [product, setProduct] = useState<string | undefined>(undefined);
+  const [chosenProduct, setProduct] = useState<string | undefined>(undefined);
+  // Inside a product's own tab the product is given; in the workspace Work tab the person picks it.
+  const product = fixedProduct ?? chosenProduct;
   const [view, setView] = useState<View>('board');
   const [openRef, setOpenRef] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
+  const [epicFilter, setEpicFilter] = useState<string | null>(null);
 
   useEffect(() => {
-    if (product || !products.data?.length) return;
+    if (fixedProduct || chosenProduct || !products.data?.length) return;
     setProduct(defaultProduct(products.data, readSaved(storageKey(auth?.workspaceId))));
-  }, [products.data, product, auth?.workspaceId]);
+  }, [products.data, chosenProduct, fixedProduct, auth?.workspaceId]);
 
   const stream = useWorkStream(auth, product);
   const live = stream === 'live';
@@ -75,6 +79,13 @@ export default function WorkTabContent() {
   const summary = summarise(allItems, allSessions);
   const agentClients = useMemo(() => new Map(allSessions.filter((s) => s.agent).map((s) => [s.agent!.id, s.agent!.client])), [allSessions]);
   const plans = allItems.filter((i) => i.kind === 'epic');
+  const epics = useMemo(() => epicSummaries(allItems), [allItems]);
+  // With an epic chosen, the board shows only its work.
+  const boardItems = useMemo(() => {
+    if (!epicFilter) return allItems;
+    const ids = descendantIds(allItems, epicFilter);
+    return allItems.filter((i) => ids.has(i.id));
+  }, [allItems, epicFilter]);
   const selectedPlan = plans.find((p) => p.id === plan) ?? plans[0];
   const planItems = selectedPlan ? allItems.filter((i) => i.plan_key === selectedPlan.plan_key) : [];
   const liveIds = useMemo(() => new Set(allSessions.flatMap((s) => s.working_on.map((w) => w.item_id))), [allSessions]);
@@ -116,6 +127,7 @@ export default function WorkTabContent() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {fixedProduct ? null : (
               <label className="flex items-center gap-2 text-sm text-grey-600">
                 Product
                 <select
@@ -123,6 +135,7 @@ export default function WorkTabContent() {
                   onChange={(e) => {
                     setProduct(e.target.value);
                     setPlan(null);
+                    setEpicFilter(null);
                     setOpenRef(null);
                     save(storageKey(auth?.workspaceId), e.target.value);
                   }}
@@ -131,6 +144,7 @@ export default function WorkTabContent() {
                   {products.data.map((p) => <option key={p.tag} value={p.tag}>{p.name}{p.open_items ? ` (${p.open_items} open)` : ''}</option>)}
                 </select>
               </label>
+              )}
               <Button onClick={() => setCreating(true)} disabled={!current}><Plus className="mr-1 h-4 w-4" />New work</Button>
             </div>
           </div>
@@ -169,8 +183,11 @@ export default function WorkTabContent() {
 
           {items.error ? <p className="text-sm text-orange">Could not read the work: {workErrorMessage(items.error)}</p> : null}
           {view === 'board' ? (
-            <div className="overflow-x-auto pb-2">
-              <WorkBoard items={allItems} sessions={allSessions} agentClients={agentClients} onOpen={setOpenRef} />
+            <div className="space-y-3">
+              <WorkEpics epics={epics} selected={epicFilter} onSelect={setEpicFilter} onOpen={setOpenRef} />
+              <div className="overflow-x-auto pb-2">
+              <WorkBoard items={boardItems} sessions={allSessions} agentClients={agentClients} onOpen={setOpenRef} />
+              </div>
             </div>
           ) : view === 'graph' ? (
             selectedPlan ? (
@@ -183,8 +200,8 @@ export default function WorkTabContent() {
           )}
         </div>
       </div>
-      {openRef ? <WorkItemDrawer itemRef={openRef} live={live} product={current} agentClients={agentClients} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
-      {creating && current ? <NewWorkItemDialog product={current} onClose={() => setCreating(false)} onCreated={(ref) => { setCreating(false); setOpenRef(ref); }} /> : null}
+      {openRef ? <WorkItemDrawer itemRef={openRef} live={live} product={current} epics={epics.map((e) => e.epic)} allItems={allItems} agentClients={agentClients} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
+      {creating && current ? <NewWorkItemDialog product={current} epics={epics.map((e) => e.epic)} defaultParent={epicFilter} onClose={() => setCreating(false)} onCreated={(ref) => { setCreating(false); setOpenRef(ref); }} /> : null}
     </div>
   );
 }

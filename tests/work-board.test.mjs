@@ -117,3 +117,35 @@ test('reconnects back off from 1 s to 30 s, and polling slows while the stream i
   assert.equal(ws.pollInterval(true), 60000);
   assert.equal(ws.pollInterval(false), 5000);
 });
+
+test('epics show how far their work has got, across nested subtasks', () => {
+  const items = [
+    item({ ref: 'W-1', kind: 'epic' }),
+    item({ ref: 'W-2', parent_id: 'W-1', status: 'done' }),
+    item({ ref: 'W-3', parent_id: 'W-1', status: 'in_progress' }),
+    item({ ref: 'W-4', parent_id: 'W-3', kind: 'subtask', status: 'blocked' }),
+    item({ ref: 'W-5', parent_id: 'W-1', status: 'cancelled' }),
+    item({ ref: 'W-6', kind: 'epic' }),
+    item({ ref: 'W-7', parent_id: 'W-6', status: 'done' }),
+    item({ ref: 'W-8' }),
+  ];
+  assert.deepEqual([...w.descendantIds(items, 'W-1')].sort(), ['W-2', 'W-3', 'W-4', 'W-5']);
+  const [first, second] = w.epicSummaries(items);
+  assert.equal(first.epic.ref, 'W-1', 'unfinished epics come first');
+  assert.deepEqual({ total: first.total, done: first.done, working: first.working, attention: first.attention }, { total: 3, done: 1, working: 1, attention: 1 }, 'cancelled work does not count');
+  assert.equal(second.epic.ref, 'W-6');
+  assert.equal(second.progress, 1);
+});
+
+test('what work delivered is grouped by kind; an epic gathers its work\'s without duplicates', () => {
+  const a = (kind, ref, extra = {}) => ({ kind, ref, url: null, title: null, meta: null, at: '2026-10-29T08:00:00Z', by: null, ...extra });
+  const groups = w.groupArtifacts([
+    { ref: 'W-1', artifacts: [a('document', 'docs/plan.md')] },
+    { ref: 'W-2', artifacts: [a('commit', 'a1'), a('component', 'database:orders-db'), a('pull_request', '#42')] },
+    { ref: 'W-3', artifacts: [a('pull_request', '#42'), a('release', 'sha256:9f2c')] },
+  ]);
+  assert.deepEqual(plain(groups.map((g) => g.kind)), ['component', 'release', 'pull_request', 'commit', 'document']);
+  assert.equal(groups.find((g) => g.kind === 'pull_request').entries.length, 1);
+  assert.equal(groups.find((g) => g.kind === 'pull_request').entries[0].from, 'W-2', 'credited to the first item that delivered it');
+  assert.deepEqual(plain(w.groupArtifacts([{ ref: 'W-9' }])), []);
+});

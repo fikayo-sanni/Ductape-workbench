@@ -88,6 +88,8 @@ export interface INewWorkItem {
   components?: IWorkComponent[];
   critical?: boolean;
   assignee?: 'me';
+  kind?: 'task' | 'epic' | 'subtask';
+  parent?: string;
 }
 
 /** Creates one work item in a product. */
