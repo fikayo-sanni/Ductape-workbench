@@ -273,7 +273,10 @@ export function splitSessions<T extends Pick<IWorkSession, 'state' | 'working_on
 /** The line under an agent's name: the name it was given when that says more than the label, and its machine. */
 export function agentWhere(agent: { name: string | null; machine: string } | null, label: string): string {
   if (!agent) return '';
-  return [agent.name && agent.name !== label ? agent.name : null, agent.machine].filter(Boolean).join(' · ');
+  // A default name ("Ada's Cursor") says nothing the label does not; a given one ("refunds bot") does.
+  const client = label.replace(/^(Your |.*?'s? )/, '');
+  const given = agent.name && agent.name !== label && !agent.name.endsWith(`'s ${client}`) && !agent.name.endsWith(`' ${client}`) ? agent.name : null;
+  return [given, agent.machine].filter(Boolean).join(' · ');
 }
 
 export const SOURCE_LABEL: Record<ArtifactSource, string> = {

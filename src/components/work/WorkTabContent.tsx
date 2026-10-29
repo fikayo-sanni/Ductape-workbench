@@ -190,7 +190,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
               );
             })}
             {view === 'graph' && plans.length > 1 ? (
-              <select value={selectedPlan?.id} onChange={(e) => setPlan(e.target.value)} className="ml-auto rounded-md border border-grey-400 bg-white px-2 py-1 text-sm">
+              <select value={selectedPlan?.id} onChange={(e) => setPlan(e.target.value)} className="ml-auto rounded-md border border-grey-400 bg-white px-2 py-1 text-sm text-grey">
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.ref} {p.title}</option>)}
               </select>
             ) : null}

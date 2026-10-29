@@ -251,7 +251,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
               onChange={(e) => setOutcome(e.target.value)}
               rows={2}
               placeholder="What you checked, or what needs to change"
-              className="w-full rounded-md border border-grey-400 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-md border border-grey-400 bg-white px-3 py-2 text-sm text-grey"
             />
             <div className="flex gap-2">
               <Button className="flex-1" disabled={act.isPending} onClick={() => act.mutate(() => approveWorkItem(auth!, item.ref, outcome.trim()))}>
@@ -275,7 +275,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
             value={item.priority}
             disabled={act.isPending || item.status === 'done'}
             onChange={(e) => act.mutate(() => updateWorkItem(auth!, item.ref, { priority: e.target.value }))}
-            className="rounded-md border border-grey-400 bg-white px-2 py-1.5 text-sm"
+            className="rounded-md border border-grey-400 bg-white px-2 py-1.5 text-sm text-grey"
           >
             {['urgent', 'high', 'medium', 'low'].map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
@@ -285,7 +285,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
               value={epics.find((e) => e.id === item.parent_id)?.ref ?? ''}
               disabled={act.isPending}
               onChange={(e) => act.mutate(() => updateWorkItem(auth!, item.ref, { parent: e.target.value || null }))}
-              className="max-w-[180px] rounded-md border border-grey-400 bg-white px-2 py-1.5 text-sm"
+              className="max-w-[180px] rounded-md border border-grey-400 bg-white px-2 py-1.5 text-sm text-grey"
             >
               <option value="">No epic</option>
               {epics.map((e) => <option key={e.id} value={e.ref}>{e.ref} {e.title}</option>)}

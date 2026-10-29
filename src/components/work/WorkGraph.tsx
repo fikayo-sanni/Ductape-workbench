@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { useThemeStore } from '@/stores/theme-store';
 import { cn } from '@/lib/utils';
 import { layoutGraph, type IWorkItem, type WorkStatus } from '@/utils/workBoard';
 import { StatusChip } from './WorkChips';
@@ -55,6 +56,7 @@ export default function WorkGraph({ items, edges, liveIds, onOpen }: { items: IW
         }),
     [blocking, nodes, items],
   );
+  const theme = useThemeStore((t) => t.theme);
   if (!nodes.length) return <div className="rounded-xl border border-grey-400 bg-white p-8 text-center text-sm text-grey-600">No work in this plan yet.</div>;
   return (
     <div className="overflow-hidden rounded-xl border border-grey-400 bg-white" style={{ height: Math.max(320, Math.min(720, (Math.max(...nodes.map((n) => n.position.y)) + 110) + 120)) }} data-testid="work-graph">
@@ -63,6 +65,8 @@ export default function WorkGraph({ items, edges, liveIds, onOpen }: { items: IW
           nodes={nodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}
+          // React Flow marks its own box light or dark, and the Workbench's theme colours follow that class.
+          colorMode={theme}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
           minZoom={0.3}

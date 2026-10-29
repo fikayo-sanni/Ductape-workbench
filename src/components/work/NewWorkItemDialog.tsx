@@ -50,8 +50,8 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
           <button onClick={onClose} className="rounded p-1 text-grey-600 hover:bg-grey-100" aria-label="Close"><X className="h-4 w-4" /></button>
         </header>
         <div className="space-y-4 p-5">
-          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing" className="w-full rounded-md border border-grey-400 px-3 py-2 text-sm" />
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="Details, acceptance criteria, links" className="w-full rounded-md border border-grey-400 px-3 py-2 text-sm" />
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing" className="w-full rounded-md border border-grey-400 px-3 py-2 text-sm text-grey" />
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="Details, acceptance criteria, links" className="w-full rounded-md border border-grey-400 px-3 py-2 text-sm text-grey" />
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-grey-600">Ductape components it uses</p>
             {options.length ? (
@@ -71,10 +71,10 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
               <p className="text-xs text-grey-600">This product has no components yet.</p>
             )}
             <div className="mt-2 flex gap-1.5">
-              <select value={plannedType} onChange={(e) => setPlannedType(e.target.value)} className="rounded-md border border-grey-400 px-2 py-1 text-xs">
+              <select value={plannedType} onChange={(e) => setPlannedType(e.target.value)} className="rounded-md border border-grey-400 px-2 py-1 text-xs text-grey">
                 {['feature', 'database', 'app', 'event', 'job', 'notification', 'storage', 'session', 'cache', 'function', 'healthcheck', 'quota', 'fallback'].map((t) => <option key={t}>{t}</option>)}
               </select>
-              <input value={plannedTag} onChange={(e) => setPlannedTag(e.target.value)} placeholder="tag of one this work will create" className="flex-1 rounded-md border border-grey-400 px-2 py-1 font-mono text-xs" />
+              <input value={plannedTag} onChange={(e) => setPlannedTag(e.target.value)} placeholder="tag of one this work will create" className="flex-1 rounded-md border border-grey-400 px-2 py-1 font-mono text-xs text-grey" />
               <Button
                 type="button"
                 variant="outline"
@@ -95,7 +95,7 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-sm text-grey">
               Kind
-              <select value={kind} onChange={(e) => setKind(e.target.value as 'task' | 'epic')} className="rounded-md border border-grey-400 px-2 py-1 text-sm">
+              <select value={kind} onChange={(e) => setKind(e.target.value as 'task' | 'epic')} className="rounded-md border border-grey-400 px-2 py-1 text-sm text-grey">
                 <option value="task">Task</option>
                 <option value="epic">Epic</option>
               </select>
@@ -103,7 +103,7 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
             {epics.length ? (
               <label className="flex items-center gap-2 text-sm text-grey">
                 Part of
-                <select value={parent} onChange={(e) => setParent(e.target.value)} className="max-w-[200px] rounded-md border border-grey-400 px-2 py-1 text-sm">
+                <select value={parent} onChange={(e) => setParent(e.target.value)} className="max-w-[200px] rounded-md border border-grey-400 px-2 py-1 text-sm text-grey">
                   <option value="">No epic</option>
                   {epics.map((e) => <option key={e.id} value={e.ref}>{e.ref} {e.title}</option>)}
                 </select>
@@ -111,7 +111,7 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
             ) : null}
             <label className="flex items-center gap-2 text-sm text-grey">
               Priority
-              <select value={priority} onChange={(e) => setPriority(e.target.value as IWorkItem['priority'])} className="rounded-md border border-grey-400 px-2 py-1 text-sm">
+              <select value={priority} onChange={(e) => setPriority(e.target.value as IWorkItem['priority'])} className="rounded-md border border-grey-400 px-2 py-1 text-sm text-grey">
                 {['urgent', 'high', 'medium', 'low'].map((p) => <option key={p}>{p}</option>)}
               </select>
             </label>
@@ -121,7 +121,7 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
             </label>
           </div>
         </div>
-        <footer className="flex justify-end gap-2 border-t border-grey-400 px-5 py-3">
+        <footer className="flex justify-end gap-2 border-t border-grey-400 px-5 py-3 text-grey">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button disabled={!title.trim() || create.isPending} onClick={() => create.mutate()}>Create</Button>
         </footer>

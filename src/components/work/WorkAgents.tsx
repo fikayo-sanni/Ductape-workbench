@@ -64,7 +64,7 @@ export default function WorkAgents({ sessions, meId, onOpen }: { sessions: IWork
               <td className="px-4 py-3">
                 {s.working_on.length ? (
                   s.working_on.map((w) => (
-                    <button key={w.item_id} onClick={() => w.ref && onOpen(w.ref)} className="block text-left text-xs hover:text-primary">
+                    <button key={w.item_id} onClick={() => w.ref && onOpen(w.ref)} className="block text-left text-xs text-grey hover:text-primary">
                       <span className="font-mono font-semibold">{w.ref}</span> {w.title} <span className="text-grey-600">· {leaseLeft(w.expires_at)}</span>
                     </button>
                   ))

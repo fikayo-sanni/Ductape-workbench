@@ -190,6 +190,7 @@ test('quiet sessions (stopped answering, holding nothing) are kept out of the wa
   assert.deepEqual(plain(quiet.map((x) => x.id)), ['c']);
   assert.equal(w.agentWhere({ name: "Ada's Claude Code", machine: 'ada-mbp' }, "Ada's Claude Code"), 'ada-mbp', 'the label is not repeated');
   assert.equal(w.agentWhere({ name: 'refunds bot', machine: 'ci-7' }, "Ada's Claude Code"), 'refunds bot · ci-7');
+  assert.equal(w.agentWhere({ name: "Ada's Cursor", machine: 'ada-mbp' }, 'Your Cursor'), 'ada-mbp', 'a default name is left out');
   assert.equal(w.agentWhere(null, 'x'), '');
 });
 
