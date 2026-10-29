@@ -40,6 +40,9 @@ export function describeEvent(e: IWorkEvent): string {
 /** What a rule did on work it opened: it acts as the person who set it up, but it was the rule. */
 const byRule = (item: { source: string }, e: IWorkEvent) =>
   item.source === 'rule' && (e.type === 'created' || e.type === 'rule_fired' || (e.type === 'note' && String(e.data?.text ?? '').startsWith('Still failing')));
+/** Work an outside system opened: it acts as the person who made its key, but it was that system. */
+const byIntake = (item: { source: string; intake_name?: string | null }, e: IWorkEvent) =>
+  item.source === 'webhook' && Boolean(item.intake_name) && (e.type === 'created' || e.type === 'artifact_added' || (e.type === 'note' && Boolean(e.data?.intake)));
 
 const EVENT_ICON: Record<string, typeof GitCommit> = { commit: GitCommit, pull_request: GitPullRequest };
 
@@ -239,7 +242,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
               const Icon = EVENT_ICON[e.type];
               return (
                 <li key={e.id} className="text-xs">
-                  <span className="text-grey-600">{ago(e.at)} · {byRule(item, e) ? 'a rule' : e.actor.type === 'agent' ? agentLabel(agents.get(e.actor.agent_id ?? ''), meId) : e.actor.user_id === meId ? 'you' : 'a person'}</span>
+                  <span className="text-grey-600">{ago(e.at)} · {byRule(item, e) ? 'a rule' : byIntake(item, e) ? item.intake_name : e.actor.type === 'agent' ? agentLabel(agents.get(e.actor.agent_id ?? ''), meId) : e.actor.user_id === meId ? 'you' : 'a person'}</span>
                   <p className="flex items-start gap-1 break-words text-grey">{Icon ? <Icon className="mt-0.5 h-3 w-3 flex-shrink-0" /> : null}{describeEvent(e)}</p>
                 </li>
               );

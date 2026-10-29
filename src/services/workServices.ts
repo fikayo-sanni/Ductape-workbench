@@ -263,3 +263,32 @@ export async function saveWorkPolicy(auth: IWorkAuth, policy: Partial<Omit<IWork
   const { data } = await apiClient.put<{ data: IWorkPolicy }>(`${BASE}/policy`, body(auth, policy as Record<string, unknown>));
   return data.data;
 }
+
+/** A key an outside system uses to open work in one product. `key` is present only in the answer that made it. */
+export interface IIntakeKey {
+  id: string;
+  product: string;
+  name: string;
+  hint: string;
+  defaults: { priority: IWorkItem['priority']; labels: string[] };
+  uses: number;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  key?: string;
+}
+
+export async function fetchIntakeKeys(auth: IWorkAuth, product: string): Promise<IIntakeKey[]> {
+  const { data } = await apiClient.get<{ data: IIntakeKey[] }>(`${BASE}/intake-keys?${params(auth, { product })}`);
+  return data.data;
+}
+
+export async function createIntakeKey(auth: IWorkAuth, input: { product: string; name: string; priority: IWorkItem['priority'] }): Promise<IIntakeKey> {
+  const { data } = await apiClient.post<{ data: IIntakeKey }>(`${BASE}/intake-keys`, body(auth, input));
+  return data.data;
+}
+
+export async function revokeIntakeKey(auth: IWorkAuth, id: string): Promise<IIntakeKey> {
+  const { data } = await apiClient.delete<{ data: IIntakeKey }>(`${BASE}/intake-keys/${encodeURIComponent(id)}`, { data: body(auth) });
+  return data.data;
+}

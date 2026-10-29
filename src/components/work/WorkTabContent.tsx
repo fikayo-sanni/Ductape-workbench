@@ -11,6 +11,7 @@ import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
 import WorkRules from './WorkRules';
+import WorkIntakeKeys from './WorkIntakeKeys';
 import WorkPolicy from './WorkPolicy';
 import { StepUpDialog } from './StepUp';
 import WorkGraph from './WorkGraph';
@@ -112,7 +113,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
     { id: 'graph', label: 'Plan graph', icon: Network, count: plans.length },
     { id: 'agents', label: 'Agents', icon: Bot, count: splitSessions(allSessions).live.length },
     { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: approvals.data?.items.length },
-    { id: 'rules', label: 'Rules', icon: Zap, count: rules.data?.filter((r) => r.enabled).length },
+    { id: 'rules', label: 'Automation', icon: Zap, count: rules.data?.filter((r) => r.enabled).length },
     // The policy is the workspace's, so it lives in the workspace Work tab, not in each product's.
     ...(fixedProduct ? [] : [{ id: 'policy' as View, label: 'Policy', icon: Scale }]),
   ];
@@ -221,7 +222,10 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
           ) : view === 'policy' ? (
             <WorkPolicy />
           ) : view === 'rules' && current ? (
-            <WorkRules product={current} items={allItems} onOpen={setOpenRef} />
+            <div className="space-y-4">
+              <WorkRules product={current} items={allItems} onOpen={setOpenRef} />
+              <WorkIntakeKeys product={current} />
+            </div>
           ) : view === 'approvals' ? (
             <WorkApprovals product={fixedProduct} meId={auth?.userId} onOpen={openFrom} />
           ) : (

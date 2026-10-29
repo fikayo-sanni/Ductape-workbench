@@ -74,6 +74,8 @@ export interface IWorkItem {
   artifacts?: IWorkArtifact[];
   /** Only on the answer to creating it. */
   similar?: ISimilarWork[];
+  /** The outside system that opened it, by its key's name. */
+  intake_name?: string | null;
   /** A person's decisions when it waited for approval, oldest first. */
   approvals?: IWorkApproval[];
   critical: boolean;
