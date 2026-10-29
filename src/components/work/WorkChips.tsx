@@ -47,14 +47,14 @@ export function ComponentChip({ component }: { component: IWorkComponent }) {
   );
 }
 
-/** Who holds or is assigned the work: an agent shows its client, a person shows "Person". */
-export function AssigneeBadge({ assignee, client, live }: { assignee: IWorkItem['assignee']; client?: string | null; live?: boolean }) {
+/** Who holds or is assigned the work: an agent shows whose agent it is ("Ada's Claude Code"), a person "Person". */
+export function AssigneeBadge({ assignee, label, live }: { assignee: IWorkItem['assignee']; label?: string; live?: boolean }) {
   if (!assignee) return <span className="text-[11px] text-grey-600">Unassigned</span>;
   const agent = assignee.type === 'agent';
   return (
     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-grey">
       {agent ? <Bot className="h-3.5 w-3.5 text-primary" /> : <User className="h-3.5 w-3.5 text-grey-600" />}
-      {agent ? clientName(client) : 'Person'}
+      {agent ? label ?? clientName(null) : 'Person'}
       {live ? <span className="ml-0.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green" aria-label="working now" /> : null}
     </span>
   );

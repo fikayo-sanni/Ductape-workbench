@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useWorkAuth, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
 import { workErrorMessage } from '@/services/workServices';
 import { useWorkStream } from '@/hooks/useWorkStream';
-import { defaultProduct, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
+import { agentDirectory, defaultProduct, splitSessions, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
 import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
@@ -77,7 +77,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
   const allItems = items.data?.items ?? [];
   const allSessions = sessions.data ?? [];
   const summary = summarise(allItems, allSessions);
-  const agentClients = useMemo(() => new Map(allSessions.filter((s) => s.agent).map((s) => [s.agent!.id, s.agent!.client])), [allSessions]);
+  const agents = useMemo(() => agentDirectory(allSessions, items.data?.agents), [allSessions, items.data?.agents]);
   const plans = allItems.filter((i) => i.kind === 'epic');
   const epics = useMemo(() => epicSummaries(allItems), [allItems]);
   // With an epic chosen, the board shows only its work.
@@ -103,7 +103,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
   const VIEWS: Array<{ id: View; label: string; icon: typeof Circle; count?: number }> = [
     { id: 'board', label: 'Board', icon: KanbanSquare },
     { id: 'graph', label: 'Plan graph', icon: Network, count: plans.length },
-    { id: 'agents', label: 'Agents', icon: Bot, count: allSessions.length },
+    { id: 'agents', label: 'Agents', icon: Bot, count: splitSessions(allSessions).live.length },
   ];
 
   return (
@@ -186,7 +186,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
             <div className="space-y-3">
               <WorkEpics epics={epics} selected={epicFilter} onSelect={setEpicFilter} onOpen={setOpenRef} />
               <div className="overflow-x-auto pb-2">
-              <WorkBoard items={boardItems} sessions={allSessions} agentClients={agentClients} onOpen={setOpenRef} />
+              <WorkBoard items={boardItems} sessions={allSessions} agents={agents} meId={auth?.userId} onOpen={setOpenRef} />
               </div>
             </div>
           ) : view === 'graph' ? (
@@ -196,11 +196,11 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
               <div className="rounded-xl border border-grey-400 bg-white p-8 text-center text-sm text-grey-600">No plans yet. An agent publishes one with ductape_work_publish_plan, or a person with ductape work plan publish.</div>
             )
           ) : (
-            <WorkAgents sessions={allSessions} onOpen={setOpenRef} />
+            <WorkAgents sessions={allSessions} meId={auth?.userId} onOpen={setOpenRef} />
           )}
         </div>
       </div>
-      {openRef ? <WorkItemDrawer itemRef={openRef} live={live} product={current} epics={epics.map((e) => e.epic)} allItems={allItems} agentClients={agentClients} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
+      {openRef ? <WorkItemDrawer itemRef={openRef} live={live} product={current} epics={epics.map((e) => e.epic)} allItems={allItems} agents={agents} meId={auth?.userId} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
       {creating && current ? <NewWorkItemDialog product={current} epics={epics.map((e) => e.epic)} defaultParent={epicFilter} onClose={() => setCreating(false)} onCreated={(ref) => { setCreating(false); setOpenRef(ref); }} /> : null}
     </div>
   );

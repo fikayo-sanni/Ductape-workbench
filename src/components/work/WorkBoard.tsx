@@ -1,6 +1,6 @@
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { COLUMNS, groupIntoColumns, leaseLeft, sortComponents, type IWorkItem, type IWorkSession } from '@/utils/workBoard';
+import { COLUMNS, agentLabel, groupIntoColumns, leaseLeft, sortComponents, type IAgentInfo, type IWorkItem, type IWorkSession } from '@/utils/workBoard';
 import { AssigneeBadge, ComponentChip, PriorityChip, StatusChip } from './WorkChips';
 
 interface IHolder {
@@ -20,9 +20,9 @@ export function holdersByItem(sessions: IWorkSession[]): Map<string, IHolder> {
   return out;
 }
 
-function Card({ item, holder, agentClients, onOpen }: { item: IWorkItem; holder?: IHolder; agentClients: Map<string, string>; onOpen: (ref: string) => void }) {
+function Card({ item, holder, agents, meId, onOpen }: { item: IWorkItem; holder?: IHolder; agents: Map<string, IAgentInfo>; meId?: string; onOpen: (ref: string) => void }) {
   const components = sortComponents(item.components);
-  const client = item.assignee?.type === 'agent' ? holder?.client ?? agentClients.get(item.assignee.id) ?? null : null;
+  const label = item.assignee?.type === 'agent' ? agentLabel(agents.get(item.assignee.id), meId, holder?.client) : undefined;
   return (
     <button
       type="button"
@@ -54,7 +54,7 @@ function Card({ item, holder, agentClients, onOpen }: { item: IWorkItem; holder?
         <div className="mb-2 text-[11px] text-grey-600">{item.artifacts.length} delivered</div>
       ) : null}
       <div className="flex items-center justify-between">
-        <AssigneeBadge assignee={item.assignee} client={client} live={Boolean(holder)} />
+        <AssigneeBadge assignee={item.assignee} label={label} live={Boolean(holder)} />
         {holder ? <span className="text-[11px] tabular-nums text-grey-600">{leaseLeft(holder.expiresAt)}</span> : null}
       </div>
     </button>
@@ -62,7 +62,7 @@ function Card({ item, holder, agentClients, onOpen }: { item: IWorkItem; holder?
 }
 
 /** The product's work as columns, from waiting to done. */
-export default function WorkBoard({ items, sessions, agentClients, onOpen }: { items: IWorkItem[]; sessions: IWorkSession[]; agentClients: Map<string, string>; onOpen: (ref: string) => void }) {
+export default function WorkBoard({ items, sessions, agents, meId, onOpen }: { items: IWorkItem[]; sessions: IWorkSession[]; agents: Map<string, IAgentInfo>; meId?: string; onOpen: (ref: string) => void }) {
   const columns = groupIntoColumns(items);
   const holders = holdersByItem(sessions);
   return (
@@ -78,7 +78,7 @@ export default function WorkBoard({ items, sessions, agentClients, onOpen }: { i
           </header>
           <div className="flex flex-1 flex-col gap-2 p-2">
             {columns[column.id].map((item) => (
-              <Card key={item.id} item={item} holder={holders.get(item.id)} agentClients={agentClients} onOpen={onOpen} />
+              <Card key={item.id} item={item} holder={holders.get(item.id)} agents={agents} meId={meId} onOpen={onOpen} />
             ))}
           </div>
         </section>

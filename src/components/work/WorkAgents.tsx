@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Bot, GitBranch } from 'lucide-react';
@@ -5,12 +6,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useWorkAuth } from '@/hooks/useWork';
 import { pauseAgent, workErrorMessage } from '@/services/workServices';
-import { ago, clientName, leaseLeft, type IWorkSession } from '@/utils/workBoard';
+import { agentLabel, agentWhere, ago, leaseLeft, splitSessions, viaLabel, type IWorkSession } from '@/utils/workBoard';
 
 /** The agent sessions open on the product: who, where, on what, and the last sign of life. */
-export default function WorkAgents({ sessions, onOpen }: { sessions: IWorkSession[]; onOpen: (ref: string) => void }) {
+export default function WorkAgents({ sessions, meId, onOpen }: { sessions: IWorkSession[]; meId?: string; onOpen: (ref: string) => void }) {
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
+  const [showQuiet, setShowQuiet] = useState(false);
+  const { live, quiet } = splitSessions(sessions);
+  const rows = showQuiet ? [...live, ...quiet] : live;
   const pause = useMutation({
     mutationFn: (agentId: string) => pauseAgent(auth!, agentId, 'Paused from the Workbench'),
     onSuccess: () => {
@@ -40,15 +44,18 @@ export default function WorkAgents({ sessions, onOpen }: { sessions: IWorkSessio
           </tr>
         </thead>
         <tbody>
-          {sessions.map((s) => (
+          {rows.map((s) => {
+            const label = agentLabel(s.agent ? { client: s.agent.client, owner: s.owner ? { id: s.user_id, name: s.owner.name } : null } : undefined, meId);
+            return (
             <tr key={s.id} className="border-t border-grey-400 align-top">
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1.5 font-medium text-grey">
                   <span className={cn('h-2 w-2 rounded-full', s.state === 'active' ? 'bg-green' : 'bg-orange')} aria-label={s.state} />
                   <Bot className="h-4 w-4 text-primary" />
-                  {clientName(s.agent?.client)}
+                  {label}
                 </div>
-                <div className="mt-0.5 text-xs text-grey-600">{s.agent?.name ?? s.agent?.machine}</div>
+                <div className="mt-0.5 text-xs text-grey-600">{agentWhere(s.agent, label)}</div>
+                <div className="mt-0.5 text-[11px] text-grey-600" title="The agent names its own client; this is what it said, not a proof">{viaLabel(s)}</div>
               </td>
               <td className="px-4 py-3 text-xs text-grey">
                 <div>{s.repo || 'no repo'}</div>
@@ -74,9 +81,23 @@ export default function WorkAgents({ sessions, onOpen }: { sessions: IWorkSessio
                 ) : null}
               </td>
             </tr>
-          ))}
+            );
+          })}
+          {!live.length && !showQuiet ? (
+            <tr className="border-t border-grey-400"><td colSpan={5} className="px-4 py-4 text-center text-xs text-grey-600">No agent is working on this product right now.</td></tr>
+          ) : null}
         </tbody>
       </table>
+      {quiet.length ? (
+        <button
+          type="button"
+          onClick={() => setShowQuiet((v) => !v)}
+          className="w-full border-t border-grey-400 px-4 py-2 text-left text-xs text-grey-600 hover:text-primary"
+          data-testid="work-agents-quiet"
+        >
+          {showQuiet ? 'Hide' : 'Show'} {quiet.length} {quiet.length === 1 ? 'session' : 'sessions'} that stopped answering and hold nothing (Ductape ends them after an hour)
+        </button>
+      ) : null}
     </div>
   );
 }

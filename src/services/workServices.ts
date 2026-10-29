@@ -5,7 +5,7 @@
  */
 
 import apiClient from '@/config/axiosinstance';
-import type { IWorkItem, IWorkProduct, IWorkSession, IWorkComponent } from '@/utils/workBoard';
+import type { IAgentInfo, IWorkItem, IWorkProduct, IWorkSession, IWorkComponent } from '@/utils/workBoard';
 
 const BASE = '/tickets/v1/work';
 
@@ -60,8 +60,8 @@ export async function fetchWorkProducts(auth: IWorkAuth): Promise<IWorkProduct[]
   return data.data ?? [];
 }
 
-export async function fetchWorkItems(auth: IWorkAuth, product: string): Promise<{ items: IWorkItem[]; total: number }> {
-  const { data } = await apiClient.get<{ data: { items: IWorkItem[]; total: number } }>(`${BASE}/items?${params(auth, { product, limit: '200' })}`);
+export async function fetchWorkItems(auth: IWorkAuth, product: string): Promise<{ items: IWorkItem[]; total: number; agents?: Record<string, IAgentInfo> }> {
+  const { data } = await apiClient.get<{ data: { items: IWorkItem[]; total: number; agents?: Record<string, IAgentInfo> } }>(`${BASE}/items?${params(auth, { product, limit: '200' })}`);
   return data.data;
 }
 

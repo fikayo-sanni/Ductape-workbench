@@ -5,7 +5,7 @@ import { Bot, GitCommit, GitPullRequest, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWorkAuth, useWorkContext } from '@/hooks/useWork';
 import { completeWorkItem, releaseWorkItem, updateWorkItem, workErrorMessage, type IWorkEvent } from '@/services/workServices';
-import { ago, clientName, descendantIds, groupArtifacts, leaseLeft, sortComponents, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
+import { SOURCE_LABEL, agentLabel, ago, artifactDetail, shortRef, descendantIds, groupArtifacts, leaseLeft, sortComponents, type IAgentInfo, type IWorkArtifact, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
 import { ComponentChip, PriorityChip, StatusChip, statusLabel } from './WorkChips';
 
 /** One line of an item's history, in words. */
@@ -36,7 +36,30 @@ export function describeEvent(e: IWorkEvent): string {
 const EVENT_ICON: Record<string, typeof GitCommit> = { commit: GitCommit, pull_request: GitPullRequest };
 
 /** An item, its Ductape components, what it waits on, who holds it and what happened, with the changes a person makes. */
-export default function WorkItemDrawer({ itemRef, live = false, product, epics = [], allItems = [], agentClients, onClose, onOpen }: { itemRef: string; live?: boolean; product?: IWorkProduct; epics?: IWorkItem[]; allItems?: IWorkItem[]; agentClients: Map<string, string>; onClose: () => void; onOpen: (ref: string) => void }) {
+/** A delivered thing's name; a test run's name without the counts its detail line already gives. */
+const artifactName = (a: IWorkArtifact): string | null => (a.kind === 'test_report' && a.title && a.meta?.result ? a.title.replace(/: [^:]*$/, '') : a.title);
+
+/** Says how Ductape knows about a delivered thing, and who recorded it. Only Ductape's own checks show as checked. */
+function SourceTag({ artifact, by }: { artifact: IWorkArtifact; by: string }) {
+  const source = artifact.source ?? 'reported';
+  return (
+    <span
+      title={`${SOURCE_LABEL[source]}, recorded by ${by}`}
+      data-testid={`artifact-source-${source}`}
+      className={
+        source === 'ductape'
+          ? 'flex-shrink-0 whitespace-nowrap rounded bg-green/10 px-1 text-[10px] font-medium text-green'
+          : source === 'ductape_cli'
+            ? 'flex-shrink-0 whitespace-nowrap rounded bg-primary/10 px-1 text-[10px] font-medium text-primary'
+            : 'flex-shrink-0 whitespace-nowrap rounded border border-grey-400 px-1 text-[10px] text-grey-600'
+      }
+    >
+      {source === 'ductape' ? 'Checked' : source === 'ductape_cli' ? 'Run by CLI' : 'Reported'}
+    </span>
+  );
+}
+
+export default function WorkItemDrawer({ itemRef, live = false, product, epics = [], allItems = [], agents, meId, onClose, onOpen }: { itemRef: string; live?: boolean; product?: IWorkProduct; epics?: IWorkItem[]; allItems?: IWorkItem[]; agents: Map<string, IAgentInfo>; meId?: string; onClose: () => void; onOpen: (ref: string) => void }) {
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useWorkContext(itemRef, live);
@@ -58,7 +81,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
   const item: IWorkItem = data.item;
   const components = sortComponents(item.components);
   const existing = product?.components ?? {};
-  const holderClient = data.claim?.agent_id ? agentClients.get(data.claim.agent_id) : null;
+  const holderLabel = data.claim?.agent_id ? agentLabel(agents.get(data.claim.agent_id), meId) : null;
 
   return (
     <aside className="flex w-full max-w-[460px] flex-col border-l border-grey-400 bg-white" data-testid="work-item-drawer">
@@ -112,7 +135,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
           <section className="rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center gap-1.5 text-sm font-medium text-grey">
               <Bot className="h-4 w-4 text-primary" />
-              {data.claim.agent_id ? clientName(holderClient) : 'A person'} is working on it
+              {holderLabel ?? (data.claim.user_id === meId ? 'You are' : 'A person is')}{holderLabel ? ' is' : ''} working on it
               <span className="ml-auto text-xs tabular-nums text-grey-600">{leaseLeft(data.claim.expires_at)}</span>
             </div>
             <p className="mt-1 text-xs text-grey-600">
@@ -155,11 +178,19 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
                       <p className="text-[11px] font-medium text-grey-600">{g.label}</p>
                       <ul className="mt-0.5 space-y-0.5">
                         {g.entries.map((a) => (
-                          <li key={`${a.kind}|${a.ref}`} className="flex items-baseline gap-1.5 text-xs text-grey">
-                            {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="font-mono text-primary hover:underline">{a.ref.length > 48 ? `${a.ref.slice(0, 45)}...` : a.ref}</a> : <span className="font-mono">{a.ref}</span>}
-                            {a.title ? <span className="truncate">{a.title}</span> : null}
-                            {a.meta ? <span className="text-grey-600">{Object.entries(a.meta).map(([k, v]) => `${k} ${v}`).join(', ')}</span> : null}
-                            {a.from !== item.ref ? <button className="ml-auto flex-shrink-0 text-[11px] text-primary hover:underline" onClick={() => onOpen(a.from)}>{a.from}</button> : null}
+                          <li key={`${a.kind}|${a.ref}`} className="flex items-start gap-2" title={a.ref}>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-xs text-grey">
+                                {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">{artifactName(a) ?? shortRef(a)}</a> : artifactName(a) ?? <span className="font-mono">{shortRef(a)}</span>}
+                              </div>
+                              {a.title || (a.meta && artifactDetail(a)) ? (
+                                <div className="truncate text-[11px] text-grey-600">
+                                  {[a.title ? shortRef(a) : null, a.meta ? artifactDetail(a) : null].filter(Boolean).join(' · ')}
+                                </div>
+                              ) : null}
+                            </div>
+                            <SourceTag artifact={a} by={a.by?.agent_id ? agentLabel(agents.get(a.by.agent_id), meId) : a.by?.user_id === meId ? 'you' : 'a person'} />
+                            {a.from !== item.ref ? <button className="flex-shrink-0 text-[11px] text-primary hover:underline" onClick={() => onOpen(a.from)}>{a.from}</button> : null}
                           </li>
                         ))}
                       </ul>
@@ -182,7 +213,7 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
               const Icon = EVENT_ICON[e.type];
               return (
                 <li key={e.id} className="text-xs">
-                  <span className="text-grey-600">{ago(e.at)} · {e.actor.type === 'agent' ? clientName(agentClients.get(e.actor.agent_id ?? '')) : 'person'}</span>
+                  <span className="text-grey-600">{ago(e.at)} · {e.actor.type === 'agent' ? agentLabel(agents.get(e.actor.agent_id ?? ''), meId) : e.actor.user_id === meId ? 'you' : 'a person'}</span>
                   <p className="flex items-start gap-1 break-words text-grey">{Icon ? <Icon className="mt-0.5 h-3 w-3 flex-shrink-0" /> : null}{describeEvent(e)}</p>
                 </li>
               );

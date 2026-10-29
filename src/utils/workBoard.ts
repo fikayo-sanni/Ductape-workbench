@@ -30,6 +30,20 @@ export interface IWorkArtifact {
   meta: Record<string, string | number | boolean> | null;
   at: string;
   by: { type: 'user' | 'agent'; user_id: string; agent_id: string | null } | null;
+  /** How Ductape knows it: checked against its own records, run by its CLI, or reported by someone. */
+  source?: ArtifactSource;
+  /** A checked deployment's state now, read from Deploy; `meta` keeps what it was when recorded. */
+  current?: { state: string; traffic_percent: number; release: string; at: string | null };
+}
+
+export type ArtifactSource = 'ductape' | 'ductape_cli' | 'reported';
+
+/** Open work that may be the same as work just created, and why. */
+export interface ISimilarWork {
+  ref: string;
+  title: string;
+  status: WorkStatus;
+  reason: string;
 }
 
 export interface IWorkItem {
@@ -50,6 +64,8 @@ export interface IWorkItem {
   components: IWorkComponent[];
   /** What the work delivered. */
   artifacts?: IWorkArtifact[];
+  /** Only on the answer to creating it. */
+  similar?: ISimilarWork[];
   critical: boolean;
   source: string;
   plan_key: string | null;
@@ -63,6 +79,11 @@ export interface IWorkSession {
   id: string;
   agent: { id: string; client: string; name: string | null; machine: string; repo: string } | null;
   user_id: string;
+  /** The person the agent works for. */
+  owner?: { name: string; full_name: string } | null;
+  /** How the agent reached Ductape, and the client name it gave there (evidence, not proof). */
+  via?: 'mcp' | 'hook' | 'cli';
+  client_name?: string | null;
   product: string | null;
   repo: string;
   branch: string | null;
@@ -197,6 +218,85 @@ const CLIENT_NAMES: Record<string, string> = { 'claude-code': 'Claude Code', cod
 
 /** The name an agent client is shown under. */
 export const clientName = (client: string | undefined | null): string => CLIENT_NAMES[client ?? ''] ?? 'Agent';
+
+/** An agent as the board names it: its client and the person it works for. */
+export interface IAgentInfo {
+  client: string;
+  owner: { id: string; name: string } | null;
+}
+
+/** Every agent the page knows of, from open sessions and from the items' own agent directory. */
+export function agentDirectory(sessions: IWorkSession[], fromItems: Record<string, IAgentInfo> = {}): Map<string, IAgentInfo> {
+  const out = new Map<string, IAgentInfo>(Object.entries(fromItems));
+  for (const s of sessions) {
+    if (!s.agent) continue;
+    out.set(s.agent.id, { client: s.agent.client, owner: s.owner ? { id: s.user_id, name: s.owner.name } : out.get(s.agent.id)?.owner ?? null });
+  }
+  return out;
+}
+
+/** "Your Claude Code", "Ada's Claude Code", or just "Claude Code" when the person is not known. */
+export function agentLabel(info: IAgentInfo | undefined, meId?: string, client?: string | null): string {
+  const name = clientName(info?.client ?? client);
+  if (!info?.owner) return name;
+  if (meId && info.owner.id === meId) return `Your ${name}`;
+  return `${info.owner.name}${info.owner.name.endsWith('s') ? "'" : "'s"} ${name}`;
+}
+
+/** How an agent session reached Ductape, as shown beside it. */
+export function viaLabel(session: Pick<IWorkSession, 'via' | 'client_name'>): string {
+  const how = session.via === 'mcp' ? 'MCP' : session.via === 'hook' ? 'hooks' : 'the CLI';
+  return session.client_name ? `via ${how} (${session.client_name})` : `via ${how}`;
+}
+
+/**
+ * Sessions worth a row: working, or holding work. One that stopped answering with nothing claimed is quiet: a closed
+ * window, kept out of the way until Ductape ends it after an hour.
+ */
+export function splitSessions<T extends Pick<IWorkSession, 'state' | 'working_on'>>(sessions: T[]): { live: T[]; quiet: T[] } {
+  const live: T[] = [];
+  const quiet: T[] = [];
+  for (const s of sessions) (s.state === 'offline' && !s.working_on.length ? quiet : live).push(s);
+  return { live, quiet };
+}
+
+/** The line under an agent's name: the name it was given when that says more than the label, and its machine. */
+export function agentWhere(agent: { name: string | null; machine: string } | null, label: string): string {
+  if (!agent) return '';
+  return [agent.name && agent.name !== label ? agent.name : null, agent.machine].filter(Boolean).join(' · ');
+}
+
+export const SOURCE_LABEL: Record<ArtifactSource, string> = {
+  ductape: 'Checked by Ductape',
+  ductape_cli: 'Run by the Ductape CLI',
+  reported: 'Reported',
+};
+
+/** A ref short enough for one line: hashes and ids cut down, a test run named by its commit and time. */
+export function shortRef(a: Pick<IWorkArtifact, 'kind' | 'ref'>): string {
+  const ref = a.ref;
+  if (a.kind === 'test_report' && ref.includes(' @ ')) return ref.slice(ref.lastIndexOf(' @ ') + 3).replace(/T(\d\d:\d\d):\d\dZ$/, ' $1 UTC');
+  const hash = /^(sha256:)?([a-f0-9]{16,})$/i.exec(ref);
+  if (hash) return `${hash[1] ?? ''}${hash[2].slice(0, 12)}`;
+  return ref.length > 60 ? `${ref.slice(0, 57)}...` : ref;
+}
+
+/** An artifact's details in words: "47 passed, 1 failed", "prd, live, 100% of traffic". */
+export function artifactDetail(a: Pick<IWorkArtifact, 'kind' | 'meta' | 'current'>): string {
+  const m = a.meta ?? {};
+  if (a.kind === 'deployment' && a.current) {
+    const now = `${a.current.state.replace(/_/g, ' ')}, ${a.current.traffic_percent}% of traffic`;
+    const then = `${String(m.state ?? '').replace(/_/g, ' ')}, ${m.traffic_percent}% of traffic`;
+    if (now === then) return [m.env, now].filter(Boolean).join(', ');
+    return [m.env, `now ${a.current.state.replace(/_/g, ' ')} at ${a.current.traffic_percent}%`, `was ${String(m.state ?? '').replace(/_/g, ' ')} at ${m.traffic_percent}%`].filter(Boolean).join(', ');
+  }
+  if (a.kind === 'test_report' && m.passed !== undefined) return `${m.passed} passed, ${m.failed ?? 0} failed${m.result === 'failed' && !Number(m.failed) ? ` (exit ${m.exit_code})` : ''}`;
+  if (a.kind === 'test_report' && m.result) return m.result === 'passed' ? 'passed' : `failed (exit ${m.exit_code})`;
+  if (a.kind === 'deployment') return [m.env, m.state, m.traffic_percent !== undefined ? `${m.traffic_percent}% of traffic` : null].filter((v) => v !== undefined && v !== null && v !== '').join(', ');
+  if (a.kind === 'build' && m.status) return String(m.status);
+  if (a.kind === 'release' && m.version) return m.deployable === 'service' ? 'service' : '';
+  return Object.entries(m).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ');
+}
 
 /** How a component reads on a chip: its type and tag, as the SDK and the CLI name it. */
 export const componentLabel = (c: IWorkComponent): string => `${c.type}:${c.tag}`;

@@ -149,3 +149,53 @@ test('what work delivered is grouped by kind; an epic gathers its work\'s withou
   assert.equal(groups.find((g) => g.kind === 'pull_request').entries[0].from, 'W-2', 'credited to the first item that delivered it');
   assert.deepEqual(plain(w.groupArtifacts([{ ref: 'W-9' }])), []);
 });
+
+test('agents are named for their person: yours, someone else\'s, or the client alone when unknown', () => {
+  const sessions = [
+    { agent: { id: 'a1', client: 'claude-code' }, user_id: 'u-ada', owner: { name: 'Ada', full_name: 'Ada Okafor' } },
+    { agent: null, user_id: 'u-ada' },
+  ];
+  const dir = w.agentDirectory(sessions, { a2: { client: 'codex', owner: { id: 'u-bola', name: 'Bola' } }, a3: { client: 'cursor', owner: null } });
+  assert.equal(w.agentLabel(dir.get('a1'), 'u-ada'), 'Your Claude Code');
+  assert.equal(w.agentLabel(dir.get('a1'), 'u-bola'), "Ada's Claude Code");
+  assert.equal(w.agentLabel(dir.get('a2'), 'u-ada'), "Bola's Codex");
+  assert.equal(w.agentLabel({ client: 'codex', owner: { id: 'x', name: 'Jesus' } }), "Jesus' Codex");
+  assert.equal(w.agentLabel(dir.get('a3')), 'Cursor');
+  assert.equal(w.agentLabel(undefined, 'u-ada', 'codex'), 'Codex', 'an agent not in the directory falls back to its client');
+  assert.equal(w.viaLabel({ via: 'mcp', client_name: 'claude-code 2.1.0' }), 'via MCP (claude-code 2.1.0)');
+  assert.equal(w.viaLabel({ via: 'hook' }), 'via hooks');
+  assert.equal(w.viaLabel({}), 'via the CLI');
+});
+
+test('what was delivered reads in words, and says how Ductape knows it', () => {
+  assert.equal(w.artifactDetail({ kind: 'test_report', meta: { passed: 47, failed: 1, result: 'failed', exit_code: 1 } }), '47 passed, 1 failed');
+  assert.equal(w.artifactDetail({ kind: 'test_report', meta: { result: 'failed', exit_code: 3 } }), 'failed (exit 3)');
+  assert.equal(w.artifactDetail({ kind: 'deployment', meta: { env: 'prd', state: 'live', traffic_percent: 100, release: 'sha256:ab' } }), 'prd, live, 100% of traffic');
+  assert.equal(w.artifactDetail({ kind: 'build', meta: { status: 'succeeded' } }), 'succeeded');
+  assert.equal(w.artifactDetail({ kind: 'document', meta: { pages: 3 } }), 'pages 3');
+  assert.deepEqual(plain(Object.keys(w.SOURCE_LABEL)), ['ductape', 'ductape_cli', 'reported']);
+});
+
+test('long refs are cut to one line: hashes, ids, and test runs by commit and time', () => {
+  assert.equal(w.shortRef({ kind: 'release', ref: `sha256:${'7c'.repeat(32)}` }), 'sha256:7c7c7c7c7c7c');
+  assert.equal(w.shortRef({ kind: 'deployment', ref: '6ae378119925595364232f2e' }), '6ae378119925');
+  assert.equal(w.shortRef({ kind: 'test_report', ref: 'npm test @ a1b2c3d 2026-10-29T16:45:12Z' }), 'a1b2c3d 2026-10-29 16:45 UTC');
+  assert.equal(w.shortRef({ kind: 'commit', ref: '4e1f9a2' }), '4e1f9a2');
+});
+
+test('quiet sessions (stopped answering, holding nothing) are kept out of the way', () => {
+  const s = (id, state, held) => ({ id, state, working_on: held ? [{ item_id: 'x' }] : [] });
+  const { live, quiet } = w.splitSessions([s('a', 'active', false), s('b', 'offline', true), s('c', 'offline', false)]);
+  assert.deepEqual(plain(live.map((x) => x.id)), ['a', 'b'], 'an agent that stopped answering while holding work still shows');
+  assert.deepEqual(plain(quiet.map((x) => x.id)), ['c']);
+  assert.equal(w.agentWhere({ name: "Ada's Claude Code", machine: 'ada-mbp' }, "Ada's Claude Code"), 'ada-mbp', 'the label is not repeated');
+  assert.equal(w.agentWhere({ name: 'refunds bot', machine: 'ci-7' }, "Ada's Claude Code"), 'refunds bot · ci-7');
+  assert.equal(w.agentWhere(null, 'x'), '');
+});
+
+test('a deployment shows its state now beside what it was when recorded', () => {
+  const meta = { env: 'prd', state: 'live', traffic_percent: 100 };
+  assert.equal(w.artifactDetail({ kind: 'deployment', meta }), 'prd, live, 100% of traffic');
+  assert.equal(w.artifactDetail({ kind: 'deployment', meta, current: { state: 'live', traffic_percent: 100 } }), 'prd, live, 100% of traffic', 'unchanged: said once');
+  assert.equal(w.artifactDetail({ kind: 'deployment', meta, current: { state: 'rolled_back', traffic_percent: 0 } }), 'prd, now rolled back at 0%, was live at 100%');
+});

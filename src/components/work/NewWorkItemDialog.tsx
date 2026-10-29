@@ -32,7 +32,11 @@ export default function NewWorkItemDialog({ product, epics = [], defaultParent =
     mutationFn: () => createWorkItem(auth!, { title: title.trim(), body: body.trim() || undefined, product: product.tag, priority, critical, components: picked, kind, parent: parent || undefined }),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: ['work'] });
-      toast.success(`${item.ref} created`);
+      if (item.similar?.length) {
+        toast(`${item.ref} created. It may be the same work as ${item.similar.map((x) => `${x.ref} (${x.title})`).join(', ')}; cancel it from its panel if so.`, { duration: 9000 });
+      } else {
+        toast.success(`${item.ref} created`);
+      }
       onCreated(item.ref);
     },
     onError: (e) => toast.error(workErrorMessage(e)),
