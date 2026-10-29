@@ -100,3 +100,20 @@ test('the Work area opens on the remembered product, else the busiest', () => {
   assert.equal(w.defaultProduct(products, 'gone'), 'shop', 'a remembered product that no longer exists is ignored');
   assert.equal(w.defaultProduct([], null), undefined);
 });
+
+const ws = load('../src/utils/workStream.ts');
+
+test('the live stream is framed into events across chunk boundaries; keep-alives are skipped', () => {
+  const first = ws.parseSse('event: ready\ndata: {"product":"shop"}\n\n: keep-alive\n\nevent: work\ndata: {"ref":"W-');
+  assert.deepEqual(plain(first.events), [{ event: 'ready', data: { product: 'shop' } }]);
+  const second = ws.parseSse(first.rest + '3","type":"claimed"}\r\n\r\n');
+  assert.deepEqual(plain(second.events), [{ event: 'work', data: { ref: 'W-3', type: 'claimed' } }]);
+  assert.equal(second.rest, '');
+  assert.deepEqual(plain(ws.parseSse('data: not json\n\n').events), [{ event: 'message', data: 'not json' }]);
+});
+
+test('reconnects back off from 1 s to 30 s, and polling slows while the stream is live', () => {
+  assert.deepEqual([0, 1, 2, 5, 9].map(ws.reconnectDelay), [1000, 2000, 4000, 30000, 30000]);
+  assert.equal(ws.pollInterval(true), 60000);
+  assert.equal(ws.pollInterval(false), 5000);
+});

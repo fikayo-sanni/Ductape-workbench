@@ -35,10 +35,10 @@ export function describeEvent(e: IWorkEvent): string {
 const EVENT_ICON: Record<string, typeof GitCommit> = { commit: GitCommit, pull_request: GitPullRequest };
 
 /** An item, its Ductape components, what it waits on, who holds it and what happened, with the changes a person makes. */
-export default function WorkItemDrawer({ itemRef, product, agentClients, onClose, onOpen }: { itemRef: string; product?: IWorkProduct; agentClients: Map<string, string>; onClose: () => void; onOpen: (ref: string) => void }) {
+export default function WorkItemDrawer({ itemRef, live = false, product, agentClients, onClose, onOpen }: { itemRef: string; live?: boolean; product?: IWorkProduct; agentClients: Map<string, string>; onClose: () => void; onOpen: (ref: string) => void }) {
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useWorkContext(itemRef);
+  const { data, isLoading, error } = useWorkContext(itemRef, live);
   const [outcome, setOutcome] = useState('');
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['work'] });
   const act = useMutation({

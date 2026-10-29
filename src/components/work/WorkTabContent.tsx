@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useWorkAuth, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
 import { workErrorMessage } from '@/services/workServices';
+import { useWorkStream } from '@/hooks/useWorkStream';
 import { defaultProduct, summarise, type Tone } from '@/utils/workBoard';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
@@ -63,9 +64,11 @@ export default function WorkTabContent() {
     setProduct(defaultProduct(products.data, readSaved(storageKey(auth?.workspaceId))));
   }, [products.data, product, auth?.workspaceId]);
 
-  const items = useWorkItems(product);
-  const sessions = useWorkSessions(product);
-  const deps = useWorkDependencies(view === 'graph' ? product : undefined);
+  const stream = useWorkStream(auth, product);
+  const live = stream === 'live';
+  const items = useWorkItems(product, live);
+  const sessions = useWorkSessions(product, live);
+  const deps = useWorkDependencies(view === 'graph' ? product : undefined, live);
   const current = products.data?.find((p) => p.tag === product);
   const allItems = items.data?.items ?? [];
   const allSessions = sessions.data ?? [];
@@ -102,7 +105,14 @@ export default function WorkTabContent() {
               <p className={cn('flex items-center gap-1.5 text-sm', toneText[summary.tone])} data-testid="work-status">
                 {summary.tone === 'warn' ? <AlertTriangle className="h-4 w-4" /> : summary.tone === 'good' ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
                 {items.isLoading ? 'Reading work' : summary.label}
-                {items.isFetching && !items.isLoading ? <span className="text-xs text-grey-600">· live</span> : null}
+                <span
+                  className={cn('ml-1 inline-flex items-center gap-1 text-xs', live ? 'text-green' : 'text-grey-600')}
+                  title={live ? 'Changes appear as agents and people make them' : 'Re-reading every few seconds until the live connection is back'}
+                  data-testid="work-stream-state"
+                >
+                  <span className={cn('h-1.5 w-1.5 rounded-full', live ? 'animate-pulse bg-green' : stream === 'connecting' ? 'bg-grey-400' : 'bg-orange')} />
+                  {live ? 'Live' : stream === 'connecting' ? 'Connecting' : 'Reconnecting'}
+                </span>
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -173,7 +183,7 @@ export default function WorkTabContent() {
           )}
         </div>
       </div>
-      {openRef ? <WorkItemDrawer itemRef={openRef} product={current} agentClients={agentClients} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
+      {openRef ? <WorkItemDrawer itemRef={openRef} live={live} product={current} agentClients={agentClients} onClose={() => setOpenRef(null)} onOpen={setOpenRef} /> : null}
       {creating && current ? <NewWorkItemDialog product={current} onClose={() => setCreating(false)} onCreated={(ref) => { setCreating(false); setOpenRef(ref); }} /> : null}
     </div>
   );
