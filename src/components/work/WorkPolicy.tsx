@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { useWorkAuth, useWorkPolicy } from '@/hooks/useWork';
+import { StepUpCancelled, withStepUp } from './StepUp';
 import { saveWorkPolicy, workErrorMessage, type IWorkPolicy } from '@/services/workServices';
 
 type Draft = Pick<IWorkPolicy, 'approvers' | 'allow_self_approval' | 'critical_components' | 'agents_claim_unassigned'>;
@@ -33,12 +34,12 @@ export default function WorkPolicy() {
     setCritical(policy.data.critical_components.join(', '));
   }, [policy.data]);
   const save = useMutation({
-    mutationFn: () => saveWorkPolicy(auth!, { ...draft!, critical_components: critical.split(',').map((s) => s.trim()).filter(Boolean) }),
+    mutationFn: () => withStepUp(auth!, () => saveWorkPolicy(auth!, { ...draft!, critical_components: critical.split(',').map((s) => s.trim()).filter(Boolean) })),
     onSuccess: () => {
       toast.success('Work policy saved');
       queryClient.invalidateQueries({ queryKey: ['work'] });
     },
-    onError: (e) => toast.error(workErrorMessage(e)),
+    onError: (e) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); },
   });
 
   if (policy.isLoading || !draft) return <p className="text-sm text-grey-600">Reading the work policy</p>;

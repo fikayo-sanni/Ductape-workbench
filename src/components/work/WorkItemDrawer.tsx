@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useWorkAuth, useWorkContext } from '@/hooks/useWork';
 import { approveWorkItem, releaseWorkItem, sendBackWorkItem, updateWorkItem, workErrorMessage, type IWorkEvent } from '@/services/workServices';
 import { SOURCE_LABEL, agentLabel, ago, artifactDetail, shortRef, descendantIds, groupArtifacts, leaseLeft, sortComponents, type IAgentInfo, type IWorkArtifact, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
+import { StepUpCancelled, withStepUp } from './StepUp';
 import { ComponentChip, PriorityChip, StatusChip, statusLabel } from './WorkChips';
 
 /** One line of an item's history, in words. */
@@ -73,12 +74,12 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
   const [outcome, setOutcome] = useState('');
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['work'] });
   const act = useMutation({
-    mutationFn: async (fn: () => Promise<unknown>) => fn(),
+    mutationFn: async (fn: () => Promise<unknown>) => withStepUp(auth!, fn),
     onSuccess: () => {
       setOutcome('');
       refresh();
     },
-    onError: (e) => toast.error(workErrorMessage(e)),
+    onError: (e) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); },
   });
 
   if (isLoading || !data) {

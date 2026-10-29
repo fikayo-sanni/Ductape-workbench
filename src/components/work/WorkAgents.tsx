@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useWorkAuth } from '@/hooks/useWork';
 import { pauseAgent, workErrorMessage } from '@/services/workServices';
+import { StepUpCancelled, withStepUp } from './StepUp';
 import { agentLabel, agentWhere, ago, leaseLeft, splitSessions, viaLabel, type IWorkSession } from '@/utils/workBoard';
 
 /** The agent sessions open on the product: who, where, on what, and the last sign of life. */
@@ -16,12 +17,12 @@ export default function WorkAgents({ sessions, meId, onOpen }: { sessions: IWork
   const { live, quiet } = splitSessions(sessions);
   const rows = showQuiet ? [...live, ...quiet] : live;
   const pause = useMutation({
-    mutationFn: (agentId: string) => pauseAgent(auth!, agentId, 'Paused from the Workbench'),
+    mutationFn: (agentId: string) => withStepUp(auth!, () => pauseAgent(auth!, agentId, 'Paused from the Workbench')),
     onSuccess: () => {
       toast.success('Agent paused; what it held is back on the board.');
       queryClient.invalidateQueries({ queryKey: ['work'] });
     },
-    onError: (e) => toast.error(workErrorMessage(e)),
+    onError: (e) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); },
   });
 
   if (!sessions.length) {

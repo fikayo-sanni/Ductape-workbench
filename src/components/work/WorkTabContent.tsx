@@ -12,6 +12,7 @@ import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
 import WorkRules from './WorkRules';
 import WorkPolicy from './WorkPolicy';
+import { StepUpDialog } from './StepUp';
 import WorkGraph from './WorkGraph';
 import WorkItemDrawer from './WorkItemDrawer';
 import NewWorkItemDialog from './NewWorkItemDialog';
@@ -127,6 +128,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden" data-testid="work-tab">
+      <StepUpDialog />
       <div className="min-w-0 flex-1 overflow-auto bg-grey-100 p-4 md:p-6">
         <div className="mx-auto max-w-[1500px] space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

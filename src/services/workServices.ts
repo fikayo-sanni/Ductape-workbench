@@ -22,6 +22,40 @@ const params = (auth: IWorkAuth, extra: Record<string, string | undefined> = {})
 };
 const body = (auth: IWorkAuth, extra: Record<string, unknown> = {}) => ({ workspace_id: auth.workspaceId, user_id: auth.userId, public_key: auth.publicKey, ...extra });
 
+/**
+ * Proof that the person, not an agent with their sign-in, is acting: a grant from a code emailed to them, held in
+ * memory only (never in storage an agent could read) and sent with work tracker calls until it expires.
+ */
+let held: { grant: string; expiresAt: number; workspaceId: string } | null = null;
+
+export function heldGrant(workspaceId: string): string | undefined {
+  if (!held || held.workspaceId !== workspaceId || held.expiresAt <= Date.now()) return undefined;
+  return held.grant;
+}
+
+apiClient.interceptors.request.use((config) => {
+  if (held && held.expiresAt > Date.now() && typeof config.url === 'string' && config.url.startsWith(BASE)) {
+    config.headers.set?.('x-ductape-grant', held.grant);
+  }
+  return config;
+});
+
+/** Whether a refusal asks the person for a code from their email. */
+export function needsStepUp(error: unknown): boolean {
+  const e = error as { response?: { status?: number; data?: { meta?: { code?: string } } } };
+  return e?.response?.status === 403 && e?.response?.data?.meta?.code === 'STEP_UP_REQUIRED';
+}
+
+export async function startWorkStepUp(auth: IWorkAuth): Promise<{ required: boolean; sent_to?: string; expires_at?: string }> {
+  const { data } = await apiClient.post<{ data: { required: boolean; sent_to?: string; expires_at?: string } }>(`${BASE}/step-up/start`, body(auth));
+  return data.data;
+}
+
+export async function verifyWorkStepUp(auth: IWorkAuth, code: string): Promise<void> {
+  const { data } = await apiClient.post<{ data: { required: boolean; grant?: string; expires_at?: string } }>(`${BASE}/step-up/verify`, body(auth, { code }));
+  if (data.data.grant) held = { grant: data.data.grant, expiresAt: Date.parse(data.data.expires_at ?? '') || Date.now() + 15 * 60_000, workspaceId: auth.workspaceId };
+}
+
 /** The server's explanation of a refusal, so a screen can show it as written. */
 export function workErrorMessage(error: unknown): string {
   const e = error as { response?: { data?: { errors?: unknown } }; message?: string };

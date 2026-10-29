@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useWorkAuth, useWorkRules } from '@/hooks/useWork';
 import { RULE_KINDS, createWorkRule, deleteWorkRule, updateWorkRule, workErrorMessage, type INewWorkRule, type IWorkRule, type RuleKind } from '@/services/workServices';
+import { StepUpCancelled, withStepUp } from './StepUp';
 import { ago, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
 
 const field = 'rounded-md border border-grey-400 bg-white px-2.5 py-1.5 text-sm text-grey';
@@ -36,14 +37,14 @@ function NewRule({ product, onDone }: { product: IWorkProduct; onDone: () => voi
         threshold: { failures, within_minutes: within },
         item: { priority, critical },
       };
-      return createWorkRule(auth!, input);
+      return withStepUp(auth!, () => createWorkRule(auth!, input));
     },
     onSuccess: (rule) => {
       toast.success(`Rule added: ${rule.description}`);
       queryClient.invalidateQueries({ queryKey: ['work', 'rules'] });
       onDone();
     },
-    onError: (e) => toast.error(workErrorMessage(e)),
+    onError: (e) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); },
   });
 
   return (
@@ -94,9 +95,9 @@ function RuleRow({ rule, onOpenItem, itemRef }: { rule: IWorkRule; onOpenItem: (
   const auth = useWorkAuth();
   const queryClient = useQueryClient();
   const change = useMutation({
-    mutationFn: (fn: () => Promise<unknown>) => fn(),
+    mutationFn: (fn: () => Promise<unknown>) => withStepUp(auth!, fn),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['work', 'rules'] }),
-    onError: (e) => toast.error(workErrorMessage(e)),
+    onError: (e) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); },
   });
   return (
     <li className="flex items-start gap-3 border-t border-grey-400 px-4 py-3 first:border-t-0" data-testid={`work-rule-${rule.id}`}>
