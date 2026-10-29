@@ -110,6 +110,32 @@ export async function completeWorkItem(auth: IWorkAuth, ref: string, outcome: st
   return data.data;
 }
 
+/** An item waiting for approval, with who finished it and since when. */
+export interface IApprovalItem extends IWorkItem {
+  waiting_since: string;
+  finished_by: { type: 'user' | 'agent'; user_id: string; agent_id: string | null } | null;
+  /** The person asking finished it, or their own agent did. */
+  own: boolean;
+}
+
+/** What waits for a person's approval: every product, or one. */
+export async function fetchWorkApprovals(auth: IWorkAuth, product?: string): Promise<{ items: IApprovalItem[]; agents: Record<string, IAgentInfo> }> {
+  const { data } = await apiClient.get<{ data: { items: IApprovalItem[]; agents: Record<string, IAgentInfo> } }>(`${BASE}/approvals?${params(auth, { product })}`);
+  return data.data;
+}
+
+/** Approves work waiting for approval: it is completed and the approval recorded with the note. */
+export async function approveWorkItem(auth: IWorkAuth, ref: string, note: string): Promise<{ item: IWorkItem; unblocked: string[] }> {
+  const { data } = await apiClient.post<{ data: { item: IWorkItem; unblocked: string[] } }>(`${BASE}/items/${encodeURIComponent(ref)}/approve`, body(auth, { note: note || undefined }));
+  return data.data;
+}
+
+/** Sends work waiting for approval back to whoever did it, saying what to change. */
+export async function sendBackWorkItem(auth: IWorkAuth, ref: string, note: string): Promise<IWorkItem> {
+  const { data } = await apiClient.post<{ data: IWorkItem }>(`${BASE}/items/${encodeURIComponent(ref)}/request-changes`, body(auth, { note }));
+  return data.data;
+}
+
 /** Takes an item back from whoever holds it, so it can be picked up again. */
 export async function releaseWorkItem(auth: IWorkAuth, ref: string, note: string): Promise<IWorkItem> {
   const { data } = await apiClient.post<{ data: IWorkItem }>(`${BASE}/items/${encodeURIComponent(ref)}/release`, body(auth, { note }));

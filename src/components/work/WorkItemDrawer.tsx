@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Bot, GitCommit, GitPullRequest, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWorkAuth, useWorkContext } from '@/hooks/useWork';
-import { completeWorkItem, releaseWorkItem, updateWorkItem, workErrorMessage, type IWorkEvent } from '@/services/workServices';
+import { approveWorkItem, releaseWorkItem, sendBackWorkItem, updateWorkItem, workErrorMessage, type IWorkEvent } from '@/services/workServices';
 import { SOURCE_LABEL, agentLabel, ago, artifactDetail, shortRef, descendantIds, groupArtifacts, leaseLeft, sortComponents, type IAgentInfo, type IWorkArtifact, type IWorkItem, type IWorkProduct } from '@/utils/workBoard';
 import { ComponentChip, PriorityChip, StatusChip, statusLabel } from './WorkChips';
 
@@ -22,6 +22,8 @@ export function describeEvent(e: IWorkEvent): string {
     case 'commit': return `Commit ${d.sha}${d.message ? `: ${d.message}` : ''}`;
     case 'pull_request': return `Pull request ${d.url}`;
     case 'components_changed': return `Ductape components: ${d.components?.join(', ')}`;
+    case 'approved': return d.note ? `Approved: ${d.note}` : 'Approved';
+    case 'changes_requested': return `Sent back: ${d.note}`;
     case 'artifact_added': return `Delivered ${d.artifacts?.map((a: any) => `${String(a.kind).replace('_', ' ')} ${a.ref}`).join(', ')}`;
     case 'completed': return `Completed${d.outcome ? `: ${d.outcome}` : ''}`;
     case 'blocked': return `Blocked: ${d.reason}${d.blocker ? ` (waits on ${d.blocker})` : ''}`;
@@ -67,7 +69,10 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['work'] });
   const act = useMutation({
     mutationFn: async (fn: () => Promise<unknown>) => fn(),
-    onSuccess: () => refresh(),
+    onSuccess: () => {
+      setOutcome('');
+      refresh();
+    },
     onError: (e) => toast.error(workErrorMessage(e)),
   });
 
@@ -206,6 +211,21 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
 
         {item.outcome ? <section><h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-grey-600">Outcome</h3><p className="text-sm text-grey">{item.outcome}</p></section> : null}
 
+        {item.approvals?.length ? (
+          <section data-testid="work-approvals-history">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-grey-600">Approval</h3>
+            <ul className="space-y-1.5">
+              {item.approvals.map((a, n) => (
+                <li key={n} className="text-xs">
+                  <span className={a.decision === 'approved' ? 'font-medium text-green' : 'font-medium text-orange'}>{a.decision === 'approved' ? 'Approved' : 'Sent back'}</span>
+                  <span className="text-grey-600"> by {a.by?.user_id === meId ? 'you' : 'a person'} · {ago(a.at)}</span>
+                  {a.note ? <p className="text-grey">{a.note}</p> : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-grey-600">History</h3>
           <ol className="space-y-2 border-l border-grey-400 pl-3">
@@ -224,16 +244,29 @@ export default function WorkItemDrawer({ itemRef, live = false, product, epics =
 
       <footer className="space-y-2 border-t border-grey-400 p-4">
         {item.status === 'awaiting_approval' ? (
-          <div className="space-y-2">
-            <input
+          <div className="space-y-2" data-testid="work-approve">
+            <p className="text-xs text-grey-600">This work waits for a person. Approve it to complete it, or send it back to whoever did it with what to change.</p>
+            <textarea
               value={outcome}
               onChange={(e) => setOutcome(e.target.value)}
-              placeholder="What you checked before approving"
+              rows={2}
+              placeholder="What you checked, or what needs to change"
               className="w-full rounded-md border border-grey-400 bg-white px-3 py-2 text-sm"
             />
-            <Button className="w-full" disabled={act.isPending || !outcome.trim()} onClick={() => act.mutate(() => completeWorkItem(auth!, item.ref, outcome.trim()))}>
-              Approve and complete
-            </Button>
+            <div className="flex gap-2">
+              <Button className="flex-1" disabled={act.isPending} onClick={() => act.mutate(() => approveWorkItem(auth!, item.ref, outcome.trim()))}>
+                Approve
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={act.isPending || !outcome.trim()}
+                title={outcome.trim() ? undefined : 'Say what needs to change first'}
+                onClick={() => act.mutate(() => sendBackWorkItem(auth!, item.ref, outcome.trim()))}
+              >
+                Send back
+              </Button>
+            </div>
           </div>
         ) : null}
         <div className="flex flex-wrap gap-2">

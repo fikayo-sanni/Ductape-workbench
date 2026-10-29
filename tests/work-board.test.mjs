@@ -199,3 +199,10 @@ test('a deployment shows its state now beside what it was when recorded', () => 
   assert.equal(w.artifactDetail({ kind: 'deployment', meta, current: { state: 'live', traffic_percent: 100 } }), 'prd, live, 100% of traffic', 'unchanged: said once');
   assert.equal(w.artifactDetail({ kind: 'deployment', meta, current: { state: 'rolled_back', traffic_percent: 0 } }), 'prd, now rolled back at 0%, was live at 100%');
 });
+
+test('how long something has waited reads in its largest whole unit', () => {
+  assert.equal(w.waited('2026-10-29T07:48:00Z', NOW), '12m');
+  assert.equal(w.waited('2026-10-29T05:00:00Z', NOW), '3h');
+  assert.equal(w.waited('2026-10-26T08:00:00Z', NOW), '3d');
+  assert.equal(w.waited('2026-10-29T09:00:00Z', NOW), '0m', 'a clock a little ahead is not negative');
+});

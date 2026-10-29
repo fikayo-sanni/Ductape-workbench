@@ -38,6 +38,14 @@ export interface IWorkArtifact {
 
 export type ArtifactSource = 'ductape' | 'ductape_cli' | 'reported';
 
+/** A person's decision on work that waited for approval. */
+export interface IWorkApproval {
+  decision: 'approved' | 'changes_requested';
+  note: string | null;
+  at: string;
+  by: { type: 'user' | 'agent'; user_id: string; agent_id: string | null } | null;
+}
+
 /** Open work that may be the same as work just created, and why. */
 export interface ISimilarWork {
   ref: string;
@@ -66,6 +74,8 @@ export interface IWorkItem {
   artifacts?: IWorkArtifact[];
   /** Only on the answer to creating it. */
   similar?: ISimilarWork[];
+  /** A person's decisions when it waited for approval, oldest first. */
+  approvals?: IWorkApproval[];
   critical: boolean;
   source: string;
   plan_key: string | null;
@@ -441,4 +451,12 @@ export function groupArtifacts(sources: Array<{ ref: string; artifacts?: IWorkAr
     }
   }
   return ARTIFACT_ORDER.filter((k) => byKind.has(k)).map((kind) => ({ kind, label: ARTIFACT_LABEL[kind], entries: byKind.get(kind)! }));
+}
+
+/** How long something has waited, in the largest whole unit: "12m", "3h", "2d". */
+export function waited(since: string, now = Date.now()): string {
+  const m = Math.max(0, Math.floor((now - Date.parse(since)) / 60_000));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }

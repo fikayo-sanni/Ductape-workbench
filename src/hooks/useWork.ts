@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { pollInterval } from '@/utils/workStream';
 import {
+  fetchWorkApprovals,
   fetchWorkContext,
   fetchWorkDependencies,
   fetchWorkItems,
@@ -61,6 +62,17 @@ export function useWorkContext(ref: string | null, live = false) {
     queryKey: ['work', 'context', auth?.workspaceId, ref],
     queryFn: () => fetchWorkContext(auth!, ref!),
     enabled: Boolean(auth && ref),
+    refetchInterval: pollInterval(live),
+  });
+}
+
+/** What waits for a person's approval: every product, or one. */
+export function useWorkApprovals(product?: string, live = false) {
+  const auth = useWorkAuth();
+  return useQuery({
+    queryKey: ['work', 'approvals', auth?.workspaceId, product ?? '*'],
+    queryFn: () => fetchWorkApprovals(auth!, product),
+    enabled: Boolean(auth),
     refetchInterval: pollInterval(live),
   });
 }
