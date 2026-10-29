@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Bot, CheckCircle2, ShieldCheck, Zap, Circle, KanbanSquare, Loader2, Network, Plus } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, Scale, ShieldCheck, Zap, Circle, KanbanSquare, Loader2, Network, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useWorkApprovals, useWorkAuth, useWorkRules, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
@@ -11,11 +11,12 @@ import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
 import WorkRules from './WorkRules';
+import WorkPolicy from './WorkPolicy';
 import WorkGraph from './WorkGraph';
 import WorkItemDrawer from './WorkItemDrawer';
 import NewWorkItemDialog from './NewWorkItemDialog';
 
-type View = 'board' | 'graph' | 'agents' | 'approvals' | 'rules';
+type View = 'board' | 'graph' | 'agents' | 'approvals' | 'rules' | 'policy';
 
 const toneText: Record<Tone, string> = { good: 'text-green', warn: 'text-orange', bad: 'text-red', neutral: 'text-grey-600' };
 
@@ -111,6 +112,8 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
     { id: 'agents', label: 'Agents', icon: Bot, count: splitSessions(allSessions).live.length },
     { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: approvals.data?.items.length },
     { id: 'rules', label: 'Rules', icon: Zap, count: rules.data?.filter((r) => r.enabled).length },
+    // The policy is the workspace's, so it lives in the workspace Work tab, not in each product's.
+    ...(fixedProduct ? [] : [{ id: 'policy' as View, label: 'Policy', icon: Scale }]),
   ];
   const openFrom = (ref: string, itemProduct: string) => {
     if (!fixedProduct && itemProduct !== product) {
@@ -213,6 +216,8 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
             ) : (
               <div className="rounded-xl border border-grey-400 bg-white p-8 text-center text-sm text-grey-600">No plans yet. An agent publishes one with ductape_work_publish_plan, or a person with ductape work plan publish.</div>
             )
+          ) : view === 'policy' ? (
+            <WorkPolicy />
           ) : view === 'rules' && current ? (
             <WorkRules product={current} items={allItems} onOpen={setOpenRef} />
           ) : view === 'approvals' ? (

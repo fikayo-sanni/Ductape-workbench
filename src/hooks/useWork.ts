@@ -3,6 +3,7 @@ import { useAuth } from '@/store/useAuth';
 import { pollInterval } from '@/utils/workStream';
 import {
   fetchWorkApprovals,
+  fetchWorkPolicy,
   fetchWorkRules,
   fetchWorkContext,
   fetchWorkDependencies,
@@ -86,4 +87,10 @@ export function useWorkRules(product: string | undefined) {
     queryFn: () => fetchWorkRules(auth!, product!),
     enabled: Boolean(auth && product),
   });
+}
+
+/** The workspace's work policy. */
+export function useWorkPolicy() {
+  const auth = useWorkAuth();
+  return useQuery({ queryKey: ['work', 'policy', auth?.workspaceId], queryFn: () => fetchWorkPolicy(auth!), enabled: Boolean(auth) });
 }

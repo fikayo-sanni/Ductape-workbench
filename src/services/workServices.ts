@@ -209,3 +209,23 @@ export async function updateWorkRule(auth: IWorkAuth, id: string, patch: Partial
 export async function deleteWorkRule(auth: IWorkAuth, id: string): Promise<void> {
   await apiClient.delete(`${BASE}/rules/${encodeURIComponent(id)}`, { data: body(auth) });
 }
+
+/** The workspace's work policy, with the asking person's role and whether they may change it. */
+export interface IWorkPolicy {
+  approvers: 'members' | 'admins';
+  allow_self_approval: boolean;
+  critical_components: string[];
+  agents_claim_unassigned: boolean;
+  your_role: 'owner' | 'admin' | 'collaborator';
+  can_change: boolean;
+}
+
+export async function fetchWorkPolicy(auth: IWorkAuth): Promise<IWorkPolicy> {
+  const { data } = await apiClient.get<{ data: IWorkPolicy }>(`${BASE}/policy?${params(auth)}`);
+  return data.data;
+}
+
+export async function saveWorkPolicy(auth: IWorkAuth, policy: Partial<Omit<IWorkPolicy, 'your_role' | 'can_change'>>): Promise<IWorkPolicy> {
+  const { data } = await apiClient.put<{ data: IWorkPolicy }>(`${BASE}/policy`, body(auth, policy as Record<string, unknown>));
+  return data.data;
+}
