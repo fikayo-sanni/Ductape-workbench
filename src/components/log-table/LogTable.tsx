@@ -59,6 +59,10 @@ export type ProcessLog = ILog['logs']['data'][number];
 export type FetchLogPayload = (log: ProcessLog) => Promise<unknown>;
 
 // Helper to safely parse and format log data
+/** What to show for a log whose request and response were removed by the plan's log retention. */
+export const prunedPayloadText = (prunedAt: string | Date): string =>
+  `The request and response were removed on ${new Date(prunedAt).toLocaleDateString()}, after your plan's log retention. The rest of this log is kept.`;
+
 export const formatLogData = (data: any): string => {
   if (data === undefined || data === null) {
     return 'No data available';
@@ -435,13 +439,15 @@ export function LogCard({ log, fetchPayload }: { log: ProcessLog; fetchPayload?:
 
 /** The payload text shown in an expanded row: the row's own data, or one fetched when it is opened. */
 function usePayloadText(log: ProcessLog, fetchPayload: FetchLogPayload | undefined, expanded: boolean): string {
-  const lazy = log.data === undefined && !!fetchPayload;
+  const pruned = (log as { data_pruned_at?: string }).data_pruned_at;
+  const lazy = !pruned && log.data === undefined && !!fetchPayload;
   const query = useQuery({
     queryKey: ['log-payload', log._id || log.process_id],
     queryFn: () => fetchPayload!(log),
     enabled: lazy && expanded,
     staleTime: Infinity,
   });
+  if (pruned) return prunedPayloadText(pruned);
   if (!lazy) return formatLogData(log.data);
   if (query.isLoading) return 'Loading...';
   if (query.isError) return 'The payload could not be loaded.';
