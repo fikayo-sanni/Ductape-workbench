@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { pollInterval } from '@/utils/workStream';
+import { workServiceUnavailable } from '@/utils/workBoard';
 import {
   fetchWorkApprovals,
   fetchWorkPolicy,
@@ -24,7 +25,13 @@ export function useWorkAuth(): IWorkAuth | undefined {
 
 export function useWorkProducts() {
   const auth = useWorkAuth();
-  return useQuery({ queryKey: ['work', 'products', auth?.workspaceId], queryFn: () => fetchWorkProducts(auth!), enabled: Boolean(auth) });
+  return useQuery({
+    queryKey: ['work', 'products', auth?.workspaceId],
+    queryFn: () => fetchWorkProducts(auth!),
+    enabled: Boolean(auth),
+    // Asking again and again does not help when the work tracker is not there at all.
+    retry: (count, error) => !workServiceUnavailable(error) && count < 3,
+  });
 }
 
 export function useWorkItems(product: string | undefined, live = false) {

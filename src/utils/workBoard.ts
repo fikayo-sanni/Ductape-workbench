@@ -465,3 +465,17 @@ export function waited(since: string, now = Date.now()): string {
   const h = Math.floor(m / 60);
   return h < 48 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
+
+/**
+ * Whether an error means the work tracker cannot be reached at all (not deployed on this server, or down), rather
+ * than refusing a request: no response (a network or CORS failure), or the gateway answering that nothing serves the
+ * path (404, 405) or that the service is unavailable (502, 503, 504). A refusal from the work tracker itself carries
+ * its own message and is shown as it is.
+ */
+export function workServiceUnavailable(error: unknown): boolean {
+  const e = error as { response?: { status?: number; data?: { errors?: unknown } }; request?: unknown; code?: string } | null;
+  if (!e || typeof e !== 'object') return false;
+  if (!e.response) return Boolean(e.request) || e.code === 'ERR_NETWORK';
+  if (typeof e.response.data?.errors === 'string') return false;
+  return [404, 405, 502, 503, 504].includes(e.response.status ?? 0);
+}

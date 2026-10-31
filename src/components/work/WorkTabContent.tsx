@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useWorkApprovals, useWorkAuth, useWorkRules, useWorkDependencies, useWorkItems, useWorkProducts, useWorkSessions } from '@/hooks/useWork';
 import { workErrorMessage } from '@/services/workServices';
 import { useWorkStream } from '@/hooks/useWorkStream';
-import { agentDirectory, defaultProduct, splitSessions, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
+import { agentDirectory, defaultProduct, splitSessions, workServiceUnavailable, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
 import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
@@ -100,6 +100,21 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
 
   if (products.isLoading) {
     return <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  }
+  if (products.error && workServiceUnavailable(products.error)) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6" data-testid="work-unavailable">
+        <div className="max-w-md rounded-xl border border-grey-400 bg-white p-5 text-center">
+          <p className="text-sm font-semibold text-grey">The work tracker is not available here yet</p>
+          <p className="mt-1 text-sm text-grey-600">
+            Ductape could not reach it on this server. Nothing in your workspace is affected; try again later.
+          </p>
+          <Button className="mt-4" size="sm" variant="outline" disabled={products.isFetching} onClick={() => void products.refetch()}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
   }
   if (products.error) {
     return <div className="p-6 text-sm text-red">Could not read the workspace's products: {workErrorMessage(products.error)}</div>;

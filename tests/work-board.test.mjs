@@ -207,3 +207,31 @@ test('how long something has waited reads in its largest whole unit', () => {
   assert.equal(w.waited('2026-10-26T08:00:00Z', NOW), '3d');
   assert.equal(w.waited('2026-10-29T09:00:00Z', NOW), '0m', 'a clock a little ahead is not negative');
 });
+
+test('the work tracker counts as unavailable only when it cannot be reached, judged on real HTTP errors', async () => {
+  const http = await import('node:http');
+  const { default: axios } = await import('axios');
+  const server = http.createServer((req, res) => {
+    if (req.url === '/refused') {
+      res.writeHead(403, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ status: false, errors: 'Only a person can do this' }));
+    }
+    const status = Number(req.url.slice(1)) || 404;
+    res.writeHead(status, { 'content-type': 'text/html' });
+    res.end('<html><body>nginx</body></html>');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const fail = (url) => axios.get(url).then(() => null, (e) => e);
+  try {
+    for (const status of [404, 405, 502, 503, 504]) assert.equal(w.workServiceUnavailable(await fail(`${base}/${status}`)), true, `${status}`);
+    assert.equal(w.workServiceUnavailable(await fail(`${base}/500`)), false, 'a server error is shown as it is');
+    assert.equal(w.workServiceUnavailable(await fail(`${base}/refused`)), false, 'a refusal from the work tracker is shown as it is');
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+  // Nothing listening: no response at all.
+  assert.equal(w.workServiceUnavailable(await fail(base)), true);
+  assert.equal(w.workServiceUnavailable(null), false);
+  assert.equal(w.workServiceUnavailable(new Error('plain')), false);
+});
