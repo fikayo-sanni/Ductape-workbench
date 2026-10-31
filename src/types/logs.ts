@@ -104,6 +104,8 @@ export interface ILog {
       name: string;
       message: string;
       data: string;
+      /** When log retention removed the request and response; the rest of the log is kept. */
+      data_pruned_at?: string;
       status: string;
       timestamp: string;
       start?: number;

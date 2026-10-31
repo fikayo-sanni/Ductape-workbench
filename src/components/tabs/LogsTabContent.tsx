@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatLogData, prunedPayloadText } from '@/components/log-table/LogTable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useDebouncedValue } from '@wojtekmaj/react-hooks';
 import {
@@ -234,7 +235,7 @@ function LogsCards({ processes }: { processes: ProcessLog[] }) {
               <p className="text-xs text-grey-600 mb-2 font-medium">Request Data</p>
               <pre className="bg-white border border-grey-400 rounded-md p-3 overflow-x-auto">
                 <code className="text-xs font-mono text-grey">
-                  {JSON.stringify(JSON.parse(log.data), null, 2)}
+                  {log.data_pruned_at ? prunedPayloadText(log.data_pruned_at) : formatLogData(log.data)}
                 </code>
               </pre>
             </div>
