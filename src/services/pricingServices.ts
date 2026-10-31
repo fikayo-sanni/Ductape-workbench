@@ -1,6 +1,7 @@
 import apiClient from "@/config/axiosinstance";
 import { PricingApiResponse, ChangePlanRequest, ChangePlanResponse, PricingPlan, TotalExpenseRecord, TotalIncomeRecord, DeletePricingResponse, BillingResponse, BillingApiResponse, SubscriptionResponse } from "@/types/pricing";
 import toast from "react-hot-toast";
+import type { IWorkspaceUsage } from '@/utils/usage';
 
 
 
@@ -237,7 +238,15 @@ const createSubscription = async (data: {
   }
 };
 
+/** The workspace's measured log usage for its billing period (or this month): GET /pricing/v1/usage/:workspace_id. */
+const fetchWorkspaceUsage = async (data: { user_id: string; public_key: string; workspace_id: string }): Promise<IWorkspaceUsage> => {
+  const { user_id, public_key, workspace_id } = data;
+  const response = await apiClient.get<{ data: IWorkspaceUsage }>(`/pricing/v1/usage/${workspace_id}`, { params: { user_id, public_key } });
+  return response.data.data;
+};
+
 const pricingServices = {
+  fetchWorkspaceUsage,
   createBundle,
   fetchBundles,
   fetchTotalIncome,
