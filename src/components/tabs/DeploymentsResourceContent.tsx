@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { fetchDeploymentJournal, type IDeployAuth } from '@/services/deployServices';
 import { useDeployAuth, useProductDeployments, useProductEnvironments } from '@/hooks/useProductDeployments';
 import {
-  deployErrorMessage, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, shortHash, totals,
+  deployErrorMessage, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, rolloutView, shortHash, totals,
   type DeployableKind, type IDeployment, type IJournalEntry,
 } from '@/utils/deployments';
 import { DataTable, Panel, Pill, SectionEmpty, SectionError, SectionLoading, SectionPage, SegmentedTabs, StatTile, StatusDot, type SectionTint } from './ProductSection';
@@ -17,6 +17,7 @@ import DeploymentPlanDialog from '@/components/deploy/DeploymentPlanDialog';
 import PlansPanel from '@/components/deploy/PlansPanel';
 import PolicyDialog from '@/components/deploy/PolicyDialog';
 import VersionsPanel from '@/components/deploy/VersionsPanel';
+import RolloutPanel from '@/components/deploy/RolloutPanel';
 import { ControlButton } from '@/components/deploy/controls';
 
 const TINT: SectionTint = { bg: 'bg-primary/10', text: 'text-primary' };
@@ -276,8 +277,14 @@ function DeploymentDetail({ auth, deployment, onChange }: { auth: IDeployAuth; d
   });
   const lastGood = deployment.lastGoodReleaseHash && deployment.lastGoodReleaseHash !== deployment.releaseHash ? deployment.lastGoodReleaseHash : undefined;
   const intents = deploymentIntents(deployment, caps.data);
+  const rollout = rolloutView(deployment, journal.data ?? []);
   return (
     <>
+      {rollout ? (
+        <Panel title="Rollout" description="The new release beside the last good one. Change the split, or roll back, from the plan buttons below.">
+          <RolloutPanel view={rollout} />
+        </Panel>
+      ) : null}
       <Panel title="Change this deployment" description="Each change is a plan you review and approve first. Nothing happens in your cloud until you apply it.">
         {/* When one reason holds them all back, it is said once rather than under every button. */}
         {(() => {

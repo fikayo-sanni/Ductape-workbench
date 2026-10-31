@@ -285,3 +285,90 @@ export const DEPLOY_PROVIDERS: ReadonlySet<string> = new Set(['gcp', 'aws', 'azu
 
 /** Whether a connection was created with the deploy scope, which a build or deploy through it needs. */
 export const hasDeployScope = (scopes: readonly string[] | undefined): boolean => Boolean(scopes?.includes('deploy'));
+
+/** One side of a rollout: the release taking part of the traffic, or the last good one keeping the rest. */
+export interface IRolloutSide {
+  release: string;
+  revision?: string;
+  /** The share of traffic Ductape asked the cloud to send it. */
+  trafficPercent: number;
+  /** The share the cloud reported, when its last answer named this revision. */
+  observedPercent?: number;
+}
+
+export interface IRolloutView {
+  candidate: IRolloutSide & {
+    url?: string;
+    since?: string;
+    /** The checks run against it before (or right after) it took traffic. */
+    verification?: { at: string; attempts?: number; passed: number; total: number; status?: number };
+  };
+  stable: IRolloutSide;
+  /** Still moving: the cloud has not reported the final split yet. */
+  moving: boolean;
+}
+
+const asNumber = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+/** What the cloud last reported as the split between revisions, newest entry first. */
+function observedSplit(journal: IJournalEntry[]): Array<{ revision: string; percent: number }> | undefined {
+  for (const entry of [...journal].sort((a, b) => b.seq - a.seq)) {
+    const o = entry.observed ?? {};
+    const list = Array.isArray(o.traffic) ? o.traffic : Array.isArray(o.live) ? o.live : undefined;
+    if (!list) continue;
+    const split = list
+      .map((t: any) => ({ revision: String(t?.revision ?? t?.version ?? ''), percent: asNumber(t?.percent) ?? asNumber(t?.weight) ?? 0 }))
+      .filter((t: { revision: string }) => t.revision);
+    if (split.length) return split;
+  }
+  return undefined;
+}
+
+/** The latest verification of the candidate in the journal: service checks (paths and statuses) or a function call. */
+function latestVerification(journal: IJournalEntry[]): IRolloutView['candidate']['verification'] {
+  for (const entry of [...journal].sort((a, b) => b.seq - a.seq)) {
+    const o = entry.observed ?? {};
+    const v: any = entry.step === 'verified' ? o : o.verifiedAfterTraffic;
+    if (!v || typeof v !== 'object') continue;
+    if (Array.isArray(v.checks)) {
+      const passed = v.checks.filter((c: any) => c?.ok === true || (asNumber(c?.status) !== undefined && c.status >= 200 && c.status < 400)).length;
+      return { at: entry.at, attempts: asNumber(v.attempts), passed, total: v.checks.length };
+    }
+    const status = asNumber(v.status);
+    if (status !== undefined) return { at: entry.at, attempts: asNumber(v.attempts), passed: status >= 200 && status < 400 ? 1 : 0, total: 1, status };
+  }
+  return undefined;
+}
+
+/**
+ * The candidate release beside the last good one, while a release takes part of the traffic or is being checked before it
+ * does. Undefined when there is no rollout: a first release, or one already serving everything.
+ */
+export function rolloutView(deployment: IDeployment, journal: IJournalEntry[] = []): IRolloutView | undefined {
+  const stableRelease = deployment.lastGoodReleaseHash;
+  if (!stableRelease || stableRelease === deployment.releaseHash) return undefined;
+  const moving = deployment.state === 'verifying' || deployment.state === 'promoting';
+  const traffic = Math.min(100, Math.max(0, deployment.trafficPercent));
+  if (!moving && (traffic <= 0 || traffic >= 100)) return undefined;
+  const split = observedSplit(journal);
+  const observed = (revision?: string) => (revision && split ? split.find((s) => s.revision === revision)?.percent : undefined);
+  const since = [...journal].sort((a, b) => b.seq - a.seq).find((e) => e.step === 'promoted_partially' || e.step === 'provisioned')?.at;
+  return {
+    moving,
+    candidate: {
+      release: deployment.releaseHash,
+      revision: deployment.currentRevision,
+      trafficPercent: moving && deployment.state === 'verifying' ? 0 : traffic,
+      observedPercent: observed(deployment.currentRevision),
+      url: deployment.candidateUrl,
+      since,
+      verification: latestVerification(journal),
+    },
+    stable: {
+      release: stableRelease,
+      revision: deployment.lastGoodRevision,
+      trafficPercent: moving && deployment.state === 'verifying' ? 100 : 100 - traffic,
+      observedPercent: observed(deployment.lastGoodRevision),
+    },
+  };
+}
