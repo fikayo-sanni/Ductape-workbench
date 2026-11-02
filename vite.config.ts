@@ -11,6 +11,8 @@ const GATEWAY_PROXY_PATHS = [
   "/apps",
   "/marketplace",
   "/logs",
+  // The logs API is also served under /log/v1. A bare "/log" would capture the app's own /login page, so it is a pattern.
+  "^/log/",
   "/integrations",
   "/webhooks",
   "/notifications",

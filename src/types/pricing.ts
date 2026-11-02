@@ -306,8 +306,25 @@ export interface BillingPlan {
   isPayAsYouGo: boolean;
   resourcePricing?: ResourcePricing;
   customFeatures: any[];
+  /** Percent off twelve months of the monthly price when billed annually. */
+  annualDiscountPercent?: number;
+  /** Yearly billing is offered on this plan. Set by the pricing service only when it is ready to take the payment. */
+  annualBillingEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export type BillingCycle = 'monthly' | 'annual';
+
+/** Annual billing is for fixed-price paid plans. Enterprise is by contract and pay as you go has no fixed price. */
+export function isAnnualEligible(plan: Pick<BillingPlan, 'monthlyPrice' | 'isPayAsYouGo' | 'isEnterprise' | 'annualBillingEnabled'>): boolean {
+  return plan.annualBillingEnabled === true && (plan.monthlyPrice ?? 0) > 0 && !plan.isPayAsYouGo && !plan.isEnterprise;
+}
+
+/** What is charged up front for a year: twelve months less the plan's annual discount (10% unless the plan says otherwise). */
+export function annualTotal(plan: Pick<BillingPlan, 'monthlyPrice' | 'annualDiscountPercent'>): number {
+  const discount = plan.annualDiscountPercent ?? 10;
+  return Math.round((plan.monthlyPrice ?? 0) * 12 * (1 - discount / 100) * 100) / 100;
 }
 
 export interface BillingApiResponse {
@@ -334,6 +351,8 @@ export interface ChangePlanRequest {
   subscription_id: string;
   newPlanId: string;
   reason: string;
+  /** 'annual' moves the subscription to yearly billing, on newPlanId. */
+  billingCycle?: 'annual';
 }
 
 // Subscribe interface

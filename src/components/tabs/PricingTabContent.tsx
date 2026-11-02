@@ -1,3 +1,4 @@
+import YearlyBillingCard from '@/components/billing/YearlyBillingCard';
 import React, {useEffect, useState} from 'react';
 import {
   Plus,
@@ -1897,6 +1898,7 @@ export default function PricingTabContent() {
                 </div>
               </div>
             </section>
+            <YearlyBillingCard plan={planInfo} subscription={subscriptionInfo} />
 
             <div className="bg-white rounded-lg border border-grey-400 shadow-sm">
               <div className=" flex gap-2 p-4 border-b border-grey-400">

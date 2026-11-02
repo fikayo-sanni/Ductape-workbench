@@ -212,6 +212,7 @@ const createSubscription = async (data: {
   payload: {
     plan_id: string;
     workspace_id: string;
+    billingCycle?: 'monthly' | 'annual';
   };
 }): Promise<SubscriptionResponse> => {
 

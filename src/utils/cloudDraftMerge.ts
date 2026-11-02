@@ -194,6 +194,9 @@ export function mergeDatabaseEnvFromDraft(
         : undefined;
     const next: Record<string, unknown> = {
       ...env,
+      ...(draftEnv.username != null ? { username: draftEnv.username } : {}),
+      ...(draftEnv.redis ? { redis: draftEnv.redis } : {}),
+      ...(draftEnv.tlsCa ? { tlsCa: draftEnv.tlsCa } : {}),
       cloud,
       linkedFromCloud: true,
       connection_url: String(draftEnv.connection_url || env.connection_url || ''),

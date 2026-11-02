@@ -107,6 +107,7 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
   }, [productEnvs]);
 
   const dbTypeDefaults: Record<string, { port: string; example: string }> = {
+    redis: { port: '6379', example: 'rediss://default:password@host:6379/0' },
     postgresql: {
       port: '5432',
       example: 'postgresql://username:password@localhost:5432/database_name',
@@ -407,6 +408,7 @@ export default function NewDatabaseTabContent({ tabId, data }: NewDatabaseTabCon
                   <SelectItem value="postgresql">PostgreSQL</SelectItem>
                   <SelectItem value="mysql">MySQL</SelectItem>
                   <SelectItem value="mongodb">MongoDB</SelectItem>
+                  <SelectItem value="redis">Redis</SelectItem>
                   <SelectItem value="redis">Redis</SelectItem>
                 </SelectContent>
               </Select>

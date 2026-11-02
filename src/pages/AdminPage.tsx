@@ -14,6 +14,7 @@ import adminServices, {
   getInstanceStatus,
   hasAdminToken,
   InstanceStatusResponse,
+  setInstanceTelemetry,
 } from '@/services/adminServices';
 import { useAuth } from '@/store/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -937,13 +938,85 @@ function WorkspacesTab({ instanceStatus }: { instanceStatus: InstanceStatusRespo
 }
 
 // ---------------------------------------------------------------------------
+// Usage reporting (opt-in)
+// ---------------------------------------------------------------------------
+
+const TELEMETRY_FIELDS: Array<[keyof NonNullable<InstanceStatusResponse['telemetry']>['preview'], string]> = [
+  ['platform_version', 'Platform version'],
+  ['users', 'Users'],
+  ['workspaces', 'Workspaces'],
+  ['products', 'Products'],
+  ['apps', 'Apps'],
+  ['imported_apps', 'Imported marketplace apps'],
+];
+
+function TelemetryPanel({ telemetry, onChanged }: { telemetry: NonNullable<InstanceStatusResponse['telemetry']>; onChanged: () => void }) {
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async () => {
+    if (!user?._id || !user?.public_key) return;
+    setSaving(true);
+    try {
+      await setInstanceTelemetry({ enabled: !telemetry.enabled, user_id: user._id, public_key: user.public_key });
+      toast.success(telemetry.enabled ? 'Usage reporting turned off' : 'Usage reporting turned on');
+      onChanged();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { errors?: string } }; message?: string };
+      toast.error(error?.response?.data?.errors || error?.message || 'Could not change usage reporting');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-10px border border-grey-400 bg-white p-6 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-grey">Usage reporting</h2>
+          <p className="text-sm text-grey-600 mt-1">
+            Off unless you turn it on. When on, this instance sends the figures below to Ductape with its daily licence check, so we can
+            see how many installs are running and support them. Nothing else leaves your instance: no names, emails, content or credentials.
+          </p>
+        </div>
+        <Button onClick={toggle} disabled={saving || telemetry.locked_off} variant={telemetry.enabled ? 'outline' : 'default'} className="shrink-0">
+          {saving ? <Loader className="h-4 w-4 animate-spin" /> : telemetry.enabled ? 'Turn off' : 'Turn on'}
+        </Button>
+      </div>
+
+      {telemetry.locked_off && (
+        <p className="text-xs text-grey-600">Reporting is locked off by <code>DUCTAPE_TELEMETRY=off</code> in this instance's environment.</p>
+      )}
+
+      <div>
+        <p className="text-xs font-medium text-grey-600 mb-2">What would be sent</p>
+        <dl className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {TELEMETRY_FIELDS.map(([key, label]) => (
+            <div key={key} className="rounded-md bg-grey-100 px-3 py-2">
+              <dt className="text-[11px] text-grey-600">{label}</dt>
+              <dd className="text-sm font-medium text-grey tabular-nums">{String(telemetry.preview[key])}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="text-xs text-grey-600 mt-3">
+          {telemetry.enabled
+            ? telemetry.reported_at ? `Last sent ${formatDate(telemetry.reported_at)}.` : 'Nothing sent yet. The next licence check will send it.'
+            : 'Reporting is off.'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Instance Health tab
 // ---------------------------------------------------------------------------
 
-function InstanceHealthTab({ instanceStatus, onValidate, validating }: {
+function InstanceHealthTab({ instanceStatus, onValidate, validating, onRefresh }: {
   instanceStatus: InstanceStatusResponse | undefined;
   onValidate: () => void;
   validating: boolean;
+  onRefresh: () => void;
 }) {
   if (!instanceStatus) {
     return (
@@ -1011,6 +1084,8 @@ function InstanceHealthTab({ instanceStatus, onValidate, validating }: {
           </Button>
         </div>
       </div>
+
+      {instanceStatus.telemetry && <TelemetryPanel telemetry={instanceStatus.telemetry} onChanged={onRefresh} />}
     </div>
   );
 }
@@ -1107,6 +1182,7 @@ export default function AdminPage() {
                 instanceStatus={instanceStatus}
                 onValidate={handleValidate}
                 validating={validating}
+                onRefresh={handleRefreshStatus}
               />
             </TabsContent>
           </div>
