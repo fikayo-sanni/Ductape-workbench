@@ -34,7 +34,7 @@ interface CloudLinkPanelProps {
   envSlug: string;
   storageProvider?: 'aws' | 'azure' | 'gcp';
   /** Narrows cloud connections for `componentType: 'databases'` — mongodb_atlas only supports 'mongodb'. */
-  databaseEngine?: 'postgresql' | 'mongodb' | 'mysql';
+  databaseEngine?: 'postgresql' | 'mongodb' | 'mysql' | 'redis';
   /** Narrows cloud connections for `componentType: 'graphs'` — neo4j only supports neo4j_aura, neptune only supports aws. */
   graphType?: string;
   onDraftApplied: (draftEnv: Record<string, unknown>) => void;
@@ -99,6 +99,7 @@ const GRAPH_PROVIDER_BY_TYPE: Record<string, string> = {
 
 /** Services that support create-new via provision API */
 const PROVISIONABLE_SERVICES = new Set([
+  'elasticache', 'memorystore', 'azure-redis',
   's3',
   'sqs',
   'gcs',
@@ -155,6 +156,10 @@ function servicesForProvider(
   storageProvider?: string,
   databaseEngine?: string,
 ): string[] {
+  if (kind === 'databases' && databaseEngine === 'redis') {
+    const service = ({ aws: 'elasticache', gcp: 'memorystore', azure: 'azure-redis' } as Record<string, string>)[provider];
+    return service ? [service] : [];
+  }
   const map = SERVICE_BY_KIND[kind];
   if (kind === 'storage' && storageProvider) {
     if (storageProvider === 'aws') return map.aws;
@@ -200,6 +205,7 @@ export default function CloudLinkPanel({
   const [existingGraphUsername, setExistingGraphUsername] = useState('');
   const [mongoDbName, setMongoDbName] = useState('');
   const [graphDatabase, setGraphDatabase] = useState('');
+  const [redis, setRedis] = useState<Record<string, unknown>>({});
 
   const awsVpcService = service === 'rds' || service === 'neptune';
   const awsVpcResourceType = service === 'neptune' ? 'neptune' : 'rds';
@@ -330,13 +336,14 @@ export default function CloudLinkPanel({
   const selectedResourceHasStoredCredentials = useMemo(() => {
     if (!resourceId) return false;
     const match = engineFilteredResources.find((r: { id?: string }) => r.id === resourceId);
+    if (service === 'memorystore' || service === 'azure-redis') return true;
     return Boolean((match as { metadata?: { hasStoredCredentials?: boolean } })?.metadata?.hasStoredCredentials);
-  }, [engineFilteredResources, resourceId]);
+  }, [engineFilteredResources, resourceId, service]);
 
   const needsExistingDbPassword =
     componentType === 'databases' &&
     Boolean(resourceId) &&
-    (service === 'rds' || service === 'cloudsql' || service === 'postgresql' || service === 'mysql') &&
+    (service === 'elasticache' || service === 'rds' || service === 'cloudsql' || service === 'postgresql' || service === 'mysql') &&
     !selectedResourceHasStoredCredentials;
 
   // Aura shows the auto-generated database password only once, at instance creation, in the Aura
@@ -409,6 +416,7 @@ export default function CloudLinkPanel({
       linkedFromCloud: true,
       instance,
       region: overrides?.region ?? region,
+      ...(databaseEngine === 'redis' ? { redis, username: existingGraphUsername } : {}),
       importExisting: linkingExisting,
       credentialsStored: linkingExisting && credentialsStored,
       ...autoSecurityGroupsDraft(tags),
@@ -416,6 +424,11 @@ export default function CloudLinkPanel({
       ...(dbName ? { dbName } : {}),
     });
   };
+
+  useEffect(() => {
+    if (databaseEngine === 'redis' && selectedConnection) notifyDatabaseCloudSelection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redis, existingGraphUsername]);
 
   // Re-sync once `selectedResourceHasStoredCredentials` actually reflects the selected
   // resource. `notifyDatabaseCloudSelection` is also called synchronously right after
@@ -741,7 +754,7 @@ export default function CloudLinkPanel({
         )}
       </div>
 
-      {service && ['s3', 'sqs', 'rds', 'cloudsql', 'neptune', 'opensearch', 'spanner-graph', 'vertex-vector-search', 'postgresql', 'mysql'].includes(service) && (
+      {service && ['elasticache', 'memorystore', 'azure-redis', 's3', 'sqs', 'rds', 'cloudsql', 'neptune', 'opensearch', 'spanner-graph', 'vertex-vector-search', 'postgresql', 'mysql'].includes(service) && (
         <div>
           <Label>{service === 'cloudsql' ? 'Region (GCP)' : regionProvider === 'azure' ? 'Location (Azure)' : 'Region'}</Label>
           <CloudRegionSelect
@@ -910,9 +923,12 @@ export default function CloudLinkPanel({
         </div>
       )}
 
+      {databaseEngine === 'redis' && service === 'elasticache' && resourceId && (
+        <div><Label>Redis ACL username (optional)</Label><Input value={existingGraphUsername} onChange={e => setExistingGraphUsername(e.target.value)} placeholder="default" /></div>
+      )}
       {needsExistingDbPassword ? (
         <div className="space-y-1.5">
-          <Label htmlFor={`existing-db-password-${envSlug}`}>Master password</Label>
+          <Label htmlFor={`existing-db-password-${envSlug}`}>{databaseEngine === 'redis' ? 'Redis AUTH token / password' : 'Master password'}</Label>
           <Input
             id={`existing-db-password-${envSlug}`}
             type="password"
@@ -926,7 +942,7 @@ export default function CloudLinkPanel({
                 credentialsStored: false,
               });
             }}
-            placeholder="RDS master user password"
+            placeholder={databaseEngine === 'redis' ? 'Redis AUTH token or ACL password' : 'Database master password'}
             autoComplete="new-password"
           />
           <p className="text-xs text-grey-600 leading-relaxed">
@@ -936,8 +952,9 @@ export default function CloudLinkPanel({
         </div>
       ) : selectedResourceHasStoredCredentials && componentType === 'databases' && resourceId ? (
         <p className="text-xs text-emerald-700 leading-relaxed rounded-md border border-emerald-500/25 bg-emerald-500/5 p-3">
-          Credentials for this instance are already in workspace secrets from a previous Ductape
-          link — no password needed.
+          {service === 'memorystore' || service === 'azure-redis'
+            ? 'Ductape retrieves the Redis credential through your cloud connection and stores it as a workspace secret.'
+            : 'Credentials for this instance are already in workspace secrets — no password needed.'}
         </p>
       ) : null}
 
@@ -989,8 +1006,9 @@ export default function CloudLinkPanel({
         </div>
       ) : selectedResourceHasStoredCredentials && componentType === 'graphs' && resourceId ? (
         <p className="text-xs text-emerald-700 leading-relaxed rounded-md border border-emerald-500/25 bg-emerald-500/5 p-3">
-          Credentials for this instance are already in workspace secrets from a previous Ductape
-          link — no password needed.
+          {service === 'memorystore' || service === 'azure-redis'
+            ? 'Ductape retrieves the Redis credential through your cloud connection and stores it as a workspace secret.'
+            : 'Credentials for this instance are already in workspace secrets — no password needed.'}
         </p>
       ) : null}
 
@@ -1075,6 +1093,26 @@ export default function CloudLinkPanel({
                 }
               />
             </div>
+            {databaseEngine === 'redis' && (
+              <div className="w-full space-y-3">
+                <p className="text-xs text-grey-600">Creates a paid managed Redis instance on your cloud account. Your application needs private network access; Azure also requires a private endpoint after creation.</p>
+                <details className="text-xs text-grey-600"><summary>Cloud setup and permissions</summary>
+                  <p className="mt-2">{service === 'memorystore'
+                    ? 'Enable the Memorystore Redis API. Allow redis.instances.list, redis.instances.create and redis.instances.getAuthString. Prepare Private Service Access on the selected VPC. Use the returned CA certificate when connecting over TLS.'
+                    : service === 'elasticache'
+                    ? 'Allow elasticache:DescribeReplicationGroups and elasticache:CreateReplicationGroup. Supply an existing cache subnet group and security groups that allow your application to connect on port 6379.'
+                    : 'Allow Microsoft.Cache/redisEnterprise read/write, databases read/write and databases/listKeys/action. After creation, configure a private endpoint and DNS for application connectivity.'}</p>
+                </details>
+                {(service === 'memorystore' ? [
+                  ['authorizedNetwork', 'VPC network resource path'], ['memorySizeGb', 'Memory (GB, default 1)'],
+                ] : service === 'elasticache' ? [
+                  ['cacheSubnetGroupName', 'Cache subnet group'], ['securityGroupIds', 'Security group IDs (comma separated)'], ['nodeType', 'Node type (e.g. cache.t4g.micro)'],
+                ] : [['resourceGroup', 'Resource group'], ['sku', 'Managed Redis SKU (e.g. Balanced_B0)']]).map(([key, label]) => (
+                  <div key={key}><Label>{label}</Label><Input className="mt-1.5" value={Array.isArray(redis[key]) ? (redis[key] as string[]).join(',') : String(redis[key] ?? '')}
+                    onChange={e => setRedis(previous => ({ ...previous, [key]: key === 'securityGroupIds' ? e.target.value.split(',').map(v => v.trim()).filter(Boolean) : key === 'memorySizeGb' ? Number(e.target.value) : e.target.value }))} /></div>
+                ))}
+              </div>
+            )}
             {(service === 'rds' || service === 'cloudsql') && (
               <div className="flex-1 min-w-[160px]">
                 <Label>Database name</Label>

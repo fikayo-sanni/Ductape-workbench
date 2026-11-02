@@ -58,6 +58,8 @@ interface EnvConnection {
   importExisting?: boolean;
   /** Master password for existing RDS / Cloud SQL import (create input only) */
   masterPassword?: string;
+  redis?: Record<string, unknown>;
+  tlsCa?: string;
   /** Password already in workspace secrets from a prior Ductape link */
   credentialsStored?: boolean;
   /** MongoDB Atlas only: database name to inject into the connection string */
@@ -154,7 +156,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
     },
     redis: {
       port: '6379',
-      example: 'redis://username:password@localhost:6379',
+      example: 'rediss://default:password@host:6379/0',
     },
     neo4j: {
       port: '7687',
@@ -192,6 +194,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
       { value: 'postgresql', label: 'PostgreSQL' },
       { value: 'mysql', label: 'MySQL' },
       { value: 'mongodb', label: 'MongoDB' },
+      { value: 'redis', label: 'Redis' },
       { value: 'dynamodb', label: 'DynamoDB' },
     ];
   };
@@ -439,6 +442,9 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
           .map(env => {
             const envConfig: any = {
               slug: env.slug,
+              ...(env.redis ? { redis: env.redis } : {}),
+              ...(formData.type === 'redis' && env.username ? { username: env.username } : {}),
+              ...(env.tlsCa ? { tlsCa: env.tlsCa } : {}),
             };
 
             // Vector database fields
@@ -522,7 +528,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                   if (env.credentialsStored) {
                     envConfig.credentialsStored = true;
                   } else if (env.masterPassword?.trim()) {
-                    envConfig.masterPassword = env.masterPassword.trim();
+                    envConfig.masterPassword = formData.type === 'redis' ? env.masterPassword : env.masterPassword.trim();
                   }
                 }
               } else {
@@ -719,7 +725,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                 const showCloudLink =
                   Boolean(sdkProxy && formData.tag) &&
                   ((databaseType === 'database' &&
-                    (formData.type === 'postgresql' ||
+                    (formData.type === 'redis' || formData.type === 'postgresql' ||
                       formData.type === 'mysql' ||
                       formData.type === 'mongodb')) ||
                     (databaseType === 'graph' &&
@@ -748,7 +754,7 @@ export default function InlineDatabaseForm({ product, databaseType, onCancel, on
                         }
                         databaseEngine={
                           databaseType === 'database'
-                            ? (formData.type as 'postgresql' | 'mysql' | 'mongodb')
+                            ? (formData.type as 'postgresql' | 'mysql' | 'mongodb' | 'redis')
                             : undefined
                         }
                         graphType={databaseType === 'graph' ? formData.type : undefined}
