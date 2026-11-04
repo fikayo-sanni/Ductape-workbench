@@ -31,6 +31,10 @@ export default function NewPlanDialog({
   const [env, setEnv] = useState('');
   const [targetKey, setTargetKey] = useState('');
   const [region, setRegion] = useState('');
+  const [network, setNetwork] = useState('');
+  const [subnet, setSubnet] = useState('');
+  const [awsSubnets, setAwsSubnets] = useState('');
+  const [awsGroups, setAwsGroups] = useState('');
   const [traffic, setTraffic] = useState('10');
   const [problem, setProblem] = useState<string | undefined>();
 
@@ -48,15 +52,25 @@ export default function NewPlanDialog({
   useEffect(() => { if (open) { setProblem(undefined); } }, [open]);
   useEffect(() => { if (target && !region) setRegion(target.defaultRegion); }, [target, region]);
 
+  const vpcEgress = target?.targetKind === 'cloud_run' && (network.trim() || subnet.trim())
+    ? { network: network.trim(), subnet: subnet.trim() }
+    : undefined;
+  const splitIds = (value: string) => value.split(',').map(id => id.trim()).filter(Boolean);
+  const supportsAwsEgress = target?.targetKind === 'aws_lambda' || target?.targetKind === 'aws_fargate';
+  const awsVpcEgress = supportsAwsEgress && (awsSubnets.trim() || awsGroups.trim())
+    ? { subnetIds: splitIds(awsSubnets), securityGroupIds: splitIds(awsGroups) }
+    : undefined;
+  const planInput = { product: productTag, release, env, target, region, trafficPercent: traffic, vpcEgress, awsVpcEgress };
+
   const create = useMutation({
-    mutationFn: () => createPlan(auth, buildNewPlanRequest({ product: productTag, release, env, target, region, trafficPercent: traffic })),
+    mutationFn: () => createPlan(auth, buildNewPlanRequest(planInput)),
     onSuccess: async (plan) => { toast.success('Plan made. Nothing has changed in your cloud yet.'); await refresh(); onCreated(plan.id); },
     onError: (error) => setProblem(controlError(error, 'The plan could not be made.').message),
   });
 
   const submit = () => {
     setProblem(undefined);
-    try { buildNewPlanRequest({ product: productTag, release, env, target, region, trafficPercent: traffic }); } catch (e) { setProblem((e as Error).message); return; }
+    try { buildNewPlanRequest(planInput); } catch (e) { setProblem((e as Error).message); return; }
     create.mutate();
   };
 
@@ -97,6 +111,26 @@ export default function NewPlanDialog({
           <Field label="Region" htmlFor="plan-region" hint="A location in that cloud, such as europe-west2, eu-west-2 or uksouth.">
             <Input id="plan-region" value={region} onChange={(event) => setRegion(event.target.value)} disabled={!gate.enabled} placeholder="europe-west2" />
           </Field>
+          {target?.targetKind === 'cloud_run' ? (
+            <>
+              <Field label="VPC network" htmlFor="plan-network" hint="Optional. Use a subnet with Cloud NAT and a reserved IP for static outbound traffic. Setting these fields replaces the deployment runtime settings.">
+                <Input id="plan-network" value={network} onChange={(event) => setNetwork(event.target.value)} />
+              </Field>
+              <Field label="VPC subnet" htmlFor="plan-subnet" hint="The subnet must be in the deployment region.">
+                <Input id="plan-subnet" value={subnet} onChange={(event) => setSubnet(event.target.value)} />
+              </Field>
+            </>
+          ) : null}
+          {supportsAwsEgress ? (
+            <>
+              <Field label="Private subnet IDs" htmlFor="plan-aws-subnets" hint="Optional. Enter comma-separated IDs for subnets routed through a NAT gateway with an Elastic IP. Setting these fields replaces the deployment runtime settings.">
+                <Input id="plan-aws-subnets" value={awsSubnets} onChange={(event) => setAwsSubnets(event.target.value)} />
+              </Field>
+              <Field label="Security group IDs" htmlFor="plan-aws-groups" hint="Comma-separated IDs in the same VPC.">
+                <Input id="plan-aws-groups" value={awsGroups} onChange={(event) => setAwsGroups(event.target.value)} />
+              </Field>
+            </>
+          ) : null}
           <TrafficPicker value={traffic} onChange={setTraffic} />
         </div>
         {problem ? <Note tone="bad">{problem}</Note> : null}
