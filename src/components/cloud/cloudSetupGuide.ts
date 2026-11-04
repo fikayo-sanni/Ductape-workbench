@@ -379,6 +379,9 @@ export const CLOUD_PROVIDER_GUIDES: Record<CloudProvider, CloudProviderGuide> = 
         { title: 'Build and deploy', body: 'Once the connection is active, build with ductape deploy builds create, plan and apply, and watch the result under Deployments in the product.' },
       ],
       troubleshooting: [
+        { problem: 'Static egress creation fails with a Compute API or IAM error', fix: 'Enable compute.googleapis.com in the connected project. Grant the connection service account the Compute permissions named in the error, then retry the deployment. The journal records the outbound IPv4 once the network is ready.' },
+        { problem: 'Cloud Run cannot attach the VPC subnet', fix: 'Check that the subnet belongs to the selected VPC and is in the deployment region and connected project. If Google Cloud reports an IAM denial, check the principal and permission named in the error.' },
+        { problem: 'Cloud Run starts but Atlas connections time out or fail during TLS setup', fix: 'Check that Cloud NAT serves the selected subnet and uses a reserved IPv4. Verify the actual outbound IP from the revision and allowlist it as a /32 in Atlas. If the Ductape resolver returns 502, check the integrations logs for that request separately.' },
         { problem: '"<API> has not been used in project <id> before or it is disabled"', fix: 'Enable that API (step 1), wait a minute or two, and try again.' },
         { problem: 'Validation lists missing permissions and the roles that grant them', fix: 'Grant exactly those roles to the Ductape service account on the project (step 2) and validate again.' },
         { problem: '"caller does not have permission to act as service account …" when a build or deploy starts', fix: 'Grant roles/iam.serviceAccountUser to the Ductape service account on the project. Cloud Build and Cloud Run run as a service account, and the Ductape account must be allowed to act as it.' },

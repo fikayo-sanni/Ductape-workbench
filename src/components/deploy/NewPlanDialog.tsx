@@ -11,6 +11,7 @@ import {
 } from '@/hooks/useDeployControls';
 import { useProductEnvironments } from '@/hooks/useProductDeployments';
 import { buildNewPlanRequest, controlError, newPlanGate, releaseFitsTarget, targetOptions } from '@/utils/deployControls';
+import { getCloudRegionOptions } from '@/utils/cloudRegions';
 import { describePolicy, compareVersions } from '@/utils/deployments';
 import { Field, NativeSelect, Note } from './controls';
 import TrafficPicker from './TrafficPicker';
@@ -30,7 +31,8 @@ export default function NewPlanDialog({
   const [releaseHash, setReleaseHash] = useState('');
   const [env, setEnv] = useState('');
   const [targetKey, setTargetKey] = useState('');
-  const [region, setRegion] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [provision, setProvision] = useState(false);
   const [network, setNetwork] = useState('');
   const [subnet, setSubnet] = useState('');
   const [awsSubnets, setAwsSubnets] = useState('');
@@ -42,6 +44,12 @@ export default function NewPlanDialog({
   const targets = useMemo(() => targetOptions(connections.data ?? [], caps.data), [connections.data, caps.data]);
   const release = (releases.data ?? []).find((r) => r.releaseHash === releaseHash);
   const target = targets.find((t) => t.key === targetKey);
+  const provider = target?.provider;
+  const regionOptions = provider === 'gcp' || provider === 'aws' || provider === 'azure'
+    ? getCloudRegionOptions(provider)
+    : [];
+  const defaultRegion = target?.defaultRegion ?? '';
+  const region = selectedRegion || defaultRegion;
   const activeEnvs = (environments.data ?? []).filter((e) => e.active);
   const policy = activeEnvs.find((e) => e.slug === env)?.policy;
   const sortedReleases = useMemo(
@@ -50,10 +58,9 @@ export default function NewPlanDialog({
   );
 
   useEffect(() => { if (open) { setProblem(undefined); } }, [open]);
-  useEffect(() => { if (target && !region) setRegion(target.defaultRegion); }, [target, region]);
 
-  const vpcEgress = target?.targetKind === 'cloud_run' && (network.trim() || subnet.trim())
-    ? { network: network.trim(), subnet: subnet.trim() }
+  const vpcEgress = target?.targetKind === 'cloud_run' && (provision || network.trim() || subnet.trim())
+    ? { network: network.trim(), subnet: subnet.trim(), ...(provision ? { provision: true } : {}) }
     : undefined;
   const splitIds = (value: string) => value.split(',').map(id => id.trim()).filter(Boolean);
   const supportsAwsEgress = target?.targetKind === 'aws_lambda' || target?.targetKind === 'aws_fargate';
@@ -70,6 +77,10 @@ export default function NewPlanDialog({
 
   const submit = () => {
     setProblem(undefined);
+    if (target && regionOptions.length > 0 && !region) {
+      setProblem('Choose a deployment region.');
+      return;
+    }
     try { buildNewPlanRequest(planInput); } catch (e) { setProblem((e as Error).message); return; }
     create.mutate();
   };
@@ -103,17 +114,31 @@ export default function NewPlanDialog({
             </NativeSelect>
           </Field>
           <Field label="Cloud connection" htmlFor="plan-connection" hint={target && !target.enabled ? target.reason : undefined}>
-            <NativeSelect id="plan-connection" value={targetKey} onChange={(event) => { setTargetKey(event.target.value); setRegion(''); }} disabled={!gate.enabled}>
+            <NativeSelect id="plan-connection" value={targetKey} onChange={(event) => { setTargetKey(event.target.value); setSelectedRegion(''); setProvision(false); }} disabled={!gate.enabled}>
               <option value="">Choose a connection</option>
               {targets.map((t) => <option key={t.key} value={t.key}>{t.label}{t.enabled ? '' : ' - unavailable'}</option>)}
             </NativeSelect>
           </Field>
-          <Field label="Region" htmlFor="plan-region" hint="A location in that cloud, such as europe-west2, eu-west-2 or uksouth.">
-            <Input id="plan-region" value={region} onChange={(event) => setRegion(event.target.value)} disabled={!gate.enabled} placeholder="europe-west2" />
-          </Field>
+          {provider !== 'cloudflare' ? (
+            <Field label="Region" htmlFor="plan-region" hint={target ? undefined : 'Choose a cloud connection first.'}>
+              <NativeSelect id="plan-region" value={region} onChange={(event) => setSelectedRegion(event.target.value)} disabled={!gate.enabled || !target}>
+                <option value="" disabled>Choose a region</option>
+                {defaultRegion && !regionOptions.some((option) => option.value === defaultRegion) ? (
+                  <option value={defaultRegion}>{defaultRegion} (connection default)</option>
+                ) : null}
+                {regionOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+          ) : null}
           {target?.targetKind === 'cloud_run' ? (
             <>
-              <Field label="VPC network" htmlFor="plan-network" hint="Optional. Use a subnet with Cloud NAT and a reserved IP for static outbound traffic. Setting these fields replaces the deployment runtime settings.">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={provision} onChange={(event) => setProvision(event.target.checked)} />
+                Create static egress network
+              </label>
+              <Field label="VPC network" htmlFor="plan-network" hint="Enter the network name to create or an existing network name. Setting these fields replaces the deployment runtime settings.">
                 <Input id="plan-network" value={network} onChange={(event) => setNetwork(event.target.value)} />
               </Field>
               <Field label="VPC subnet" htmlFor="plan-subnet" hint="The subnet must be in the deployment region.">

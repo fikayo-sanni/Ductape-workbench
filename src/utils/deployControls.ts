@@ -376,7 +376,7 @@ export interface INewPlanInput {
   target: ITargetOption | undefined;
   region: string;
   trafficPercent: number | string;
-  vpcEgress?: { network: string; subnet: string };
+  vpcEgress?: { network: string; subnet: string; provision?: boolean };
   awsVpcEgress?: { subnetIds: string[]; securityGroupIds: string[] };
 }
 
