@@ -99,6 +99,12 @@ export default function PlanReviewDialog({ auth, planId, onClose }: { auth: IDep
               {detail.warnings.length > 0 ? <Note tone="warn">{detail.warnings.join(' ')}</Note> : null}
 
               <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                {detail.desired.runtime?.vpcEgress ? (
+                  <Fact label="Cloud Run VPC egress"><code>{JSON.stringify(detail.desired.runtime.vpcEgress)}</code></Fact>
+                ) : null}
+                {detail.desired.runtime?.awsVpcEgress ? (
+                  <Fact label="AWS VPC egress"><code>{JSON.stringify(detail.desired.runtime.awsVpcEgress)}</code></Fact>
+                ) : null}
                 <Fact label="Traffic to the release">{formatTraffic(detail.desired.trafficPercent)}</Fact>
                 <Fact label="Release"><span className="font-mono" title={detail.desired.releaseHash}>{shortHash(detail.desired.releaseHash)}</span></Fact>
                 <Fact label="Image">{detail.release ? <span className="font-mono" title={detail.release.imageDigest}>{shortHash(detail.release.imageDigest)}</span> : '-'}</Fact>

@@ -376,9 +376,12 @@ export interface INewPlanInput {
   target: ITargetOption | undefined;
   region: string;
   trafficPercent: number | string;
+  vpcEgress?: { network: string; subnet: string };
+  awsVpcEgress?: { subnetIds: string[]; securityGroupIds: string[] };
 }
 
 export interface INewPlanRequest {
+  runtime?: { vpcEgress?: INewPlanInput['vpcEgress']; awsVpcEgress?: INewPlanInput['awsVpcEgress'] };
   product: string;
   kind: 'function' | 'service';
   function?: string;
@@ -413,11 +416,17 @@ export function buildNewPlanRequest(input: INewPlanInput): INewPlanRequest {
   if (!traffic.ok) throw new Error(traffic.error);
   if (input.target.targetKind === 'aws_ecs_express' && traffic.value !== 100) throw new Error('ECS Express Mode cannot split traffic: AWS runs its own canary on every update. Use 100%, or deploy to Fargate to control the split.');
   const region = input.region.trim();
+  const vpcEgress = input.vpcEgress;
+  if (vpcEgress && (!vpcEgress.network || !vpcEgress.subnet)) {
+    throw new Error('Enter both the GCP VPC network and subnet names.');
+  }
   const name = input.release.kind === 'service' ? { service: input.release.name } : { function: input.release.name };
   return {
     product: input.product, kind: input.release.kind, ...name, version: input.release.version, env: input.env,
     target: { kind: input.target.targetKind, connection: input.target.connectionTag, ...(region ? { region } : {}) },
     releaseHash: input.release.releaseHash, trafficPercent: traffic.value,
+    ...(vpcEgress ? { runtime: { vpcEgress } } : {}),
+    ...(input.awsVpcEgress ? { runtime: { awsVpcEgress: input.awsVpcEgress } } : {}),
   };
 }
 
