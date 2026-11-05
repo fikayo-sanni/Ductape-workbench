@@ -189,10 +189,10 @@ export default function CloudSidebar() {
                   key={c.id}
                   onClick={() => handleConnectionClick(c)}
                   className={cn(
-                    'group p-2.5 border-b transition-all flex items-center gap-2.5 cursor-pointer',
+                    'group p-2.5 border-b border-grey-400 transition-colors flex items-center gap-2.5 cursor-pointer',
                     isSelected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-grey-300 hover:border-primary/50 hover:bg-grey-100/80',
+                      ? 'bg-primary/10'
+                      : 'hover:bg-grey-100',
                   )}
                 >
                   <CloudProviderIcon
