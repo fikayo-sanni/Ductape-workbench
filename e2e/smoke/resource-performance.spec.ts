@@ -20,6 +20,10 @@ for(const kind of ['database', 'vector', 'graph', 'storage']) {
     await expect(page.getByText('12,000', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('+100.0% vs previous period')).toBeVisible();
     await expect(page.getByText('Latency distribution', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Review operations' }).click();
+    await expect(page.getByLabel('Query ranking')).toHaveValue('failing');
+    await page.getByRole('group', { name: 'Performance time period' }).getByRole('button', { name: '4h', exact: true }).click();
+    await expect.poll(() => requests.some(url => { const params = new URL(url).searchParams; return Date.parse(params.get('end_date')!) - Date.parse(params.get('start_date')!) === 4 * 3600000; })).toBeTruthy();
     expect(requests[0]).toContain(`/resources/${kind}/core/performance/000000000000000000000001`);
     expect(requests[0]).toContain('env=snd');
     await page.getByRole('button', { name: /find-active-users.*query shape/ }).click();
