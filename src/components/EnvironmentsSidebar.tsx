@@ -185,8 +185,10 @@ export default function EnvironmentsSidebar() {
               <div
                 key={env._id}
                 className={cn(
-                  'p-3 border-b border-grey-400 cursor-pointer hover:border-primary transition-colors',
-                  selectedEnvId === env._id && 'border-primary bg-blue-400'
+                  'p-3 border-b border-grey-400 cursor-pointer transition-colors',
+                  selectedEnvId === env._id
+                    ? 'bg-primary/10'
+                    : 'hover:bg-grey-100'
                 )}
                 onClick={() => setSelectedEnvId(env._id)}
               >

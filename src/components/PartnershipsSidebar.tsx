@@ -302,8 +302,10 @@ export default function PartnershipsSidebar() {
                     key={partnership._id}
                     onClick={() => handlePartnershipClick(partnership)}
                     className={cn(
-                      'group p-2 border-b border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors cursor-pointer dark:hover:bg-grey-400/30',
-                      selectedPartnershipId === partnership._id && 'border-primary bg-blue-400 dark:bg-primary/20'
+                      'group p-2 border-b border-grey-400 transition-colors cursor-pointer',
+                      selectedPartnershipId === partnership._id
+                        ? 'bg-primary/10'
+                        : 'hover:bg-grey-100'
                     )}
                   >
                     <div className="flex items-start gap-2">
@@ -400,8 +402,10 @@ export default function PartnershipsSidebar() {
                 <div
                   key={brief._id}
                   className={cn(
-                    'group p-3 border-b border-grey-400 hover:border-primary transition-colors',
-                    selectedBriefId === brief._id && 'border-primary bg-blue-400 dark:bg-primary/20'
+                    'group p-3 border-b border-grey-400 transition-colors',
+                    selectedBriefId === brief._id
+                      ? 'bg-primary/10'
+                      : 'hover:bg-grey-100'
                   )}
                 >
                   <div className="flex items-start gap-2">
