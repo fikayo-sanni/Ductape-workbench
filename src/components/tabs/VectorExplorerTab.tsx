@@ -1,3 +1,4 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Boxes,
@@ -72,7 +73,6 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { JsonViewer } from '@/components/JsonViewer';
@@ -2006,15 +2006,7 @@ await ductape.init();`,
         </div>
       </div>
 
-      <ActivityTimelinePanel
-        title="Activity timeline"
-        kind="vector"
-        productTag={vector.productTag}
-        componentTag={vector.vector}
-        env={currentEnvSlug}
-        countLabel="operations"
-        enabled={!!vector.productTag}
-      />
+      <ResourcePerformanceOverview kind="vector" productTag={vector.productTag} resourceTag={vector.vector} env={currentEnvSlug} />
 
       {/* Quick Actions */}
       <div>

@@ -1,3 +1,4 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Share2,
@@ -76,7 +77,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -5096,15 +5096,7 @@ await ductape.init();`,
               </div>
             </div>
 
-            <ActivityTimelinePanel
-              title="Activity timeline"
-              kind="graph"
-              productTag={graph.productTag}
-              componentTag={graph.tag}
-              env={graph.env.slug}
-              countLabel="operations"
-              enabled={!!graph.productTag}
-            />
+            <ResourcePerformanceOverview kind="graph" productTag={graph.productTag} resourceTag={graph.tag} env={graph.env.slug} />
 
             {/* Quick Actions */}
             <div>

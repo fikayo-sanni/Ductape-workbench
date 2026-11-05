@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAuth } from '/src/store/useAuth.tsx';
+import ResourcePerformanceOverview from '/src/components/performance/ResourcePerformanceOverview.tsx';
+import '/src/index.css';
+useAuth.getState().setUser({ _id: 'fixture-user', public_key: 'fixture-public', auth_token: 'fixture-token', workspaces: [] });
+useAuth.getState().setCurrentWorkspaceId('000000000000000000000001');
+const params = new URLSearchParams(location.search);
+if(params.get('dark')) document.documentElement.classList.add('dark');
+const kind = params.get('kind') || 'database';
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider, { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) }, React.createElement('div', { className: 'bg-grey-100 p-6 min-h-screen' }, React.createElement(ResourcePerformanceOverview, { kind, productTag: 'fixture-product', resourceTag: 'core', env: 'snd' }))));
+</script></body></html>

@@ -1,3 +1,4 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Table,
@@ -68,7 +69,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import CodeSidebar from '@/components/CodeSidebar';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -4420,15 +4420,7 @@ const result = await ductape.database.transaction(
               </div>
             </div>
 
-            <ActivityTimelinePanel
-              title="Activity timeline"
-              kind="database"
-              productTag={database.productTag}
-              componentTag={database.tag}
-              env={database.env.slug}
-              countLabel="operations"
-              enabled={!!database.productTag}
-            />
+            <ResourcePerformanceOverview kind="database" productTag={database.productTag} resourceTag={database.tag} env={database.env.slug} />
 
             {/* Quick Actions */}
             <div>

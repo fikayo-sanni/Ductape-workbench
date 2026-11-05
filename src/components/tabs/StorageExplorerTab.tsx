@@ -1,3 +1,4 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   LinkIcon,
@@ -73,7 +74,6 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
@@ -1857,15 +1857,7 @@ console.log('Files by type:', stats.byType);`,
               </div>
             </div>
 
-            <ActivityTimelinePanel
-              title="Activity timeline"
-              kind="storage"
-              productTag={storage.productTag}
-              componentTag={storage.tag}
-              env={storage.env.slug}
-              countLabel="operations"
-              enabled={!!storage.productTag}
-            />
+            <ResourcePerformanceOverview kind="storage" productTag={storage.productTag} resourceTag={storage.tag} env={storage.env.slug} />
 
             {/* Storage Info & Performance */}
             <div className="grid grid-cols-2 gap-4">
