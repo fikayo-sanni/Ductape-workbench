@@ -322,6 +322,24 @@ function DeploymentDetail({ auth, deployment, onChange }: { auth: IDeployAuth; d
           <Fact label="Updated">{when(deployment.updatedAt)}</Fact>
         </dl>
       </Panel>
+      {deployment.kind === 'service' && (
+        <Panel title="Functions served by this API" description="Discovered from registered runtime handlers. Service health checks do not verify individual functions.">
+          {!deployment.servedFunctions?.length ? <p className="text-sm text-grey-600">No serving function inventory is available yet. It is collected automatically during deployment verification with a supported SDK.</p> :
+            deployment.servedFunctions.map(inventory => (
+              <div key={inventory.revision} className="space-y-2 mb-4 last:mb-0">
+                <p className="text-xs text-grey-600">Revision {inventory.revision} · {inventory.trafficPercent}% traffic</p>
+                {inventory.status === 'unavailable' ? <p className="text-sm text-grey-600">Function discovery unavailable ({inventory.reason ?? 'not recorded'}). Update the SDK and redeploy; ensure DUCTAPE_ACCESS_KEY references a workspace secret.</p> :
+                  !inventory.functions.length ? <p className="text-sm text-grey-600">This revision reports no registered local function handlers.</p> :
+                    <ul className="divide-y divide-grey-400">
+                      {inventory.functions.map(fn => <li key={`${fn.namespace}@${fn.version}`} className="py-2">
+                        <p className="text-sm text-grey font-medium">{fn.namespace} <span className="font-mono text-xs">{fn.version}</span></p>
+                        <p className="text-xs text-grey-600">{fn.operations.join(', ')} · Deployed · Function verification pending</p>
+                      </li>)}
+                    </ul>}
+              </div>
+            ))}
+        </Panel>
+      )}
       <Panel title="Journal" description="Every change this deployment went through, oldest first." flush>
         {journal.isLoading ? (
           <SectionLoading label="Loading the journal..." />

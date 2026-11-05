@@ -32,6 +32,14 @@ export interface IDeployment {
   currentRevision?: string;
   lastGoodRevision?: string;
   candidateUrl?: string;
+  servedFunctions?: Array<{
+    revision: string;
+    releaseHash?: string;
+    trafficPercent: number;
+    status: 'discovered' | 'unavailable';
+    reason?: string;
+    functions: Array<{ namespace: string; version: string; operations: string[]; contractHash: string; verificationStatus: 'unverified' }>;
+  }>;
 }
 
 export interface IEnvironmentPolicy {
