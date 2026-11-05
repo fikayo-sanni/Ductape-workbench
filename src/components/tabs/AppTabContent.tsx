@@ -1,3 +1,5 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import LogoEditor from '@/components/LogoEditor';
 import {useState, useMemo, useEffect, useCallback, useRef} from 'react';
 import {IApp} from '@/types/app';
@@ -1457,35 +1459,15 @@ export default function AppTabContent({
       title: string,
       value: string | number,
       icon: React.ReactNode,
-      iconBg: string,
+      _iconBg: string,
       suffix?: string,
       isLoading?: boolean,
     ) => (
-      <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div
-            className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center`}
-          >
-            {icon}
-          </div>
-          {isLoading && (
-            <div className="flex items-center gap-1 text-xs text-grey-600">
-              <Loader2 className="h-3 w-3 animate-spin" />
-            </div>
-          )}
-        </div>
-        <div className="text-2xl font-bold text-grey mb-1">
-          {isLoading ? (
-            <span className="inline-block w-16 h-6 bg-grey-200 dark:bg-grey-600 rounded animate-pulse" />
-          ) : (
-            <>
-              {value}
-              {suffix}
-            </>
-          )}
-        </div>
-        <div className="text-xs text-grey-600 font-medium">{title}</div>
-      </div>
+      <ResourceMetricCard
+        label={title}
+        icon={<span className="[&>svg]:h-4 [&>svg]:w-4 [&>svg]:text-primary">{icon}</span>}
+        value={isLoading ? <span role="status" aria-label={`Loading ${title}`} className="inline-block h-7 w-20 animate-pulse rounded bg-grey-300" /> : <>{value}{suffix}</>}
+      />
     );
 
     const getMethodColor = (method: string) => {
@@ -1508,20 +1490,20 @@ export default function AppTabContent({
     return (
       <div
         key="overview-content"
-        className="h-full overflow-auto p-3 sm:p-4 md:p-6"
+        className="h-full overflow-auto bg-grey-100 p-3 sm:p-4 md:p-6"
       >
-        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
           {/* Dashboard Header */}
-          <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+          <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex min-w-0 items-start gap-3 md:gap-4">
                 {canEditApp && !isProductView ? (
                   <LogoEditor
                     logo={currentApp?.logo}
                     subject="app"
-                    className="h-12 w-12 rounded-xl shadow-lg shadow-primary/20"
-                    fallbackClassName="bg-gradient-to-br from-primary to-primary/80"
-                    fallback={<BarChart3 className="h-6 w-6 text-white" />}
+                    className="h-16 w-16 shrink-0 rounded-2xl border border-grey-300"
+                    fallbackClassName="bg-primary/5"
+                    fallback={<BarChart3 className="h-7 w-7 text-primary" />}
                     onSave={async (logo) => {
                       await appServices.updateApp({
                         app_id: currentApp._id,
@@ -1537,7 +1519,7 @@ export default function AppTabContent({
                     }}
                   />
                 ) : (
-                  <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-grey-300 bg-primary/5">
                     {currentApp?.logo ? (
                       <img
                         src={currentApp?.logo}
@@ -1545,22 +1527,22 @@ export default function AppTabContent({
                         className="w-full h-full rounded-xl object-cover"
                       />
                     ) : (
-                      <BarChart3 className="h-6 w-6 text-white" />
+                      <BarChart3 className="h-7 w-7 text-primary" />
                     )}
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h1 className="text-xl md:text-2xl font-bold text-grey mb-2 break-words">
+                  <h1 className="mb-1 break-words text-xl font-semibold tracking-tight text-grey sm:text-2xl">
                     {isProductView
                       ? `${currentApp?.app_name} in ${productDisplayName}`
-                      : `${currentApp?.app_name} Dashboard`}
+                      : currentApp?.app_name}
                   </h1>
-                  <p className="text-sm text-grey-600 mb-2">
+                  <p className="mb-3 text-xs leading-relaxed text-grey/60 sm:text-sm">
                     {isProductView
                       ? 'Usage and performance for this app within the connected product.'
                       : 'Workspace-wide usage across all products that call this app.'}
                   </p>
-                  <div className="flex items-center gap-2 text-sm flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-grey-100 dark:bg-grey-700 text-grey-700 dark:text-grey font-mono font-medium">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                       {currentApp?.tag}
@@ -1591,7 +1573,7 @@ export default function AppTabContent({
                         'px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1',
                         isInternalApp
                           ? 'bg-blue-500/10 text-blue-600'
-                          : 'bg-orange-500/10 text-orange-600',
+                          : 'bg-primary/10 text-primary',
                       )}
                     >
                       {isInternalApp ? (
@@ -1715,9 +1697,9 @@ export default function AppTabContent({
           )}
 
           {isProductView && (
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+            <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-lg font-semibold text-grey">Product environments</h2>
+                <h2 className="text-sm font-semibold text-grey sm:text-base">Product environments</h2>
                 {accessTag && connectedProductApp && (
                   <Button variant="outline" size="sm" onClick={() => setShowEditConnectionModal(true)}>
                     <Settings2 className="h-4 w-4 mr-2" />Edit connection
@@ -1726,14 +1708,14 @@ export default function AppTabContent({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {(productEnvs || []).map((env: any) => (
-                  <div key={env.slug} className="p-4 bg-white dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg">
+                  <div key={env.slug} className="rounded-lg border-b border-grey-300 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className={cn(
                         'px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide border',
                         env.slug === 'production'
                           ? 'bg-green/10 text-green border-green/20'
                           : env.slug === 'staging'
-                            ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                            ? 'bg-primary/10 text-primary border-primary/20'
                             : 'bg-blue-500/10 text-blue-600 border-blue-500/20',
                       )}>{env.env_name || env.slug}</span>
                       {env.active && <span className="flex items-center gap-1 text-xs text-green font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green" />Active</span>}
@@ -1742,7 +1724,7 @@ export default function AppTabContent({
                   </div>
                 ))}
                 {(productEnvs || []).length === 0 && (
-                  <div className="col-span-3 text-center py-8">
+                  <div className="col-span-full text-center py-8">
                     <Globe className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                     <p className="text-sm text-grey-600">No product environments configured</p>
                   </div>
@@ -1768,7 +1750,7 @@ export default function AppTabContent({
           </div>
 
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
             {renderMetricCard(
               'Total Requests',
               apiAnalytics.totalRequests.current.toLocaleString(),
@@ -1819,6 +1801,13 @@ export default function AppTabContent({
             )}
           </div>
 
+          <ResourcePerformanceOverview
+            kind="app"
+            appId={effectiveAppId || currentApp?._id}
+            resourceTag={currentApp?.tag}
+            productTag={isProductView ? productTag : undefined}
+          />
+
           <ActivityTimelinePanel
             title={isProductView ? 'Product request activity' : 'Request activity'}
             kind="app"
@@ -1833,14 +1822,14 @@ export default function AppTabContent({
             onPeriodChange={setOverviewPeriod}
             hidePeriodControls
             enabled={!!effectiveAppId || !!(currentApp as { tag?: string })?.tag}
-            className="bg-white dark:bg-background border-grey-300 dark:border-grey-400"
+            className="rounded-xl border-grey-400 bg-white"
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Requests by Method */}
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+            <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">
+                <h2 className="text-sm font-semibold text-grey sm:text-base">
                   Requests by Method
                 </h2>
                 {isLoadingMetrics && (
@@ -1910,9 +1899,9 @@ export default function AppTabContent({
             </div>
 
             {/* Top Endpoints */}
-            <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+            <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-grey">
+                <h2 className="text-sm font-semibold text-grey sm:text-base">
                   Top Endpoints
                 </h2>
                 {isLoadingMetrics && (
@@ -1935,11 +1924,12 @@ export default function AppTabContent({
                   ))}
                 </div>
               ) : topEndpoints.length > 0 ? (
-                <div className="space-y-3">
+                <div className="divide-y divide-grey-300">
                   {topEndpoints.map((endpoint: any, index: number) => (
-                    <div
+                    <button
                       key={endpoint.tag || index}
-                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 p-3 bg-grey-100 dark:bg-grey-500 rounded-lg hover:bg-grey-200 transition-colors cursor-pointer"
+                      type="button"
+                      className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 py-3 text-left transition-colors hover:bg-grey-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       onClick={() => {
                         const action = selectedVersion?.actions?.find(
                           (a: any) =>
@@ -1958,7 +1948,7 @@ export default function AppTabContent({
                         >
                           {endpoint.method}
                         </span>
-                        <span className="text-sm dark:hover:text-grey-600 font-medium text-grey truncate max-w-[200px]">
+                        <span className="max-w-[200px] truncate text-xs font-medium text-grey sm:text-sm">
                           {endpoint.name}
                         </span>
                       </div>
@@ -1967,7 +1957,7 @@ export default function AppTabContent({
                         <span className="text-grey-600">|</span>
                         <span>{endpoint.avgLatency}</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -1993,9 +1983,9 @@ export default function AppTabContent({
           </div>
 
           {/* Environment Status for workspace-owned App definitions */}
-          {!isProductView && <div className="bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-4 md:p-6">
+          {!isProductView && <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h2 className="text-lg font-semibold text-grey">
+              <h2 className="text-sm font-semibold text-grey sm:text-base">
                 {isProductView ? 'Product environments' : 'Environment Status'}
               </h2>
               {isProductView && accessTag && connectedProductApp && (
@@ -2009,7 +1999,7 @@ export default function AppTabContent({
                 <div
                   key={env.slug}
                   className={cn(
-                    'p-4 bg-white dark:bg-background border border-grey-200 dark:border-grey-400 rounded-lg transition-colors',
+                    'rounded-lg border-b border-grey-300 p-4 text-left transition-colors',
                     !isProductView && !isLockedApp && 'hover:border-primary/50 cursor-pointer',
                   )}
                   onClick={() => {
@@ -2025,7 +2015,7 @@ export default function AppTabContent({
                         env.slug === 'production'
                           ? 'bg-green/10 text-green border-green/20'
                           : env.slug === 'staging'
-                            ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                            ? 'bg-primary/10 text-primary border-primary/20'
                             : 'bg-blue-500/10 text-blue-600 border-blue-500/20',
                       )}
                     >
@@ -2046,7 +2036,7 @@ export default function AppTabContent({
                 </div>
               ))}
               {((isProductView ? productEnvs : selectedVersion?.envs) || []).length === 0 && (
-                <div className="col-span-3 text-center py-8">
+                <div className="col-span-full text-center py-8">
                   <Globe className="h-8 w-8 text-grey-600 mx-auto mb-2" />
                   <p className="text-sm text-grey-600">
                     {isProductView

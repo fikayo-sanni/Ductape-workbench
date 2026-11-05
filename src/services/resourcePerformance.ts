@@ -1,5 +1,5 @@
 import apiClient from '@/config/axiosinstance';
-export type ResourceKind = 'database' | 'vector' | 'graph' | 'storage';
+export type ResourceKind = 'database' | 'vector' | 'graph' | 'storage' | 'app';
 export interface PerformanceMeasure {
   calls: number; failures: number; measured: number; slowCalls: number; errorRatePercent: number;
   totalLatencyMs: number; averageLatencyMs: number | null; maxLatencyMs: number | null;
@@ -19,5 +19,12 @@ export async function fetchResourcePerformance(auth: { workspace: string; user: 
   const query = new URLSearchParams({ user_id: auth.user, public_key: auth.publicKey });
   for (const [key, value] of Object.entries(filters)) if (value !== undefined) query.set(key, String(value));
   const { data } = await apiClient.get<{ data: ResourcePerformance }>(`/log/v1/products/${encodeURIComponent(scope.product)}/resources/${scope.kind}/${encodeURIComponent(scope.resource)}/performance/${auth.workspace}?${query}`);
+  return data.data;
+}
+
+export async function fetchAppPerformance(auth: { workspace: string; user: string; publicKey: string }, appId: string, filters: { product_tag?: string; app_env?: string; start_date: string; end_date: string; slow_ms: number; operation?: string }): Promise<ResourcePerformance> {
+  const query = new URLSearchParams({ user_id: auth.user, public_key: auth.publicKey, app_id: appId });
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined) query.set(key, String(value));
+  const { data } = await apiClient.get<{ data: ResourcePerformance }>(`/log/v1/app/performance/${encodeURIComponent(auth.workspace)}?${query}`);
   return data.data;
 }

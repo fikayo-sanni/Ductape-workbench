@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {TooltipProvider} from '/src/components/ui/tooltip.tsx';
+import AppTabContent from '/src/components/tabs/AppTabContent.tsx';
+import {useAuth} from '/src/store/useAuth.tsx';
+import '/src/index.css';
+const params=new URLSearchParams(location.search);
+if(params.has('dark')) document.documentElement.classList.add('dark');
+useAuth.setState({user:{_id:'fixture-user',public_key:'fixture-public-key'},currentWorkspaceId:'fixture-workspace'});
+const actions=[{_id:'list-orders',name:'List orders',tag:'list-orders',method:'GET',path:'/orders'},{_id:'create-order',name:'Create order',tag:'create-order',method:'POST',path:'/orders'}];
+const envs=[{_id:'snd',slug:'sandbox',env_name:'Sandbox',base_url:'https://sandbox.example.test',active:true},{_id:'prod',slug:'production',env_name:'Production',base_url:'https://api.example.test',active:true}];
+const versions=['1.2.0','1.1.0'].map((tag,index)=>({tag,latest:index===0,status:'public',actions,envs,auths:[],variables:[],constants:[],webhooks:[],folders:[]}));
+const app={_id:'fixture-api',app_name:'Orders API',tag:'orders',workspace_id:'fixture-workspace',status:'active',active:true,description:'Order management integration',versions,folders:[],...(params.has('product')?{productTag:'shop',productName:'Shop',appViewMode:'product',productEnvs:envs}: {})};
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider,{client:new QueryClient({defaultOptions:{queries:{retry:false}}})},React.createElement(MemoryRouter,null,React.createElement(TooltipProvider,null,React.createElement('main',{className:'h-screen'},React.createElement(AppTabContent,{app}))))));
+</script></body></html>
