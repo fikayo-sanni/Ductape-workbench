@@ -88,7 +88,7 @@ function SignupForm() {
     mutationFn: (data: { token: string; user_id: string }) => authServices.verifyEmail(data),
     onSuccess: ({ data }) => {
       const user: User = data.result;
-      setUser(user);
+      setUser(user, true);
       toast.success("Welcome to Ductape! Let's get you set up.");
       triggerOnboardingForNewUser();
       navigate('/onboarding');

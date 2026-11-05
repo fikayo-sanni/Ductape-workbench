@@ -38,14 +38,24 @@ function WorkbenchShell() {
     () => useWorkbenchStore.persist.hasHydrated(),
   );
 
-  // The workbench shows the dashboard on opening, after switching workspace and after a fresh login, whatever was open before. Tabs from
-  // before stay open behind it unless the switch cleared them. Waits for the saved tabs to load so they do not replace it.
+  // Restore the active tab on refresh. A fresh login selects the dashboard in the auth store.
   const { user, currentWorkspaceId } = useAuth();
   const landing = landingKey(user?._id, currentWorkspaceId);
-  const shownFor = useRef<string | null>(null);
+  const shownFor = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (landing === null) { shownFor.current = null; return; }
-    if (!shouldOpenDashboard(shownFor.current, landing, hasHydrated)) return;
+    if (landing === null) {
+      if (shownFor.current !== undefined) shownFor.current = null;
+      return;
+    }
+    if (!hasHydrated) return;
+    if (shownFor.current === undefined) {
+      const { tabs, activeTabId } = useWorkbenchStore.getState();
+      if (tabs.some((tab) => tab.id === activeTabId)) {
+        shownFor.current = landing;
+        return;
+      }
+    }
+    if (!shouldOpenDashboard(shownFor.current ?? null, landing, hasHydrated)) return;
     shownFor.current = landing;
     navigate('dashboard');
   }, [landing, hasHydrated, navigate]);

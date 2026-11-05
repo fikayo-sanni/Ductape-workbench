@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
 import { useFetchWorkspaces } from '@/hooks/useWorkspaceQueries';
@@ -9,7 +9,17 @@ import {
 import pricingServices from '@/services/pricingServices';
 import { hasCompletedOnboarding, markOnboardingCompleted } from '@/utils/onboarding';
 import { isSelfHosted } from '@/helpers/env';
+function subscribeToNetwork(callback: () => void) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+
 export function useRequiresOnboarding() {
+  const offline = useSyncExternalStore(subscribeToNetwork, () => !navigator.onLine);
   const { user, currentWorkspaceId } = useAuth();
   const isAuthenticated = Boolean(user?._id && user?.public_key);
 
@@ -46,6 +56,7 @@ export function useRequiresOnboarding() {
     data: subscriptionResponse,
     isFetched: subscriptionFetched,
     isError: subscriptionError,
+    refetch: refetchSubscription,
   } = useQuery({
     queryKey: ['onboarding-workspace-subscription', workspaceId, user?._id],
     queryFn: () =>
@@ -84,18 +95,21 @@ export function useRequiresOnboarding() {
       workspacesFetched: false,
       hasWorkspaceAccess: false,
       hasLoadError: false,
+      connectionLimited: false,
       retryLoad: refetchWorkspaces,
     };
   }
 
-  const isLoading =
+  const canUseCachedWorkspace = Boolean(workspaceId && acceptedWorkspaces.some((workspace) => workspace.workspace_id === workspaceId));
+  const connectionLimited = offline || workspacesError || subscriptionError;
+  const isLoading = !connectionLimited && (
     workspacesLoading ||
     !workspacesFetched ||
-    (!isSelfHosted() && Boolean(workspaceId) && !subscriptionFetched && !subscriptionError);
+    (!isSelfHosted() && Boolean(workspaceId) && !subscriptionFetched));
 
   const needsPendingInvitesScreen =
     workspacesFetched &&
-    !workspacesError &&
+    !connectionLimited &&
     acceptedWorkspaces.length === 0 &&
     pendingInvites.length > 0;
 
@@ -104,7 +118,7 @@ export function useRequiresOnboarding() {
   // onboarding just because their workspace list failed to load.
   const needsOnboarding =
     workspacesFetched &&
-    !workspacesError &&
+    !connectionLimited &&
     !needsPendingInvitesScreen &&
     (acceptedWorkspaces.length === 0 ||
       // On a self-hosted install the licence entitles the instance; a workspace needs no subscription.
@@ -120,7 +134,11 @@ export function useRequiresOnboarding() {
     hasSubscription,
     workspacesFetched,
     hasWorkspaceAccess: acceptedWorkspaces.length > 0,
-    hasLoadError: workspacesFetched && workspacesError,
-    retryLoad: refetchWorkspaces,
+    hasLoadError: connectionLimited && !canUseCachedWorkspace,
+    connectionLimited,
+    retryLoad: () => {
+      void refetchWorkspaces();
+      if (workspaceId && !isSelfHosted()) void refetchSubscription();
+    },
   };
 }

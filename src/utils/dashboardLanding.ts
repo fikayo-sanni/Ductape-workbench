@@ -1,6 +1,6 @@
 /**
- * When the workbench opens on the dashboard. It does so the first time a signed-in person has a workspace, and again each time either
- * changes: a switch of workspace, or a fresh login (as the same person or another). Signing out resets it, so the next login lands again.
+ * Dashboard fallback when no active tab can be restored, and landing after changing workspace or account.
+ * Fresh login selects the dashboard through the auth store.
  */
 
 /** Who is looking at which workspace, or null when nobody is signed in or there is no workspace yet. */

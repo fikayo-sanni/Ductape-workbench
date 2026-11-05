@@ -76,7 +76,7 @@ function LoginForm() {
 
       localStorage.setItem('token', user.auth_token);
       localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
+      setUser(user, true);
       toast.success('Login successful');
       navigate(returnTo || '/');
     },
@@ -90,7 +90,7 @@ function LoginForm() {
     mutationFn: (data: { token: string; user_id: string }) => authServices.verifyEmail(data),
     onSuccess: ({ data }) => {
       const user: User = data.result;
-      setUser(user);
+      setUser(user, true);
       toast.success('Email verified! Welcome to Ductape!');
       triggerOnboardingForNewUser();
       setShowOtpModal(false);

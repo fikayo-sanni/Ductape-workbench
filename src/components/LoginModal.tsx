@@ -79,7 +79,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
 
         localStorage.setItem("token", user.auth_token);
         localStorage.setItem("user", JSON.stringify(user));
-        setUser(user);
+        setUser(user, true);
         toast.success("Login successful");
         onSuccess?.();
       } else {
@@ -98,7 +98,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
     mutationFn: (data: { token: string; user_id: string }) => authServices.verifyEmail(data),
     onSuccess: ({ data }) => {
       const user: User = data.result;
-      setUser(user);
+      setUser(user, true);
 
       toast.success("Email verified! Welcome to Ductape!");
 

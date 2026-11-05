@@ -20,7 +20,7 @@ export default function OAuthCallbackPage() {
     authServices
       .exchangeOAuthToken(token)
       .then((res) => {
-        setUser(res.data.result);
+        setUser(res.data.result, true);
         toast.success('Login successful');
         navigate('/', { replace: true });
       })

@@ -10,11 +10,14 @@ export function useFetchWorkspaces({
 }) {
   return useQuery({
     queryKey: ['workspaces', user_id],
-    queryFn: () =>
-      workspaceServices.fetchWorkspaces({
+    queryFn: async () => {
+      const response = await workspaceServices.fetchWorkspaces({
         user_id,
         public_key,
-      }),
+      });
+      if (!response) throw new Error('Could not load workspaces');
+      return response;
+    },
     enabled: !!user_id && !!public_key,
   });
 }

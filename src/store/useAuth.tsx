@@ -6,7 +6,7 @@ import { queryClient } from "@/lib/queryClient";
 interface AuthState {
   user: User | null;
   currentWorkspaceId: string | null;
-  setUser: (user: User | null) => void;
+  setUser: (user: User | null, freshLogin?: boolean) => void;
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
   logout: () => void;
 }
@@ -29,7 +29,7 @@ function clearStaleSessionState() {
 export const useAuth = create<AuthState>((set, get) => ({
   user,
   currentWorkspaceId: savedWorkspaceId,
-  setUser: (nextUser: User | null) => {
+  setUser: (nextUser: User | null, freshLogin = false) => {
     const previousUserId = get().user?._id;
     if (nextUser) {
       localStorage.setItem("user", JSON.stringify(nextUser));
@@ -40,6 +40,10 @@ export const useAuth = create<AuthState>((set, get) => ({
       clearStaleSessionState();
     }
     set({ user: nextUser });
+    if (nextUser && freshLogin) {
+      useWorkbenchStore.getState().openDashboardTab();
+      useWorkbenchStore.getState().setActiveIconSidebar('dashboard');
+    }
   },
   setCurrentWorkspaceId: (workspaceId: string | null) => {
     if (workspaceId === null) {
