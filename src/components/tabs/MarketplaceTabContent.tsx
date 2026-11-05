@@ -1,25 +1,13 @@
+import MarketplaceHeader, { MarketplaceLayoutControl } from '@/components/marketplace/MarketplaceHeader';
+import type { MarketplaceApp } from '@/services/marketplaceServices';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkbenchStore } from '@/stores/workbench-store';
 import { useAuth } from '@/store/useAuth';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Search,
-  Filter,
-  Grid3x3,
-  List,
-  Store,
-  Loader,
-} from 'lucide-react';
+import { Filter, Store, Loader, RefreshCw, X } from 'lucide-react';
 import marketplaceServices from '@/services/marketplaceServices';
 import appServicesReal from '@/services/appServicesReal';
 import { toast } from 'react-hot-toast';
@@ -32,7 +20,7 @@ import { isSelfHosted } from '@/helpers/env';
 import { cn } from '@/lib/utils';
 import HostedMarketplaceView from '@/components/marketplace/HostedMarketplaceView';
 
-function InstanceMarketplaceView() {
+export function InstanceMarketplaceView() {
   const { openTab } = useWorkbenchStore();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
@@ -42,11 +30,11 @@ function InstanceMarketplaceView() {
   const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [integrationModalOpen, setIntegrationModalOpen] = useState(false);
-  const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [selectedApp, setSelectedApp] = useState<MarketplaceApp | null>(null);
   const [isLoadingAppDetails, setIsLoadingAppDetails] = useState(false);
 
   // Fetch domains
-  const { data: domainsRes, status: domainsStatus } = useQuery({
+  const { data: domainsRes, status: domainsStatus, refetch: refetchDomains } = useQuery({
     queryKey: ['marketplace-domains'],
     queryFn: () => marketplaceServices.fetchDomains(),
   });
@@ -54,25 +42,26 @@ function InstanceMarketplaceView() {
   const domains = domainsRes?.data ?? [];
 
   // Fetch apps based on selected domain
-  const { data: apps, status: appsStatus } = useQuery({
+  const { data: apps, status: appsStatus, isFetching: appsFetching, refetch: refetchApps } = useQuery({
     queryKey: ['marketplace-apps', selectedDomain],
     queryFn: () =>
       selectedDomain === 'all'
         ? marketplaceServices.fetchAppByDomains('')
         : marketplaceServices.fetchAppByDomains(selectedDomain),
-    enabled: !!domains.length && marketplaceSection === 'browse',
+    enabled: domainsStatus === 'success' && marketplaceSection === 'browse',
   });
 
   const appsToDisplay = apps?.data ?? [];
 
   // Filter and sort apps
-  const searchLowerCase = search.toLowerCase();
+  const searchLowerCase = search.trim().toLowerCase();
   const filteredApps = appsToDisplay.filter(app => {
     const appName = app.app_name?.toLowerCase() || '';
     const domainName = app.domain_name?.toLowerCase() || '';
     return (
-      appName.includes(searchLowerCase) ||
-      domainName.includes(searchLowerCase)
+      appName.includes(searchLowerCase) || domainName.includes(searchLowerCase) ||
+      (app.description ?? '').toLowerCase().includes(searchLowerCase) ||
+      (app.domains ?? []).some(id => (domains.find(domain => domain._id === id)?.domain_name ?? id).replace(/-/g, ' ').toLowerCase().includes(searchLowerCase))
     );
   });
 
@@ -90,7 +79,7 @@ function InstanceMarketplaceView() {
     }
   });
 
-  const handleAppClick = async (app: any) => {
+  const handleAppClick = async (app: MarketplaceApp) => {
     // Fetch full app details before opening tab
     if (!user?._id || !user?.public_key) {
       toast.error('Authentication required');
@@ -98,11 +87,11 @@ function InstanceMarketplaceView() {
     }
 
     try {
-      console.log(isLoadingAppDetails);
       setIsLoadingAppDetails(true);
 
       // Fetch full app data using the app's tag
       const appTag = app.domain_name || app.tag;
+      if (!appTag) throw new Error('This integration does not have an application tag.');
       const appDetailsResponse = await appServicesReal.fetchAppByTag({
         tag: appTag,
         user_id: user._id,
@@ -129,176 +118,43 @@ function InstanceMarketplaceView() {
     }
   };
 
-  const handleIntegrateApp = (app: any) => {
+  const handleIntegrateApp = (app: MarketplaceApp) => {
     setSelectedApp(app);
     setIntegrationModalOpen(true);
   };
 
-  const getCurrentDomainName = () => {
-    if (selectedDomain === 'all') return 'All Applications';
-    const domain = domains.find(d => d._id === selectedDomain);
-    return domain ? `${domain.domain_name.replace('-', ' ')} Applications` : 'All Applications';
-  };
+  const categoryLabel = selectedDomain === 'all' ? 'All integrations' : (domains.find(domain => domain._id === selectedDomain)?.domain_name ?? 'Integrations').replace(/-/g, ' ');
 
-  if (domainsStatus === 'pending') {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-grey-600">Loading marketplace...</p>
-        </div>
-      </div>
-    );
-  }
+  if (domainsStatus === 'pending') return <div className="flex h-full items-center justify-center bg-grey-100" role="status"><Loader className="mr-2 h-5 w-5 animate-spin text-primary" /><p className="text-sm text-grey/70">Loading marketplace…</p></div>;
+  if (domainsStatus === 'error') return <div role="alert" className="flex h-full items-center justify-center bg-grey-100 p-6"><div className="max-w-md rounded-xl border border-grey-400 bg-white p-6 text-center shadow-sm"><Store className="mx-auto mb-3 h-7 w-7 text-grey/50" /><h2 className="text-base font-semibold text-grey">Marketplace could not be loaded</h2><p className="mt-2 text-sm text-grey/70">Check your connection and try again.</p><Button className="mt-4" size="sm" variant="outline" onClick={() => void refetchDomains()}>Try again</Button></div></div>;
 
   return (
-    <div className="h-full flex bg-grey-100">
-      {/* Sidebar */}
-      <MarketplaceSidebar
-        domains={domains}
-        selectedDomain={selectedDomain}
-        onDomainSelect={(id) => setSelectedDomain(id || 'all')}
-        viewMode={marketplaceSection}
-        onViewModeChange={setMarketplaceSection}
-        isMobileOpen={isMobileSidebarOpen}
-        onMobileToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-      />
-
-      {marketplaceSection === 'submissions' ? (
-        <MarketplaceSubmissionsView />
-      ) : (
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="bg-white border-b border-grey-400 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Store className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-grey">
-                  {getCurrentDomainName()}
-                </h1>
-                <p className="text-sm text-grey-600">
-                  Discover and integrate applications
-                </p>
-              </div>
+    <div className="flex h-full min-h-0 overflow-hidden bg-grey-100 text-grey">
+      <MarketplaceSidebar domains={domains} selectedDomain={selectedDomain} onDomainSelect={id => setSelectedDomain(id || 'all')} viewMode={marketplaceSection} onViewModeChange={setMarketplaceSection} isMobileOpen={isMobileSidebarOpen} onMobileToggle={() => setIsMobileSidebarOpen(open => !open)} />
+      {marketplaceSection === 'submissions' ? <div className="flex min-w-0 flex-1 flex-col"><div className="border-b border-grey-400 bg-white p-3 md:hidden"><Button variant="outline" size="sm" onClick={() => setIsMobileSidebarOpen(true)}>Marketplace navigation</Button></div><MarketplaceSubmissionsView /></div> : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-busy={isLoadingAppDetails}>
+          <div className="px-4 pt-4 sm:px-6 sm:pt-6">
+            <div className="mx-auto max-w-6xl">
+              <MarketplaceHeader description="Your next integration, a click away." search={search} onSearch={setSearch}
+                actions={<><Button size="sm" variant="outline" className="gap-1.5 md:hidden" onClick={() => setIsMobileSidebarOpen(true)}><Filter className="h-3.5 w-3.5" />Categories</Button><Button size="icon" variant="ghost" className="h-8 w-8" disabled={appsFetching} aria-label="Refresh catalogue" onClick={() => { void refetchDomains(); void refetchApps(); }}><RefreshCw className={cn('h-4 w-4 text-grey/60', appsFetching && 'animate-spin')} /></Button></>}>
+                <select aria-label="Sort integrations" value={sortBy} onChange={event => setSortBy(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-grey-400 bg-white px-2 text-xs text-grey sm:w-36 sm:flex-none"><option value="name">Name: A–Z</option><option value="domain">Domain</option><option value="created">Newest first</option></select>
+                <MarketplaceLayoutControl value={layoutView} onChange={setLayoutView} />
+              </MarketplaceHeader>
             </div>
-
-            {/* Mobile sidebar toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
           </div>
-
-          {/* Search and Controls */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-              <Input
-                placeholder="Search applications..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Sort by Name</SelectItem>
-                <SelectItem value="domain">Sort by Domain</SelectItem>
-                <SelectItem value="created">Sort by Created</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* View Mode */}
-            <div className="flex border border-grey-400 rounded-md">
-              <Button
-                variant={layoutView === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setLayoutView('grid')}
-                className="rounded-r-none"
-              >
-                <Grid3x3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={layoutView === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setLayoutView('list')}
-                className="rounded-l-none"
-              >
-                <List className="h-4 w-4" />
-              </Button>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-6xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold capitalize text-grey">{categoryLabel}</h2>{appsStatus === 'success' && <span className="rounded-full bg-grey-400/20 px-2 py-0.5 text-[11px] tabular-nums text-grey/70">{sortedApps.length} {sortedApps.length === 1 ? 'integration' : 'integrations'}</span>}{selectedDomain !== 'all' && <button type="button" aria-label="Clear category" onClick={() => setSelectedDomain('all')} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-primary hover:bg-primary/10">Clear category<X className="h-3 w-3" /></button>}</div>{isLoadingAppDetails ? <p role="status" className="text-xs text-grey/70">Opening integration…</p> : appsFetching && appsStatus !== 'pending' ? <p role="status" className="text-xs text-grey/70">Refreshing catalogue…</p> : null}</div>
+              {appsStatus === 'pending' ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading integrations">{Array.from({ length: 6 }, (_, index) => <div key={index} className="rounded-xl border border-grey-400 bg-white p-5"><Skeleton className="mb-4 h-11 w-11 rounded-xl" /><Skeleton className="mb-2 h-4 w-2/3" /><Skeleton className="mb-5 h-12 w-full" /><Skeleton className="h-7 w-full" /></div>)}</div> : appsStatus === 'error' ? <div role="alert" className="rounded-xl border border-grey-400 bg-white p-8 text-center"><h3 className="text-sm font-semibold">Integrations could not be loaded</h3><p className="mt-1 text-xs text-grey/70">Your selection is kept. Try loading the catalogue again.</p><Button size="sm" variant="outline" className="mt-4" onClick={() => void refetchApps()}>Try again</Button></div> : !sortedApps.length ? <div className="rounded-xl border border-dashed border-grey-400 bg-white px-5 py-12 text-center"><SearchEmpty /><h3 className="mt-3 text-base font-semibold">No integrations found</h3><p className="mt-1 text-sm text-grey/70">{search ? `Nothing matches “${search}” in this category.` : 'There are no integrations in this category yet.'}</p>{(search || selectedDomain !== 'all') && <Button variant="outline" size="sm" className="mt-4" onClick={() => { setSearch(''); setSelectedDomain('all'); }}>Reset filters</Button>}</div> : <div className={layoutView === 'grid' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}>{sortedApps.map(app => <AppCard key={app._id} app={app} domains={domains} viewMode={layoutView} onClick={() => void handleAppClick(app)} onIntegrate={() => handleIntegrateApp(app)} />)}</div>}
             </div>
           </div>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {appsStatus === 'pending' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-lg border border-grey-400 p-6">
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-1/2 mb-4" />
-                  <Skeleton className="h-20 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : sortedApps.length === 0 ? (
-            <div className="text-center py-12">
-              <Store className="h-12 w-12 text-grey-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-grey mb-2">No applications found</h3>
-              <p className="text-grey-600">
-                {search ? 'Try adjusting your search terms' : 'No applications available in this category'}
-              </p>
-            </div>
-          ) : (
-            <div className={
-              layoutView === 'grid'
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                : 'space-y-4'
-            }>
-              {sortedApps.map((app) => (
-                <AppCard
-                  key={app._id}
-                  app={app}
-                  domains={domains}
-                  onClick={() => handleAppClick(app)}
-                  onIntegrate={() => handleIntegrateApp(app)}
-                  viewMode={layoutView}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
       )}
-
-      {/* Integration Modal */}
-      {selectedApp && (
-        <IntegrationProvider>
-          <AppIntegrationModal
-            app={selectedApp}
-            open={integrationModalOpen}
-            onOpenChange={setIntegrationModalOpen}
-          />
-        </IntegrationProvider>
-      )}
+      {selectedApp && <IntegrationProvider><AppIntegrationModal app={{ ...selectedApp, domain_name: selectedApp.domain_name || selectedApp.tag || '' }} open={integrationModalOpen} onOpenChange={setIntegrationModalOpen} /></IntegrationProvider>}
     </div>
   );
 }
+function SearchEmpty() { return <Store className="mx-auto h-8 w-8 text-grey/40" />; }
 
 type MarketplaceSource = 'instance' | 'hosted';
 
@@ -319,8 +175,8 @@ export default function MarketplaceTabContent() {
   return (
     <div className="h-full flex flex-col bg-grey-100">
       <div className="bg-white border-b border-grey-400 px-4 py-2 flex items-center">
-        <div className="flex border border-grey-400 rounded-md" role="tablist" aria-label="Marketplace source">
-          {SOURCES.map((item, index) => (
+        <div className="inline-flex rounded-lg border border-grey-400 bg-white p-0.5" role="tablist" aria-label="Marketplace source">
+          {SOURCES.map((item) => (
             <Button
               key={item.id}
               role="tab"
@@ -328,7 +184,7 @@ export default function MarketplaceTabContent() {
               variant={source === item.id ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setSource(item.id)}
-              className={cn(index === 0 ? 'rounded-r-none' : 'rounded-l-none')}
+              className="h-7 rounded-md px-3 text-xs"
             >
               {item.label}
             </Button>

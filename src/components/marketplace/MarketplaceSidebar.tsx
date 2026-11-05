@@ -1,234 +1,40 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { X, Globe, ChevronRight, LayoutGrid, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  X,
-  Globe,
-  ChevronRight,
-  ChevronDown,
-  Layout,
-  ClipboardList,
-} from 'lucide-react';
-
+import type { Domain } from '@/services/marketplaceServices';
 export type MarketplaceViewMode = 'browse' | 'submissions';
-
-interface Domain {
-  _id: string;
-  domain_name: string;
-  parent_domain_id: string | null;
-  parents: string[];
-}
-
 interface MarketplaceSidebarProps {
-  domains: any[];
-  selectedDomain: string | null;
-  onDomainSelect: (id: string | null) => void;
-  viewMode?: MarketplaceViewMode;
-  onViewModeChange?: (mode: MarketplaceViewMode) => void;
-  isMobileOpen: boolean;
-  onMobileToggle: () => void;
+  domains: Domain[]; selectedDomain: string | null; onDomainSelect: (id: string | null) => void;
+  viewMode?: MarketplaceViewMode; onViewModeChange?: (mode: MarketplaceViewMode) => void;
+  isMobileOpen: boolean; onMobileToggle: () => void;
 }
-
-export default function MarketplaceSidebar({
-  domains,
-  selectedDomain,
-  onDomainSelect,
-  viewMode = 'browse',
-  onViewModeChange,
-  isMobileOpen,
-  onMobileToggle,
-}: MarketplaceSidebarProps) {
-  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set());
-
-  const toggleDomain = (domainId: string) => {
-    const newExpanded = new Set(expandedDomains);
-    if (newExpanded.has(domainId)) {
-      newExpanded.delete(domainId);
-    } else {
-      newExpanded.add(domainId);
-    }
-    setExpandedDomains(newExpanded);
-  };
-
-
-  const getDomainDisplayName = (domainName: string) => {
-    return domainName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  // Group domains by parent
-  const rootDomains = domains.filter(d => !d.parent_domain_id);
-  const childDomains = domains.filter(d => d.parent_domain_id);
-
-  const getChildDomains = (parentId: string) => {
-    return childDomains.filter(d => d.parent_domain_id === parentId);
-  };
-
-  const renderDomainItem = (domain: Domain, level: number = 0) => {
-    const isSelected = selectedDomain === domain._id;
-    const isExpanded = expandedDomains.has(domain._id);
-    const hasChildren = getChildDomains(domain._id).length > 0;
-
-    return (
-      <div key={domain._id}>
-        <button
-          onClick={() => {
-            if (hasChildren) {
-              toggleDomain(domain._id);
-            } else {
-              onDomainSelect(domain._id);
-            }
-          }}
-          className={cn(
-            'w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl transition-all duration-200 group',
-            isSelected
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'text-grey-600 hover:bg-grey-100/50 hover:text-primary font-medium'
-          )}
-          style={{ paddingLeft: `${16 + level * 16}px` }}
-        >
-          {hasChildren ? (
-            isExpanded ? (
-              <ChevronDown className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
-            ) : (
-              <ChevronRight className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
-            )
-          ) : (
-            <Globe className={cn("h-4 w-4 flex-shrink-0 transition-transform", isSelected ? "text-white" : "text-grey-600 group-hover:text-primary")} />
-          )}
-          <span className="truncate text-sm tracking-tight">
-            {getDomainDisplayName(domain.domain_name)}
-          </span>
-        </button>
-
-        {/* Render children if expanded */}
-        {hasChildren && isExpanded && (
-          <div className="mt-2 space-y-1">
-            {getChildDomains(domain._id).map(child =>
-              renderDomainItem(child, level + 1)
-            )}
-          </div>
-        )}
+const nameOf = (value: string) => value.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+export default function MarketplaceSidebar({ domains, selectedDomain, onDomainSelect, viewMode = 'browse', onViewModeChange, isMobileOpen, onMobileToggle }: MarketplaceSidebarProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const select = (id: string | null) => { onDomainSelect(id); if (isMobileOpen) onMobileToggle(); };
+  const row = (active: boolean) => cn('flex w-full min-w-0 items-center gap-2.5 rounded-md px-3 py-2 text-left text-xs font-medium transition-colors', active ? 'bg-primary/10 text-primary' : 'text-grey/70 hover:bg-grey-100 hover:text-grey');
+  const roots = domains.filter(domain => !domain.parent_domain_id || !domains.some(parent => parent._id === domain.parent_domain_id));
+  function category(domain: Domain, depth = 0, ancestors = new Set<string>()): ReactNode {
+    if (ancestors.has(domain._id)) return null;
+    const children = domains.filter(child => child.parent_domain_id === domain._id);
+    const active = selectedDomain === domain._id;
+    return <div key={domain._id}>
+      <div className="flex items-center gap-0.5" style={{ paddingLeft: depth * 12 }}>
+        <button type="button" aria-pressed={active} onClick={() => select(domain._id)} className={row(active)}><Globe className="h-3.5 w-3.5 shrink-0 opacity-70" /><span className="truncate" title={nameOf(domain.domain_name)}>{nameOf(domain.domain_name)}</span></button>
+        {children.length > 0 && <button type="button" aria-label={`Expand ${nameOf(domain.domain_name)}`} aria-expanded={expanded.has(domain._id)} onClick={() => setExpanded(current => { const next = new Set(current); next.has(domain._id) ? next.delete(domain._id) : next.add(domain._id); return next; })} className="shrink-0 rounded p-1.5 text-grey/60 hover:bg-grey-100"><ChevronRight className={cn('h-3.5 w-3.5 transition-transform', expanded.has(domain._id) && 'rotate-90')} /></button>}
       </div>
-    );
-  };
-
-  return (
-    <>
-      {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden transition-all"
-          onClick={onMobileToggle}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div
-        className={cn(
-          'w-72 bg-white border-r border-grey-400/30 flex flex-col transition-all duration-300 z-50',
-          'md:translate-x-0 md:static md:z-auto',
-          isMobileOpen ? 'translate-x-0 fixed inset-y-0 left-0 shadow-2xl' : '-translate-x-full fixed inset-y-0 left-0'
-        )}
-      >
-        {/* Mobile close button */}
-        <div className="p-4 border-b border-grey-400/30 md:hidden flex justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMobileToggle}
-            className="h-8 w-8 rounded-lg"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
-          {onViewModeChange && (
-          <div className="mb-6">
-            <h3 className="text-[10px] font-bold text-grey-700 uppercase tracking-widest mb-4 px-2">
-              Marketplace
-            </h3>
-
-            <button
-              onClick={() => onViewModeChange?.('browse')}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
-                viewMode === 'browse'
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
-              )}
-            >
-              <Layout className="h-4 w-4" />
-              Browse apps
-            </button>
-
-            <button
-              onClick={() => onViewModeChange?.('submissions')}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
-                viewMode === 'submissions'
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
-              )}
-            >
-              <ClipboardList className="h-4 w-4" />
-              My submissions
-            </button>
-          </div>
-          )}
-
-          {viewMode === 'browse' && (
-          <>
-          <div className="mb-8">
-            <h3 className="text-[10px] font-bold text-grey-700 uppercase tracking-widest mb-4 px-2">
-              Browse Categories
-            </h3>
-
-            <button
-              onClick={() => onDomainSelect(null)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-all mb-1",
-                !selectedDomain
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-grey-600 hover:bg-grey-100 hover:text-grey"
-              )}
-            >
-              <Layout className="h-4 w-4" />
-              All Applications
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            <div className="h-[1px] bg-grey-400 mx-2 mb-4 opacity-50" />
-
-            {domains.map((domain: any) => (
-              <button
-                key={domain._id}
-                onClick={() => onDomainSelect(domain._id)}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all group",
-                  selectedDomain === domain._id
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-grey-600 hover:bg-grey-100 hover:text-grey"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <Globe className={cn(
-                    "h-4 w-4 transition-colors",
-                    selectedDomain === domain._id ? "text-white/80" : "text-grey-600 group-hover:text-primary"
-                  )} />
-                  <span className="truncate">{domain.domain_name}</span>
-                </div>
-                {selectedDomain === domain._id && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                )}
-              </button>
-            ))}
-          </div>
-          </>
-          )}
-        </div>
+      {expanded.has(domain._id) && children.map(child => category(child, depth + 1, new Set([...ancestors, domain._id])))}
+    </div>;
+  }
+  return <>
+    {isMobileOpen && <button type="button" aria-label="Close category navigation" className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onMobileToggle} />}
+    <aside aria-label="Marketplace navigation" className={cn('fixed inset-y-0 left-0 z-50 flex w-56 shrink-0 flex-col border-r border-grey-400 bg-white transition-transform md:static md:z-auto md:translate-x-0', isMobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full')}>
+      <div className="flex items-center justify-between border-b border-grey-300 px-4 py-4"><p className="text-sm font-semibold text-grey">Marketplace</p><Button variant="ghost" size="icon" aria-label="Close categories" className="h-7 w-7 md:hidden" onClick={onMobileToggle}><X className="h-4 w-4" /></Button></div>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+        {onViewModeChange && <nav aria-label="Marketplace sections" className="space-y-1"><button type="button" aria-pressed={viewMode === 'browse'} onClick={() => { onViewModeChange('browse'); if (isMobileOpen) onMobileToggle(); }} className={row(viewMode === 'browse')}><LayoutGrid className="h-4 w-4" />Browse integrations</button><button type="button" aria-pressed={viewMode === 'submissions'} onClick={() => { onViewModeChange('submissions'); if (isMobileOpen) onMobileToggle(); }} className={row(viewMode === 'submissions')}><ClipboardList className="h-4 w-4" />My submissions</button></nav>}
+        {viewMode === 'browse' && <nav aria-label="Integration categories"><p className="mb-2 px-3 text-[10px] font-medium uppercase tracking-wider text-grey/50">Categories</p><div className="space-y-0.5"><button type="button" aria-pressed={!selectedDomain || selectedDomain === 'all'} className={row(!selectedDomain || selectedDomain === 'all')} onClick={() => select(null)}><LayoutGrid className="h-3.5 w-3.5 opacity-70" />All integrations</button>{roots.map(domain => category(domain))}</div></nav>}
       </div>
-    </>
-  );
+    </aside>
+  </>;
 }

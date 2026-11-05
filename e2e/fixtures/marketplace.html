@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {InstanceMarketplaceView} from '/src/components/tabs/MarketplaceTabContent.tsx';
+import HostedMarketplaceView from '/src/components/marketplace/HostedMarketplaceView.tsx';
+import {useAuth} from '/src/store/useAuth.tsx';
+import '/src/index.css';
+const params=new URLSearchParams(location.search);
+if(params.has('dark')) document.documentElement.classList.add('dark');
+useAuth.setState({user:{_id:'fixture-user',public_key:'fixture-public-key'},currentWorkspaceId:'fixture-workspace'});
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider,{client:new QueryClient({defaultOptions:{queries:{retry:false}}})},React.createElement('main',{className:'h-screen bg-grey-100'},React.createElement(params.has('hosted')?HostedMarketplaceView:InstanceMarketplaceView))));
+</script></body></html>

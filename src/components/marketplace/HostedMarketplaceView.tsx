@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, Store } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, RefreshCw, Store } from 'lucide-react';
+import MarketplaceCard from './MarketplaceCard';
+import MarketplaceHeader, { MarketplaceLayoutControl } from './MarketplaceHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,93 +15,14 @@ import RemoteAppDetailDialog from './RemoteAppDetailDialog';
 
 const PAGE_SIZE = 12;
 
-function RemoteAppCard({ app, onOpen }: { app: RemoteCatalogApp; onOpen: () => void }) {
-  const initials = (app.app_name || '?')
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
-  return (
-    <div
-      className="group relative flex flex-col p-5 bg-white rounded-lg border border-grey-400 hover:border-primary/50 transition-all cursor-pointer shadow-sm h-full"
-      onClick={onOpen}
-    >
-      <div className="flex items-start justify-between gap-2 mb-4">
-        <div className="w-14 h-14 rounded-lg bg-grey-100 flex items-center justify-center border border-grey-400 p-2 group-hover:border-primary/30 transition-colors flex-shrink-0">
-          {app.logo ? (
-            <img src={app.logo} alt={app.app_name} className="w-10 h-10 object-cover rounded-sm" />
-          ) : (
-            <div className="text-primary font-bold text-xl">{initials}</div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-1">
-          {app.imported && (
-            <Badge className="bg-green/10 text-green border-green/20 text-[10px] font-bold px-2 h-5">Imported</Badge>
-          )}
-          {app.imported && app.update_available && (
-            <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 text-[10px] font-bold px-2 h-5">
-              Update available
-            </Badge>
-          )}
-          {app.latest_version && (
-            <Badge className="bg-green/10 text-green border-green/20 text-[10px] font-bold px-2 h-5">
-              v{app.latest_version}
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1">
-        <h3 className="text-sm font-bold text-grey mb-0.5 group-hover:text-primary transition-colors break-words">
-          {app.app_name}
-        </h3>
-        {app.publisher && <p className="text-[11px] text-grey-600 font-medium mb-2">By {app.publisher}</p>}
-        <p className="text-xs text-grey-600 font-medium leading-relaxed line-clamp-3 mb-4">
-          {app.description || 'No description available for this application yet.'}
-        </p>
-      </div>
-
-      {app.domains?.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-4">
-          {app.domains.slice(0, 2).map((d) => (
-            <Badge
-              key={d}
-              variant="outline"
-              className="text-[10px] font-bold text-grey-600 border-grey-400 py-0 px-2 h-4 rounded-full"
-            >
-              {d}
-            </Badge>
-          ))}
-          {app.domains.length > 2 && (
-            <span className="text-[10px] font-bold text-grey-600">+{app.domains.length - 2}</span>
-          )}
-        </div>
-      )}
-
-      <div className="pt-4 border-t border-grey-400 mt-auto">
-        <Button
-          size="sm"
-          className="w-full rounded-md h-8 bg-primary hover:bg-primary/90 text-white text-xs font-bold"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen();
-          }}
-        >
-          {app.imported ? (app.update_available ? 'View update' : 'View') : 'Import'}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 /** The hosted marketplace catalogue, browsed through this instance, with import into the current workspace. */
 export default function HostedMarketplaceView() {
-  const { user } = useAuth();
+  const { user, currentWorkspaceId } = useAuth();
   const auth = { user_id: user?._id || '', public_key: user?.public_key || '' };
   const canCall = !!auth.user_id && !!auth.public_key;
 
+  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const scope = [auth.user_id, auth.public_key, currentWorkspaceId];
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -120,7 +42,7 @@ export default function HostedMarketplaceView() {
     isLoading: statusLoading,
     refetch: refetchStatus,
   } = useQuery({
-    queryKey: ['remote-marketplace', 'status'],
+    queryKey: ['remote-marketplace', 'status', ...scope],
     queryFn: () => remoteMarketplaceServices.fetchStatus(auth),
     enabled: canCall,
     staleTime: 1000 * 30,
@@ -133,10 +55,9 @@ export default function HostedMarketplaceView() {
     isFetching: catalogFetching,
     refetch: refetchCatalog,
   } = useQuery({
-    queryKey: ['remote-marketplace', 'catalog', search, page],
+    queryKey: ['remote-marketplace', 'catalog', ...scope, search, page],
     queryFn: () => remoteMarketplaceServices.fetchCatalog(auth, { search, page, limit: PAGE_SIZE }),
     enabled: canCall && !!status?.enabled,
-    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   });
 
@@ -149,6 +70,7 @@ export default function HostedMarketplaceView() {
   const pages = catalog?.pages ?? 1;
 
   const renderBody = () => {
+    if (!canCall) return <p className="py-12 text-center text-sm text-grey/70">Sign in to browse the hosted marketplace.</p>;
     if (statusLoading) {
       return (
         <div className="flex items-center justify-center py-12">
@@ -185,7 +107,7 @@ export default function HostedMarketplaceView() {
 
     if (catalogLoading) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={layout === 'grid' ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" : "grid grid-cols-1 gap-3"}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-white rounded-lg border border-grey-400 p-6">
               <Skeleton className="h-4 w-3/4 mb-2" />
@@ -225,9 +147,9 @@ export default function HostedMarketplaceView() {
 
     return (
       <>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={layout === 'grid' ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" : "grid grid-cols-1 gap-3"}>
           {apps.map((app) => (
-            <RemoteAppCard key={app.remote_app_id} app={app} onOpen={() => setSelected(app)} />
+            <MarketplaceCard key={app.remote_app_id} name={app.app_name} description={app.description} logo={app.logo} publisher={app.publisher} categories={app.domains} version={app.latest_version} imported={app.imported} updateAvailable={app.update_available} viewMode={layout} onInspect={() => setSelected(app)} actionLabel={app.imported ? (app.update_available ? "View update" : "View details") : "View import options"} />
           ))}
         </div>
         {pages > 1 && (
@@ -256,38 +178,14 @@ export default function HostedMarketplaceView() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      <div className="bg-white border-b border-grey-400 p-4">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Store className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-grey">Hosted marketplace</h1>
-              <p className="text-sm text-grey-600">Import applications from the Ductape cloud marketplace</p>
-            </div>
-          </div>
-          {status?.enabled && (
-            <Badge variant="outline" className="flex-shrink-0">
-              {status.max_apps === null
-                ? `${status.imported} apps imported`
-                : `${status.imported} of ${status.max_apps} apps imported`}
-            </Badge>
-          )}
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-grey-600" />
-          <Input
-            placeholder="Search the hosted marketplace..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
-            disabled={!!status && !status.enabled}
-          />
-        </div>
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
+        <MarketplaceHeader title="Hosted marketplace" description="Discover integrations from Ductape and import them into your workspace." search={searchInput} onSearch={setSearchInput} disabled={!canCall || (!!status && !status.enabled)} actions={status?.enabled && <Badge variant="outline" className="font-normal text-grey/70">{status.max_apps === null ? `${status.imported} apps imported` : `${status.imported} of ${status.max_apps} apps imported`}</Badge>}>
+          <MarketplaceLayoutControl value={layout} onChange={setLayout} />
+          <Button variant="outline" size="icon" aria-label="Refresh catalogue" disabled={statusLoading || catalogFetching || !canCall} onClick={() => { void refetchStatus(); if (status?.enabled) void refetchCatalog(); }}><RefreshCw className="h-4 w-4" /></Button>
+        </MarketplaceHeader>
+        {status?.enabled && <div className="flex items-center justify-between text-xs text-grey/60"><span>{catalog?.total ?? 0} integrations{search ? ` matching “${search}”` : ''}</span>{catalogFetching && <span role="status">Updating catalogue…</span>}</div>}
+        {renderBody()}
       </div>
-
-      <div className="flex-1 overflow-auto p-4 sm:p-6">{renderBody()}</div>
 
       <RemoteAppDetailDialog
         app={selectedLive}
