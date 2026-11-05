@@ -178,7 +178,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
                 {product.logo ? (
@@ -211,7 +211,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
               <HardDrive className="h-6 w-6 text-purple-500" />
@@ -241,7 +241,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
               const envKey = `${env.slug}-${index}`;
 
               return (
-                <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div key={index} className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       {getProviderIcon(providerType)}
@@ -631,7 +631,7 @@ export default function StorageTabContent({ storage }: StorageTabContentProps) {
 
         {/* Empty State */}
         {(!displayData.envs || displayData.envs.length === 0) && (
-          <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
+          <div className="bg-white rounded-xl border border-grey-400 p-12 shadow-sm text-center">
             <HardDrive className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Configured</h3>
             <p className="text-sm text-grey-600">

@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Loader2,
@@ -382,7 +383,7 @@ console.log('Result:', result);`
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
                   <Box className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -443,52 +444,40 @@ console.log('Result:', result);`
             <>
           {activeSection === 'overview' && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <TrendingUp className="h-4 w-4 text-green" />
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.total}</div>
-                  <div className="text-xs text-grey-600 font-medium">Total runs</div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 mb-6">
+                <ResourceMetricCard
+                  label={<>Total runs</>}
+                  value={<>{metrics.total}</>}
+                  icon={<Activity className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.sparklineData} color="#6366F1" />
                   </div>
-                </div>
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-green" />
-                    </div>
-                  </div>
-                  <div className={cn(
+                </ResourceMetricCard>
+                <ResourceMetricCard
+                  label={<>Success rate</>}
+                  value={<>
+                    {metrics.successRate.toFixed(1)}%
+                  </>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName={cn(
                     'text-2xl font-bold mb-1',
                     metrics.successRate >= 95 ? 'text-green' : metrics.successRate >= 80 ? 'text-yellow' : 'text-red'
-                  )}>
-                    {metrics.successRate.toFixed(1)}%
-                  </div>
-                  <div className="text-xs text-grey-600 font-medium">Success rate</div>
-                </div>
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Timer className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{formatDuration(metrics.avgDuration)}</div>
-                  <div className="text-xs text-grey-600 font-medium">Avg duration</div>
-                </div>
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <CalendarClock className="h-5 w-5 text-orange-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{scheduled.length}</div>
-                  <div className="text-xs text-grey-600 font-medium">Scheduled</div>
-                </div>
+                  )}
+                />
+                <ResourceMetricCard
+                  label={<>Avg duration</>}
+                  value={<>{formatDuration(metrics.avgDuration)}</>}
+                  icon={<Timer className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
+                <ResourceMetricCard
+                  label={<>Scheduled</>}
+                  value={<>{scheduled.length}</>}
+                  icon={<CalendarClock className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
               </div>
 
               <ActivityTimelinePanel
@@ -502,7 +491,7 @@ console.log('Result:', result);`
                 className="mb-6"
               />
 
-              <div className="bg-white rounded-lg border border-border shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-grey">Recent runs</h3>
                   <Button variant="ghost" size="sm" onClick={() => setActiveSection('past')} className="text-indigo-500 hover:text-indigo-600 text-xs">
@@ -562,7 +551,7 @@ console.log('Result:', result);`
           )}
 
           {activeSection === 'past' && (
-            <div className="bg-white rounded-lg border border-border shadow-sm">
+            <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-grey">Past invocations</h3>
                 <p className="text-xs text-grey-600 mt-1">{runs.length} runs</p>
@@ -625,7 +614,7 @@ console.log('Result:', result);`
           )}
 
           {activeSection === 'future' && (
-            <div className="bg-white rounded-lg border border-border shadow-sm">
+            <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-grey">Future invocations</h3>
                 <p className="text-xs text-grey-600 mt-1">{scheduled.length} scheduled</p>

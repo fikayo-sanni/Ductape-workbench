@@ -35,7 +35,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
     <div className="bg-grey-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
               <Globe className="h-6 w-6 text-primary" />
@@ -62,7 +62,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
 
         {/* Base URL */}
         {environment.base_url && (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-grey mb-4">Base URL</h2>
             <div className="flex items-center gap-2">
               <Input
@@ -87,7 +87,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
 
         {/* Environment Variables */}
         {envVariables.length > 0 && (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-grey mb-4">Environment Variables</h2>
             <div className="space-y-3">
               {envVariables.map((variable: any, index: number) => (
@@ -144,7 +144,7 @@ export default function EnvironmentTabContent({ environment }: EnvironmentTabCon
 
         {/* Empty State */}
         {envVariables.length === 0 && !environment.base_url && (
-          <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
+          <div className="bg-white rounded-xl border border-grey-400 p-12 shadow-sm text-center">
             <Globe className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Variables Configured</h3>
             <p className="text-sm text-grey-600">

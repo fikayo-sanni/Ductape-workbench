@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ResourceMetricCard } from '/src/components/resource-overview/ResourceMetricCard.tsx';
+import { Panel, StatTile } from '/src/components/tabs/ProductSection.tsx';
+import SessionDashboard from '/src/components/tabs/SessionDashboard.tsx';
+import { WebhookTabOverview } from '/src/components/webhook-explorer/WebhookTabOverview.tsx';
+import { ActivityPeriodSelector } from '/src/components/activity/ActivityPeriodSelector.tsx';
+import '/src/index.css';
+const params = new URLSearchParams(location.search);
+const kind = params.get('kind') || 'messaging';
+if(params.get('dark')) document.documentElement.classList.add('dark');
+const dashboard = { dau: { current: 1200, previous: 1000, change: 20 }, wau: { current: 8400, previous: 8000, change: 5 }, mau: { current: 25000, previous: 24000, change: 4 }, avgSessionDuration: { current: '4m 12s', previous: '4m', change: 5 }, totalSessions: 42000, newUsersThisWeek: 260, peakHours: [{ hour: '12 PM', count: 10 }], activityTimeline: [] };
+const metricSets = {
+ messaging: [['Published (7 days)', '12,345'], ['Consumed (7 days)', '12,300'], ['Success Rate', '99.6%'], ['Dead Lettered', '45']],
+ notifications: [['Sent (7 days)', '8,400'], ['Delivered (7 days)', '8,300'], ['Failed (7 days)', '100'], ['Delivery Rate', '98.8%']],
+ caches: [['Reads (7 days)', '24,000'], ['Cache Hits', '23,000'], ['Hit Rate', '95.8%'], ['Avg Latency', '2.3ms']],
+ jobs: [['Total runs', '1,240'], ['Success rate', '99.2%'], ['Avg duration', '420ms'], ['Scheduled', '12']],
+ features: [['Executions (7 days)', '9,200'], ['Successful (7 days)', '9,150'], ['Failed (7 days)', '50'], ['P95 Latency', '180ms']],
+ agents: [['Conversations (7 days)', '240'], ['Tokens (7 days)', '1.2M'], ['Cost (7 days)', '$12.40'], ['Tool Calls (7 days)', '860']],
+ resilience: [['Status', 'active'], ['Invocations', '1,800'], ['Checks', '120'], ['Failures', '3']],
+};
+function Examples() {
+ const [period, setPeriod] = React.useState({ period: '7d', customStart: '', customEnd: '' });
+ if(kind === 'sessions') return React.createElement(SessionDashboard, { session: {}, sessionTag: 'players', productTag: '', productName: 'Fixture product', dashboardData: dashboard });
+ if(kind === 'webhooks') return React.createElement(WebhookTabOverview, { webhook: { tag: 'order-events', name: 'Order events', envs: [] }, events: [], selectorStats: { singleSelector: 4, multiSelector: 2 }, copiedText: null, onCopy() {}, onViewAllEvents() {}, onSelectEvent() {} });
+ const rows=metricSets[kind];
+ return React.createElement('div', { className: 'p-3 sm:p-6 space-y-4' },
+  React.createElement(Panel, { title: kind, description: 'Overview fixture data', action: React.createElement(ActivityPeriodSelector, { ...period, onChange: setPeriod }) }),
+  React.createElement('div', { className: 'grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4' }, (rows || [['Traffic', '12,000'], ['Failed', '20'], ['Average latency', '52ms'], ['Slow calls (p95)', '300ms']]).map(([label,value])=>rows ? React.createElement(ResourceMetricCard,{ key:label,label,value,hint:'Compared with the previous period',trend:label.includes('Failed')?null:React.createElement('span', {className:'text-green'},'↑ 12%')}) : React.createElement(StatTile,{key:label,label,value,hint:'Measured operations'})))
+ );
+}
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider, {client:new QueryClient({defaultOptions:{queries:{retry:false}}})}, React.createElement('main', {className:'bg-grey-100 min-h-screen text-grey'},React.createElement(Examples))));
+</script></body></html>

@@ -459,7 +459,7 @@ print('Session refreshed:', refreshed_session)
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
                 {product.logo ? (
@@ -488,7 +488,7 @@ print('Session refreshed:', refreshed_session)
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
               <KeyRound className="h-6 w-6 text-blue-500" />
@@ -521,7 +521,7 @@ print('Session refreshed:', refreshed_session)
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-grey">Environment Sessions</h2>
             {session.envs.map((env: any, index: number) => (
-              <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+              <div key={index} className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Server className="h-5 w-5 text-primary" />
@@ -554,7 +554,7 @@ print('Session refreshed:', refreshed_session)
         )}
 
         {/* Session Configuration */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-grey">Session Configuration</h2>
             <div className="flex gap-2">
@@ -656,7 +656,7 @@ print('Session refreshed:', refreshed_session)
         </div>
 
         {/* Session Behavior Info */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-grey mb-4">How Sessions Work</h2>
           <div className="space-y-3 text-sm text-grey-600">
             <div className="flex gap-3">
@@ -691,7 +691,7 @@ print('Session refreshed:', refreshed_session)
 
         {/* Security Benefits */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <KeyRound className="h-5 w-5 text-blue-500" />
               <h3 className="text-sm font-semibold text-grey">Secure Authentication</h3>
@@ -701,7 +701,7 @@ print('Session refreshed:', refreshed_session)
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-5 w-5 text-orange-500" />
               <h3 className="text-sm font-semibold text-grey">Automatic Expiry</h3>
@@ -711,7 +711,7 @@ print('Session refreshed:', refreshed_session)
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <FileJson className="h-5 w-5 text-green" />
               <h3 className="text-sm font-semibold text-grey">Flexible Schema</h3>

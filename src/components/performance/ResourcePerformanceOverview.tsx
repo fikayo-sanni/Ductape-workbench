@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -152,12 +153,14 @@ function CopyTrace({ value }: { value?: string }) {
 
 function PerformanceMetric({ icon: Icon, label, value, hint, change, current, previous }: { icon: LucideIcon; label: string; value: string; hint: string; change: string; current?: number | null; previous?: number | null }) {
   const changeColor = current != null && previous != null && previous > 0 && current !== previous ? current > previous ? 'text-red' : 'text-green' : 'text-grey/70';
-  return <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm">
-    <div className="flex items-center justify-between gap-2"><p className="text-xs text-grey/70 sm:text-sm">{label}</p><Icon className="h-4 w-4 shrink-0 text-grey/50" /></div>
-    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-grey sm:text-3xl">{value}</p>
-    <p className={`mt-1 text-[11px] font-medium sm:text-xs ${changeColor}`}>{change}</p>
-    <p className="mt-2 text-[11px] text-grey/70">{hint}</p>
-  </div>;
+  return <ResourceMetricCard
+    label={label}
+    value={value}
+    icon={<Icon className="h-4 w-4" />}
+    valueClassName="sm:text-3xl"
+    trend={<span className={`text-[11px] font-medium sm:text-xs ${changeColor}`}>{change}</span>}
+    hint={hint}
+  />;
 }
 function CompactMetric({ label, value, hint, tone }: { label: string; value: string; hint: string; tone?: 'bad' | 'warn' }) {
   return <div className="min-w-0 p-3 sm:px-4">

@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
@@ -984,9 +985,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 /* Skeleton Loading State */
                 <>
                   {/* 7-Day Activity Stats Skeleton */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
                     {[...Array(6)].map((_, i) => (
-                      <div key={i} className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm">
+                      <div key={i} className="bg-white rounded-xl border border-grey-400 p-5 shadow-sm">
                         <div className="flex items-start justify-between mb-3">
                           <Skeleton className="w-10 h-10 rounded-lg" />
                           <Skeleton className="w-12 h-4" />
@@ -998,7 +999,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
 
                   {/* Activity Timeline Skeleton */}
-                  <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm mb-6">
+                  <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm mb-6">
                     <Skeleton className="h-6 w-48 mb-4" />
                     <div className="space-y-3">
                       {[...Array(7)].map((_, i) => (
@@ -1011,9 +1012,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
 
                   {/* Current Session Metrics Skeleton */}
-                  <div className="grid grid-cols-6 gap-4 mb-6">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
                     {[...Array(6)].map((_, i) => (
-                      <div key={i} className="bg-white rounded-lg p-4 border border-border shadow-sm">
+                      <div key={i} className="bg-white rounded-xl p-4 border border-grey-400 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
                           <Skeleton className="h-4 w-20" />
                           <Skeleton className="h-4 w-4" />
@@ -1045,7 +1046,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
 
                   {/* Recent Messages Skeleton */}
-                  <div className="bg-white rounded-lg border border-border shadow-sm">
+                  <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                     <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                       <Skeleton className="h-5 w-32" />
                       <Skeleton className="h-8 w-32" />
@@ -1073,76 +1074,58 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 /* Loaded Content */
                 <>
               {/* 7-Day Activity Stats - Session Dashboard Style */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
                 {/* Messages Published (7 days) */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                      <Send className="h-5 w-5 text-green" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.published.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Published (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Published (7 days)</>}
+                  value={<>{metrics.weeklyStats.published.toLocaleString()}</>}
+                  icon={<Send className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Messages Consumed */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.consumed.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Consumed (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Consumed (7 days)</>}
+                  value={<>{metrics.weeklyStats.consumed.toLocaleString()}</>}
+                  icon={<Users className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Failed Messages */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                      <XCircle className="h-5 w-5 text-red" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-red mb-1">{metrics.weeklyStats.failed.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Failed (7 days)</>}
+                  value={<>{metrics.weeklyStats.failed.toLocaleString()}</>}
+                  icon={<XCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red mb-1"
+                />
 
                 {/* Dead Lettered */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <Trash2 className="h-5 w-5 text-orange-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-orange-500 mb-1">{metrics.weeklyStats.deadLettered.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Dead Lettered</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Dead Lettered</>}
+                  value={<>{metrics.weeklyStats.deadLettered.toLocaleString()}</>}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-orange-500 mb-1"
+                />
 
                 {/* Throughput */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-cyan-600/10 flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-cyan-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">
+                <ResourceMetricCard
+                  label={<>Avg Throughput</>}
+                  value={<>
                     {metrics.weeklyStats.throughput > 0 ? `${metrics.weeklyStats.throughput.toLocaleString()}/hr` : '-'}
-                  </div>
-                  <div className="text-xs text-grey-600 font-medium">Avg Throughput</div>
-                </div>
+                  </>}
+                  icon={<Activity className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Avg Latency */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <Clock className="h-5 w-5 text-indigo-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">
+                <ResourceMetricCard
+                  label={<>Avg Latency</>}
+                  value={<>
                     {metrics.weeklyStats.avgLatency > 0 ? `${Math.round(metrics.weeklyStats.avgLatency)}ms` : '-'}
-                  </div>
-                  <div className="text-xs text-grey-600 font-medium">Avg Latency</div>
-                </div>
+                  </>}
+                  icon={<Clock className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
               </div>
 
               <ActivityTimelinePanel
@@ -1157,77 +1140,77 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               />
 
               {/* Current Session Metrics Dashboard */}
-              <div className="grid grid-cols-6 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
                 {/* Total Messages */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Messages</span>
-                    <Activity className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.total}</p>
+                <ResourceMetricCard
+                  label={<>Total Messages</>}
+                  value={<>{metrics.total}</>}
+                  icon={<Activity className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.sparklineData} color="#0891B2" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Success Rate */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Success Rate</span>
-                    <TrendingUp className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className={cn(
+                <ResourceMetricCard
+                  label={<>Success Rate</>}
+                  value={<>
+                    {metrics.successRate.toFixed(1)}%
+                  </>}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  valueClassName={cn(
                     'text-2xl font-bold',
                     metrics.successRate >= 90 ? 'text-green' :
                     metrics.successRate >= 70 ? 'text-yellow' :
                     'text-red'
-                  )}>
-                    {metrics.successRate.toFixed(1)}%
-                  </p>
+                  )}
+                >
                   <p className="text-xs text-grey-600 mt-2">{metrics.success} succeeded</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Successful */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Successful</span>
-                    <CheckCircle2 className="h-4 w-4 text-green" />
-                  </div>
-                  <p className="text-2xl font-bold text-green">{metrics.success}</p>
+                <ResourceMetricCard
+                  label={<>Successful</>}
+                  value={<>{metrics.success}</>}
+                  icon={<CheckCircle2 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-green"
+                >
                   <p className="text-xs text-grey-600 mt-2">processed</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Failed */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Failed</span>
-                    <AlertCircle className="h-4 w-4 text-red" />
-                  </div>
-                  <p className="text-2xl font-bold text-red">{metrics.failed}</p>
+                <ResourceMetricCard
+                  label={<>Failed</>}
+                  value={<>{metrics.failed}</>}
+                  icon={<AlertCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.errorSparkline} color="#DC3444" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Partial */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Partial</span>
-                    <Shield className="h-4 w-4 text-yellow-500" />
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-500">{metrics.partial}</p>
+                <ResourceMetricCard
+                  label={<>Partial</>}
+                  value={<>{metrics.partial}</>}
+                  icon={<Shield className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-yellow-500"
+                >
                   <p className="text-xs text-grey-600 mt-2">partially delivered</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Dead Letters */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Dead Letters</span>
-                    <Trash2 className="h-4 w-4 text-orange-500" />
-                  </div>
-                  <p className="text-2xl font-bold text-orange-500">{metrics.deadLetterCount}</p>
+                <ResourceMetricCard
+                  label={<>Dead Letters</>}
+                  value={<>{metrics.deadLetterCount}</>}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-orange-500"
+                >
                   <p className="text-xs text-grey-600 mt-2">need attention</p>
-                </div>
+                </ResourceMetricCard>
               </div>
 
               {/* Breakdown Charts */}
@@ -1285,7 +1268,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </div>
 
               {/* Recent Messages */}
-              <div className="bg-white rounded-lg border border-border shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-grey">Recent Messages</h3>
                   <Button
@@ -1348,7 +1331,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
             </div>
           ) : viewMode === 'topics' ? (
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border min-h-full overflow-hidden">
+              <div className="bg-white rounded-xl border border-grey-400 min-h-full overflow-hidden">
                 <div className="px-6 py-4 border-b border-border flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-grey">Topics</h2>
@@ -1411,7 +1394,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
           ) : viewMode === 'consumers' ? (
             /* Consumers List View */
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                 <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                   <div className="grid grid-cols-[1fr,120px,100px,100px,100px,120px,100px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
                     <div>Consumer</div>
@@ -1480,7 +1463,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
           ) : viewMode === 'producers' ? (
             /* Producers List View */
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                 <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                   <div className="grid grid-cols-[1fr,120px,100px,100px,100px,120px,100px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
                     <div>Producer</div>
@@ -1549,7 +1532,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
           ) : viewMode === 'dead-letter' ? (
             /* Dead Letters View */
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                 <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                   <div className="grid grid-cols-[1fr,120px,120px,100px,100px,80px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
                     <div>Message</div>
@@ -1628,7 +1611,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   Back to Consumers
                 </Button>
               </div>
-              <div className="bg-white rounded-lg border border-border p-6 mb-4">
+              <div className="bg-white rounded-xl border border-grey-400 p-6 mb-4">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
                     <Users className="h-6 w-6 text-blue-500" />
@@ -1687,7 +1670,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 </div>
 
                 {showFilters && (
-                  <div className="bg-white rounded-lg border border-grey-400 p-4 mb-4">
+                  <div className="bg-white rounded-xl border border-grey-400 p-4 mb-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-grey-600 mb-2 block">Search</label>
@@ -1738,7 +1721,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </div>
 
               {/* Consumer's Messages Table */}
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                 {/* Table header */}
                 <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                   <div className="grid grid-cols-[1fr,140px,140px,100px,100px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
@@ -1974,7 +1957,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   Back to Producers
                 </Button>
               </div>
-              <div className="bg-white rounded-lg border border-border p-6 mb-4">
+              <div className="bg-white rounded-xl border border-grey-400 p-6 mb-4">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center">
                     <Send className="h-6 w-6 text-green" />
@@ -2033,7 +2016,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 </div>
 
                 {showFilters && (
-                  <div className="bg-white rounded-lg border border-grey-400 p-4 mb-4">
+                  <div className="bg-white rounded-xl border border-grey-400 p-4 mb-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-grey-600 mb-2 block">Search</label>
@@ -2084,7 +2067,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </div>
 
               {/* Producer's Messages Table */}
-              <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                 {/* Table header */}
                 <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                   <div className="grid grid-cols-[1fr,140px,140px,100px,100px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
@@ -2347,8 +2330,8 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
 
                 {/* Expandable Filter Panel */}
                 {showFilters && (
-                  <div className="bg-white rounded-lg border border-grey-400 p-4 mb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-xl border border-grey-400 p-4 mb-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
                       {/* Search Input */}
                       <div>
                         <label className="text-sm font-medium text-grey-600 mb-2 block">
@@ -2425,7 +2408,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
 
               {/* Messages Table */}
               <div className="flex-1 overflow-auto p-4">
-                <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+                <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                   {/* Table header */}
                   <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                     <div className="grid grid-cols-[1fr,140px,140px,100px,100px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">

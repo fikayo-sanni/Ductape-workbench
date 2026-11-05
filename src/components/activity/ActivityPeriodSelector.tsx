@@ -38,7 +38,7 @@ export function ActivityPeriodSelector({ period, customStart, customEnd, onChang
   };
 
   return (
-    <div className={cn('flex rounded-lg border border-grey-300 overflow-hidden', className)}>
+    <div className={cn('inline-flex flex-wrap rounded-lg border border-grey-400 bg-white p-0.5', className)}>
       {PERIOD_OPTIONS.map((opt) =>
         opt.id === 'custom' ? (
           <Popover key={opt.id} open={open} onOpenChange={setOpen}>
@@ -47,7 +47,7 @@ export function ActivityPeriodSelector({ period, customStart, customEnd, onChang
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={cn('rounded-none h-8 px-3 text-xs', period === 'custom' && 'bg-primary/10 text-primary')}
+                className={cn('rounded-md h-7 px-2.5 text-xs', period === 'custom' && 'bg-primary text-white hover:bg-primary/90 hover:text-white')}
               >
                 <Calendar className="h-3.5 w-3.5 mr-1" />
                 {opt.label}
@@ -84,7 +84,7 @@ export function ActivityPeriodSelector({ period, customStart, customEnd, onChang
             type="button"
             variant="ghost"
             size="sm"
-            className={cn('rounded-none h-8 px-3 text-xs', period === opt.id && 'bg-primary/10 text-primary')}
+            className={cn('rounded-md h-7 px-2.5 text-xs', period === opt.id && 'bg-primary text-white hover:bg-primary/90 hover:text-white')}
             onClick={() => onChange({ period: opt.id, customStart, customEnd })}
           >
             {opt.label}

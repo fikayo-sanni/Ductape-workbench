@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Play,
@@ -632,96 +633,54 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
             /* Overview Content */
             <div className="flex-1 overflow-auto p-6">
               {/* 7-Day Activity Stats - Session Dashboard Style */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
                 {/* Total Conversations (7 days) */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                      <MessageSquare className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      15.3%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.conversations.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Conversations (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Conversations (7 days)</>}
+                  value={<>{metrics.weeklyStats.conversations.toLocaleString()}</>}
+                  icon={<MessageSquare className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Successful */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-green" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      11.2%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-green mb-1">{metrics.weeklyStats.successful.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Successful (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Successful (7 days)</>}
+                  value={<>{metrics.weeklyStats.successful.toLocaleString()}</>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-green mb-1"
+                />
 
                 {/* Failed */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                      <XCircle className="h-5 w-5 text-red" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-red">
-                      <TrendingDown className="h-3 w-3" />
-                      -6.8%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-red mb-1">{metrics.weeklyStats.failed.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Failed (7 days)</>}
+                  value={<>{metrics.weeklyStats.failed.toLocaleString()}</>}
+                  icon={<XCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red mb-1"
+                />
 
                 {/* Total Tokens */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      22.1%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{formatTokens(metrics.weeklyStats.totalTokens7d)}</div>
-                  <div className="text-xs text-grey-600 font-medium">Tokens (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Tokens (7 days)</>}
+                  value={<>{formatTokens(metrics.weeklyStats.totalTokens7d)}</>}
+                  icon={<Zap className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Total Cost */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <DollarSign className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-red">
-                      <TrendingUp className="h-3 w-3" />
-                      18.5%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">${metrics.weeklyStats.totalCost7d.toFixed(2)}</div>
-                  <div className="text-xs text-grey-600 font-medium">Cost (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Cost (7 days)</>}
+                  value={<>${metrics.weeklyStats.totalCost7d.toFixed(2)}</>}
+                  icon={<DollarSign className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Tool Calls */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <Wrench className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-green">
-                      <TrendingUp className="h-3 w-3" />
-                      9.4%
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.toolCalls7d.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Tool Calls (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Tool Calls (7 days)</>}
+                  value={<>{metrics.weeklyStats.toolCalls7d.toLocaleString()}</>}
+                  icon={<Wrench className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
               </div>
 
               <ActivityTimelinePanel
@@ -736,77 +695,77 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
               />
 
               {/* Current Session Metrics Dashboard */}
-              <div className="grid grid-cols-6 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
                 {/* Total Runs */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Runs</span>
-                    <MessageSquare className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.total}</p>
+                <ResourceMetricCard
+                  label={<>Total Runs</>}
+                  value={<>{metrics.total}</>}
+                  icon={<MessageSquare className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.sparklineData} color="#A855F7" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Success Rate */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Success Rate</span>
-                    <CheckCircle className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className={cn(
+                <ResourceMetricCard
+                  label={<>Success Rate</>}
+                  value={<>
+                    {metrics.successRate.toFixed(1)}%
+                  </>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName={cn(
                     'text-2xl font-bold',
                     metrics.successRate >= 95 ? 'text-green' :
                     metrics.successRate >= 80 ? 'text-yellow' :
                     'text-red'
-                  )}>
-                    {metrics.successRate.toFixed(1)}%
-                  </p>
+                  )}
+                >
                   <p className="text-xs text-grey-600 mt-2">{metrics.completed} succeeded</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Active */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Active</span>
-                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-purple-500 animate-spin' : 'text-grey-600')} />
-                  </div>
-                  <p className="text-2xl font-bold text-purple-500">{metrics.running}</p>
+                <ResourceMetricCard
+                  label={<>Active</>}
+                  value={<>{metrics.running}</>}
+                  icon={<Loader2 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-purple-500"
+                >
                   <p className="text-xs text-grey-600 mt-2">currently running</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Errors */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Errors</span>
-                    <AlertCircle className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-red">{metrics.failed}</p>
+                <ResourceMetricCard
+                  label={<>Errors</>}
+                  value={<>{metrics.failed}</>}
+                  icon={<AlertCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.errorSparkline} color="#DC3444" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Tokens */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Tokens</span>
-                    <Zap className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{formatTokens(metrics.totalTokens)}</p>
+                <ResourceMetricCard
+                  label={<>Total Tokens</>}
+                  value={<>{formatTokens(metrics.totalTokens)}</>}
+                  icon={<Zap className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <p className="text-xs text-grey-600 mt-2">{metrics.totalToolCalls} tool calls</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Cost */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Cost</span>
-                    <DollarSign className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">${metrics.totalCost.toFixed(2)}</p>
+                <ResourceMetricCard
+                  label={<>Total Cost</>}
+                  value={<>${metrics.totalCost.toFixed(2)}</>}
+                  icon={<DollarSign className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <p className="text-xs text-grey-600 mt-2">avg: {formatDuration(metrics.avgDuration)}</p>
-                </div>
+                </ResourceMetricCard>
               </div>
 
               {/* Breakdown Charts */}
@@ -872,7 +831,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
               </div>
 
               {/* Recent Runs */}
-              <div className="bg-white rounded-lg border border-border shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-grey">Recent Conversations</h3>
                   <Button
@@ -952,7 +911,7 @@ export default function AgentExplorerTab({ agent = {} }: AgentExplorerTabProps) 
 
               {/* Table */}
               <div className="flex-1 overflow-auto p-4">
-                <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+                <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
               {/* Table header */}
               <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                 <div className="grid grid-cols-[1fr,120px,140px,120px,100px,100px,80px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">

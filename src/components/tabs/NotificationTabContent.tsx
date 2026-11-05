@@ -116,7 +116,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
                 {product.logo ? (
@@ -149,7 +149,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-red/10 flex items-center justify-center flex-shrink-0">
               <Bell className="h-6 w-6 text-red" />
@@ -174,7 +174,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
               const notificationConfig = env;
               const envKey = `${env.slug}-${index}`;
               return (
-                <div key={env._id ?? envKey} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                <div key={env._id ?? envKey} className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                   <div className="flex items-center gap-2 mb-4">
                     <Bell className="h-5 w-5 text-primary" />
                     <h3 className="text-base font-semibold text-grey">{env.slug}</h3>
@@ -691,7 +691,7 @@ export default function NotificationTabContent({ data }: NotificationTabContentP
             })}
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <div className="text-center py-8">
               <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
               <p className="text-sm text-grey-600">No environment configurations</p>

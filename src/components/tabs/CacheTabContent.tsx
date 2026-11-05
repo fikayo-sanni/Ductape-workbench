@@ -66,7 +66,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
                 {product.logo ? (
@@ -95,7 +95,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
               <Layers className="h-6 w-6 text-orange-500" />
@@ -123,7 +123,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-grey">Environment Connections</h2>
             {environments.map((env: any, index: number) => (
-              <div key={index} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+              <div key={index} className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Server className="h-5 w-5 text-primary" />
@@ -163,7 +163,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         )}
 
         {/* Cache Configuration */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-grey mb-4">Cache Configuration</h2>
 
           <div className="space-y-4">
@@ -221,7 +221,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
         </div>
 
         {/* Cache Behavior Info */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-grey mb-4">How Caching Works</h2>
           <div className="space-y-3 text-sm text-grey-600">
             <div className="flex gap-3">
@@ -256,7 +256,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
 
         {/* Performance Benefits */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-5 w-5 text-orange-500" />
               <h3 className="text-sm font-semibold text-grey">Faster Response</h3>
@@ -266,7 +266,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-5 w-5 text-orange-500" />
               <h3 className="text-sm font-semibold text-grey">Reduced Load</h3>
@@ -276,7 +276,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Tag className="h-5 w-5 text-green" />
               <h3 className="text-sm font-semibold text-grey">Auto-Refresh</h3>
@@ -289,7 +289,7 @@ export default function CacheTabContent({ cache }: CacheTabContentProps) {
 
         {/* Empty State for no environments */}
         {environments.length === 0 && (
-          <div className="bg-white rounded-lg border border-grey-400 p-12 shadow-sm text-center">
+          <div className="bg-white rounded-xl border border-grey-400 p-12 shadow-sm text-center">
             <Layers className="h-12 w-12 text-grey-600 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-grey mb-2">No Environments Available</h3>
             <p className="text-sm text-grey-600">

@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
@@ -368,22 +369,21 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
         <div className="flex-1 overflow-auto p-6">
           {view === 'overview' && (
             <div className="mx-auto max-w-6xl space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
                 {summary.map((item) => (
-                  <div key={item.label} className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
-                    <div className={cn('mb-3 flex h-10 w-10 items-center justify-center rounded-lg', item.tint, item.color)}>
-                      <item.icon className="h-5 w-5" />
-                    </div>
-                    <p className={cn('text-2xl font-bold capitalize', item.color)}><LoadingValue loading={invocationsLoading && ['Checks', 'Invocations'].includes(item.label)}>{String(item.value)}</LoadingValue></p>
-                    <p className="mt-1 text-xs font-medium text-grey-600">{item.label}</p>
-                  </div>
+                  <ResourceMetricCard key={item.label}
+                    label={<>{item.label}</>}
+                    value={<><LoadingValue loading={invocationsLoading && ['Checks', 'Invocations'].includes(item.label)}>{String(item.value)}</LoadingValue></>}
+                    icon={<item.icon className="h-4 w-4" />}
+                    valueClassName={cn('text-2xl font-bold capitalize', item.color)}
+                  />
                 ))}
               </div>
 
               <ActivityTimelinePanel kind={kind} productTag={product.tag} componentTag={resource.tag} env={env.slug} title={`${meta.label} activity`} countLabel={kind === 'healthcheck' ? 'checks' : 'invocations'} />
 
               {kind !== 'healthcheck' && (
-                <section className="rounded-lg border border-grey-300 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
+                <section className="rounded-xl border border-grey-400 bg-white shadow-sm dark:border-grey-400 dark:bg-background">
                   <div className="px-5 pb-2 pt-4">
                     <h2 className="text-sm font-semibold text-grey">Options</h2>
                     <p className="mt-1 text-xs text-grey-600">Ordered execution path and share of recent invocations</p>
@@ -410,7 +410,7 @@ export default function ResilienceComponentTab({ kind, resource, product, env }:
               )}
 
               {kind === 'healthcheck' && currentEnv && (
-                <section className="rounded-lg border border-grey-300 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
+                <section className="rounded-xl border border-grey-400 bg-white p-5 shadow-sm dark:border-grey-400 dark:bg-background">
                   <h2 className="text-sm font-semibold text-grey">Latest probe</h2>
                   <div className="mt-4"><JsonViewer data={currentEnv.response ?? currentEnv.payload ?? { status: status || 'unknown', ...(currentEnv.lastError ? { error: currentEnv.lastError } : {}) }} /></div>
                 </section>

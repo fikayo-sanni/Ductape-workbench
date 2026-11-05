@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -777,7 +778,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20">
+                <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
                   <Activity className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -810,7 +811,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
                 <Button
                   size="sm"
                   onClick={() => setShowExecuteModal(true)}
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg shadow-primary/25"
+                  className="bg-primary text-white hover:bg-primary/90"
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Run Feature
@@ -835,72 +836,54 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
             /* Overview Content */
             <div className="flex-1 overflow-auto p-6">
               {/* 7-Day Activity Stats - Session Dashboard Style */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
                 {/* Total Executions (7 days) */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.executions.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Executions (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Executions (7 days)</>}
+                  value={<>{metrics.weeklyStats.executions.toLocaleString()}</>}
+                  icon={<Activity className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Successful Runs */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-green" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-green mb-1">{metrics.weeklyStats.successful.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Successful (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Successful (7 days)</>}
+                  value={<>{metrics.weeklyStats.successful.toLocaleString()}</>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-green mb-1"
+                />
 
                 {/* Failed Runs */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-red/10 flex items-center justify-center">
-                      <XCircle className="h-5 w-5 text-red" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-red mb-1">{metrics.weeklyStats.failed.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Failed (7 days)</>}
+                  value={<>{metrics.weeklyStats.failed.toLocaleString()}</>}
+                  icon={<XCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red mb-1"
+                />
 
                 {/* Avg Duration */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Timer className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{formatDuration(metrics.weeklyStats.avgDuration7d)}</div>
-                  <div className="text-xs text-grey-600 font-medium">Avg Duration</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Avg Duration</>}
+                  value={<>{formatDuration(metrics.weeklyStats.avgDuration7d)}</>}
+                  icon={<Timer className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* P95 Latency */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                      <BarChart3 className="h-5 w-5 text-purple-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{formatDuration(metrics.weeklyStats.p95_7d)}</div>
-                  <div className="text-xs text-grey-600 font-medium">P95 Latency</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>P95 Latency</>}
+                  value={<>{formatDuration(metrics.weeklyStats.p95_7d)}</>}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
 
                 {/* Throughput */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-orange-600" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.throughput}/hr</div>
-                  <div className="text-xs text-grey-600 font-medium">Avg Throughput</div>
-                </div>
+                <ResourceMetricCard
+                  label={<>Avg Throughput</>}
+                  value={<>{metrics.weeklyStats.throughput}/hr</>}
+                  icon={<Zap className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                />
               </div>
 
               <ActivityTimelinePanel
@@ -914,77 +897,77 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
               />
 
               {/* Current Session Metrics Dashboard */}
-              <div className="grid grid-cols-6 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
                 {/* Total Runs */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Runs</span>
-                    <LayoutGrid className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.total}</p>
+                <ResourceMetricCard
+                  label={<>Total Runs</>}
+                  value={<>{metrics.total}</>}
+                  icon={<LayoutGrid className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.sparklineData} color="#0846A6" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Success Rate */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Success Rate</span>
-                    <CheckCircle className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className={cn(
+                <ResourceMetricCard
+                  label={<>Success Rate</>}
+                  value={<>
+                    {metrics.successRate.toFixed(1)}%
+                  </>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName={cn(
                     'text-2xl font-bold',
                     metrics.successRate >= 95 ? 'text-green' :
                     metrics.successRate >= 80 ? 'text-yellow' :
                     'text-red'
-                  )}>
-                    {metrics.successRate.toFixed(1)}%
-                  </p>
+                  )}
+                >
                   <p className="text-xs text-grey-600 mt-2">{metrics.completed} succeeded</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Active */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Active</span>
-                    <Loader2 className={cn('h-4 w-4', metrics.running > 0 ? 'text-primary animate-spin' : 'text-grey-600')} />
-                  </div>
-                  <p className="text-2xl font-bold text-primary">{metrics.running}</p>
+                <ResourceMetricCard
+                  label={<>Active</>}
+                  value={<>{metrics.running}</>}
+                  icon={<Loader2 className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-primary"
+                >
                   <p className="text-xs text-grey-600 mt-2">currently running</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Errors */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Errors</span>
-                    <AlertCircle className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-red">{metrics.failed + metrics.timeout}</p>
+                <ResourceMetricCard
+                  label={<>Errors</>}
+                  value={<>{metrics.failed + metrics.timeout}</>}
+                  icon={<AlertCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-red"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.errorSparkline} color="#DC3444" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Avg Duration */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Avg Duration</span>
-                    <Timer className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{formatDuration(metrics.avgDuration)}</p>
+                <ResourceMetricCard
+                  label={<>Avg Duration</>}
+                  value={<>{formatDuration(metrics.avgDuration)}</>}
+                  icon={<Timer className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <p className="text-xs text-grey-600 mt-2">p50: {formatDuration(metrics.p50)}</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* P99 Latency */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">P99 Latency</span>
-                    <TrendingUp className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{formatDuration(metrics.p99)}</p>
+                <ResourceMetricCard
+                  label={<>P99 Latency</>}
+                  value={<>{formatDuration(metrics.p99)}</>}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <p className="text-xs text-grey-600 mt-2">p95: {formatDuration(metrics.p95)}</p>
-                </div>
+                </ResourceMetricCard>
               </div>
 
               {/* Breakdown Charts */}
@@ -1051,7 +1034,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
               </div>
 
               {/* Recent Runs */}
-              <div className="bg-white rounded-lg border border-border shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-grey">Recent Runs</h3>
                   <Button
@@ -1132,7 +1115,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
 
               {/* Table */}
               <div className="flex-1 overflow-auto p-4">
-                <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+                <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                   {/* Table header */}
               <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                 <div className="grid grid-cols-[1fr,120px,140px,120px,100px,180px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
@@ -1303,7 +1286,7 @@ export default function FeatureExplorerTab({ tabId, feature = {}, product }: Fea
             <Button
               onClick={handleExecuteFeature}
               disabled={isExecuting}
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white"
+              className="bg-primary text-white hover:bg-primary/90"
             >
               {isExecuting ? (
                 <>

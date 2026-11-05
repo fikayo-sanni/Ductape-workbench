@@ -178,13 +178,13 @@ export function ActivityTimelinePanel({
   return (
     <div
       className={cn(
-        'bg-white dark:bg-background rounded-lg border border-grey-300 dark:border-grey-400 p-6 shadow-sm',
+        'bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5',
         className,
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-grey">{title}</h2>
+          <h2 className="text-sm font-semibold text-grey sm:text-base">{title}</h2>
           {(isLoading || isFetching) && (
             <Loader2 className="h-4 w-4 animate-spin text-grey-600" />
           )}

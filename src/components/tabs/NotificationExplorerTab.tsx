@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Bell,
@@ -822,7 +823,7 @@ console.log('Result:', result);`;
           )}
 
           {/* Header with New Template */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
@@ -857,7 +858,7 @@ console.log('Result:', result);`;
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-grey">Notifiers</h2>
             {notifiers.length === 0 ? (
-              <div className="bg-white rounded-lg border border-grey-400 p-12 text-center shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 p-12 text-center shadow-sm">
                 <Bell className="h-12 w-12 text-grey-600 mx-auto mb-3" />
                 <p className="text-grey-600 mb-2">No notifiers yet</p>
                 <p className="text-sm text-grey-600 mb-4">Create a notification from your product to get started.</p>
@@ -866,7 +867,7 @@ console.log('Result:', result);`;
               notifiers.map((notifier) => {
                 const envs = notifier.envs ?? product.envs ?? [];
                 return (
-                  <div key={notifier.tag} className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+                  <div key={notifier.tag} className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -1123,83 +1124,59 @@ console.log('Result:', result);`;
           /* Overview Content */
           <div className="flex-1 overflow-auto p-6">
             {/* Key Metrics - Session Dashboard Style */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
               {/* Total Sent */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Send className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalSent.toLocaleString()}</div>
-                <div className="text-xs text-grey-600 font-medium">Sent (7 days)</div>
-              </div>
+              <ResourceMetricCard
+                label={<>Sent (7 days)</>}
+                value={<>{weeklyStats.totalSent.toLocaleString()}</>}
+                icon={<Send className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+              />
 
               {/* Delivered */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-green" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalDelivered.toLocaleString()}</div>
-                <div className="text-xs text-grey-600 font-medium">Delivered (7 days)</div>
-              </div>
+              <ResourceMetricCard
+                label={<>Delivered (7 days)</>}
+                value={<>{weeklyStats.totalDelivered.toLocaleString()}</>}
+                icon={<CheckCircle className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+              />
 
               {/* Failed */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.totalFailed.toLocaleString()}</div>
-                <div className="text-xs text-grey-600 font-medium">Failed (7 days)</div>
-              </div>
+              <ResourceMetricCard
+                label={<>Failed (7 days)</>}
+                value={<>{weeklyStats.totalFailed.toLocaleString()}</>}
+                icon={<XCircle className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+              />
 
               {/* Delivery Rate */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className={cn(
+              <ResourceMetricCard
+                label={<>Delivery Rate</>}
+                value={<>
+                  {weeklyStats.deliveryRate}%
+                </>}
+                icon={<BarChart3 className="h-4 w-4" />}
+                valueClassName={cn(
                   "text-2xl font-bold mb-1",
                   weeklyStats.deliveryRate >= 95 ? 'text-green' : weeklyStats.deliveryRate >= 85 ? 'text-orange-500' : 'text-red'
-                )}>
-                  {weeklyStats.deliveryRate}%
-                </div>
-                <div className="text-xs text-grey-600 font-medium">Delivery Rate</div>
-              </div>
+                )}
+              />
 
               {/* Email Channel */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center">
-                    <Mail className="h-5 w-5 text-blue" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.email.sent}</div>
-                <div className="text-xs text-grey-600 font-medium">Emails Sent</div>
-              </div>
+              <ResourceMetricCard
+                label={<>Emails Sent</>}
+                value={<>{weeklyStats.byChannel.email.sent}</>}
+                icon={<Mail className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+              />
 
               {/* Push Notifications */}
-              <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Smartphone className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="text-xs font-medium text-grey-600">—</div>
-                </div>
-                <div className="text-2xl font-bold text-grey mb-1">{weeklyStats.byChannel.push.sent}</div>
-                <div className="text-xs text-grey-600 font-medium">Push Notifications</div>
-              </div>
+              <ResourceMetricCard
+                label={<>Push Notifications</>}
+                value={<>{weeklyStats.byChannel.push.sent}</>}
+                icon={<Smartphone className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+              />
             </div>
 
             <ActivityTimelinePanel
@@ -1214,7 +1191,7 @@ console.log('Result:', result);`;
             {/* Channel Distribution - Session Dashboard Style */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               {/* Channel Breakdown */}
-              <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-5 w-5 text-blue-500" />
                   <h2 className="text-lg font-semibold text-grey">Channel Distribution</h2>
@@ -1261,7 +1238,7 @@ console.log('Result:', result);`;
               </div>
 
               {/* Top Templates */}
-              <div className="bg-white rounded-lg border border-grey-300 p-6 shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="h-5 w-5 text-blue-500" />
                   <h2 className="text-lg font-semibold text-grey">Top Templates (7 days)</h2>
@@ -1401,7 +1378,7 @@ console.log('Result:', result);`;
             </div>
 
             {/* All Messages (templates/child_tags from log service) */}
-            <div className="bg-white rounded-lg border border-border shadow-sm">
+            <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-grey">All Messages</h3>
               </div>
@@ -1485,7 +1462,7 @@ console.log('Result:', result);`;
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-lg border border-border overflow-auto">
+              <div className="bg-white rounded-xl border border-grey-400 overflow-auto">
                 {isLoadingMessageLogs ? (
                   <div className="flex flex-col items-center justify-center py-16">
                     <Loader2 className="animate-spin w-8 h-8 text-blue-500 mb-4" />

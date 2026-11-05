@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import type { ComponentType, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -81,9 +82,9 @@ export function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn('rounded-lg border border-grey-400 bg-white shadow-sm', className)}>
+    <section className={cn('rounded-xl border border-grey-400 bg-white shadow-sm', className)}>
       {title || action ? (
-        <div className="flex items-start justify-between gap-3 border-b border-grey-300 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-grey-300 px-4 py-3 sm:px-5">
           <div className="min-w-0">
             {title ? <h2 className="text-sm font-semibold text-grey sm:text-base">{title}</h2> : null}
             {description ? <p className="mt-0.5 text-xs text-grey-600">{description}</p> : null}
@@ -118,15 +119,9 @@ export function StatusDot({ tone }: { tone: Tone }) {
   return <span className={cn('h-2 w-2 flex-shrink-0 rounded-full', TONES[tone].dot)} />;
 }
 
-/** Small centred number tile, matching the "Overview" tiles on the product home page. */
+/** Dashboard-style metric shared by functions, rate limits, deployment and resource summaries. */
 export function StatTile({ label, value, hint, tone = 'neutral' }: { label: string; value: ReactNode; hint?: string; tone?: Tone }) {
-  return (
-    <div className="rounded-lg bg-grey-100 p-3 text-center sm:p-4">
-      <p className={cn('text-xl font-bold sm:text-2xl md:text-3xl', TONES[tone].value)}>{value}</p>
-      <p className="mt-0.5 text-[11px] text-grey-600 sm:text-xs md:text-sm">{label}</p>
-      {hint ? <p className="mt-0.5 text-[10px] text-grey-600 sm:text-xs">{hint}</p> : null}
-    </div>
-  );
+  return <ResourceMetricCard label={label} value={value} hint={hint} valueClassName={TONES[tone].value} />;
 }
 
 export function SectionLoading({ label = 'Loading...' }: { label?: string }) {

@@ -224,7 +224,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Product Context Header */}
         {product && (
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20 p-6">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
                 {product.logo ? (
@@ -261,7 +261,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
               <Zap className="h-6 w-6 text-purple-500" />
@@ -287,7 +287,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
         </div>
 
         {/* Job Configuration */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-grey mb-4">Job Configuration</h2>
 
           <div className="space-y-4">
@@ -343,7 +343,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
 
         {/* Component Being Executed */}
         {componentData && (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-grey mb-4">Component Being Executed</h2>
             
             <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
@@ -451,7 +451,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
 
         {/* Execution Details */}
         {(displayData.lastRun || displayData.nextRun || displayData.runCount) && (
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-grey mb-4">Execution Details</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -493,7 +493,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
         )}
 
         {/* Job Behavior Info */}
-        <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-grey mb-4">How Jobs Work</h2>
           <div className="space-y-3 text-sm text-grey-600">
             <div className="flex gap-3">
@@ -528,7 +528,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
 
         {/* Performance Benefits */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-5 w-5 text-purple-500" />
               <h3 className="text-sm font-semibold text-grey">Automated Tasks</h3>
@@ -538,7 +538,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-5 w-5 text-blue" />
               <h3 className="text-sm font-semibold text-grey">Scheduled Execution</h3>
@@ -548,7 +548,7 @@ export default function JobTabContent({ job }: JobTabContentProps) {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <RefreshCw className="h-5 w-5 text-green" />
               <h3 className="text-sm font-semibold text-grey">Reliable Processing</h3>

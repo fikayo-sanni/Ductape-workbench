@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { TrendingUp, TrendingDown, Users, Activity, Clock, BarChart3, UserPlus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ActivityTimelinePanel } from '@/components/activity/ActivityTimelinePanel';
@@ -105,7 +106,7 @@ export default function SessionDashboard({
   if (isLoading) {
     return (
       <div className="h-full overflow-auto bg-grey-100 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
           {/* Header Skeleton */}
           <div>
             <div className="h-8 w-48 bg-grey-200 rounded animate-pulse mb-2" />
@@ -117,11 +118,11 @@ export default function SessionDashboard({
           </div>
 
           {/* Stats Grid Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm"
+                className="bg-white rounded-xl border border-grey-400 p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-lg bg-grey-200 animate-pulse" />
@@ -136,7 +137,7 @@ export default function SessionDashboard({
           {/* Charts Skeleton */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Activity Timeline Skeleton */}
-            <div className="lg:col-span-2 bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="lg:col-span-2 bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="h-6 w-48 bg-grey-200 rounded animate-pulse" />
                 <div className="h-5 w-5 bg-grey-200 rounded animate-pulse" />
@@ -158,7 +159,7 @@ export default function SessionDashboard({
             </div>
 
             {/* Peak Hours Skeleton */}
-            <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+            <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="h-6 w-40 bg-grey-200 rounded animate-pulse" />
                 <div className="h-5 w-5 bg-grey-200 rounded animate-pulse" />
@@ -189,10 +190,10 @@ export default function SessionDashboard({
 
   return (
     <div className="h-full overflow-auto bg-grey-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-grey mb-1">Session Analytics</h1>
+        <div className="rounded-xl border border-grey-400 bg-white p-4 shadow-sm sm:p-5">
+          <h1 className="text-base font-semibold text-grey mb-1">Session Analytics</h1>
           <div className="flex items-center gap-2">
             <code className="text-sm font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
               {sessionTag}
@@ -207,20 +208,17 @@ export default function SessionDashboard({
         </div>
 
         {/* Stats Grid - matching workspace Dashboard pattern exactly */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
           {stats.map((stat) => {
             const Icon = stat.icon;
             const TrendIcon = stat.trend === 'up' ? TrendingUp : TrendingDown;
             return (
-              <div
-                key={stat.title}
-                className="bg-white rounded-lg border border-grey-400 p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', stat.bgColor)}>
-                    <Icon className={cn('h-5 w-5', stat.color)} />
-                  </div>
-                  {stat.trend && stat.change && (
+              <ResourceMetricCard key={stat.title}
+                label={<>{stat.title}</>}
+                value={<>{stat.value}</>}
+                icon={<Icon className="h-4 w-4" />}
+                valueClassName="text-2xl font-bold text-grey mb-1"
+                trend={<>{stat.trend && stat.change && (
                     <div
                       className={cn(
                         'flex items-center gap-1 text-xs font-medium px-2 py-1 rounded',
@@ -232,11 +230,8 @@ export default function SessionDashboard({
                       <TrendIcon className="h-3 w-3" />
                       {stat.change}
                     </div>
-                  )}
-                </div>
-                <h3 className="text-2xl font-bold text-grey mb-1">{stat.value}</h3>
-                <p className="text-sm text-grey-600">{stat.title}</p>
-              </div>
+                  )}</>}
+              />
             );
           })}
         </div>
@@ -253,7 +248,7 @@ export default function SessionDashboard({
           />
 
           {/* Peak Hours */}
-          <div className="bg-white rounded-lg border border-grey-400 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-grey-400 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-grey">Peak Activity Hours</h2>
               <BarChart3 className="h-5 w-5 text-grey-600" />

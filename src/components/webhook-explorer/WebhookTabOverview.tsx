@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { Zap, Filter, BarChart3, Globe, ChevronRight, Copy, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -61,13 +62,12 @@ export function WebhookTabOverview({
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {statCards.map((card) => (
-            <div key={card.label} className="rounded-xl border border-grey-300 bg-white p-4 shadow-sm">
-              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center mb-2', card.iconClass)}>
-                <card.icon className="h-4 w-4" />
-              </div>
-              <p className="text-2xl font-bold text-grey tabular-nums">{card.value}</p>
-              <p className="text-xs text-grey-600 mt-0.5">{card.label}</p>
-            </div>
+            <ResourceMetricCard key={card.label}
+              label={<>{card.label}</>}
+              value={<>{card.value}</>}
+              icon={<card.icon className="h-4 w-4" />}
+              valueClassName="text-2xl font-bold text-grey tabular-nums"
+            />
           ))}
         </div>
 

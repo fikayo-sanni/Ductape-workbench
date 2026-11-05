@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import {
   Send,
   CheckCircle,
@@ -94,26 +95,20 @@ export function WebhookExplorerOverview({
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {statCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-xl border border-grey-300 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', card.iconClass)}>
-                  <card.icon className="h-4 w-4" />
-                </div>
-                {card.hint && (
+            <ResourceMetricCard key={card.label}
+              label={<>{card.label}</>}
+              value={<>
+                {card.value}
+              </>}
+              icon={<card.icon className="h-4 w-4" />}
+              valueClassName={cn('text-2xl font-bold tabular-nums', card.valueClass ?? 'text-grey')}
+              trend={<>{card.hint && (
                   <span className="flex items-center gap-0.5 text-[10px] font-semibold text-green">
                     <TrendingUp className="h-3 w-3" />
                     {card.hint}
                   </span>
-                )}
-              </div>
-              <p className={cn('text-2xl font-bold tabular-nums', card.valueClass ?? 'text-grey')}>
-                {card.value}
-              </p>
-              <p className="text-xs text-grey-600 mt-0.5">{card.label}</p>
-            </div>
+                )}</>}
+            />
           ))}
         </div>
 

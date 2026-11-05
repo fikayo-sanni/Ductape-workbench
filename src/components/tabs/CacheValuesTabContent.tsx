@@ -1,3 +1,4 @@
+import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/store/useAuth';
@@ -699,14 +700,14 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
             /* Overview Content */
             <div className="flex-1 overflow-auto p-6">
               {/* Key Metrics - Session Dashboard Style */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 mb-6">
                 {/* Total Reads (7 days) */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-blue-600" />
-                    </div>
-                    {metrics.weeklyStats.trends.reads.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Reads (7 days)</>}
+                  value={<>{metrics.weeklyStats.reads.toLocaleString()}</>}
+                  icon={<Zap className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                  trend={<>{metrics.weeklyStats.trends.reads.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         metrics.weeklyStats.trends.reads.direction === 'up' ? 'text-green' : 'text-red-500'
@@ -714,19 +715,16 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.reads.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.reads.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.reads.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Reads (7 days)</div>
-                </div>
+                    )}</>}
+                />
 
                 {/* Cache Writes */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                      <Database className="h-5 w-5 text-green" />
-                    </div>
-                    {metrics.weeklyStats.trends.writes.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Writes (7 days)</>}
+                  value={<>{metrics.weeklyStats.writes.toLocaleString()}</>}
+                  icon={<Database className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                  trend={<>{metrics.weeklyStats.trends.writes.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         metrics.weeklyStats.trends.writes.direction === 'up' ? 'text-green' : 'text-red-500'
@@ -734,19 +732,16 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.writes.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.writes.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.writes.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Writes (7 days)</div>
-                </div>
+                    )}</>}
+                />
 
                 {/* Cache Hits */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-purple-600" />
-                    </div>
-                    {metrics.weeklyStats.trends.hits.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Cache Hits</>}
+                  value={<>{metrics.weeklyStats.hits.toLocaleString()}</>}
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                  trend={<>{metrics.weeklyStats.trends.hits.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         metrics.weeklyStats.trends.hits.direction === 'up' ? 'text-green' : 'text-red-500'
@@ -754,19 +749,16 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.hits.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.hits.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.hits.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Cache Hits</div>
-                </div>
+                    )}</>}
+                />
 
                 {/* Cache Misses */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                    </div>
-                    {metrics.weeklyStats.trends.misses.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Cache Misses</>}
+                  value={<>{metrics.weeklyStats.misses.toLocaleString()}</>}
+                  icon={<XCircle className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                  trend={<>{metrics.weeklyStats.trends.misses.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         // For misses, down is good (green) and up is bad (red)
@@ -775,19 +767,21 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.misses.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.misses.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.misses.toLocaleString()}</div>
-                  <div className="text-xs text-grey-600 font-medium">Cache Misses</div>
-                </div>
+                    )}</>}
+                />
 
                 {/* Hit Rate */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <BarChart3 className="h-5 w-5 text-orange-600" />
-                    </div>
-                    {metrics.weeklyStats.trends.hitRate.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Hit Rate</>}
+                  value={<>
+                    {metrics.weeklyStats.hitRate.toFixed(1)}%
+                  </>}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  valueClassName={cn(
+                    "text-2xl font-bold mb-1",
+                    metrics.weeklyStats.hitRate >= 90 ? 'text-green' : metrics.weeklyStats.hitRate >= 75 ? 'text-orange-500' : 'text-red'
+                  )}
+                  trend={<>{metrics.weeklyStats.trends.hitRate.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         metrics.weeklyStats.trends.hitRate.direction === 'up' ? 'text-green' : 'text-red-500'
@@ -795,24 +789,16 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.hitRate.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.hitRate.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className={cn(
-                    "text-2xl font-bold mb-1",
-                    metrics.weeklyStats.hitRate >= 90 ? 'text-green' : metrics.weeklyStats.hitRate >= 75 ? 'text-orange-500' : 'text-red'
-                  )}>
-                    {metrics.weeklyStats.hitRate.toFixed(1)}%
-                  </div>
-                  <div className="text-xs text-grey-600 font-medium">Hit Rate</div>
-                </div>
+                    )}</>}
+                />
 
                 {/* Avg Latency */}
-                <div className="bg-white rounded-lg border border-grey-300 p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <Timer className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    {metrics.weeklyStats.trends.latency.direction !== 'neutral' && (
+                <ResourceMetricCard
+                  label={<>Avg Latency</>}
+                  value={<>{metrics.weeklyStats.avgLatency7d.toFixed(1)}ms</>}
+                  icon={<Timer className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey mb-1"
+                  trend={<>{metrics.weeklyStats.trends.latency.direction !== 'neutral' && (
                       <div className={cn(
                         "flex items-center gap-1 text-xs font-semibold",
                         // For latency, down is good (green) and up is bad (red)
@@ -821,11 +807,8 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
                         {metrics.weeklyStats.trends.latency.direction === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {metrics.weeklyStats.trends.latency.value.toFixed(1)}%
                       </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-grey mb-1">{metrics.weeklyStats.avgLatency7d.toFixed(1)}ms</div>
-                  <div className="text-xs text-grey-600 font-medium">Avg Latency</div>
-                </div>
+                    )}</>}
+                />
               </div>
 
               <ActivityTimelinePanel
@@ -840,70 +823,70 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
               />
 
               {/* Cache Status Overview */}
-              <div className="grid grid-cols-6 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
                 {/* Total Entries */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Total Entries</span>
-                    <Database className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.total}</p>
+                <ResourceMetricCard
+                  label={<>Total Entries</>}
+                  value={<>{metrics.total}</>}
+                  icon={<Database className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.sparklineData} color="#F97316" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Total Reads */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Cumulative Reads</span>
-                    <Zap className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-orange-500">{metrics.totalReads.toLocaleString()}</p>
+                <ResourceMetricCard
+                  label={<>Cumulative Reads</>}
+                  value={<>{metrics.totalReads.toLocaleString()}</>}
+                  icon={<Zap className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-orange-500"
+                >
                   <p className="text-xs text-grey-600 mt-2">all time</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Avg Latency */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Avg Latency</span>
-                    <Timer className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.avgLatency.toFixed(1)}ms</p>
+                <ResourceMetricCard
+                  label={<>Avg Latency</>}
+                  value={<>{metrics.avgLatency.toFixed(1)}ms</>}
+                  icon={<Timer className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <div className="mt-2 h-8">
                     <Sparkline data={metrics.latencySparkline} color="#10B981" />
                   </div>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Expiring Soon */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Expiring Soon</span>
-                    <Clock className="h-4 w-4 text-orange-500" />
-                  </div>
-                  <p className="text-2xl font-bold text-orange-500">{metrics.expiringSoon}</p>
+                <ResourceMetricCard
+                  label={<>Expiring Soon</>}
+                  value={<>{metrics.expiringSoon}</>}
+                  icon={<Clock className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-orange-500"
+                >
                   <p className="text-xs text-grey-600 mt-2">within 1 hour</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Permanent */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Permanent</span>
-                    <Shield className="h-4 w-4 text-green" />
-                  </div>
-                  <p className="text-2xl font-bold text-green">{metrics.permanent}</p>
+                <ResourceMetricCard
+                  label={<>Permanent</>}
+                  value={<>{metrics.permanent}</>}
+                  icon={<Shield className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-green"
+                >
                   <p className="text-xs text-grey-600 mt-2">no expiration</p>
-                </div>
+                </ResourceMetricCard>
 
                 {/* Components */}
-                <div className="bg-white rounded-lg p-4 border border-border shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-grey-600">Components</span>
-                    <Layers className="h-4 w-4 text-grey-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-grey">{metrics.uniqueComponents}</p>
+                <ResourceMetricCard
+                  label={<>Components</>}
+                  value={<>{metrics.uniqueComponents}</>}
+                  icon={<Layers className="h-4 w-4" />}
+                  valueClassName="text-2xl font-bold text-grey"
+                >
                   <p className="text-xs text-grey-600 mt-2">unique sources</p>
-                </div>
+                </ResourceMetricCard>
               </div>
 
               {/* Breakdown Charts */}
@@ -967,7 +950,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
               </div>
 
               {/* Recent Entries */}
-              <div className="bg-white rounded-lg border border-border shadow-sm">
+              <div className="bg-white rounded-xl border border-grey-400 shadow-sm">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-grey">Recent Entries</h3>
                   <Button
@@ -1050,7 +1033,7 @@ export default function CacheValuesTabContent({ cache }: CacheValuesTabContentPr
 
               {/* Table */}
               <div className="flex-1 overflow-auto p-4">
-                <div className="bg-white rounded-lg border border-border h-full overflow-auto">
+                <div className="bg-white rounded-xl border border-grey-400 h-full overflow-auto">
                   {/* Table header */}
                   <div className="sticky top-0 z-10 bg-background-secondary border-b border-border">
                     <div className="grid grid-cols-[1fr,140px,140px,100px,100px,120px,40px] gap-4 px-6 py-3 text-xs font-medium text-grey-600 uppercase tracking-wider">
