@@ -287,7 +287,7 @@ export default function PartnershipsSidebar() {
               {searchQuery ? 'No matching partnerships' : 'No partnerships yet'}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0">
               {filteredPartnerships.map((partnership) => {
                 const partnerInfo = partnership.relationship_type === 'client'
                   ? partnership.client
@@ -302,7 +302,7 @@ export default function PartnershipsSidebar() {
                     key={partnership._id}
                     onClick={() => handlePartnershipClick(partnership)}
                     className={cn(
-                      'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors cursor-pointer dark:hover:bg-grey-400/30',
+                      'group p-2 border-b border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors cursor-pointer dark:hover:bg-grey-400/30',
                       selectedPartnershipId === partnership._id && 'border-primary bg-blue-400 dark:bg-primary/20'
                     )}
                   >
@@ -395,12 +395,12 @@ export default function PartnershipsSidebar() {
               {searchQuery ? 'No matching briefs' : 'No briefs yet'}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0">
               {filteredBriefs.map((brief) => (
                 <div
                   key={brief._id}
                   className={cn(
-                    'group p-3 rounded-md border border-grey-400 hover:border-primary transition-colors',
+                    'group p-3 border-b border-grey-400 hover:border-primary transition-colors',
                     selectedBriefId === brief._id && 'border-primary bg-blue-400 dark:bg-primary/20'
                   )}
                 >

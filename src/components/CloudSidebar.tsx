@@ -172,7 +172,7 @@ export default function CloudSidebar() {
             )}
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-0">
             {filtered.map((c: {
               id: string;
               display_name?: string;
@@ -189,9 +189,9 @@ export default function CloudSidebar() {
                   key={c.id}
                   onClick={() => handleConnectionClick(c)}
                   className={cn(
-                    'group p-2.5 rounded-lg border transition-all flex items-center gap-2.5 cursor-pointer',
+                    'group p-2.5 border-b transition-all flex items-center gap-2.5 cursor-pointer',
                     isSelected
-                      ? 'border-primary bg-primary/5 shadow-sm'
+                      ? 'border-primary bg-primary/5'
                       : 'border-grey-300 hover:border-primary/50 hover:bg-grey-100/80',
                   )}
                 >

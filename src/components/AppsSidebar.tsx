@@ -128,7 +128,7 @@ export default function AppsSidebar() {
       <div
         key={app._id}
         className={cn(
-          'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 dark:hover:bg-grey-400/30',
+          'group p-2 border-b border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 dark:hover:bg-grey-400/30',
           selectedAppId === app._id && 'border-primary bg-blue-400 dark:bg-primary/20',
           isLoadingThisApp && 'opacity-70 cursor-wait'
         )}
@@ -238,7 +238,7 @@ export default function AppsSidebar() {
                     Internal
                   </h3>
                 </div>
-                <div className="p-4 space-y-1">
+                <div className="p-4 space-y-0">
                   {filteredWorkspaceApps.map((app: IApp) => renderAppCard(app))}
                 </div>
               </div>
@@ -252,7 +252,7 @@ export default function AppsSidebar() {
                     Third Party
                   </h3>
                 </div>
-                <div className="p-4 space-y-1">
+                <div className="p-4 space-y-0">
                   {filteredThirdPartyApps.map((app: IApp) => renderAppCard(app))}
                 </div>
               </div>

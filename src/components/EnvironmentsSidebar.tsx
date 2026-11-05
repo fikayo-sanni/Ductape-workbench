@@ -180,12 +180,12 @@ export default function EnvironmentsSidebar() {
             {searchQuery ? 'No matching environments' : 'No environments yet'}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-0">
             {filteredEnvironments.map((env: IEnvironment) => (
               <div
                 key={env._id}
                 className={cn(
-                  'p-3 rounded-lg border border-grey-400 cursor-pointer hover:border-primary transition-colors',
+                  'p-3 border-b border-grey-400 cursor-pointer hover:border-primary transition-colors',
                   selectedEnvId === env._id && 'border-primary bg-blue-400'
                 )}
                 onClick={() => setSelectedEnvId(env._id)}

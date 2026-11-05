@@ -211,12 +211,12 @@ export default function ProductsSidebar() {
               {searchQuery ? 'No matching products' : 'No products yet'}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0">
               {filteredProducts.map((product: IProduct) => (
                 <div
                   key={product._id}
                   className={cn(
-                    'group p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 dark:hover:bg-grey-400/30',
+                    'group p-2 border-b border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 dark:hover:bg-grey-400/30',
                     selectedProductId === product._id && 'border-primary bg-blue-400 dark:bg-primary/20'
                   )}
                 >
@@ -269,14 +269,14 @@ export default function ProductsSidebar() {
                 {searchQuery ? 'No matching components' : 'No components yet'}
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0">
                 {allComponents.map((component, index) => {
                   const Icon = getComponentIcon(component.type);
                   return (
                     <div
                       key={`${component.type}-${component.data._id}-${index}`}
                       onClick={() => handleComponentClick(component)}
-                      className="p-2 rounded-md border border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 cursor-pointer dark:hover:bg-grey-400/30"
+                      className="p-2 border-b border-grey-400 hover:border-primary hover:bg-grey-100 transition-colors flex items-center gap-2 cursor-pointer dark:hover:bg-grey-400/30"
                     >
                       {/* Icon */}
                       <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
