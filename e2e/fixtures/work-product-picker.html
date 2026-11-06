@@ -4,7 +4,8 @@ import {createRoot} from 'react-dom/client';
 import WorkProductPicker from '/src/components/work/WorkProductPicker.tsx';
 import '/src/index.css';
 if(new URLSearchParams(location.search).has('dark')) document.documentElement.classList.add('dark');
-const products=[{id:'1',name:'Statecraft',tag:'ductape:statecraft',open_items:18},{id:'2',name:'Buydeck',tag:'ductape:buydeck',open_items:7},{id:'3',name:'A product with a longer name',tag:'ductape:longer-product-name',open_items:0}];
+const sampleLogo='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><rect width="48" height="48" rx="10" fill="#1656c1"/><path d="M13 15h22v6H19v5h16v7H13v-6h16v-1H13z" fill="white"/></svg>');
+const products=[{id:'1',name:'Statecraft',tag:'ductape:statecraft',logo:sampleLogo,open_items:18},{id:'2',name:'Buydeck',tag:'ductape:buydeck',logo:'/broken-logo.svg',open_items:7},{id:'3',name:'A product with a longer name',tag:'ductape:longer-product-name',open_items:0}];
 function Preview(){const [value,setValue]=React.useState(products[0].tag);return React.createElement('main',{className:'min-h-screen bg-grey-100 p-6 text-grey'},React.createElement('div',{className:'mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 rounded-xl border border-grey-400 bg-white p-5'},React.createElement('div',null,React.createElement('h1',{className:'text-2xl font-semibold'},'Work'),React.createElement('p',{className:'mt-1 text-sm text-grey/60'},'Sample product picker preview')),React.createElement(WorkProductPicker,{products,value,onValueChange:setValue})));}
 createRoot(document.getElementById('root')).render(React.createElement(Preview));
 </script></body></html>

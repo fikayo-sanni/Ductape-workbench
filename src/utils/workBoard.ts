@@ -106,6 +106,7 @@ export interface IWorkSession {
 }
 
 export interface IWorkProduct {
+  logo?: string | null;
   id: string;
   tag: string;
   name: string;
