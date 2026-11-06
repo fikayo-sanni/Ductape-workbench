@@ -169,9 +169,9 @@ export default function PublishAppModal({
         workspace_id: currentWorkspaceId,
       };
 
-      // Add version if provided
-      if (version?.tag) {
-        updatePayload.version = version.tag;
+      // Target the selected version for review; version labels use a separate rename operation.
+      if (formData.isPublic && version?.tag) {
+        updatePayload.review_version = version.tag;
       }
 
       // Only include fields that changed
