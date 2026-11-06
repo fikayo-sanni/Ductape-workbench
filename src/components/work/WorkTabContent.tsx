@@ -1,3 +1,4 @@
+import WorkProductPicker from './WorkProductPicker';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Bot, CheckCircle2, Scale, ShieldCheck, Zap, Circle, KanbanSquare, Loader2, Network, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -167,22 +168,17 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {fixedProduct ? null : (
-              <label className="flex items-center gap-2 text-sm text-grey-600">
-                Product
-                <select
-                  value={product}
-                  onChange={(e) => {
-                    setProduct(e.target.value);
-                    setPlan(null);
-                    setEpicFilter(null);
-                    setOpenRef(null);
-                    save(storageKey(auth?.workspaceId), e.target.value);
-                  }}
-                  className="rounded-md border border-grey-400 bg-white px-3 py-1.5 text-sm font-medium text-grey"
-                >
-                  {products.data.map((p) => <option key={p.tag} value={p.tag}>{p.name}{p.open_items ? ` (${p.open_items} open)` : ''}</option>)}
-                </select>
-              </label>
+              <WorkProductPicker
+                products={products.data}
+                value={product}
+                onValueChange={tag => {
+                  setProduct(tag);
+                  setPlan(null);
+                  setEpicFilter(null);
+                  setOpenRef(null);
+                  save(storageKey(auth?.workspaceId), tag);
+                }}
+              />
               )}
               <Button onClick={() => setCreating(true)} disabled={!current}><Plus className="mr-1 h-4 w-4" />New work</Button>
             </div>
