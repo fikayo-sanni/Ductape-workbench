@@ -1,5 +1,5 @@
 import apiClient from '@/config/axiosinstance';
-export type ResourceKind = 'database' | 'vector' | 'graph' | 'storage' | 'app';
+export type ResourceKind = 'database' | 'vector' | 'graph' | 'storage' | 'app' | 'message_broker';
 export interface PerformanceMeasure {
   calls: number; failures: number; measured: number; slowCalls: number; errorRatePercent: number;
   totalLatencyMs: number; averageLatencyMs: number | null; maxLatencyMs: number | null;

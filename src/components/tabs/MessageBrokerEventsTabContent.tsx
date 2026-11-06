@@ -1,3 +1,4 @@
+import ResourcePerformanceOverview from '@/components/performance/ResourcePerformanceOverview';
 import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
@@ -80,6 +81,7 @@ const Skeleton = ({ className }: { className?: string }) => (
 
 // Sparkline component for mini charts
 const Sparkline = ({ data, color, height = 32 }: { data: number[]; color: string; height?: number }) => {
+  if (data.length < 2) return <p className="text-[11px] text-grey/60">Trend unavailable</p>;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const range = max - min || 1;
@@ -139,7 +141,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
   const [viewMode, setViewMode] = useState<ViewMode>(tabState.viewMode || 'overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listViewMode, setListViewMode] = useState<'list' | 'grid'>(tabState.listViewMode || 'list');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(tabState.isSidebarCollapsed || false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(tabState.isSidebarCollapsed ?? (typeof window !== 'undefined' && window.innerWidth < 768));
   const [selectedConsumer, setSelectedConsumer] = useState<ConsumerInstance | null>(tabState.selectedConsumer || null);
   const [selectedProducer, setSelectedProducer] = useState<ProducerInstance | null>(tabState.selectedProducer || null);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(tabState.selectedTopic || null);
@@ -476,13 +478,11 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
     // Generate sparkline data from hourly distribution or fallback
     const hourlyData = dashboardData?.hourly_distribution || [];
     const sparklineData = hourlyData.length > 0
-      ? hourlyData.map(h => h.count)
-      : Array.from({ length: 24 }, () => Math.floor(Math.random() * 20) + 5);
+      ? [...hourlyData].sort((a, b) => a.hour - b.hour).map(h => h.count)
+      : [];
 
-    const errorSparkline = Array.from({ length: 24 }, (_, i) => {
-      const hourData = hourlyData.find(h => h.hour === i);
-      return hourData ? Math.floor(hourData.count * 0.05) : Math.floor(Math.random() * 5);
-    });
+    // Failure counts are not available per hour; do not manufacture a trend.
+    const errorSparkline: number[] = [];
 
     // Build daily trend from dashboard data
     const dailyActivity = dashboardData?.daily_activity || [];
@@ -641,7 +641,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 }
               }}
               className={cn(
-                "rounded-lg bg-cyan-600/10 flex items-center justify-center text-cyan-600 flex-shrink-0 transition-all hover:ring-2 hover:ring-cyan-500/50",
+                "rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 transition-all hover:ring-2 hover:ring-cyan-500/50",
                 isSidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
               )}
               title={isSidebarCollapsed ? "Expand sidebar" : "Return to overview"}
@@ -697,7 +697,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'overview'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -705,7 +705,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <LayoutDashboard className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'overview' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'overview' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && <span className="flex-1 text-left font-medium">Overview</span>}
               </button>
@@ -720,7 +720,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <button
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="text-grey-600 hover:text-cyan-600 transition-colors"
+                  className="text-grey-600 hover:text-primary transition-colors"
                   title="Refresh data"
                 >
                   <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
@@ -740,7 +740,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'all-events'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -748,7 +748,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <LayoutGrid className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'all-events' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'all-events' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && (
                   <>
@@ -756,7 +756,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
                       viewMode === 'all-events'
-                        ? 'bg-cyan-600/20 text-cyan-600'
+                        ? 'bg-primary/20 text-primary'
                         : 'bg-background-secondary text-grey-600'
                     )}>
                       {dashboardLoading ? (
@@ -780,7 +780,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'topics'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -788,7 +788,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <ListTree className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'topics' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'topics' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && (
                   <>
@@ -796,7 +796,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
                       viewMode === 'topics'
-                        ? 'bg-cyan-600/20 text-cyan-600'
+                        ? 'bg-primary/20 text-primary'
                         : 'bg-background-secondary text-grey-600'
                     )}>
                       {dashboardLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : topicSummaries.length}
@@ -816,7 +816,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'consumers'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -824,7 +824,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <Headphones className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'consumers' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'consumers' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && (
                   <>
@@ -832,7 +832,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
                       viewMode === 'consumers'
-                        ? 'bg-cyan-600/20 text-cyan-600'
+                        ? 'bg-primary/20 text-primary'
                         : 'bg-background-secondary text-grey-600'
                     )}>
                       {consumersLoading ? (
@@ -856,7 +856,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'producers'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -864,7 +864,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <Megaphone className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'producers' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'producers' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && (
                   <>
@@ -872,7 +872,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
                       viewMode === 'producers'
-                        ? 'bg-cyan-600/20 text-cyan-600'
+                        ? 'bg-primary/20 text-primary'
                         : 'bg-background-secondary text-grey-600'
                     )}>
                       {producersLoading ? (
@@ -896,7 +896,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
                   viewMode === 'dead-letter'
-                    ? 'bg-cyan-600/10 text-cyan-600'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-grey hover:bg-background-secondary',
                   isSidebarCollapsed && 'justify-center px-2'
                 )}
@@ -904,7 +904,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               >
                 <Trash2 className={cn(
                   'h-4 w-4 flex-shrink-0',
-                  viewMode === 'dead-letter' ? 'text-cyan-600' : 'text-grey-600'
+                  viewMode === 'dead-letter' ? 'text-primary' : 'text-grey-600'
                 )} />
                 {!isSidebarCollapsed && (
                   <>
@@ -912,7 +912,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded min-w-[24px] text-center',
                       viewMode === 'dead-letter'
-                        ? 'bg-cyan-600/20 text-cyan-600'
+                        ? 'bg-primary/20 text-primary'
                         : 'bg-background-secondary text-grey-600'
                     )}>
                       {deadLettersLoading ? (
@@ -945,17 +945,17 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
       <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border bg-white">
-          <div className="px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-cyan-600/10 flex items-center justify-center">
-                  <MessageSquare className="h-6 w-6 text-cyan-600" />
+          <div className="px-3 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MessageSquare className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-grey">{broker.name} - Events</h1>
-                  <div className="flex items-center gap-2 mt-1">
+                  <h1 className="text-lg font-semibold tracking-tight text-grey">{broker.name}</h1>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <code className="text-sm text-grey-600 font-mono">{broker.brokerTag || broker.tag}</code>
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-600/10 text-cyan-600">
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary">
                       <LoadingValue loading={messagesLoading}>{totalMessagesCount}</LoadingValue> messages
                     </span>
                   </div>
@@ -980,7 +980,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
 
         {viewMode === 'overview' ? (
             /* Overview Content */
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-3 sm:p-5 lg:p-6">
               {dashboardLoading ? (
                 /* Skeleton Loading State */
                 <>
@@ -1026,9 +1026,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   </div>
 
                   {/* Breakdown Charts Skeleton */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
                     {[...Array(2)].map((_, i) => (
-                      <div key={i} className="bg-white rounded-lg p-5 border border-border shadow-sm">
+                      <div key={i} className="bg-white rounded-xl p-5 border border-grey-400 shadow-sm">
                         <Skeleton className="h-5 w-32 mb-4" />
                         <div className="space-y-3">
                           {[...Array(3)].map((_, j) => (
@@ -1128,6 +1128,13 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 />
               </div>
 
+              <ResourcePerformanceOverview
+                kind="message_broker"
+                productTag={broker.productTag}
+                resourceTag={broker.brokerTag || broker.tag}
+                env={brokerEnv}
+              />
+              <div className="mt-5" />
               <ActivityTimelinePanel
                 title="Activity timeline"
                 kind="broker"
@@ -1214,9 +1221,9 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
               </div>
 
               {/* Breakdown Charts */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
                 {/* By Entity */}
-                <div className="bg-white rounded-lg p-5 border border-border shadow-sm">
+                <div className="bg-white rounded-xl p-5 border border-grey-400 shadow-sm">
                   <h3 className="text-sm font-semibold text-grey mb-4">Broker Entities</h3>
                   <div className="space-y-3">
                     {[
@@ -1238,7 +1245,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 </div>
 
                 {/* By Status */}
-                <div className="bg-white rounded-lg p-5 border border-border shadow-sm">
+                <div className="bg-white rounded-xl p-5 border border-grey-400 shadow-sm">
                   <h3 className="text-sm font-semibold text-grey mb-4">Messages by Status</h3>
                   <div className="space-y-3">
                     {[
@@ -1277,7 +1284,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     onClick={() => {
                       setViewMode('all-events');
                     }}
-                    className="text-cyan-600 hover:text-cyan-700 text-xs"
+                    className="text-primary hover:text-primary text-xs"
                   >
                     View All Messages
                     <ChevronRight className="h-3 w-3 ml-1" />
@@ -1286,7 +1293,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {dashboardLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading messages...</p>
                       <p className="text-grey-600 text-sm mt-1">Fetching broker activity</p>
                     </div>
@@ -1378,7 +1385,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                       <div>
                         <div className="text-xs tabular-nums text-grey mb-1">{topic.usageShare.toFixed(1)}%</div>
                         <div className="h-1.5 w-16 bg-grey-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-cyan-600 rounded-full" style={{ width: `${Math.max(topic.usageShare, topic.messages > 0 ? 4 : 0)}%` }} />
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(topic.usageShare, topic.messages > 0 ? 4 : 0)}%` }} />
                         </div>
                       </div>
                       <div className="text-sm tabular-nums text-grey">{topic.producers}</div>
@@ -1409,7 +1416,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {consumersLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading consumers...</p>
                     </div>
                   ) : consumerInstances.length === 0 ? (
@@ -1478,7 +1485,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {producersLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading producers...</p>
                     </div>
                   ) : producerInstances.length === 0 ? (
@@ -1546,7 +1553,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {deadLettersLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading dead letters...</p>
                     </div>
                   ) : deadLettersList.length === 0 ? (
@@ -1702,15 +1709,15 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                         <p className="text-xs text-grey-600 mb-2">Active Filters:</p>
                         <div className="flex flex-wrap gap-2">
                           {statusFilter !== 'all' && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Status: {statusOptions.find(s => s.id === statusFilter)?.name}</span>
-                              <button onClick={() => setStatusFilter('all')} className="hover:bg-cyan-600/20 rounded p-0.5"><X className="h-3 w-3" /></button>
+                              <button onClick={() => setStatusFilter('all')} className="hover:bg-primary/20 rounded p-0.5"><X className="h-3 w-3" /></button>
                             </div>
                           )}
                           {searchQuery && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Search: "{searchQuery}"</span>
-                              <button onClick={() => setSearchQuery('')} className="hover:bg-cyan-600/20 rounded p-0.5"><X className="h-3 w-3" /></button>
+                              <button onClick={() => setSearchQuery('')} className="hover:bg-primary/20 rounded p-0.5"><X className="h-3 w-3" /></button>
                             </div>
                           )}
                         </div>
@@ -1738,7 +1745,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {messagesLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading messages...</p>
                     </div>
                   ) : filteredMessages.length === 0 ? (
@@ -1934,7 +1941,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   )}
                   {isFetchingNextPage && (
                     <div className="flex justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-cyan-600" />
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     </div>
                   )}
                 </div>
@@ -2048,15 +2055,15 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                         <p className="text-xs text-grey-600 mb-2">Active Filters:</p>
                         <div className="flex flex-wrap gap-2">
                           {statusFilter !== 'all' && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Status: {statusOptions.find(s => s.id === statusFilter)?.name}</span>
-                              <button onClick={() => setStatusFilter('all')} className="hover:bg-cyan-600/20 rounded p-0.5"><X className="h-3 w-3" /></button>
+                              <button onClick={() => setStatusFilter('all')} className="hover:bg-primary/20 rounded p-0.5"><X className="h-3 w-3" /></button>
                             </div>
                           )}
                           {searchQuery && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Search: "{searchQuery}"</span>
-                              <button onClick={() => setSearchQuery('')} className="hover:bg-cyan-600/20 rounded p-0.5"><X className="h-3 w-3" /></button>
+                              <button onClick={() => setSearchQuery('')} className="hover:bg-primary/20 rounded p-0.5"><X className="h-3 w-3" /></button>
                             </div>
                           )}
                         </div>
@@ -2084,7 +2091,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                 <div className="divide-y divide-border">
                   {messagesLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                       <p className="text-grey font-medium">Loading messages...</p>
                     </div>
                   ) : filteredMessages.length === 0 ? (
@@ -2280,7 +2287,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   )}
                   {isFetchingNextPage && (
                     <div className="flex justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-cyan-600" />
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     </div>
                   )}
                 </div>
@@ -2314,7 +2321,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                       </Button>
                     )}
                     {selectedTopic && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-600/10 text-cyan-600 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
                         <ListTree className="h-3.5 w-3.5" />
                         {selectedTopic}
                         <button onClick={() => setSelectedTopic(null)} className="hover:text-cyan-800" title="Clear topic filter">
@@ -2378,22 +2385,22 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                         <p className="text-xs text-grey-600 mb-2">Active Filters:</p>
                         <div className="flex flex-wrap gap-2">
                           {statusFilter !== 'all' && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Status: {statusOptions.find(s => s.id === statusFilter)?.name}</span>
                               <button
                                 onClick={() => setStatusFilter('all')}
-                                className="hover:bg-cyan-600/20 rounded p-0.5"
+                                className="hover:bg-primary/20 rounded p-0.5"
                               >
                                 <X className="h-3 w-3" />
                               </button>
                             </div>
                           )}
                           {searchQuery && (
-                            <div className="flex items-center gap-1 bg-cyan-600/10 text-cyan-600 px-2 py-1 rounded text-xs">
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs">
                               <span>Search: "{searchQuery}"</span>
                               <button
                                 onClick={() => setSearchQuery('')}
-                                className="hover:bg-cyan-600/20 rounded p-0.5"
+                                className="hover:bg-primary/20 rounded p-0.5"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -2425,7 +2432,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                   <div className="divide-y divide-border">
                     {messagesLoading ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-cyan-600 mb-4" />
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                         <p className="text-grey font-medium">Loading messages...</p>
                         <p className="text-grey-600 text-sm mt-1">Fetching broker activity</p>
                       </div>
@@ -2624,7 +2631,7 @@ export default function MessageBrokerEventsTabContent({ broker }: MessageBrokerE
                     )}
                     {isFetchingNextPage && (
                       <div className="flex justify-center py-4">
-                        <Loader2 className="h-6 w-6 animate-spin text-cyan-600" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       </div>
                     )}
                   </div>

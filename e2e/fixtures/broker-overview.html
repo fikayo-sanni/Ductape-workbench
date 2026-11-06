@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import MessageBrokerEventsTabContent from '/src/components/tabs/MessageBrokerEventsTabContent.tsx';
+import {SDKProxyService} from '/src/services/sdkProxy.ts';
+import {useAuth} from '/src/store/useAuth.tsx';
+import '/src/index.css';
+const params=new URLSearchParams(location.search);
+if(params.has('dark')) document.documentElement.classList.add('dark');
+useAuth.setState({user:{_id:'fixture-user',public_key:'fixture-public-key',auth_token:'fixture-token'},currentWorkspaceId:'000000000000000000000001'});
+const stats={total:12400,pending:20,success:12300,failed:74,partial:6,producer_count:2,consumer_count:3,dead_letter_count:12,messages_by_topic:{orders:12400},messages_by_producer:{},avg_processing_time:84};
+SDKProxyService.prototype.execute=async(_module,method)=>{
+ if(method==='messages.getDashboard') return {stats,recent_messages:[],top_producers:[],top_consumers:[],daily_activity:[{date:'2026-11-05',published:12400,consumed:12300,failed:74}],hourly_distribution:[]};
+ if(method==='messages.getProducers') return {producers:[],total:0,hasMore:false};
+ if(method==='messages.getConsumers') return {consumers:[],total:0,hasMore:false};
+ if(method==='messages.getDeadLetters') return {deadLetters:[],total:0,hasMore:false};
+ return {messages:[],total:0,hasMore:false};
+};
+createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider,{client:new QueryClient({defaultOptions:{queries:{retry:false}}})},React.createElement('main',{className:'flex h-screen'},React.createElement(MessageBrokerEventsTabContent,{broker:{name:'Orders messaging',tag:'orders-broker',brokerTag:'orders-broker',productTag:'shop',productName:'Shop',env:{slug:'snd'},topics:[]}}))));
+</script></body></html>
