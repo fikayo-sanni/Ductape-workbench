@@ -88,6 +88,7 @@ import { useWorkItems } from '@/hooks/useWork';
 import { workTotals } from '@/utils/workBoard';
 import {useProductDeployments} from '@/hooks/useProductDeployments';
 import {totals as deploymentTotals, describeState} from '@/utils/deployments';
+import {useProductFocusStore} from '@/stores/product-focus-store';
 
 interface ProductTabContentProps {
   tabId: string;
@@ -322,6 +323,20 @@ export default function ProductTabContent({
   useEffect(() => {
     hasRestoredStateRef.current = true;
   }, []);
+
+  // A request from elsewhere, such as the dashboard, to open this product on a section and, for deployments, on one deployment.
+  const focusKey = productId || initialProduct?._id;
+  const focusRequest = useProductFocusStore((state) => (focusKey ? state.requests[focusKey] : undefined));
+  const clearFocus = useProductFocusStore((state) => state.clear);
+  const [deploymentFocus, setDeploymentFocus] = useState<{id: string; nonce: number} | undefined>();
+  useEffect(() => {
+    if (!focusRequest || !focusKey) return;
+    setInlineCreateMode(null);
+    setActiveCategory(focusRequest.category);
+    setIsMobileNavOpen(false);
+    if (focusRequest.deploymentId) setDeploymentFocus({id: focusRequest.deploymentId, nonce: focusRequest.nonce});
+    clearFocus(focusKey, focusRequest.nonce);
+  }, [focusRequest, focusKey, clearFocus]);
 
   // Helper to change category and exit inline create mode
   const handleCategoryChange = (category: ResourceCategory) => {
@@ -2395,7 +2410,7 @@ export default function ProductTabContent({
       return <ProductObservabilityContent product={product} />;
     }
     if (activeCategory === 'deployments') {
-      return <DeploymentsResourceContent key={product?.tag} product={product} />;
+      return <DeploymentsResourceContent key={product?.tag} product={product} focus={deploymentFocus} />;
     }
     if (activeCategory === 'work') {
       return <WorkTabContent key={product?.tag} fixedProduct={product?.tag} />;

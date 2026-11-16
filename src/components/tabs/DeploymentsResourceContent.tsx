@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Box, RefreshCw, Rocket, Search, Server, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,8 @@ function StatePill({ state }: { state: string }) {
   );
 }
 
-export default function DeploymentsResourceContent({ product }: { product: any }) {
+/** `focus` opens one deployment when it arrives, such as when it was clicked on the dashboard. */
+export default function DeploymentsResourceContent({ product, focus }: { product: any; focus?: { id: string; nonce: number } }) {
   const auth = useDeployAuth();
   const tag: string | undefined = product?.tag;
   const [kind, setKind] = useState<KindFilter>('all');
@@ -71,6 +72,11 @@ export default function DeploymentsResourceContent({ product }: { product: any }
   const [changing, setChanging] = useState<{ deployment: IDeployment; intent: DeploymentIntent } | null>(null);
   const [policyFor, setPolicyFor] = useState<string | null>(null);
   const deployments = useProductDeployments(tag);
+  useEffect(() => {
+    if (!focus) return;
+    setView('deployments');
+    setSelectedId(focus.id);
+  }, [focus?.id, focus?.nonce]);
   const environments = useProductEnvironments(tag);
 
   const all = deployments.data ?? [];

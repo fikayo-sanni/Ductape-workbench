@@ -616,7 +616,7 @@ export default function Dashboard() {
         {tab === 'deployments' && (
           <div className="space-y-4 sm:space-y-5" role="tabpanel" id="dashboard-panel-deployments" aria-labelledby="dashboard-tab-deployments">
         {/* What is deployed, and which clouds are connected */}
-        <SectionBoundary title="Deployments and cloud connections"><InfraSummary /></SectionBoundary>
+        <SectionBoundary title="Deployments and cloud connections"><InfraSummary products={productList} /></SectionBoundary>
             <DeliveryMetrics />
           </div>
         )}

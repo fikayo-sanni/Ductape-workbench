@@ -1,4 +1,9 @@
-import { AlertTriangle, Cloud, CheckCircle2, Loader2, Rocket } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { AlertTriangle, ChevronRight, Cloud, CheckCircle2, Loader2, Rocket } from 'lucide-react';
+import { useWorkbenchStore } from '@/stores/workbench-store';
+import { useProductFocusStore } from '@/stores/product-focus-store';
+import { cloudTabTitle } from '@/components/cloud/CloudConnectionTagBadge';
+import { connectionNeedsSetup } from '@/components/cloud/cloudConnection.constants';
 import { cn } from '@/lib/utils';
 import { Panel, Pill } from '@/components/tabs/ProductSection';
 import { useInfraSummaryData } from '@/hooks/useInfraSummary';
@@ -36,11 +41,27 @@ function Groups({ title, groups }: { title: string; groups: IGroupCount[] }) {
   );
 }
 
-function DeploymentRow({ deployment }: { deployment: IDeployment }) {
+const ROW = 'flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left';
+const CLICKABLE = 'group cursor-pointer hover:bg-grey-100 focus-visible:bg-grey-100 focus-visible:outline-none';
+
+/** A row that opens what it shows when there is somewhere to open it, and is plain text when there is not. */
+function RowShell({ onOpen, label, children }: { onOpen?: () => void; label: string; children: ReactNode }) {
+  if (!onOpen) return <div className={ROW}>{children}</div>;
+  return (
+    <button type="button" className={cn(ROW, CLICKABLE)} onClick={onOpen} aria-label={label} title={label}>
+      {children}
+    </button>
+  );
+}
+
+const Chevron = ({ show }: { show: boolean }) =>
+  show ? <ChevronRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-grey-600 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden /> : null;
+
+function DeploymentRow({ deployment, onOpen }: { deployment: IDeployment; onOpen?: () => void }) {
   const state = describeState(deployment.state);
   return (
-    <div className="flex items-start justify-between gap-3 px-4 py-2.5">
-      <div className="min-w-0">
+    <RowShell onOpen={onOpen} label={`Open ${deployment.name} in ${deployment.product}`}>
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-grey">{deployment.name} <span className="font-normal text-grey-600">v{deployment.version}</span></p>
         <p className="truncate text-xs text-grey-600">{deployment.product} · {deployment.env} · {describeTarget(deployment.target)}</p>
       </div>
@@ -48,13 +69,19 @@ function DeploymentRow({ deployment }: { deployment: IDeployment }) {
         <Pill tone={state.tone}>{state.label}</Pill>
         <span className="text-[11px] text-grey-600">{deployment.state === 'active' ? `${formatTraffic(deployment.trafficPercent)} · ` : ''}{timeAgo(deployment.updatedAt)}</span>
       </div>
-    </div>
+      <Chevron show={Boolean(onOpen)} />
+    </RowShell>
   );
 }
 
+interface IProductRef { _id: string; tag?: string; name?: string }
+interface IConnectionRef { id?: string; _id?: string; tag?: string; display_name?: string; provider?: string; status?: string }
+
 /** What is deployed and how it is doing, and which cloud accounts are connected and ready to deploy through. */
-export default function InfraSummary() {
+export default function InfraSummary({ products = [] }: { products?: IProductRef[] }) {
   const { deployments, plans, builds, capabilities, connections } = useInfraSummaryData();
+  const openTab = useWorkbenchStore((state) => state.openTab);
+  const requestFocus = useProductFocusStore((state) => state.request);
   // What the server says it can do is used only when it looks like that; anything else is treated as not known.
   const caps = capabilities.data && typeof capabilities.data === 'object' && !Array.isArray(capabilities.data) && 'stepUp' in capabilities.data ? capabilities.data : undefined;
   const deployList = Array.isArray(deployments.data) ? deployments.data : [];
@@ -62,6 +89,34 @@ export default function InfraSummary() {
   const cloud = summarizeConnections(Array.isArray(connections.data) ? connections.data : [], caps, deployList);
   const notices = capabilityNotices(caps);
   const capped = deployList.length >= WORKSPACE_DEPLOYMENTS_LIMIT;
+
+  // A deployment names its product by tag; the product tab is opened by id, the same way the products sidebar opens it.
+  const productFor = (key: string) => products.find((p) => p.tag === key || String(p._id) === key);
+  const openDeployment = (deployment: IDeployment) => {
+    const product = productFor(deployment.product);
+    if (!product) return undefined;
+    return () => {
+      const id = String(product._id);
+      requestFocus(id, { category: 'deployments', deploymentId: deployment.id });
+      openTab({ id: `product-${id}`, type: 'product', title: product.name || product.tag || 'Product', itemId: id, data: product });
+    };
+  };
+
+  // Opens the connection the way the Cloud sidebar does, so the tab is the same one either way.
+  const rawConnections: IConnectionRef[] = Array.isArray(connections.data) ? (connections.data as IConnectionRef[]) : [];
+  const openConnection = (tag: string) => {
+    const connection = rawConnections.find((c) => c.tag === tag);
+    const id = connection ? String(connection.id ?? connection._id ?? '') : '';
+    if (!connection || !id) return undefined;
+    return () =>
+      openTab({
+        id: `cloud-${id}`,
+        type: 'cloud',
+        title: cloudTabTitle(connection),
+        itemId: id,
+        data: { ...connection, id, isSetup: connectionNeedsSetup(connection.status) },
+      });
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2" data-testid="infra-summary">
@@ -100,7 +155,7 @@ export default function InfraSummary() {
             <div className="border-t border-grey-400">
               <p className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wide text-grey-600">{deploy.needsAttention.length > 0 ? 'Needs attention' : 'Latest deployments'}</p>
               <div className="divide-y divide-grey-400/60">
-                {(deploy.needsAttention.length > 0 ? deploy.needsAttention : deploy.recent).map((d) => <DeploymentRow key={d.id} deployment={d} />)}
+                {(deploy.needsAttention.length > 0 ? deploy.needsAttention : deploy.recent).map((d) => <DeploymentRow key={d.id} deployment={d} onOpen={openDeployment(d)} />)}
               </div>
             </div>
           )
@@ -132,9 +187,11 @@ export default function InfraSummary() {
               </div>
             </div>
             <div className="max-h-[22rem] divide-y divide-grey-400/60 overflow-y-auto border-t border-grey-400">
-              {cloud.rows.map((row) => (
-                <div key={row.tag} className="flex items-start justify-between gap-3 px-4 py-2.5">
-                  <div className="min-w-0">
+              {cloud.rows.map((row) => {
+                const onOpen = openConnection(row.tag);
+                return (
+                <RowShell key={row.tag} onOpen={onOpen} label={`Open ${row.name}`}>
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-grey">{row.name} <span className="font-normal text-grey-600">{row.providerLabel}</span></p>
                     <p className={cn('truncate text-xs', row.deployReady ? 'text-grey-600' : row.deployNote ? 'text-orange' : 'text-grey-600')} title={row.deployNote}>
                       {row.deployReady ? `Deploys to ${row.targets.join(', ')}` : row.deployNote ?? 'Not used for deployments'}
@@ -145,8 +202,10 @@ export default function InfraSummary() {
                     {row.deployReady ? <CheckCircle2 className="h-3.5 w-3.5 text-green" aria-label="Ready to deploy" /> : null}
                     <Pill tone={row.statusTone}>{row.statusLabel}</Pill>
                   </span>
-                </div>
-              ))}
+                  <Chevron show={Boolean(onOpen)} />
+                </RowShell>
+                );
+              })}
             </div>
           </>
         )}
