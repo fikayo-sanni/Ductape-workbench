@@ -32,6 +32,7 @@ import {
   PanelLeft,
   BarChart3,
   Rocket,
+  LayoutTemplate,
   Activity,
   Home,
   FileText,
@@ -83,6 +84,7 @@ import ProductObservabilityContent from './ProductObservabilityContent';
 import RateLimitMonitoring from './RateLimitMonitoring';
 import FunctionsResourceContent from './FunctionsResourceContent';
 import DeploymentsResourceContent from './DeploymentsResourceContent';
+import UiPiecesResourceContent from './UiPiecesResourceContent';
 import WorkTabContent from '../work/WorkTabContent';
 import { useWorkItems } from '@/hooks/useWork';
 import { workTotals } from '@/utils/workBoard';
@@ -101,6 +103,7 @@ type ResourceCategory =
   | 'overview'
   | 'observability'
   | 'deployments'
+  | 'ui'
   | 'work'
   | 'apps'
   | 'environments'
@@ -311,7 +314,7 @@ export default function ProductTabContent({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const collapsed = isSidebarCollapsed && !isMobile;
   const mobileSectionLabel =
-    ({overview: 'Overview', environments: 'Environments', observability: 'Observability', deployments: 'Deployments', work: 'Work'} as Record<string, string>)[activeCategory] ||
+    ({overview: 'Overview', environments: 'Environments', observability: 'Observability', deployments: 'Deployments', ui: 'UI pieces', work: 'Work'} as Record<string, string>)[activeCategory] ||
     [...resourceCategories, rateLimitsCategory].find((c) => c.id === activeCategory)?.label ||
     'Overview';
   // Which notification card is expanded to show templates inline (tag or null)
@@ -2412,6 +2415,9 @@ export default function ProductTabContent({
     if (activeCategory === 'deployments') {
       return <DeploymentsResourceContent key={product?.tag} product={product} focus={deploymentFocus} />;
     }
+    if (activeCategory === 'ui') {
+      return <UiPiecesResourceContent key={product?.tag} product={product} />;
+    }
     if (activeCategory === 'work') {
       return <WorkTabContent key={product?.tag} fixedProduct={product?.tag} />;
     }
@@ -2657,6 +2663,23 @@ export default function ProductTabContent({
               </button>
             </div>
 
+            {/* The workspace's UI pieces, seen from this product: what it can add and whether it has what they need. */}
+            <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => handleCategoryChange('ui')}
+                className={cn(
+                  'w-full flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors',
+                  activeCategory === 'ui'
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-grey hover:bg-grey-100',
+                )}
+                data-testid="product-nav-ui"
+              >
+                <LayoutTemplate className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'ui' ? 'text-primary' : 'text-grey-600')} />
+                <span className="flex-1 text-left">UI pieces</span>
+              </button>
+            </div>
+
             {/* Rate limits sit next to observability: both are about how the product is behaving. */}
             <div className="px-1.5 sm:px-2 mb-0.5 sm:mb-1">
               <button
@@ -2881,6 +2904,22 @@ export default function ProductTabContent({
                     {workStats.open > 9 ? '9+' : workStats.open}
                   </span>
                 ) : null}
+              </button>
+            </div>
+
+            <div className="px-1 mb-0.5 sm:mb-1">
+              <button
+                onClick={() => {
+                  handleCategoryChange('ui');
+                  setIsSidebarCollapsed(false);
+                }}
+                className={cn(
+                  'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
+                  activeCategory === 'ui' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100',
+                )}
+                title="UI pieces"
+              >
+                <LayoutTemplate className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'ui' ? 'text-primary' : 'text-grey-600')} />
               </button>
             </div>
 
