@@ -779,7 +779,7 @@ export default function CloudConnectionsSettings({
                 onChange={(e) => setCloudflareToken(e.target.value)}
               />
               <p className="text-xs text-grey-600 mt-2">
-                With Account / Workers Scripts / Edit and Account / Workers KV Storage / Edit. It is stored as a workspace secret and never shown again.
+                With Account / Workers Scripts / Edit and Account / Workers KV Storage / Edit, plus Account / Workers Containers / Edit to deploy container images. It is stored as a workspace secret and never shown again.
               </p>
             </div>
           </div>
