@@ -7,14 +7,14 @@ const PREFIX = 'workbench:layout:';
 function read(key: string): ListLayout {
   try {
     const value = window.localStorage.getItem(PREFIX + key);
-    return value === 'list' ? 'list' : 'grid';
+    return value === 'grid' ? 'grid' : 'list';
   } catch {
-    return 'grid';
+    return 'list';
   }
 }
 
 /**
- * Grid or list layout for a card collection, remembered per section in this browser.
+ * Grid or list layout for a card collection, remembered per section in this browser. Defaults to the list.
  */
 export function useListLayout(key: string): [ListLayout, (next: ListLayout) => void] {
   const [state, setState] = useState<{ key: string; layout: ListLayout }>(() => ({ key, layout: read(key) }));
