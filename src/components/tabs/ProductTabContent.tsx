@@ -85,6 +85,8 @@ import RateLimitMonitoring from './RateLimitMonitoring';
 import FunctionsResourceContent from './FunctionsResourceContent';
 import DeploymentsResourceContent from './DeploymentsResourceContent';
 import UiPiecesResourceContent from './UiPiecesResourceContent';
+import {LayoutToggle} from './ProductSection';
+import {useListLayout, type ListLayout} from '@/hooks/useListLayout';
 import WorkTabContent from '../work/WorkTabContent';
 import { useWorkItems } from '@/hooks/useWork';
 import { workTotals } from '@/utils/workBoard';
@@ -302,6 +304,7 @@ export default function ProductTabContent({
   const [activeCategory, setActiveCategory] = useState<ResourceCategory>(
     persistedState?.activeCategory || 'overview',
   );
+  const [listLayout, setListLayout] = useListLayout(`product:${activeCategory}`);
   const [searchQuery, setSearchQuery] = useState(
     persistedState?.searchQuery || '',
   );
@@ -1283,7 +1286,11 @@ export default function ProductTabContent({
   };
 
   // Render resource card (using old design style)
-  const renderResourceCard = (item: any, category: ResourceCategoryConfig) => {
+  const renderResourceCard = (
+    item: any,
+    category: ResourceCategoryConfig,
+    layout: ListLayout = 'grid',
+  ) => {
     const itemName = item.name || item.app_name || item.tag || item.env_name;
     const isLoadingApp =
       category.id === 'apps' && loadingAppTag === (item.tag || item.app_tag);
@@ -1697,7 +1704,145 @@ export default function ProductTabContent({
     const isExpanded = isNotifications && expandedNotificationTag === item.tag;
     const templates = isNotifications && item.messages ? item.messages : [];
 
-    const cardContent = (
+    const openItem = () => {
+      if (isCloudProvisioning) return;
+      if (category.id === 'apps') {
+        handleOpenApp(item);
+      } else if (category.id === 'environments') {
+        handleEditEnvironment(item);
+      } else {
+        handleOpenComponent(item, resourceType);
+      }
+    };
+    const typeBadges = [databaseTypeBadge, messageBrokerTypeBadge, storageTypeBadge].filter(
+      Boolean,
+    ) as Array<{label: string; bgColor: string; textColor: string}>;
+
+    // List view: the card's facts on one line, with the same click targets.
+    const rowContent = (
+      <div
+        onClick={openItem}
+        className={cn(
+          'flex items-center gap-3 px-3 sm:px-4 py-2.5 transition-colors',
+          isCloudProvisioning
+            ? 'opacity-50 cursor-not-allowed'
+            : 'hover:bg-grey-100 cursor-pointer',
+          isLoadingApp && 'opacity-70 cursor-wait',
+        )}
+      >
+        <div
+          className={cn(
+            'rounded-lg flex items-center justify-center flex-shrink-0 w-8 h-8',
+            category.bgColor,
+          )}
+        >
+          {isLoadingApp ? (
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          ) : item.logo ? (
+            <img src={item.logo} alt={itemName} className="w-6 h-6 rounded object-cover" />
+          ) : (
+            <ItemIcon className={cn('h-4 w-4', category.color)} />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="text-sm font-medium text-grey truncate">{itemName}</h3>
+            {typeBadges.map(badge => (
+              <span
+                key={badge.label}
+                className={cn(
+                  'hidden sm:inline-block flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium',
+                  badge.bgColor,
+                  badge.textColor,
+                )}
+              >
+                {badge.label}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-grey-600 truncate">
+            {[item.tag || item.slug, item.description || detailText].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+        {hasEnvs && !excludeEnvButtons && (
+          <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+            {itemEnvs.slice(0, 3).map((env: any) => (
+              <button
+                key={env.slug}
+                onClick={e => {
+                  if (isCloudProvisioning) {
+                    e.stopPropagation();
+                    return;
+                  }
+                  handleOpenResourceExplorer(item, resourceType, env, e);
+                }}
+                disabled={isCloudProvisioning}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors',
+                  isCloudProvisioning
+                    ? 'bg-grey-100 text-grey-600 cursor-not-allowed'
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
+                )}
+                title={
+                  isCloudProvisioning
+                    ? 'Cloud database is still provisioning'
+                    : `Open ${env.slug} in explorer`
+                }
+              >
+                {env.slug}
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            ))}
+            {itemEnvs.length > 3 && (
+              <span className="text-[10px] text-grey-600">+{itemEnvs.length - 3}</span>
+            )}
+          </div>
+        )}
+        {isNotifications && (
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              setExpandedNotificationTag(isExpanded ? null : item.tag);
+            }}
+            className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1 transition-colors"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Templates ({templates.length})
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+        )}
+        {(isCloudProvisioning || isCloudProvisionFailed) && (
+          <span
+            className={cn(
+              'px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 inline-flex items-center gap-1',
+              isCloudProvisioning
+                ? 'bg-amber-100 text-amber-800 border-amber-200'
+                : 'bg-red-100 text-red-700 border-red-200',
+            )}
+          >
+            {isCloudProvisioning && <Loader2 className="h-3 w-3 animate-spin" />}
+            {isCloudProvisioning ? 'Provisioning' : 'Provision failed'}
+          </span>
+        )}
+        {!isCloudProvisioning &&
+          !isCloudProvisionFailed &&
+          (item.status || item.active !== undefined) && (
+            <span
+              className={cn(
+                'px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0',
+                isActive
+                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                  : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+              )}
+            >
+              {item.status || (isActive ? 'Active' : 'Inactive')}
+            </span>
+          )}
+      </div>
+    );
+
+    const cardContent = layout === 'list' ? rowContent : (
       <div
         onClick={() => {
           if (isCloudProvisioning) return;
@@ -1910,6 +2055,7 @@ export default function ProductTabContent({
             <div
               className={cn(
                 'border-l-2 border-blue-200 bg-blue-50/50 rounded-r-lg mt-1',
+                layout === 'list' && 'mb-2',
                 'ml-2 sm:ml-4 pl-2 sm:pl-4 py-2 sm:py-3 pr-2 sm:pr-4',
               )}
               onClick={e => e.stopPropagation()}
@@ -2124,6 +2270,9 @@ export default function ProductTabContent({
                     />
                   </div>
                 )}
+                {count > 0 && (
+                  <LayoutToggle value={listLayout} onChange={setListLayout} />
+                )}
                 <Button
                   onClick={() => handleAddComponent(category.componentType)}
                   className="gap-1 sm:gap-2 shadow-sm text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
@@ -2140,7 +2289,25 @@ export default function ProductTabContent({
         {/* Content Section - Responsive */}
         <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
           {isCategoryLoading ? (
-            /* Loading State - Responsive grid */
+            /* Loading State - follows the chosen layout */
+            listLayout === 'list' ? (
+              <div className="bg-white rounded-lg border border-grey-400 divide-y divide-grey-300 overflow-hidden">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 px-3 sm:px-4 py-2.5 animate-pulse"
+                    style={{animationDelay: `${i * 100}ms`}}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-grey-200 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="h-3.5 w-32 bg-grey-200 rounded mb-1.5" />
+                      <div className="h-2.5 w-48 bg-grey-100 rounded" />
+                    </div>
+                    <div className="h-5 w-14 bg-grey-100 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
               {[1, 2, 3, 4, 5, 6].map(i => (
                 <div
@@ -2160,6 +2327,7 @@ export default function ProductTabContent({
                 </div>
               ))}
             </div>
+            )
           ) : filteredResources.length > 0 ? (
             <>
               {/* Results count when searching - Responsive */}
@@ -2172,10 +2340,16 @@ export default function ProductTabContent({
                 </p>
               )}
 
-              {/* Resources Grid - Responsive */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+              {/* Resources: grid of cards or a compact list */}
+              <div
+                className={
+                  listLayout === 'list'
+                    ? 'bg-white rounded-lg border border-grey-400 divide-y divide-grey-300 overflow-hidden'
+                    : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5'
+                }
+              >
                 {filteredResources.map(item =>
-                  renderResourceCard(item, category),
+                  renderResourceCard(item, category, listLayout),
                 )}
               </div>
             </>

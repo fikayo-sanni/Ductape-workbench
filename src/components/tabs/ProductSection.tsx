@@ -1,7 +1,8 @@
 import { ResourceMetricCard } from '@/components/resource-overview/ResourceMetricCard';
 import type { ComponentType, ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
+import { LayoutGrid, List, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { ListLayout } from '@/hooks/useListLayout';
 
 /**
  * Shared building blocks for product sections that are not plain resource lists
@@ -220,6 +221,34 @@ export function DataTable({ head, children, minWidth }: { head: string[]; childr
         </thead>
         <tbody className="divide-y divide-grey-300">{children}</tbody>
       </table>
+    </div>
+  );
+}
+
+/** Switches a card collection between the grid and a compact list. */
+export function LayoutToggle({ value, onChange, className }: { value: ListLayout; onChange: (next: ListLayout) => void; className?: string }) {
+  const options: Array<{ id: ListLayout; label: string; Icon: ComponentType<{ className?: string }> }> = [
+    { id: 'grid', label: 'Grid view', Icon: LayoutGrid },
+    { id: 'list', label: 'List view', Icon: List },
+  ];
+  return (
+    <div role="group" aria-label="Layout" className={cn('inline-flex shrink-0 rounded-lg border border-grey-400 bg-white p-0.5', className)}>
+      {options.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={value === id}
+          aria-label={label}
+          title={label}
+          onClick={() => onChange(id)}
+          className={cn(
+            'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+            value === id ? 'bg-primary/10 text-primary' : 'text-grey-600 hover:text-grey',
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
     </div>
   );
 }

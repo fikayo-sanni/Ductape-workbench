@@ -9,7 +9,8 @@ import { fetchProductObservability } from '@/services/logsServices';
 import { formatLatencyMs, formatThroughput, trafficFor, type FunctionTraffic, type OperationStat } from '@/utils/functionTraffic';
 import { schemaToRows, valueToRows, type FieldRow, type ValueRow } from '@/utils/schemaRows';
 import ProductObservabilityContent from './ProductObservabilityContent';
-import { DataTable, Panel, Pill, SectionEmpty, SectionPage, SegmentedTabs, StatTile, TEAL, type Tone } from './ProductSection';
+import { DataTable, LayoutToggle, Panel, Pill, SectionEmpty, SectionPage, SegmentedTabs, StatTile, TEAL, type Tone } from './ProductSection';
+import { useListLayout } from '@/hooks/useListLayout';
 
 type View = 'definitions' | 'activity';
 
@@ -125,6 +126,7 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [view, setView] = useState<View>('definitions');
   const [rangeId, setRangeId] = useState<TrafficRangeId>('24h');
+  const [layout, setLayout] = useListLayout('functions');
   const traffic = useFunctionTraffic(product, rangeId);
 
   const functions = useMemo(
@@ -205,7 +207,12 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
               { id: 'activity', label: 'Activity' },
             ]}
           />
-          {view === 'definitions' && count > 0 ? <TrafficRangeTabs value={rangeId} onChange={setRangeId} /> : null}
+          {view === 'definitions' && count > 0 ? (
+            <div className="flex items-center gap-2">
+              <TrafficRangeTabs value={rangeId} onChange={setRangeId} />
+              <LayoutToggle value={layout} onChange={setLayout} />
+            </div>
+          ) : null}
         </div>
       }
     >
@@ -230,6 +237,12 @@ export default function FunctionsResourceContent({ product, onRefresh }: { produ
             </Button>
           }
         />
+      ) : layout === 'list' ? (
+        <div className="divide-y divide-grey-300 overflow-hidden rounded-lg border border-grey-400 bg-white">
+          {filtered.map((fn: FunctionView) => (
+            <FunctionRow key={fn.tag} fn={fn} traffic={traffic} onOpen={() => setSelectedTag(fn.tag)} />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:gap-5 lg:grid-cols-3">
           {filtered.map((fn: FunctionView) => (
@@ -321,6 +334,44 @@ function FunctionCard({ fn, traffic, onOpen }: { fn: FunctionView; traffic: Traf
         </div>
       ) : null}
       <CardMetrics fn={fn} traffic={traffic} />
+    </button>
+  );
+}
+
+/** The list-view row for a function: the card's facts on one line. */
+function FunctionRow({ fn, traffic, onOpen }: { fn: FunctionView; traffic: TrafficState; onOpen: () => void }) {
+  const transports = transportsOf(fn);
+  const stats = traffic.status === 'ready' ? trafficFor(traffic.operations, fn.tag, traffic.windowMs) : null;
+  const dash = traffic.status === 'error' ? 'n/a' : '-';
+  const calls = stats ? stats.calls.toLocaleString() : traffic.status === 'ready' ? '0' : dash;
+  const latency = stats ? formatLatencyMs(stats.p95LatencyMs ?? stats.averageLatencyMs) : dash;
+  return (
+    <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-grey-100 sm:px-4">
+      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-teal-600/10">
+        <Braces className="h-4 w-4 text-teal-600" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <h3 className="truncate text-sm font-medium text-grey">{fn.name}</h3>
+          {fn.version ? <Pill tone="info">v{fn.version}</Pill> : null}
+        </div>
+        <p className="truncate text-xs text-grey-600">{fn.description || fn.tag}</p>
+      </div>
+      <div className="hidden flex-shrink-0 items-center gap-1.5 md:flex">
+        {transports.map(type => (
+          <Pill key={type}>{TRANSPORT_LABELS[type] ?? type}</Pill>
+        ))}
+      </div>
+      <span className="hidden w-24 flex-shrink-0 text-right text-xs text-grey-600 sm:inline">
+        {fn.operations.length === 0 && fn.method ? <Pill>{fn.method}</Pill> : `${fn.operations.length} ${fn.operations.length === 1 ? 'operation' : 'operations'}`}
+      </span>
+      <span className="w-24 flex-shrink-0 text-right text-xs text-grey" title="Calls in the selected period">
+        {calls} <span className="text-grey-600">calls</span>
+        {stats && stats.failures > 0 ? <span className="block text-[10px] text-red">{stats.failures.toLocaleString()} failed</span> : null}
+      </span>
+      <span className="hidden w-24 flex-shrink-0 text-right text-xs text-grey lg:inline" title="Latency">
+        {latency} <span className="text-grey-600">{stats && stats.p95LatencyMs === null ? 'avg' : 'p95'}</span>
+      </span>
     </button>
   );
 }

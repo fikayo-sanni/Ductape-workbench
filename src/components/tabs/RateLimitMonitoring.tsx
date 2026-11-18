@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import RateLimitFormDialog, { type RateLimitDialogMode } from './RateLimitFormDialog';
-import { DataTable, Panel, Pill, SectionEmpty, SectionError, SectionLoading, SectionPage, StatTile, TEAL, type Tone } from './ProductSection';
+import { DataTable, LayoutToggle, Panel, Pill, SectionEmpty, SectionError, SectionLoading, SectionPage, StatTile, TEAL, type Tone } from './ProductSection';
+import { useListLayout } from '@/hooks/useListLayout';
 
 const PAGE_SIZE = 25;
 /** The logs API returns at most 1000 rows per page; the policy roll-up reads one such page. */
@@ -53,6 +54,7 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
   const [dialog, setDialog] = useState<{ mode: RateLimitDialogMode; policy: StoredPolicy | null } | null>(null);
   const [removing, setRemoving] = useState<StoredPolicy | null>(null);
   const [page, setPage] = useState(1);
+  const [layout, setLayout] = useListLayout('rate-limits');
 
   const days = RANGES.find(item => item.id === range)?.days ?? 7;
   const start = day(days);
@@ -222,17 +224,21 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-grey sm:text-base">Policies</h2>
-              {policy ? (
-                <Button variant="ghost" size="sm" onClick={() => reset(setPolicy)(null)}>
-                  Show all policies
-                </Button>
-              ) : (
-                <p className="text-xs text-grey-600">{summary.total > 0 ? 'Select a policy to filter the decisions below.' : 'Decisions appear here once a policy is used.'}</p>
-              )}
+              <div className="flex items-center gap-2">
+                {policy ? (
+                  <Button variant="ghost" size="sm" onClick={() => reset(setPolicy)(null)}>
+                    Show all policies
+                  </Button>
+                ) : (
+                  <p className="hidden text-xs text-grey-600 sm:block">{summary.total > 0 ? 'Select a policy to filter the decisions below.' : 'Decisions appear here once a policy is used.'}</p>
+                )}
+                <LayoutToggle value={layout} onChange={setLayout} />
+              </div>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:gap-5 lg:grid-cols-3">
+            <div className={layout === 'list' ? 'divide-y divide-grey-300 overflow-hidden rounded-lg border border-grey-400 bg-white' : 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:gap-5 lg:grid-cols-3'}>
               {views.map(view => (
                 <PolicyCard
+                  layout={layout}
                   key={view.tag}
                   view={view}
                   selected={policy === view.tag}
@@ -350,6 +356,7 @@ export default function RateLimitMonitoring({ product, onRefresh }: { product: a
 }
 
 function PolicyCard({
+  layout = 'grid',
   view,
   selected,
   onSelect,
@@ -357,6 +364,7 @@ function PolicyCard({
   onEdit,
   onDelete,
 }: {
+  layout?: 'grid' | 'list';
   view: PolicyView;
   selected: boolean;
   onSelect: () => void;
@@ -370,6 +378,45 @@ function PolicyCard({
   const title = stored?.name && stored.name !== stored.tag ? stored.name : view.tag;
   const overrides = stored?.envs?.length ?? 0;
   const definition = stored ? describePolicy(stored) : stats?.limit !== undefined ? `Limit ${stats.limit.toLocaleString()}${stats.window ? ` per ${describeWindow(stats.window)}` : ' per window'}` : 'Limit not recorded';
+  const outcomePill = stats ? stats.rejected > 0 ? <Pill tone="bad">{rejectedShare}% rejected</Pill> : <Pill tone="good">No rejections</Pill> : <Pill>No decisions yet</Pill>;
+
+  if (layout === 'list') {
+    return (
+      <div className={cn('flex items-center gap-2 pr-2 transition-colors hover:bg-grey-100', selected && 'bg-primary/5')}>
+        <button type="button" onClick={onSelect} aria-pressed={selected} disabled={!stats} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left disabled:cursor-default sm:px-4">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-teal-600/10">
+            <Timer className="h-4 w-4 text-teal-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="truncate text-sm font-medium text-grey">{title}</h3>
+              {view.source === 'code' ? <Pill tone="info">Defined in code</Pill> : null}
+              {view.supersededBy ? <Pill tone="warn">Replaced by {view.supersededBy}</Pill> : null}
+            </div>
+            <p className="truncate text-xs text-grey-600">
+              {definition}
+              {title !== view.tag ? <span className="font-mono"> · {view.tag}</span> : null}
+            </p>
+          </div>
+          <span className="hidden w-28 flex-shrink-0 text-right text-xs text-grey-600 sm:inline">{stats ? `${stats.total.toLocaleString()} decisions` : null}</span>
+          <span className="flex-shrink-0">{outcomePill}</span>
+        </button>
+        {stored ? (
+          <div className="flex flex-shrink-0 items-center">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onNewVersion} title="Publish different limits under a new tag" aria-label={`New version of ${view.tag}`}>
+              <GitBranchPlus className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onEdit} title="Edit details" aria-label={`Edit ${view.tag}`}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red hover:text-red" onClick={onDelete} title="Delete" aria-label={`Delete ${view.tag}`}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex flex-col rounded-lg border bg-white transition-all hover:border-primary hover:shadow-md', selected ? 'border-primary ring-1 ring-primary' : 'border-grey-400')}>
@@ -382,7 +429,7 @@ function PolicyCard({
             <h3 className="truncate text-xs font-medium text-grey sm:text-sm">{title}</h3>
             {title !== view.tag ? <p className="truncate font-mono text-[11px] text-grey-600">{view.tag}</p> : null}
           </div>
-          {stats ? stats.rejected > 0 ? <Pill tone="bad">{rejectedShare}% rejected</Pill> : <Pill tone="good">No rejections</Pill> : <Pill>No decisions yet</Pill>}
+          {outcomePill}
         </div>
 
         <p className="mt-3 text-xs text-grey sm:text-sm">{definition}</p>
