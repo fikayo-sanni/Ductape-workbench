@@ -41,6 +41,10 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Clear auth data, and tabs/cached data from whoever was signed in
+      const sentToken = String(error.config?.headers?.Authorization ?? error.config?.headers?.authorization ?? '').replace(/^Bearer\s+/i, '');
+      const currentToken = (localStorage.getItem('token') ?? '').replace(/"/g, '');
+      // A response from a request sent before reauthentication cannot invalidate the new session.
+      if (sentToken && currentToken && sentToken !== currentToken) return Promise.reject(error);
       useAuth.getState().logout();
 
       // Redirect to login page
