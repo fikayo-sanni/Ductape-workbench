@@ -11,6 +11,8 @@ import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
 import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
+import WorkDeployReviews from './WorkDeployReviews';
+import { useWorkDeployReviews } from '@/hooks/useWorkDeployReviews';
 import WorkRules from './WorkRules';
 import WorkIntakeKeys from './WorkIntakeKeys';
 import WorkPolicy from './WorkPolicy';
@@ -79,6 +81,8 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
   const items = useWorkItems(product, live);
   // In a product's own tab, what waits in that product; in the workspace Work tab, what waits anywhere.
   const approvals = useWorkApprovals(fixedProduct, live);
+  const deployReviews = useWorkDeployReviews(fixedProduct);
+  const deploymentReviewCount = deployReviews.plans.data?.length ?? 0;
   const rules = useWorkRules(product);
   const sessions = useWorkSessions(product, live);
   const deps = useWorkDependencies(view === 'graph' ? product : undefined, live);
@@ -128,7 +132,7 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
     { id: 'board', label: 'Board', icon: KanbanSquare },
     { id: 'graph', label: 'Plan graph', icon: Network, count: plans.length },
     { id: 'agents', label: 'Agents', icon: Bot, count: splitSessions(allSessions).live.length },
-    { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: approvals.data?.items.length },
+    { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: (approvals.data?.items.length ?? 0) + deploymentReviewCount },
     { id: 'rules', label: 'Automation', icon: Zap, count: rules.data?.filter((r) => r.enabled).length },
     // The policy is the workspace's, so it lives in the workspace Work tab, not in each product's.
     ...(fixedProduct ? [] : [{ id: 'policy' as View, label: 'Policy', icon: Scale }]),
@@ -151,10 +155,10 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="mb-1 text-xl font-bold text-grey sm:text-2xl">Work</h1>
-              <p className={cn('flex items-center gap-1.5 text-sm', toneText[summary.tone])} data-testid="work-status">
-                {summary.tone === 'warn' ? <AlertTriangle className="h-4 w-4" /> : summary.tone === 'good' ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                {items.isLoading ? 'Reading work' : summary.awaitingApproval ? (
-                  <button type="button" className="underline-offset-2 hover:underline" onClick={() => setView('approvals')}>{summary.label}</button>
+              <p className={cn('flex items-center gap-1.5 text-sm', toneText[deploymentReviewCount ? 'warn' : summary.tone])} data-testid="work-status">
+                {summary.tone === 'warn' || deploymentReviewCount ? <AlertTriangle className="h-4 w-4" /> : summary.tone === 'good' ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                {items.isLoading ? 'Reading work' : summary.awaitingApproval || deploymentReviewCount ? (
+                  <button type="button" className="underline-offset-2 hover:underline" onClick={() => setView('approvals')}>{deploymentReviewCount ? `${deploymentReviewCount} deployment ${deploymentReviewCount === 1 ? 'plan needs' : 'plans need'} your review` : summary.label}</button>
                 ) : summary.label}
                 <span
                   className={cn('ml-1 inline-flex items-center gap-1 text-xs', live ? 'text-green' : 'text-grey-600')}
@@ -184,10 +188,12 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
             </div>
           </div>
 
+          {view !== 'approvals' ? <WorkDeployReviews product={fixedProduct} /> : null}
+
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
             <Stat label="Ready to pick up" value={summary.ready} icon={Circle} />
             <Stat label="Being worked on" value={summary.working} icon={KanbanSquare} tone="good" />
-            <Stat label="Needs a person" value={summary.blocked + summary.awaitingApproval} icon={AlertTriangle} tone="warn" />
+            <Stat label="Needs a person" value={summary.blocked + summary.awaitingApproval + deploymentReviewCount} icon={AlertTriangle} tone="warn" />
             <Stat label="Agents working" value={summary.activeAgents} icon={Bot} tone="good" />
             <Stat label="Done this week" value={summary.doneThisWeek} icon={CheckCircle2} />
           </div>

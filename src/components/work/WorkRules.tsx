@@ -24,7 +24,7 @@ function NewRule({ product, onDone }: { product: IWorkProduct; onDone: () => voi
   const [failures, setFailures] = useState(3);
   const [within, setWithin] = useState(15);
   const [env, setEnv] = useState('');
-  const [priority, setPriority] = useState<IWorkItem['priority']>('high');
+  const [priority, setPriority] = useState<IWorkItem['priority']>('medium');
   const [critical, setCritical] = useState(false);
   const chosenTag = tag || known[0] || '';
   const label = RULE_KINDS.find((k) => k.kind === kind)?.label ?? kind;

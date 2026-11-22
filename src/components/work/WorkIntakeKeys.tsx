@@ -24,7 +24,7 @@ export default function WorkIntakeKeys({ product }: { product: IWorkProduct }) {
   const keys = useQuery({ queryKey: ['work', 'intake-keys', auth?.workspaceId, product.tag], queryFn: () => fetchIntakeKeys(auth!, product.tag), enabled: Boolean(auth) });
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const [priority, setPriority] = useState<IWorkItem['priority']>('high');
+  const [priority, setPriority] = useState<IWorkItem['priority']>('medium');
   const [made, setMade] = useState<IIntakeKey | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['work', 'intake-keys'] });
   const onError = (e: unknown) => { if (!(e instanceof StepUpCancelled)) toast.error(workErrorMessage(e)); };
