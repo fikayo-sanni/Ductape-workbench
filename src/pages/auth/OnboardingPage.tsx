@@ -76,27 +76,6 @@ function OnboardingFlow() {
       });
   }, []);
 
-  const STEPS = useMemo((): { id: OnboardingStep; label: string }[] => {
-    if (!isSelfHosted()) {
-      return [
-        { id: 'workspace', label: 'Workspace' },
-        { id: 'plan', label: 'Plan' },
-        { id: 'billing', label: 'Payment' },
-        { id: 'complete', label: 'Keys' },
-      ];
-    }
-    if (showLicenseStep) {
-      return [
-        { id: 'license', label: 'License' },
-        { id: 'workspace', label: 'Workspace' },
-        { id: 'complete', label: 'Done' },
-      ];
-    }
-    return [
-      { id: 'workspace', label: 'Workspace' },
-      { id: 'complete', label: 'Done' },
-    ];
-  }, [showLicenseStep]);
 
   const [step, setStep] = useState<OnboardingStep>(() =>
     isSelfHosted() ? 'workspace' : getInitialOnboardingStep(),
@@ -205,12 +184,56 @@ function OnboardingFlow() {
     }
   }, [workspacesFetched, hasSubscription, step]);
 
-  const isFreePlan = resolvedPlan ? resolvedPlan.monthlyPrice === 0 : false;
-  const stepIndex = STEPS.findIndex((s) => s.id === step);
+  const isFreePlan = Boolean(resolvedPlan && resolvedPlan.monthlyPrice === 0 && !resolvedPlan.isPayAsYouGo && !resolvedPlan.isEnterprise);
   const workspaceLocked =
     Boolean(workspaceId || existingWorkspaceId) || isOnboardingWorkspaceLocked();
   const awaitingWorkspaceCheck =
     !workspacesFetched && !workspaceId && !isOnboardingWorkspaceLocked();
+
+  const STEPS = useMemo((): { id: OnboardingStep; label: string }[] => {
+    if (!isSelfHosted()) {
+      return [
+        { id: 'workspace', label: 'Workspace' },
+        { id: 'plan', label: 'Plan' },
+        ...(!isFreePlan ? [{ id: 'billing' as OnboardingStep, label: 'Payment' }] : []),
+        { id: 'complete', label: 'Keys' },
+      ];
+    }
+    if (showLicenseStep) {
+      return [
+        { id: 'license', label: 'License' },
+        { id: 'workspace', label: 'Workspace' },
+        { id: 'complete', label: 'Done' },
+      ];
+    }
+    return [
+      { id: 'workspace', label: 'Workspace' },
+      { id: 'complete', label: 'Done' },
+    ];
+  }, [showLicenseStep, isFreePlan]);
+  const stepIndex = STEPS.findIndex((s) => s.id === step);
+
+  const activateFreePlan = useMutation({
+    mutationFn: async () => {
+      if (!resolvedPlan || !isFreePlan || !workspaceId || !user) throw new Error('Choose a free plan and workspace first.');
+      const response = await pricingServices.createSubscription({
+        user_id: user._id,
+        public_key: user.public_key,
+        payload: { plan_id: resolvedPlan._id, workspace_id: workspaceId },
+      });
+      if (!response.status) throw new Error('Free plan activation was not confirmed.');
+      return response;
+    },
+    onSuccess: () => {
+      sessionStorage.removeItem('onboardingPayment');
+      sessionStorage.removeItem('pendingPlanId');
+      sessionStorage.removeItem('onboardingPlanId');
+      clearOnboardingFromInvites();
+      queryClient.invalidateQueries({ queryKey: ['onboarding-workspace-subscription'] });
+      setStep('complete');
+    },
+    onError: () => toast.error('Could not activate your free plan. Please try again.'),
+  });
 
   const goToStep = (next: OnboardingStep) => {
     if (workspaceLocked && next === 'workspace') return;
@@ -385,7 +408,7 @@ function OnboardingFlow() {
           <p className="text-grey-600 text-base max-w-2xl">
             {isSelfHosted()
               ? 'Create or join a workspace to get started.'
-              : "Workspace, plan, billing - then you're in."}
+              : "Set up your workspace and choose a plan to get started."}
           </p>
         </div>
 
@@ -574,15 +597,16 @@ function OnboardingFlow() {
                 </Button>
               ) : null}
               <Button
-                disabled={!selectedPlan}
+                disabled={!selectedPlan || activateFreePlan.isPending}
                 onClick={() => {
                   if (selectedPlan) {
                     sessionStorage.setItem('onboardingPlanId', selectedPlan._id);
                   }
-                  goToStep('billing');
+                  if (isFreePlan) activateFreePlan.mutate();
+                  else goToStep('billing');
                 }}
               >
-                Continue
+                {activateFreePlan.isPending ? 'Activating…' : 'Continue'}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
@@ -623,6 +647,7 @@ function OnboardingFlow() {
                   billingCycle={yearlyAvailable ? billingCycle : 'monthly'}
                   selected={selectedPlan?._id === plan._id}
                   onSelect={() => {
+                    if (activateFreePlan.isPending) return;
                     setSelectedPlan(plan);
                     sessionStorage.setItem('onboardingPlanId', plan._id);
                   }}
@@ -645,6 +670,15 @@ function OnboardingFlow() {
               <p className="text-grey-600">Select a plan before continuing to payment.</p>
               <Button onClick={() => goToStep('plan')}>Back to plans</Button>
             </div>
+          ) : isFreePlan ? (
+            <div className="p-8 sm:p-10 space-y-4">
+              <h2 className="text-2xl font-bold text-grey">Activate your free plan</h2>
+              <OnboardingPlanSummary plan={resolvedPlan} />
+              <Button disabled={activateFreePlan.isPending} onClick={() => activateFreePlan.mutate()}>
+                {activateFreePlan.isPending ? 'Activating…' : 'Continue'}
+              </Button>
+              <Button variant="outline" disabled={activateFreePlan.isPending} onClick={() => goToStep('plan')}>Back to plans</Button>
+            </div>
           ) : (
             <div className="grid lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-start">
               <div className="border-b lg:border-b-0 lg:border-r border-grey-300 bg-grey-50/80 p-6 sm:p-8 lg:p-10 space-y-4 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
@@ -652,9 +686,7 @@ function OnboardingFlow() {
                 <div>
                   <h2 className="text-2xl font-bold text-grey">Add payment method</h2>
                   <p className="text-grey-600 mt-2 leading-relaxed">
-                    {isFreePlan
-                      ? 'Add your billing details and card to activate your free plan.'
-                      : 'Complete payment to activate your workspace.'}
+                    Complete payment to activate your workspace.
                   </p>
                 </div>
                 <OnboardingPlanSummary plan={resolvedPlan} />
