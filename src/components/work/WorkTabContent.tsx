@@ -9,6 +9,7 @@ import { useWorkStream } from '@/hooks/useWorkStream';
 import { agentDirectory, defaultProduct, splitSessions, workServiceUnavailable, descendantIds, epicSummaries, summarise, type Tone } from '@/utils/workBoard';
 import WorkEpics from './WorkEpics';
 import WorkBoard from './WorkBoard';
+import WorkItemSearch from './WorkItemSearch';
 import WorkAgents from './WorkAgents';
 import WorkApprovals from './WorkApprovals';
 import WorkDeployReviews from './WorkDeployReviews';
@@ -224,12 +225,14 @@ export default function WorkTabContent({ fixedProduct }: { fixedProduct?: string
 
           {items.error ? <p className="text-sm text-orange">Could not read the work: {workErrorMessage(items.error)}</p> : null}
           {view === 'board' ? (
-            <div className="space-y-3">
-              <WorkEpics epics={epics} selected={epicFilter} onSelect={setEpicFilter} onOpen={setOpenRef} />
-              <div className="overflow-x-auto pb-2">
-              <WorkBoard items={boardItems} sessions={allSessions} agents={agents} meId={auth?.userId} onOpen={setOpenRef} />
+            <WorkItemSearch key={`${auth?.workspaceId}:${product}`} product={product} live={live} onOpen={setOpenRef}>
+              <div className="space-y-3">
+                <WorkEpics epics={epics} selected={epicFilter} onSelect={setEpicFilter} onOpen={setOpenRef} />
+                <div className="overflow-x-auto pb-2">
+                  <WorkBoard items={boardItems} sessions={allSessions} agents={agents} meId={auth?.userId} onOpen={setOpenRef} />
+                </div>
               </div>
-            </div>
+            </WorkItemSearch>
           ) : view === 'graph' ? (
             selectedPlan ? (
               <WorkGraph items={planItems} edges={deps.data ?? []} liveIds={liveIds} onOpen={setOpenRef} />

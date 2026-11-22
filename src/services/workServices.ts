@@ -99,6 +99,24 @@ export async function fetchWorkItems(auth: IWorkAuth, product: string): Promise<
   return data.data;
 }
 
+/** Search the full product history, including work outside the board's recent-item window. */
+export async function searchWorkItems(auth: IWorkAuth, product: string, query: string, offset = 0): Promise<{ items: IWorkItem[]; total: number }> {
+  const term = query.trim().slice(0, 200);
+  const reference = /^w-?(\d+)$/i.exec(term);
+  if (reference) {
+    try {
+      const { data } = await apiClient.get<{ data: IWorkItem }>(`${BASE}/items/${encodeURIComponent(`W-${reference[1]}`)}?${params(auth)}`);
+      const items = data.data.product === product ? [data.data] : [];
+      return { items, total: items.length };
+    } catch (error) {
+      if ((error as { response?: { status?: number } }).response?.status === 404) return { items: [], total: 0 };
+      throw error;
+    }
+  }
+  const { data } = await apiClient.get<{ data: { items: IWorkItem[]; total: number } }>(`${BASE}/items?${params(auth, { product, q: term, limit: '50', offset: String(offset) })}`);
+  return data.data;
+}
+
 export async function fetchWorkSessions(auth: IWorkAuth, product?: string): Promise<IWorkSession[]> {
   const { data } = await apiClient.get<{ data: IWorkSession[] }>(`${BASE}/sessions?${params(auth, { product })}`);
   return data.data ?? [];
