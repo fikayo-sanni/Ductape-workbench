@@ -90,7 +90,8 @@ import {useListLayout, type ListLayout} from '@/hooks/useListLayout';
 import WorkTabContent from '../work/WorkTabContent';
 import { useWorkItems } from '@/hooks/useWork';
 import { workTotals } from '@/utils/workBoard';
-import {useProductDeployments} from '@/hooks/useProductDeployments';
+import {useDeploymentActivity} from '@/hooks/useDeploymentActivity';
+import {DeploymentActivityBadges} from '@/components/deploy/DeploymentActivity';
 import {totals as deploymentTotals, describeState} from '@/utils/deployments';
 import {useProductFocusStore} from '@/stores/product-focus-store';
 
@@ -433,7 +434,8 @@ export default function ProductTabContent({
 
   const product = fetchedProductData || initialProduct;
   // Counters for the Deployments entry in the side nav. Shares its query with the Deployments section, so the server is asked once.
-  const deploymentsQuery = useProductDeployments(product?.tag);
+  const deploymentActivity = useDeploymentActivity(product?.tag);
+  const deploymentsQuery = deploymentActivity.deployments;
   const deploymentStats = deploymentTotals(deploymentsQuery.data ?? []);
   // No counter when the server cannot say (for example it has no deploy support), rather than a misleading 0.
   const deploymentsKnown = !deploymentsQuery.isError && deploymentsQuery.data !== undefined;
@@ -2779,6 +2781,7 @@ export default function ProductTabContent({
               >
                 <Rocket className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0', activeCategory === 'deployments' ? 'text-primary' : 'text-grey-600')} />
                 <span className="flex-1 text-left">Deployments</span>
+                <DeploymentActivityBadges pendingPlans={deploymentActivity.pendingPlans} inProgress={deploymentActivity.inProgress} />
                 {deploymentsQuery.isLoading ? (
                   <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-grey-600" />
                 ) : deploymentsKnown ? (
@@ -3046,10 +3049,10 @@ export default function ProductTabContent({
                   'w-full flex items-center justify-center p-1.5 sm:p-2 rounded-lg transition-colors relative',
                   activeCategory === 'deployments' ? 'bg-primary/10 text-primary' : 'text-grey hover:bg-grey-100',
                 )}
-                title={deploymentsKnown ? `Deployments (${deploymentStats.total}${deploymentStats.attention > 0 ? `, ${deploymentStats.attention} need attention` : ''})` : 'Deployments'}
+                title={`Deployments · ${deploymentActivity.pendingPlans} pending plans · ${deploymentActivity.inProgress} in progress${deploymentStats.attention ? ` · ${deploymentStats.attention} need attention` : ''}`}
               >
                 <Rocket className={cn('h-4 w-4 sm:h-5 sm:w-5', activeCategory === 'deployments' ? 'text-primary' : 'text-grey-600')} />
-                {deploymentsKnown && deploymentStats.total > 0 ? (
+                {deploymentActivity.pendingPlans || deploymentActivity.inProgress ? <DeploymentActivityBadges pendingPlans={deploymentActivity.pendingPlans} inProgress={deploymentActivity.inProgress} collapsed /> : deploymentsKnown && deploymentStats.total > 0 ? (
                   <span
                     className={cn(
                       'absolute -top-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 text-white text-[8px] sm:text-[10px] rounded-full flex items-center justify-center font-medium',

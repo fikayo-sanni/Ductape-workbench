@@ -36,6 +36,7 @@ export function useProductPlans(productTag: string | undefined) {
     queryKey: ['deploy-plans', auth?.workspaceId, productTag],
     queryFn: () => fetchPlans(auth!, { product: productTag }),
     enabled: Boolean(auth && productTag),
+    refetchInterval: 15_000,
   });
 }
 
@@ -125,6 +126,7 @@ export function useCloudConnectionsForDeploy(enabled = true) {
 }
 
 const DEPLOY_KEYS = [
+  'deploy',
   'deployments', 'deployment-environments', 'deployment-journal', 'connection-deployments', 'connection-builds',
   'deploy-plans', 'deploy-plan', 'deploy-versions', 'deploy-functions', 'deploy-version-history', 'deploy-builds', 'deploy-policy-changes',
 ];

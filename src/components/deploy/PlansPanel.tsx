@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ListChecks, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useWorkDeployReviews } from '@/hooks/useWorkDeployReviews';
 import { useDeployAuth } from '@/hooks/useProductDeployments';
 import { useDeployCapabilities, useProductPlans } from '@/hooks/useDeployControls';
 import { capabilityNotices, controlError, describeIntent, describeStage, expiresIn, newPlanGate, planTotals, sortPlans, type IPlanRow } from '@/utils/deployControls';
@@ -16,10 +17,12 @@ const TINT: SectionTint = { bg: 'bg-primary/10', text: 'text-primary' };
 export default function PlansPanel({ productTag, reviewId, onReview }: { productTag: string; reviewId: string | undefined; onReview: (id: string | undefined) => void }) {
   const auth = useDeployAuth();
   const plans = useProductPlans(productTag);
+  const actionable = useWorkDeployReviews(productTag).plans;
   const caps = useDeployCapabilities();
   const [creating, setCreating] = useState(false);
 
-  const rows = useMemo(() => sortPlans(plans.data ?? []), [plans.data]);
+  // Keep older actionable plans visible even when the recent-history response is full.
+  const rows = useMemo(() => sortPlans([...new Map([...(actionable.data ?? []), ...(plans.data ?? [])].map((plan) => [plan.id, plan])).values()]), [plans.data, actionable.data]);
   const totals = planTotals(rows);
   const gate = newPlanGate(caps.data);
 
@@ -39,7 +42,7 @@ export default function PlansPanel({ productTag, reviewId, onReview }: { product
         flush
         action={
           <span className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => void plans.refetch()} disabled={plans.isFetching} aria-label="Refresh plans">
+            <Button variant="outline" size="sm" onClick={() => void Promise.all([plans.refetch(), actionable.refetch()])} disabled={plans.isFetching || actionable.isFetching} aria-label="Refresh plans">
               <RefreshCw className={plans.isFetching ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
             </Button>
             <ControlButton control={gate} size="sm" onClick={() => setCreating(true)} className="gap-2" showReason={false}><Plus className="h-3.5 w-3.5" />New plan</ControlButton>

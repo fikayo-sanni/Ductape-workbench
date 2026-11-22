@@ -4,13 +4,15 @@ import { ArrowLeft, Box, RefreshCw, Rocket, Search, Server, ShieldCheck } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchDeploymentJournal, type IDeployAuth } from '@/services/deployServices';
-import { useDeployAuth, useProductDeployments, useProductEnvironments } from '@/hooks/useProductDeployments';
+import { useDeployAuth, useProductEnvironments } from '@/hooks/useProductDeployments';
 import {
   deployErrorMessage, describePolicy, describeState, describeTarget, filterDeployments, formatTraffic, groupByEnvironment, isInFlight, rolloutView, shortHash, totals,
   type DeployableKind, type IDeployment, type IJournalEntry,
 } from '@/utils/deployments';
 import { DataTable, Panel, Pill, SectionEmpty, SectionError, SectionLoading, SectionPage, SegmentedTabs, StatTile, StatusDot, type SectionTint } from './ProductSection';
 import { deploymentIntents, type DeploymentIntent } from '@/utils/deployControls';
+import { useDeploymentActivity } from '@/hooks/useDeploymentActivity';
+import { DeploymentActivityNotice } from '@/components/deploy/DeploymentActivity';
 import { useDeployCapabilities } from '@/hooks/useDeployControls';
 import BuildsPanel from '@/components/deploy/BuildsPanel';
 import DeploymentPlanDialog from '@/components/deploy/DeploymentPlanDialog';
@@ -71,7 +73,8 @@ export default function DeploymentsResourceContent({ product, focus }: { product
   const [reviewId, setReviewId] = useState<string | undefined>();
   const [changing, setChanging] = useState<{ deployment: IDeployment; intent: DeploymentIntent } | null>(null);
   const [policyFor, setPolicyFor] = useState<string | null>(null);
-  const deployments = useProductDeployments(tag);
+  const activity = useDeploymentActivity(tag);
+  const deployments = activity.deployments;
   useEffect(() => {
     if (!focus) return;
     setView('deployments');
@@ -86,8 +89,8 @@ export default function DeploymentsResourceContent({ product, focus }: { product
     () => groupByEnvironment(visible, environments.data ?? []).filter((g) => env === 'all' || g.slug === env),
     [visible, environments.data, env],
   );
-  const refreshing = deployments.isFetching || environments.isFetching;
-  const refresh = () => void Promise.all([deployments.refetch(), environments.refetch()]);
+  const refreshing = deployments.isFetching || environments.isFetching || activity.plans.isFetching;
+  const refresh = () => void Promise.all([deployments.refetch(), environments.refetch(), activity.plans.refetch()]);
 
   const refreshButton = (
     <Button variant="outline" size="sm" className="gap-2" onClick={refresh} disabled={refreshing}>
@@ -95,6 +98,8 @@ export default function DeploymentsResourceContent({ product, focus }: { product
       <span className="hidden sm:inline">Refresh</span>
     </Button>
   );
+
+  const activityNotice = <DeploymentActivityNotice {...activity} onPlans={() => { setSelectedId(null); setView('plans'); }} onDeployments={() => { setSelectedId(null); setKind('all'); setEnv('all'); setSearch(''); setView('deployments'); }} />;
 
   if (selected && auth) {
     return (
@@ -113,6 +118,7 @@ export default function DeploymentsResourceContent({ product, focus }: { product
           </>
         }
       >
+        {activityNotice}
         <DeploymentDetail auth={auth} deployment={selected} onChange={(intent) => setChanging({ deployment: selected, intent })} />
         <DeploymentPlanDialog
           auth={auth} deployment={changing?.deployment ?? null} initialIntent={changing?.intent} onClose={() => setChanging(null)}
@@ -152,7 +158,7 @@ export default function DeploymentsResourceContent({ product, focus }: { product
       }
       toolbar={
         <div className="flex flex-wrap items-center gap-3">
-          <SegmentedTabs label="Section" value={view} onChange={setView} options={VIEWS} />
+          <SegmentedTabs label="Section" value={view} onChange={setView} options={VIEWS.map((option) => ({ ...option, label: option.id === 'plans' && activity.pendingPlans ? `Plans (${activity.pendingPlans} pending)` : option.id === 'deployments' && activity.inProgress ? `Deployments (${activity.inProgress} in progress)` : option.label }))} />
           {view === 'deployments' && all.length > 0 ? (
             <>
               <SegmentedTabs
@@ -167,6 +173,8 @@ export default function DeploymentsResourceContent({ product, focus }: { product
         </div>
       }
     >
+      {activityNotice}
+      {activity.plans.error ? <SectionError onRetry={() => void activity.plans.refetch()}>Could not check pending plans: {deployErrorMessage(activity.plans.error)}</SectionError> : null}
       {view === 'plans' && tag ? (
         <PlansPanel productTag={tag} reviewId={reviewId} onReview={setReviewId} />
       ) : view === 'versions' && tag ? (

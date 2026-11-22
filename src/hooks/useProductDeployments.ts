@@ -21,7 +21,7 @@ export function useProductDeployments(productTag: string | undefined) {
     queryKey: ['deployments', auth?.workspaceId, productTag],
     queryFn: () => fetchProductDeployments(auth!, productTag!),
     enabled: Boolean(auth && productTag),
-    refetchInterval: (query) => ((query.state.data ?? []).some((d) => isInFlight(d.state)) ? POLL_MS : false),
+    refetchInterval: (query) => ((query.state.data ?? []).some((d) => isInFlight(d.state)) ? POLL_MS : 30_000),
   });
 }
 
